@@ -15,6 +15,7 @@ For the returned result envelope, see [agrun_docs/result-schema.md](./result-sch
 For Web UI consumption and activity derivation, see [agrun_docs/webui-integration-contract.md](./webui-integration-contract.md).
 For a tutorial-style entry point (concepts, install, real chatbot), see [agrun_docs/usage-quickstart.md](./usage-quickstart.md).
 For every supported on/off knob in one page, see [agrun_docs/feature-toggles.md](./feature-toggles.md).
+For a visual end-user flow map of the runtime, see [FLOWCHART.md](../FLOWCHART.md).
 
 ## Public Surface
 

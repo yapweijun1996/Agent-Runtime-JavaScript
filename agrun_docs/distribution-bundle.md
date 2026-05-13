@@ -14,7 +14,7 @@ Internally this runs three steps, exposed as separate scripts so partial rebuild
 
 | Script | Tool | Output |
 |---|---|---|
-| `npm run build:lib` | rollup (`rollup.config.js`) | `dist/agrun.js`, `dist/agrun.md`, `dist/agrun_docs/`, `dist/CHANGELOG.md` |
+| `npm run build:lib` | rollup (`rollup.config.js`) | `dist/agrun.js`, `dist/README.md`, `dist/FLOWCHART.md`, `dist/agrun.md`, `dist/agrun_docs/`, `dist/CHANGELOG.md` |
 | `npm run build:browser` | vite (`examples/browser/vite.config.ts`) | `examples/browser/dist/` |
 | `node build/copy-browser-dist.cjs` | copy + secret guard | `dist/example/` |
 
@@ -25,7 +25,9 @@ The combined `build` script runs them in order and fails fast if any stage error
 ```text
 dist/
 ├── agrun.js          UMD bundle, ~1.7 MB. Single-file runtime + bundled skills + roles.
-├── agrun.md          Auto-generated consumer usage guide (README + quickstart + contracts).
+├── README.md         Repo README copied for first-read distribution context.
+├── FLOWCHART.md      Visual runtime logic map copied for end-user understanding.
+├── agrun.md          Auto-generated consumer usage guide (quickstart + contracts index).
 ├── agrun_docs/       Doc bundle referenced from agrun.md, with rewritten relative links.
 ├── CHANGELOG.md      Per-version changes.
 └── example/          Self-contained static site of the React + Vite browser example.
@@ -52,7 +54,7 @@ or as ES module:
 import { createRuntime } from "./dist/agrun.js";
 ```
 
-The contract is documented in `dist/agrun.md` (auto-generated) and the per-topic files under `dist/agrun_docs/`.
+Start with `dist/README.md` for project context, then `dist/FLOWCHART.md` for the visual runtime logic map. The runtime contract is documented in `dist/agrun.md` (auto-generated) and the per-topic files under `dist/agrun_docs/`.
 
 ### Path B — preview the runtime
 Engineers who want to evaluate what agrun can do open the example:
@@ -99,7 +101,7 @@ This means `dist/agrun.js` and `dist/example/assets/index-*.js` from the same `n
 
 ## Distribution policy
 
-This repo commits the **entire `dist/` tree** — `dist/agrun.js`, `dist/agrun.md`, `dist/agrun_docs/`, `dist/CHANGELOG.md`, **and `dist/example/`**. Reasons:
+This repo commits the **entire `dist/` tree** — `dist/agrun.js`, `dist/README.md`, `dist/FLOWCHART.md`, `dist/agrun.md`, `dist/agrun_docs/`, `dist/CHANGELOG.md`, **and `dist/example/`**. Reasons:
 
 - The stated distribution model is "share `dist/` with another engineer". A committed `dist/` means the deliverable is always exactly what the latest commit produced — no separate publish step, no risk of a stale demo paired with a fresh lib bundle.
 - The lib bundle and the demo share a build id (see "Build identity" above). Committing both atomically guarantees the pair stays in sync; committing only one would let them drift across PRs.

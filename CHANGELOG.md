@@ -46,7 +46,7 @@ Global memory policy work — host hooks + domain-neutral extractor.
 - Host hooks: `sensitivityFilter`, `promotionValidator` (fail-closed, 2s default timeout).
 - Design principle #6 "Stay Domain-neutral." ([agrun_docs/spec.md](./agrun_docs/spec.md))
 - Design principle #7 "Domain-neutral Memory Policy." ([agrun_docs/runtime-state-and-memory-architecture.md](./agrun_docs/runtime-state-and-memory-architecture.md))
-- "Multi-tenant Deployment Pattern" section in root [README.md](./agrun.md).
+- "Multi-tenant Deployment Pattern" section in root [README.md](./README.md).
 - "Global Memory Configuration" section in [agrun_docs/public-runtime-api.md](./agrun_docs/public-runtime-api.md).
 - `test/corpus/` redacted regression samples.
 
