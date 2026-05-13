@@ -34,31 +34,203 @@ External references:
 - [AWS Prescriptive Guidance: Build trust through identity, guardrails, and observability](https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-operationalizing-agentic-ai/focus-areas-trust.html)
 - [DORA: Continuous delivery capability](https://dora.dev/capabilities/continuous-delivery/)
 
-## Chart 1: Big Picture
+## Chart 1: Whole System Big Picture
 
 ```mermaid
 flowchart TD
-  User["End user"] --> Host["Host Web UI / chatbox"]
-  Host --> Input["Runtime input envelope"]
-  Input --> Runtime["agrun createRuntime / session.run"]
-  Runtime --> Context["Session context, memory, thread, goal anchor"]
-  Context --> Router["runLoop route decision"]
-  Router --> SkillLoop["Skill loop"]
-  Router --> ActionLoop["AI planner action loop"]
-  SkillLoop --> Result["Structured run result"]
-  ActionLoop --> Result
-  Result --> HostRender["Host renders answer, blocked approval, or error"]
-  Result --> Inspector["Inspector / debug panels from steps and runState"]
+  subgraph SourceDist["Source, Build, And Distribution"]
+    Source["src/ runtime source"]
+    Docs["README / FLOWCHART / agrun_docs"]
+    Build["npm run build"]
+    Dist["dist/agrun.js + dist docs + dist/example"]
+  end
+
+  subgraph Host["Host Product Surface"]
+    User["End user"]
+    HostUI["Web UI / chatbox"]
+    Settings["Provider settings, model, endpoints, auth mode"]
+    ApprovalUI["Approval UI"]
+    InspectorUI["Inspector, Debug Report, Support Bundle"]
+  end
+
+  subgraph PublicAPI["Public Runtime API"]
+    CreateRuntime["createRuntime(options)"]
+    RuntimeConfig["Runtime config: skills, agentSkills, policies, stores, hooks"]
+    RunAPI["runtime.run(input)"]
+    SessionAPI["createSession() / openSession(id) / session.run(input)"]
+    Getters["getState / getMemory / getRuntimeConfig / getActionRegistry"]
+  end
+
+  subgraph ContextHarness["Context And State Harness"]
+    Normalize["Normalize input envelope"]
+    SessionStore["Session store: IndexedDB or memory"]
+    ThreadRouter["Thread router: new task / follow-up / drill-down"]
+    Compaction["Prompt context and compaction"]
+    Memory["Session memory + global memory"]
+    GoalAnchor["Goal anchor and continuity snapshot"]
+    RunState["RunState: runId, phase, cycles, pendingApproval, diagnostics"]
+  end
+
+  subgraph Routing["runLoop Route Layer"]
+    RunLoop["runLoop()"]
+    ApprovalResume{"approval_resolution?"}
+    ProviderCheck{"provider present?"}
+    DirectSkill{"direct skill match?"}
+    SkillLoop["Skill loop"]
+    ActionLoop["AI planner action loop"]
+  end
+
+  subgraph PlannerProvider["Planner And Provider Layer"]
+    PlannerPrompt["Planner prompt projection: context + actions + observations"]
+    PlannerMode["native_tools or envelope mode"]
+    ProviderAdapter["OpenAI / Gemini provider adapter"]
+    Model["LLM model"]
+    PlannerDecision{"Planner decision: final, action, plan, clarification"}
+  end
+
+  subgraph ActionSurface["Action Registry And Capabilities"]
+    ActionRegistry["Action registry SSOT"]
+    AgentSkillCatalog["list/read/use agent skill"]
+    ExecuteSkillTool["execute_skill_tool"]
+    WebSearch["web_search"]
+    ReadUrl["read_url"]
+    TodoActions["TodoState actions"]
+    WorkspaceActions["Virtual workspace actions"]
+    RepoTools["optional repo_rg / repo_read_file"]
+    Clarify["ask_clarification"]
+  end
+
+  subgraph Gates["Policy, Safety, And Human Control"]
+    PolicyGate{"Action policy: allow / ask / deny"}
+    PendingApproval["pendingApproval + resumeToken"]
+    Denied["blocked or denied result"]
+  end
+
+  subgraph WorkState["Work Artifacts And Evidence"]
+    TodoState["TodoState progress audit"]
+    VirtualWorkspace["Browser-safe virtual draft workspace"]
+    ResearchContext["Research context: search passes, read sources, evidence"]
+    ToolContext["Tool context and last tool result"]
+    OODAE["OODAE cycle trace: observe, orient, decide, act, evaluate"]
+  end
+
+  subgraph Terminal["Terminal Result And UI Consumption"]
+    Observation["Structured observation"]
+    Continue{"continue?"}
+    Finalize["planner_finalize / direct_final / plan_synthesize"]
+    Publish["workspace_publish_candidate"]
+    Error["structured failure"]
+    Result["Canonical result: output, error, steps, runState, diagnostics"]
+    HostRender["Render answer, blocked approval, or error"]
+    Persist["Persist messages, memory, thread metadata, TodoState"]
+  end
+
+  Source --> Build
+  Docs --> Build
+  Build --> Dist
+  Dist --> HostUI
+  Dist --> InspectorUI
+
+  User --> HostUI
+  HostUI --> RunAPI
+  HostUI --> SessionAPI
+  Settings --> RuntimeConfig
+  RuntimeConfig --> CreateRuntime
+  CreateRuntime --> RunAPI
+  CreateRuntime --> SessionAPI
+  Getters --> InspectorUI
+
+  RunAPI --> Normalize
+  SessionAPI --> Normalize
+  Normalize --> ThreadRouter
+  ThreadRouter --> Compaction
+  Compaction --> Memory
+  Memory --> GoalAnchor
+  GoalAnchor --> RunState
+  SessionStore --> ThreadRouter
+  RunState --> RunLoop
+
+  RunLoop --> ApprovalResume
+  ApprovalResume -- yes --> PendingApproval
+  ApprovalResume -- no --> ProviderCheck
+  ProviderCheck -- no --> SkillLoop
+  ProviderCheck -- yes --> DirectSkill
+  DirectSkill -- yes --> SkillLoop
+  DirectSkill -- no --> ActionLoop
+
+  ActionRegistry --> PlannerPrompt
+  RunState --> PlannerPrompt
+  ToolContext --> PlannerPrompt
+  ResearchContext --> PlannerPrompt
+  TodoState --> PlannerPrompt
+  VirtualWorkspace --> PlannerPrompt
+  ActionLoop --> PlannerPrompt
+  PlannerPrompt --> PlannerMode
+  PlannerMode --> ProviderAdapter
+  ProviderAdapter --> Model
+  Model --> PlannerDecision
+
+  PlannerDecision -- final --> Finalize
+  PlannerDecision -- clarification --> Clarify
+  PlannerDecision -- action or plan --> PolicyGate
+  PolicyGate -- ask --> PendingApproval
+  PolicyGate -- deny --> Denied
+  PolicyGate -- allow --> ActionRegistry
+
+  ActionRegistry --> AgentSkillCatalog
+  ActionRegistry --> ExecuteSkillTool
+  ActionRegistry --> WebSearch
+  ActionRegistry --> ReadUrl
+  ActionRegistry --> TodoActions
+  ActionRegistry --> WorkspaceActions
+  ActionRegistry --> RepoTools
+  ActionRegistry --> Clarify
+
+  AgentSkillCatalog --> Observation
+  ExecuteSkillTool --> Observation
+  WebSearch --> ResearchContext
+  ReadUrl --> ResearchContext
+  TodoActions --> TodoState
+  WorkspaceActions --> VirtualWorkspace
+  RepoTools --> Observation
+  Clarify --> Observation
+  ResearchContext --> Observation
+  TodoState --> Observation
+  VirtualWorkspace --> Observation
+
+  Observation --> OODAE
+  OODAE --> RunState
+  Observation --> Continue
+  Continue -- yes --> ActionLoop
+  Continue -- no --> Result
+  Finalize --> Result
+  Publish --> Result
+  PendingApproval --> Result
+  Denied --> Result
+  Error --> Result
+  SkillLoop --> Result
+
+  Result --> HostRender
+  Result --> InspectorUI
+  Result --> Persist
+  Persist --> SessionStore
+  Persist --> Memory
   HostRender --> User
+  ApprovalUI --> SessionAPI
+  Result -- pendingApproval --> ApprovalUI
 ```
 
-Plain logic:
+How to read this chart:
 
-1. User talks to the Web UI.
-2. The host builds a runtime input envelope with prompt, provider, model, endpoint, and options.
-3. agrun adds session context, memory, thread state, and runtime config.
-4. `runLoop()` chooses the simple skill route or the planner/action route.
-5. The final output is not just text. It is a structured result with status, steps, diagnostics, memory, and trace data.
+1. Start from the left/top: source docs and runtime source build into `dist/`, which is what another engineer can receive.
+2. The host product owns UI, provider settings, auth mode, approval controls, and debug panels.
+3. agrun's public API turns a host request into normalized context, session/thread/memory state, and `runState`.
+4. `runLoop()` chooses approval resume, skill loop, or AI planner action loop.
+5. The planner sees context plus the action registry, then the policy gate decides allow/ask/deny before any action executes.
+6. Actions update structured work state: research evidence, TodoState, virtual workspace, tool context, and OODAE trace.
+7. The terminal result always returns one canonical envelope for UI rendering, Inspector, persistence, and debugging.
+
+The rest of this document expands the big chart into smaller focused charts.
 
 ## Chart 2: Runtime Creation And Public API
 
