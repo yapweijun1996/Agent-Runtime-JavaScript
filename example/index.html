@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        const SETTINGS_KEY = 'agrun.browser.settings.v1';
+        const root = document.documentElement;
+        let theme = 'system';
+
+        try {
+          const parsed = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || 'null');
+          if (parsed?.theme === 'dark' || parsed?.theme === 'light' || parsed?.theme === 'system') {
+            theme = parsed.theme;
+          }
+        } catch {}
+
+        root.dataset.theme = theme === 'system'
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : theme;
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>AI Chatbox Workspace</title>
+    <script type="module" crossorigin src="/assets/index-J-Ep46YO.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CeOWxyYZ.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

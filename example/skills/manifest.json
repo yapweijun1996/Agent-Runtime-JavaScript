@@ -1,0 +1,132 @@
+{
+  "skills": [
+    {
+      "checksum": "933bcb78ae138be5e99608482be9472a77d374a775f01f017e58b10070e25bf1",
+      "description": "Iterative research-write-verify loop for fact-grounded long-form reports. Length follows evidence depth, not a fixed target.",
+      "inputTypes": [
+        "research-report",
+        "research-question",
+        "topic",
+        "deep-analysis",
+        "comparison",
+        "market-scan",
+        "profile",
+        "brief"
+      ],
+      "name": "deep-research-writer",
+      "skillId": "deep-research-writer",
+      "sourcePath": "deep-research-writer/SKILL.md",
+      "tags": [
+        "research",
+        "deep-research",
+        "report",
+        "fact-check",
+        "iteration",
+        "long-form",
+        "evidence",
+        "citations",
+        "verify",
+        "cross-reference"
+      ],
+      "tools": [],
+      "version": ""
+    },
+    {
+      "checksum": "2fc799f37ca6541b0ac15323f93012fefce5308112c31f2c1978facc89be71bc",
+      "description": "Write and review code with a bug-first, correctness-first engineering standard.",
+      "inputTypes": [],
+      "name": "expert-coder",
+      "skillId": "expert-coder",
+      "sourcePath": "expert-coder/SKILL.md",
+      "tags": [],
+      "tools": [],
+      "version": ""
+    },
+    {
+      "checksum": "d99de752e047360416c53cfdac0ef82c4b656398aef984c2705b966e4b5d5bad",
+      "description": "Run long-form topic research with iterative search, source reading, evidence tracking, and a final report.",
+      "inputTypes": [
+        "topic",
+        "research-question",
+        "search-query",
+        "url",
+        "webpage",
+        "article",
+        "documentation"
+      ],
+      "name": "long-web-research",
+      "skillId": "long-web-research",
+      "sourcePath": "long-web-research/SKILL.md",
+      "tags": [
+        "web",
+        "search",
+        "read-url",
+        "research",
+        "long-run",
+        "report",
+        "evidence",
+        "citations",
+        "topic",
+        "investigation"
+      ],
+      "tools": [],
+      "version": ""
+    },
+    {
+      "checksum": "1e43c608c38fedeb75a9a664ed3bd516ef64eb531f4790abf57f66a0a0c41f93",
+      "description": "Search the web and read source URLs using the runtime web_search and read_url actions.",
+      "inputTypes": [
+        "url",
+        "webpage",
+        "article",
+        "news",
+        "documentation",
+        "search-query"
+      ],
+      "name": "web-research",
+      "skillId": "web-research",
+      "sourcePath": "web-research/SKILL.md",
+      "tags": [
+        "web",
+        "search",
+        "read-url",
+        "research",
+        "source",
+        "citation",
+        "current",
+        "latest",
+        "article"
+      ],
+      "tools": [],
+      "version": ""
+    },
+    {
+      "checksum": "b02e70a980f3889799d727881d861dcf6ed6b3a28b0d205c6195beaa823ae969",
+      "description": "Get the current local time or a requested timezone using a bundled browser-safe tool.",
+      "inputTypes": [],
+      "name": "worldtime_tz",
+      "skillId": "worldtime_tz",
+      "sourcePath": "worldtime_tz/SKILL.md",
+      "tags": [],
+      "tools": [
+        {
+          "description": "Return the current time for the local browser timezone or a requested timezone.",
+          "name": "worldtime_now",
+          "parameters": {
+            "properties": {
+              "timezone": {
+                "description": "An IANA timezone like Asia/Tokyo, or a common city alias like Tokyo or Singapore.",
+                "type": "string"
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "riskTier": 0
+        }
+      ],
+      "version": "",
+      "toolsPath": "worldtime_tz/tools.mjs"
+    }
+  ]
+}

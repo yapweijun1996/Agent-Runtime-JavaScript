@@ -1,0 +1,10 @@
+{
+  "name": "agent-runtime-javascript-dist",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:pages": "node scripts/build-pages.mjs",
+    "check": "node --check agrun.js && node --check scripts/build-pages.mjs && npm run build:pages"
+  }
+}
