@@ -1,5 +1,9 @@
 # Agent Harness Runtime Patterns
 
+> **Last reviewed:** 2026-05-14 against ADR-0023..0029.
+>
+> The pattern index below remains accurate as harness-engineering vocabulary. For the **current concrete embodiment** of the "harness is a tool provider, not a decision maker" principle — including the 8 push-mode sites that were deleted to enforce it — read [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) and [ADR-0026](./adr/0026-zero-residual-push-mode.md) before changing runtime decision flow.
+
 ## Purpose
 
 This document is the pattern index for evolving `agrun.js` as a browser-first
@@ -18,6 +22,8 @@ contract -> gate -> execute -> observe -> verify
 The runtime should not solve scale or safety by stuffing more instructions into
 the prompt. Capability should flow through explicit contracts, policy gates,
 retrieval/index layers, lazy loading, structured events, and verification.
+
+The runtime should **not make decisions on behalf of the AI** (push-mode). It exposes tools and read-only signals; the AI calls the tools and chooses the next action. See [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) for the architecture, [`audits/non-ai-first-2026-05-07.md`](./audits/non-ai-first-2026-05-07.md) for the 5-question test (Q1=runtime decides, Q2=prompt injection, Q3=prose authoring, Q4=regex-on-prompt, Q5=AI-fix fallback).
 
 ## Pattern Index
 

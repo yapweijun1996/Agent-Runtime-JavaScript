@@ -1,7 +1,7 @@
 {
   "skills": [
     {
-      "checksum": "933bcb78ae138be5e99608482be9472a77d374a775f01f017e58b10070e25bf1",
+      "checksum": "e6dd88a40717b74748f4180eaa7ed1f45a6d8331304d8cf56b94103e5237a97e",
       "description": "Iterative research-write-verify loop for fact-grounded long-form reports. Length follows evidence depth, not a fixed target.",
       "inputTypes": [
         "research-report",
@@ -43,7 +43,7 @@
       "version": ""
     },
     {
-      "checksum": "d99de752e047360416c53cfdac0ef82c4b656398aef984c2705b966e4b5d5bad",
+      "checksum": "d83b61811021faff07a8ffa2c22e9d3d882d1597052065e5ac40c419ddce746e",
       "description": "Run long-form topic research with iterative search, source reading, evidence tracking, and a final report.",
       "inputTypes": [
         "topic",

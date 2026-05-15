@@ -1,5 +1,9 @@
 # agrun.js Runtime Internal Architecture
 
+> **Last reviewed:** 2026-05-14 against ADR-0023..0029.
+>
+> This document captures the **high-level shape** of the runtime kernel and remains accurate at that level. For the current AI-first push-mode architecture, see [ADR-0023](./adr/0023-harness-as-tool-provider-only.md). For the deep subsystem layout (~140 files in `src/runtime/`), see [`planner-architecture.md`](./planner-architecture.md), [`research-and-evidence-model.md`](./research-and-evidence-model.md), [`todo-state-integration.md`](./todo-state-integration.md), and [`error-handling-and-recovery.md`](./error-handling-and-recovery.md). The "File Boundaries" section below shows the original MVP layout — actual `src/runtime/` is now much larger; treat it as historical.
+
 ## Purpose
 
 This document defines the internal runtime architecture of `agrun.js` for the MVP.
@@ -50,6 +54,21 @@ Runtime
  ├ RuntimeState
  └ Memory Store
 ```
+
+Post-MVP, the runtime kernel grew additional subsystems that remain owned by the runtime (as mechanism, not policy — see [ADR-0023](./adr/0023-harness-as-tool-provider-only.md)):
+
+```text
++ Planner (envelope + native_tools modes)
++ Action Registry (tier-based policy gates)
++ TodoState subsystem (autopilot guards, autostart, debug)
++ Virtual Workspace (AI-authored files)
++ Research subsystem (evidence graph, source authority, acceptance + recovery evaluators)
++ Session Store (IndexedDB + memory + resilient)
++ Cost Ledger (observability)
++ Drift Detector / Goal Anchor (read-only signals)
+```
+
+All of these are **tool providers and read-only signal emitters**. AI owns all decisions.
 
 The runtime now enters through one canonical `run()` execution path.
 That unified entry may internally route into skill execution, planner/action execution, or approval resume handling, but those are implementation subflows rather than separate public runtime architectures.
@@ -395,23 +414,18 @@ This is necessary to keep the runtime portable across browser environments witho
 
 ## File Boundaries
 
-Recommended module layout:
+Top-level boundary (still current):
 
 ```text
 src/
-  runtime/
-    create-runtime.js
-    runtime-loop.js
-    runtime-state.js
-    skill-router.js
-  memory/
-    memory-store.js
-  index.js
+  runtime/   ← runtime kernel + subsystems (~140 files; see subsystem docs)
+  session/   ← session record, compaction, IndexedDB store
+  memory/    ← append-only memory store
+  skills/    ← bundled built-in skills
+  index.js   ← public API surface
 ```
 
-`index.js` should export public API only.
-
-Runtime logic should remain inside `src/runtime/`.
+`index.js` exports public API only. Runtime logic stays inside `src/runtime/`. The original MVP four-file layout (`create-runtime.js` / `runtime-loop.js` / etc.) is **historical** — the kernel split into focused modules per subsystem (planner, action-loop, research, todo, virtual-workspace, etc.). See [`agrun_docs/research-subsystem-decomposition.md`](./research-subsystem-decomposition.md) for one example of how a subsystem is decomposed.
 
 ## Summary
 

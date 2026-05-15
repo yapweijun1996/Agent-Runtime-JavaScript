@@ -23,6 +23,13 @@ Activation:
   shaped roughly:
   `{ sourceMinimum, authorityCoverage, claimGraph, evidenceGaps,
      budgetStatus, finalMode }`. Read it before deciding the next action.
+- The runtime may also expose
+  `loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`.
+  If it says `forbiddenReadiness: "ready"`, you must not emit a clean
+  `finalReadiness.decision="ready"` on the next terminal attempt. Either
+  continue with targeted `web_search` / `read_url` / workspace expansion,
+  or publish `limited` with `evidenceSatisfied: false` and concrete
+  `remainingGaps`.
 - The runtime owns mechanism (authority scoring, duplicate detection,
   loop budget) and never writes prose. You own workflow, queries, action
   choice, and the final report text.
@@ -114,9 +121,24 @@ Process:
       audit says the candidate is shorter than a requested length and more
       user-facing material is available, continue with `workspace_append` or
       `workspace_insert_after_section` before trying publish again.
+    - `acceptanceConvergenceSignal` / `forbiddenReadiness=ready`: your
+      repeated `ready` decision conflicts with observable acceptance facts
+      such as source minimum or Research Gate. Do not retry clean `ready`.
+      Continue evidence work, or publish only `limited` with
+      `evidenceSatisfied: false` and non-empty `remainingGaps`.
+    - `todo_state_not_synced`: call `todo_run_next` or `todo_advance`
+      to mark completed work before any terminal action. Do not switch to
+      direct `finalize` to escape an unfinished TodoState.
     If `publish_attempts_blocked` reaches 3 or more, change the action
     sequence instead of repeating the same write -> finalize -> publish
     loop.
+    If publish is blocked for readiness, length, or TodoState reasons, do
+    not replace the publish path with direct `finalize`. Use the blocker
+    status as the next OODAE observation: expand with `workspace_append` /
+    `workspace_insert_after_section`, gather a named missing source with
+    `web_search` / `read_url`, or synchronize TodoState. Only publish
+    limited when the remaining blockers are concrete and recorded in
+    `requirementsAssessment.remainingGaps`.
 14. Use this `finalReadiness` shape for limited publish when the answer is
     short or evidence-thin. Adapt values from the latest `workspace_read`
     and read source facts; do not invent numbers:

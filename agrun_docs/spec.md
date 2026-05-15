@@ -1,5 +1,9 @@
 # agrun.js System Architecture
 
+> **Last reviewed:** 2026-05-14 against ADR-0023..0029.
+>
+> This document captures the **canonical system shape** and remains accurate at that level. The major AI-first refactor (ADR-0023, 5/8) deleted 8 push-mode sites from the runtime. For the current decision-ownership boundary between runtime (mechanism + signals) and AI (policy + decisions), read [ADR-0023](./adr/0023-harness-as-tool-provider-only.md). For the long-research mechanism/policy split, read [ADR-0012](./adr/0012-long-research-belongs-to-skill.md).
+
 ## Purpose
 
 This document is the canonical top-level system architecture for `agrun.js`.

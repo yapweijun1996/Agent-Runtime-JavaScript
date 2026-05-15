@@ -13,6 +13,8 @@ The repository keeps two truths in view:
 
 > Full documentation index: [agrun_docs/README.md](./agrun_docs/README.md) — all docs grouped by intent (tutorials, how-to, reference, explanation, decisions).
 
+**Need the big picture first?** Read [FLOWCHART.md](./FLOWCHART.md) — it starts with the whole agrun.js system map, then breaks down runtime setup, session flow, planner/action gates, workspace, TodoState, finalization, and UI consumption.
+
 **Consuming agrun.js in your app?** Read [agrun_docs/usage-quickstart.md](./agrun_docs/usage-quickstart.md) first — it covers what agrun.js is, the core concepts, install, a real chatbot in ~25 lines, when to use what, and common errors.
 
 **Working on agrun.js itself?** Read these in order:

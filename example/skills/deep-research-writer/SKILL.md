@@ -41,6 +41,14 @@ Do not skip these artifacts for a concrete long report unless the user
 explicitly asked for a shorter direct answer. The runtime will not
 create missing artifacts or advance TodoState for you.
 
+If the planner context exposes
+`loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`,
+read it before any terminal action. When it forbids clean `ready`, do
+not repeat `finalReadiness.decision="ready"`. Continue with targeted
+`web_search` / `read_url` / workspace revision, or publish only
+`limited` with `evidenceSatisfied: false` and concrete non-empty
+`remainingGaps`.
+
 ## Process
 
 ### PHASE A — Decompose the question
@@ -278,7 +286,8 @@ Then make an explicit AI-owned readiness decision:
     `textStats`.
   - If `declaredUnsatisfied` includes `length` or `requirement` and
     evidence supports more detail, revise/expand `final_candidate.md`
-    with `workspace_replace` before any next `finalize`.
+    with `workspace_append`, `workspace_insert_after_section`, or
+    `workspace_replace` before any next terminal action.
   - If `declaredUnsatisfied` includes `evidence`, continue searching or
     reading unless evidence is genuinely exhausted by the Phase F rules.
   - If you still finalize as `limited`, explicitly state why no more
@@ -293,6 +302,15 @@ Then make an explicit AI-owned readiness decision:
   selected workspace candidate directly to the user without a second
   finalizer LLM rewrite. The candidate content itself must include any
   needed Limitations and Sources sections.
+- If `workspace_publish_candidate` is blocked for readiness, length, or
+  TodoState sync, do not switch to direct `finalize` to escape the block.
+  Treat the block as the next observation: expand the workspace candidate,
+  gather the named missing evidence, correct `requirementsAssessment`, or
+  call `todo_run_next` / `todo_advance` before trying publish again.
+- If an acceptance convergence signal says `forbiddenReadiness=ready`,
+  the next terminal attempt cannot be clean `ready`. You must either do
+  more evidence/workspace work, or explicitly publish `limited` with
+  `evidenceSatisfied: false` and non-empty `remainingGaps`.
 - For research/report publish, include `finalReadiness` on
   `workspace_publish_candidate` with `requirementsAssessment` populated
   from the latest `workspace_read final_candidate.md` stats. If the

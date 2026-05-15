@@ -38,197 +38,346 @@ External references:
 
 ```mermaid
 flowchart TD
-  subgraph SourceDist["Source, Build, And Distribution"]
+  subgraph BuildDist["Source, Build, And Distribution"]
     Source["src/ runtime source"]
     Docs["README / FLOWCHART / agrun_docs"]
-    Build["npm run build"]
-    Dist["dist/agrun.js + dist docs + dist/example"]
+    Rollup["rollup build:lib"]
+    Vite["browser example build"]
+    CopyExample["copy-browser-dist secret guard"]
+    Dist["dist/agrun.js + dist/FLOWCHART.md + dist/agrun_docs + dist/example"]
   end
 
   subgraph Host["Host Product Surface"]
     User["End user"]
     HostUI["Web UI / chatbox"]
-    Settings["Provider settings, model, endpoints, auth mode"]
+    HostSettings["Provider, model, endpoints, auth mode"]
+    HostHooks["onStep / onToken / onPlannerDecision / onToolResult / onBeforeFinalize"]
+    AbortSignal["abortSignal"]
     ApprovalUI["Approval UI"]
     InspectorUI["Inspector, Debug Report, Support Bundle"]
   end
 
-  subgraph PublicAPI["Public Runtime API"]
+  subgraph RuntimeSetup["Runtime Creation And Config"]
     CreateRuntime["createRuntime(options)"]
-    RuntimeConfig["Runtime config: skills, agentSkills, policies, stores, hooks"]
-    RunAPI["runtime.run(input)"]
-    SessionAPI["createSession() / openSession(id) / session.run(input)"]
-    Getters["getState / getMemory / getRuntimeConfig / getActionRegistry"]
+    NormalizeConfig["normalizeRuntimeConfig"]
+    SkillSet["skills + fallbackSkill"]
+    AgentSkillIndex["agentSkillIndexProvider + manifests + Top-K ranking"]
+    RoleConfig["agent role / system prompt"]
+    Stores["memory store + session store"]
+    Policies["actionPolicy + skillPolicy + disabledActions"]
+    AdvancedConfig["plannerMode, nativeToolsFailurePolicy, selfCorrection, circuitBreaker, costPricing"]
+    DefaultRunOptions["defaultRunOptions"]
+    PublicGetters["getState / getMemory / getRuntimeConfig / getActionRegistry"]
   end
 
-  subgraph ContextHarness["Context And State Harness"]
-    Normalize["Normalize input envelope"]
-    SessionStore["Session store: IndexedDB or memory"]
-    ThreadRouter["Thread router: new task / follow-up / drill-down"]
-    Compaction["Prompt context and compaction"]
-    Memory["Session memory + global memory"]
-    GoalAnchor["Goal anchor and continuity snapshot"]
-    RunState["RunState: runId, phase, cycles, pendingApproval, diagnostics"]
+  subgraph SessionLayer["Session, Thread, And Context Harness"]
+    RunEntry["runtime.run or session.run"]
+    MergeRunOptions["merge defaultRunOptions + per-run options"]
+    ApprovalInput{"approval_resolution input?"}
+    PersistUser["append pending user message"]
+    ThreadIntent["extract / classify turn intent"]
+    ThreadRouter["routeTopic + thread hydration"]
+    SessionContext["prepare provider session context"]
+    Compaction["compaction window + context snapshot"]
+    SessionMemory["session memory"]
+    GlobalMemory["global memory recall / promotion"]
+    RunId["CAS run-N id generator"]
+    ScopedState["thread-scoped TodoState + research slice + evidence URLs"]
   end
 
-  subgraph Routing["runLoop Route Layer"]
-    RunLoop["runLoop()"]
-    ApprovalResume{"approval_resolution?"}
-    ProviderCheck{"provider present?"}
-    DirectSkill{"direct skill match?"}
-    SkillLoop["Skill loop"]
-    ActionLoop["AI planner action loop"]
+  subgraph RunLoopLayer["runLoop Routing"]
+    NormalizeInput["normalizeInput"]
+    CallerAbort["caller abort fast-fail"]
+    RunLoop["runLoop"]
+    ApprovalRoute{"approval_resolution?"}
+    ProviderRoute{"tool-loop provider request?"}
+    DirectSkillRoute{"direct skill canHandle?"}
+    SkillLoop["runSkillLoop: canHandle, orient, execute, evaluate"]
+    ProviderInputFailure["provider input failure result"]
+    ActionLoop["runActionLoop"]
   end
 
-  subgraph PlannerProvider["Planner And Provider Layer"]
-    PlannerPrompt["Planner prompt projection: context + actions + observations"]
-    PlannerMode["native_tools or envelope mode"]
+  subgraph ActionSession["Action Loop Session State"]
+    CreateActionSession["createActionLoopSession"]
+    RunState["createRunState + hydrateRunStateWithThread"]
+    PushStep["pushStep -> runtime events, metrics, step snapshots"]
+    CostLedger["cost ledger"]
+    ActionRegistry["createActionRegistry SSOT"]
+    AvailableActions["filterAvailableActions + disabledActions"]
+    VirtualWorkspaceEnsure["ensureVirtualWorkspace"]
+    GoalAnchor["captureOriginalQuery + goal anchor"]
+    SessionBudget["session budget, fingerprints, maxSteps"]
+  end
+
+  subgraph PlannerLoop["Planner And OODAE Loop"]
+    OODAE["OODAE: observe, orient, decide, act, evaluate"]
+    TodoAutostart["Todo autopilot autostart / plan-required / inspect-loop guards"]
+    PlannerPrompt["planner prompt: state + tools + observations + directives"]
+    PlannerMode["resolve native_tools or envelope"]
+    NativeTools["native tool schemas for OpenAI / Gemini"]
+    EnvelopeMode["JSON envelope prompt"]
     ProviderAdapter["OpenAI / Gemini provider adapter"]
-    Model["LLM model"]
-    PlannerDecision{"Planner decision: final, action, plan, clarification"}
+    CircuitBreaker["provider timeout, retry, circuit breaker"]
+    LLM["LLM response"]
+    PlannerRepair["parse, repair, invalid-output hook, fallback budget"]
+    Decision{"planner decision"}
   end
 
-  subgraph ActionSurface["Action Registry And Capabilities"]
-    ActionRegistry["Action registry SSOT"]
-    AgentSkillCatalog["list/read/use agent skill"]
-    ExecuteSkillTool["execute_skill_tool"]
+  subgraph PlanPath["Plan Decision Path"]
+    PlanValidate["validatePlan"]
+    PlanParallel["runPlanActions with max parallel"]
+    PlanPartial["partial_ok handling"]
+    PlanSynthesize["synthesize_per_action / plan_synthesize"]
+    PlanObservation["plan result observation"]
+  end
+
+  subgraph Gates["Validation, Policy, And Human Control"]
+    DecisionAvailability["action availability check"]
+    ArgsValidation["validateActionArgs + alias rewrite"]
+    Preflight["action preflight"]
+    SelfCorrection["selfCorrection retry observation"]
+    ActionPolicyGate{"actionPolicy allow / ask / deny"}
+    SkillPolicyGate{"skillPolicy allow / ask / deny"}
+    PendingApproval["pendingApproval + signed resumeToken"]
+    ApprovalResume["runApprovalResolution"]
+    Denied["blocked / denied result"]
+  end
+
+  subgraph Actions["Action Registry Capabilities"]
+    ActionDispatch["dispatch selected action"]
+    SkillCatalog["list_agent_skills / read_agent_skill / use_agent_skill"]
+    SkillTool["execute_skill_tool"]
     WebSearch["web_search"]
     ReadUrl["read_url"]
-    TodoActions["TodoState actions"]
-    WorkspaceActions["Virtual workspace actions"]
-    RepoTools["optional repo_rg / repo_read_file"]
+    TodoActions["todo_plan / advance / cancel / run_next / inspect"]
+    WorkspaceActions["workspace list/read/write/replace/append/insert/remove/finalize/publish"]
+    RepoActions["optional repo_rg / repo_read_file"]
     Clarify["ask_clarification"]
   end
 
-  subgraph Gates["Policy, Safety, And Human Control"]
-    PolicyGate{"Action policy: allow / ask / deny"}
-    PendingApproval["pendingApproval + resumeToken"]
-    Denied["blocked or denied result"]
+  subgraph WorkState["Mutable Run Work State"]
+    AgentSkillContext["agentSkillContext: active/last-read/catalog"]
+    ToolContext["toolContext: lastResult + history"]
+    ResearchContext["researchContext: search passes, ranked results, readSources"]
+    ResearchState["researchState + quality gate signals"]
+    EvidenceGraph["researchEvidenceGraph + reportLoop + researchWorkspace"]
+    TodoState["TodoState + terminal observation"]
+    VirtualWorkspace["virtualWorkspace draft files + final candidate"]
+    InquiryContext["inquiry / clarification context"]
+    FailureSignals["failedTools, actionFailureSignal, recoveryState, publishBlockSignal"]
   end
 
-  subgraph WorkState["Work Artifacts And Evidence"]
-    TodoState["TodoState progress audit"]
-    VirtualWorkspace["Browser-safe virtual draft workspace"]
-    ResearchContext["Research context: search passes, read sources, evidence"]
-    ToolContext["Tool context and last tool result"]
-    OODAE["OODAE cycle trace: observe, orient, decide, act, evaluate"]
+  subgraph Terminal["Terminal And Result Normalization"]
+    DirectFinal["direct_final from skill tool"]
+    PlannerFinal["planner_final"]
+    PlannerFinalize["planner_finalize -> runtime finalizer provider call"]
+    WorkspacePublish["workspace_publish_candidate direct terminal"]
+    ReadinessContract["AI finalReadiness observation + continuation/conflict signals"]
+    TerminalContract["terminal final contract"]
+    SourceNormalize["source/citation normalization + final response structure"]
+    QualitySignals["final response quality signals"]
+    FinishRun["finishRun + finalizeResult"]
+    Failure["structured failure / maxSteps / provider error"]
+    Result["canonical result: output, error, steps, runState, diagnostics"]
   end
 
-  subgraph Terminal["Terminal Result And UI Consumption"]
-    Observation["Structured observation"]
-    Continue{"continue?"}
-    Finalize["planner_finalize / direct_final / plan_synthesize"]
-    Publish["workspace_publish_candidate"]
-    Error["structured failure"]
-    Result["Canonical result: output, error, steps, runState, diagnostics"]
-    HostRender["Render answer, blocked approval, or error"]
-    Persist["Persist messages, memory, thread metadata, TodoState"]
+  subgraph PersistUI["Persistence And UI Consumption"]
+    HostRender["render answer / approval / failure"]
+    Activity["derive activity from steps"]
+    PersistAssistant["append assistant message"]
+    PersistMemory["append session memory + promote global memory"]
+    PersistThread["persist thread TodoState + research slice"]
+    Usage["token usage + lastRun"]
   end
 
-  Source --> Build
-  Docs --> Build
-  Build --> Dist
+  Source --> Rollup
+  Docs --> Rollup
+  Rollup --> Dist
+  Vite --> CopyExample
+  CopyExample --> Dist
   Dist --> HostUI
   Dist --> InspectorUI
 
   User --> HostUI
-  HostUI --> RunAPI
-  HostUI --> SessionAPI
-  Settings --> RuntimeConfig
-  RuntimeConfig --> CreateRuntime
-  CreateRuntime --> RunAPI
-  CreateRuntime --> SessionAPI
-  Getters --> InspectorUI
+  HostUI --> RunEntry
+  HostSettings --> CreateRuntime
+  HostHooks --> DefaultRunOptions
+  AbortSignal --> MergeRunOptions
+  CreateRuntime --> NormalizeConfig
+  NormalizeConfig --> SkillSet
+  NormalizeConfig --> AgentSkillIndex
+  NormalizeConfig --> RoleConfig
+  NormalizeConfig --> Stores
+  NormalizeConfig --> Policies
+  NormalizeConfig --> AdvancedConfig
+  NormalizeConfig --> DefaultRunOptions
+  PublicGetters --> InspectorUI
 
-  RunAPI --> Normalize
-  SessionAPI --> Normalize
-  Normalize --> ThreadRouter
-  ThreadRouter --> Compaction
-  Compaction --> Memory
-  Memory --> GoalAnchor
-  GoalAnchor --> RunState
-  SessionStore --> ThreadRouter
-  RunState --> RunLoop
+  RunEntry --> MergeRunOptions
+  MergeRunOptions --> ApprovalInput
+  ApprovalInput -- yes --> ApprovalResume
+  ApprovalInput -- no --> PersistUser
+  PersistUser --> ThreadIntent
+  ThreadIntent --> ThreadRouter
+  ThreadRouter --> ScopedState
+  ThreadRouter --> SessionContext
+  SessionContext --> Compaction
+  Compaction --> SessionMemory
+  GlobalMemory --> SessionMemory
+  SessionMemory --> RunId
+  ScopedState --> RunId
+  RunId --> NormalizeInput
 
-  RunLoop --> ApprovalResume
-  ApprovalResume -- yes --> PendingApproval
-  ApprovalResume -- no --> ProviderCheck
-  ProviderCheck -- no --> SkillLoop
-  ProviderCheck -- yes --> DirectSkill
-  DirectSkill -- yes --> SkillLoop
-  DirectSkill -- no --> ActionLoop
+  NormalizeInput --> CallerAbort
+  CallerAbort --> RunLoop
+  RunLoop --> ApprovalRoute
+  ApprovalRoute -- yes --> ApprovalResume
+  ApprovalRoute -- no --> ProviderRoute
+  ProviderRoute -- no --> SkillLoop
+  ProviderRoute -- yes --> DirectSkillRoute
+  DirectSkillRoute -- yes --> SkillLoop
+  DirectSkillRoute -- no --> ActionLoop
+  RunLoop --> ProviderInputFailure
 
+  ActionLoop --> CreateActionSession
+  CreateActionSession --> RunState
+  CreateActionSession --> PushStep
+  CreateActionSession --> CostLedger
+  CreateActionSession --> ActionRegistry
+  CreateActionSession --> AvailableActions
+  CreateActionSession --> VirtualWorkspaceEnsure
+  CreateActionSession --> GoalAnchor
+  CreateActionSession --> SessionBudget
+
+  RunState --> OODAE
   ActionRegistry --> PlannerPrompt
-  RunState --> PlannerPrompt
+  AvailableActions --> PlannerPrompt
+  RoleConfig --> PlannerPrompt
+  GoalAnchor --> PlannerPrompt
   ToolContext --> PlannerPrompt
   ResearchContext --> PlannerPrompt
+  ResearchState --> PlannerPrompt
+  EvidenceGraph --> PlannerPrompt
   TodoState --> PlannerPrompt
   VirtualWorkspace --> PlannerPrompt
-  ActionLoop --> PlannerPrompt
+  FailureSignals --> PlannerPrompt
+  TodoAutostart --> PlannerPrompt
+  OODAE --> PlannerPrompt
   PlannerPrompt --> PlannerMode
-  PlannerMode --> ProviderAdapter
-  ProviderAdapter --> Model
-  Model --> PlannerDecision
+  PlannerMode -- native_tools --> NativeTools
+  PlannerMode -- envelope --> EnvelopeMode
+  NativeTools --> ProviderAdapter
+  EnvelopeMode --> ProviderAdapter
+  ProviderAdapter --> CircuitBreaker
+  CircuitBreaker --> LLM
+  LLM --> PlannerRepair
+  PlannerRepair --> Decision
 
-  PlannerDecision -- final --> Finalize
-  PlannerDecision -- clarification --> Clarify
-  PlannerDecision -- action or plan --> PolicyGate
-  PolicyGate -- ask --> PendingApproval
-  PolicyGate -- deny --> Denied
-  PolicyGate -- allow --> ActionRegistry
+  Decision -- final --> PlannerFinal
+  Decision -- finalize --> PlannerFinalize
+  Decision -- plan --> PlanValidate
+  Decision -- clarify --> Clarify
+  Decision -- action --> DecisionAvailability
+  PlanValidate --> PlanParallel
+  PlanParallel --> PlanPartial
+  PlanPartial --> PlanSynthesize
+  PlanSynthesize --> PlanObservation
+  PlanObservation --> OODAE
+  PlanParallel --> WorkState
 
-  ActionRegistry --> AgentSkillCatalog
-  ActionRegistry --> ExecuteSkillTool
-  ActionRegistry --> WebSearch
-  ActionRegistry --> ReadUrl
-  ActionRegistry --> TodoActions
-  ActionRegistry --> WorkspaceActions
-  ActionRegistry --> RepoTools
-  ActionRegistry --> Clarify
+  DecisionAvailability --> ActionPolicyGate
+  ActionPolicyGate -- ask --> PendingApproval
+  ActionPolicyGate -- deny --> Denied
+  ActionPolicyGate -- allow --> SkillPolicyGate
+  SkillPolicyGate -- ask --> PendingApproval
+  SkillPolicyGate -- deny --> Denied
+  SkillPolicyGate -- allow --> ArgsValidation
+  ArgsValidation --> Preflight
+  Preflight --> SelfCorrection
+  SelfCorrection -- retry observation --> OODAE
+  SelfCorrection -- execute --> ActionDispatch
+  PendingApproval --> ApprovalUI
+  ApprovalUI --> ApprovalResume
+  ApprovalResume --> RunLoop
 
-  AgentSkillCatalog --> Observation
-  ExecuteSkillTool --> Observation
+  ActionDispatch --> SkillCatalog
+  ActionDispatch --> SkillTool
+  ActionDispatch --> WebSearch
+  ActionDispatch --> ReadUrl
+  ActionDispatch --> TodoActions
+  ActionDispatch --> WorkspaceActions
+  ActionDispatch --> RepoActions
+  ActionDispatch --> Clarify
+
+  SkillCatalog --> AgentSkillContext
+  SkillTool --> ToolContext
   WebSearch --> ResearchContext
   ReadUrl --> ResearchContext
+  ResearchContext --> ResearchState
+  ResearchState --> EvidenceGraph
   TodoActions --> TodoState
   WorkspaceActions --> VirtualWorkspace
-  RepoTools --> Observation
-  Clarify --> Observation
-  ResearchContext --> Observation
-  TodoState --> Observation
-  VirtualWorkspace --> Observation
+  RepoActions --> ToolContext
+  Clarify --> InquiryContext
+  WebSearch --> FailureSignals
+  ReadUrl --> FailureSignals
+  WorkspaceActions --> FailureSignals
 
-  Observation --> OODAE
-  OODAE --> RunState
-  Observation --> Continue
-  Continue -- yes --> ActionLoop
-  Continue -- no --> Result
-  Finalize --> Result
-  Publish --> Result
-  PendingApproval --> Result
-  Denied --> Result
-  Error --> Result
-  SkillLoop --> Result
+  AgentSkillContext --> OODAE
+  ToolContext --> OODAE
+  ResearchContext --> OODAE
+  ResearchState --> OODAE
+  EvidenceGraph --> OODAE
+  TodoState --> OODAE
+  VirtualWorkspace --> OODAE
+  InquiryContext --> OODAE
+  FailureSignals --> OODAE
+
+  OODAE -- continue --> PlannerPrompt
+  SkillLoop --> FinishRun
+  PlannerFinal --> ReadinessContract
+  PlannerFinalize --> ReadinessContract
+  PlanSynthesize --> ReadinessContract
+  WorkspaceActions --> WorkspacePublish
+  SkillTool --> DirectFinal
+  ReadinessContract --> TerminalContract
+  DirectFinal --> TerminalContract
+  WorkspacePublish --> TerminalContract
+  TerminalContract --> SourceNormalize
+  SourceNormalize --> QualitySignals
+  QualitySignals --> FinishRun
+  Failure --> FinishRun
+  Denied --> FinishRun
+  ProviderInputFailure --> FinishRun
+  FinishRun --> Result
 
   Result --> HostRender
+  Result --> Activity
   Result --> InspectorUI
-  Result --> Persist
-  Persist --> SessionStore
-  Persist --> Memory
+  Result --> PersistAssistant
+  Result --> PersistMemory
+  Result --> PersistThread
+  Result --> Usage
+  PersistAssistant --> Stores
+  PersistMemory --> SessionMemory
+  PersistThread --> ScopedState
+  Usage --> Stores
+  Activity --> InspectorUI
   HostRender --> User
-  ApprovalUI --> SessionAPI
-  Result -- pendingApproval --> ApprovalUI
 ```
 
 How to read this chart:
 
-1. Start from the left/top: source docs and runtime source build into `dist/`, which is what another engineer can receive.
-2. The host product owns UI, provider settings, auth mode, approval controls, and debug panels.
-3. agrun's public API turns a host request into normalized context, session/thread/memory state, and `runState`.
-4. `runLoop()` chooses approval resume, skill loop, or AI planner action loop.
-5. The planner sees context plus the action registry, then the policy gate decides allow/ask/deny before any action executes.
-6. Actions update structured work state: research evidence, TodoState, virtual workspace, tool context, and OODAE trace.
-7. The terminal result always returns one canonical envelope for UI rendering, Inspector, persistence, and debugging.
+1. Start at build/distribution: source, docs, Rollup, Vite, and copy-browser-dist produce the committed `dist/` package.
+2. The host owns product UI, provider/auth settings, approval UI, abort signals, and optional hooks.
+3. `createRuntime()` normalizes skills, agent skill index, policies, stores, planner mode, circuit breaker, cost pricing, Todo/workspace config, and default run options.
+4. Session turns merge default/per-run options, route threads, compact context, recall memory, hydrate Todo/research state, and claim a durable `run-N` id.
+5. `runLoop()` routes approval resumes, non-provider/direct-skill requests, provider input failures, or the AI action loop.
+6. The action loop builds `runState`, runtime events, action registry, available actions, virtual workspace, goal anchor, cost ledger, and session budget before every OODAE planner cycle.
+7. The planner may use native provider tools or envelope JSON; invalid output is repaired or surfaced as structured observation, not hidden runtime policy.
+8. Before execution, actions pass availability, action policy, skill policy, argument validation, preflight, and optional self-correction.
+9. Actions update work state: skills, tool results, research evidence, TodoState, virtual workspace, inquiry context, failure signals, and OODAE trace.
+10. Terminal paths normalize final text through readiness signals, terminal contract, source/citation handling, quality signals, `finishRun`, and session/global persistence.
 
 The rest of this document expands the big chart into smaller focused charts.
 
@@ -445,6 +594,125 @@ This is the main mental model:
 - Host owns UI, auth, and product integration.
 - If a bug is "the AI answered too weakly", the best harness fix is usually better observable contracts, skill workflow, or verifier feedback, not a hidden hardcoded answer rule.
 
+## Chart 11: Planner Native Tools And Envelope Fallback
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Loop as Action loop
+  participant Prompt as Planner prompt builder
+  participant Mode as Planner mode resolver
+  participant Provider as Provider adapter
+  participant Model as AI model
+  participant Repair as Parse / repair cascade
+  participant Hooks as Host hooks
+
+  Loop->>Prompt: collect request, context, tools, observations, directives
+  Prompt->>Prompt: project runState, TodoState, research, workspace, failures
+  Prompt->>Mode: resolve plannerMode and provider support
+  alt native_tools available
+    Mode->>Provider: send native tool schemas
+    Provider->>Model: model chooses final_answer or action tool call
+  else envelope mode
+    Mode->>Provider: send JSON envelope instructions
+    Provider->>Model: model returns planner envelope text
+  end
+  Model-->>Provider: response, usage, tool call or envelope
+  Provider-->>Repair: normalized planner payload
+  alt valid planner decision
+    Repair-->>Loop: final / action / plan / clarify / finalize
+  else invalid output
+    Repair->>Hooks: onInvalidPlannerOutput if configured
+    alt hook recovers
+      Hooks-->>Loop: recovered planner decision
+    else repair budget remains
+      Repair->>Provider: repair prompt with original failure
+      Provider->>Model: repaired response
+      Model-->>Repair: repaired payload
+    else no safe recovery
+      Repair-->>Loop: structured invalid-output observation or failure
+    end
+  end
+```
+
+Why this chart exists:
+
+- The planner is AI-first, but not uncontrolled.
+- Runtime owns prompt projection, tool schemas, parse/repair, failure observations, and host hooks.
+- The model owns the next decision: final, action, plan, clarify, or finalize.
+
+## Chart 12: Policy, Approval, And Resume Flow
+
+```mermaid
+flowchart TD
+  Decision["Planner selected action"] --> Available{"Action visible and enabled?"}
+  Available -- no --> Observation["structured unavailable-action observation"]
+  Available -- yes --> Args["validateActionArgs + alias rewrite"]
+  Args --> Preflight["action preflight"]
+  Preflight --> ActionPolicy{"actionPolicy decision"}
+  ActionPolicy -- deny --> Denied["blocked / denied result"]
+  ActionPolicy -- ask --> Pending["create pendingApproval"]
+  ActionPolicy -- allow --> SkillCheck{"skillPolicy needed?"}
+  SkillCheck -- no --> Execute["execute action"]
+  SkillCheck -- yes --> SkillPolicy{"skillPolicy decision"}
+  SkillPolicy -- deny --> Denied
+  SkillPolicy -- ask --> Pending
+  SkillPolicy -- allow --> Execute
+  Pending --> Token["signed resumeToken + approval metadata"]
+  Token --> HostUI["host renders approval UI"]
+  HostUI --> UserDecision{"user approves?"}
+  UserDecision -- deny --> ResumeDeny["runtime.run({ approval_resolution: deny })"]
+  UserDecision -- approve --> ResumeAllow["runtime.run({ approval_resolution: approve })"]
+  ResumeDeny --> Denied
+  ResumeAllow --> Resume["runApprovalResolution"]
+  Resume --> Execute
+  Execute --> ToolResult["tool result"]
+  ToolResult --> Observation
+  Observation --> PlannerLoop["next OODAE cycle"]
+```
+
+Important behavior:
+
+- Approval is part of runtime input/output, not only a UI modal.
+- The host controls the user interaction; agrun controls signed resume metadata and execution continuity.
+- Deny/ask/allow are observable control states, so the Inspector can explain why a tool did or did not run.
+
+## Chart 13: Terminal Finalizer And Result Contract
+
+```mermaid
+flowchart TD
+  TerminalChoice{"Terminal path selected"} --> DirectFinal["direct_final from skill tool"]
+  TerminalChoice --> PlannerFinal["planner_final"]
+  TerminalChoice --> PlannerFinalize["planner_finalize"]
+  TerminalChoice --> PlanSynthesize["plan_synthesize"]
+  TerminalChoice --> WorkspacePublish["workspace_publish_candidate"]
+
+  PlannerFinalize --> FinalizerProvider["finalizer provider call"]
+  PlanSynthesize --> FinalizerProvider
+  FinalizerProvider --> FinalizerDraft["AI-authored final draft"]
+
+  DirectFinal --> Contract["shared terminal final contract"]
+  PlannerFinal --> Contract
+  FinalizerDraft --> Contract
+  WorkspacePublish --> Contract
+
+  Contract --> ProtocolAudit{"protocol conflict?"}
+  ProtocolAudit -- yes --> ContinueSignal["one-time continuation / contract audit signal"]
+  ContinueSignal --> PlannerLoop["return to OODAE loop"]
+  ProtocolAudit -- no --> SourceNormalize["normalize sources, citations, suffix contracts"]
+  SourceNormalize --> QualitySignals["record final quality/readiness signals"]
+  QualitySignals --> FinishRun["finishRun + finalizeResult"]
+  FinishRun --> Result["canonical result envelope"]
+  Result --> Persist["persist assistant message, memory, thread state, usage"]
+  Result --> UI["host renders completed / blocked / failed"]
+```
+
+Key contract:
+
+- Finalization should normalize structure and protocol facts.
+- Runtime should not secretly rewrite weak content into a better-looking answer.
+- If AI readiness conflicts with observed protocol facts, agrun should surface the conflict as a signal or continuation path.
+
 ## Source Reading Map
 
 Start here if you want to inspect the code after reading the charts:
@@ -472,9 +740,10 @@ Start here if you want to inspect the code after reading the charts:
 
 1. Read Chart 1 and Chart 10 to understand the boundary between host, runtime, and AI.
 2. Read Chart 4 and Chart 5 to understand how a request becomes either a skill loop or an AI planner loop.
-3. Read Chart 6 to understand what the AI planner is allowed to do.
-4. Read Chart 7 and Chart 8 to understand long-running, long-answer work.
-5. Read Chart 9 before building UI, because the UI should render from the canonical result contract.
+3. Read Chart 11 and Chart 12 to understand planner modes, repair, policy, approval, and resume.
+4. Read Chart 6 to understand what the AI planner is allowed to do.
+5. Read Chart 7 and Chart 8 to understand long-running, long-answer work.
+6. Read Chart 9 and Chart 13 before building UI, because the UI should render from the canonical result and terminal contract.
 
 ## Current Known Limitation
 

@@ -1,5 +1,14 @@
 # Planner Architecture
 
+> **Last reviewed:** 2026-05-14 against ADR-0023..0029.
+>
+> Sections marked **HISTORICAL** describe push-mode behavior deleted by [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) (5/8) and [ADR-0026](./adr/0026-zero-residual-push-mode.md) (5/9). The runtime no longer:
+> - runs a strict-retry 3rd API call (Stage 3 below)
+> - applies `applyPlannerGuardrails` / `finalize_to_clarify` / `clarify_to_finalize` rewrites (Planner Guardrails section below)
+> - vetoes AI's finalize via `final-response-quality.js` or `research-coverage-guard.js`
+>
+> When AI's output is bad, AI's output is bad. The harness exposes signals (`runState.actionFailureSignal`, `runState.finalResponseQuality.lastIssues`, `runState.sessionBudget`); AI decides next move. See [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) for full list.
+
 ## Purpose
 
 This document describes the planner system that drives action selection in the agrun.js action loop. The planner is the LLM-backed decision engine that chooses what action to take next during multi-cycle execution.
@@ -117,7 +126,7 @@ When no skill is active yet, the catalog remains compact, but tools with enum-co
 
 ### Terminal Envelope Policy
 
-`buildEnvelopeLines()` is the single source of truth for terminal envelope examples shown to the planner, repair request, and strict retry prompt.
+`buildEnvelopeLines()` is the single source of truth for terminal envelope examples shown to the planner and repair request. (The strict-retry path was deleted in ADR-0023.)
 
 By default, agrun keeps both terminal shapes available:
 
@@ -210,24 +219,19 @@ When the planner returns an invalid or unparseable response, the runtime attempt
 
 Before Stage 2, hosts may install `onInvalidPlannerOutput(rawText, parseError, runState)`. If the hook returns a valid planner envelope, the runtime uses it and skips the repair LLM call. If it returns `null` / `undefined`, throws, or returns an invalid envelope, the normal repair cascade continues.
 
-### Stage 3: Strict Retry (`buildStrictRetryPrompt`)
+### ~~Stage 3: Strict Retry~~ (HISTORICAL — deleted in ADR-0023)
 
-- Constructs a new prompt with:
-  - The original context (goal, topic, evidence, available actions)
-  - Envelope format examples for each available action, using the shared terminal envelope policy
-  - Explicit instructions to return valid JSON only
-- Sends as a fresh provider request
+The strict-retry 3rd API call (`buildStrictRetryPrompt`) was deleted in [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) (5/8). It was push-mode: runtime authored a hardcoded "stricter" prompt asking the LLM to retry with extra constraints. When envelope repair (Stage 2) returns null, the null decision now surfaces — AI re-plans next cycle on its own.
 
-### Stage 4: Fallback to Web Search
+### Stage 3: Fallback to Web Search (bounded, non-research only)
 
-If all repair stages fail and conditions are met:
+If repair fails and conditions are met:
 
-- `shouldFallbackToWebSearch()` checks:
-  - An active goal or query exists
-  - `web_search` is in the available actions
-  - No direct tool candidate exists
-  - No pending clarification
-- Creates a `web_search` action decision with an inferred query
+- `shouldFallbackToWebSearch()` checks active goal/query, `web_search` availability, no pending clarification.
+- `isResearchQualityGateRequired` and `isRecoveryBudgetExhausted` block the fallback when long-research is active or recovery budget (2 retries) is spent.
+- Creates a `web_search` action decision with an inferred query.
+
+Note: this remains the last bounded push-mode site (V1 in the non-ai-first audit). It only fires for non-research simple traffic and is bounded by a 2-retry budget. Long-term goal is to delete it entirely.
 
 ```text
 Planner Response
@@ -240,44 +244,16 @@ onInvalidPlannerOutput? → valid? → use decision
     ↓ (invalid)
 Envelope Repair Request → valid? → use decision
     ↓ (invalid)
-Strict Retry → valid? → use decision
-    ↓ (invalid)
-Fallback to web_search? → yes → use fallback
+Fallback to web_search (non-research, within budget)? → yes → use fallback
     ↓ (no)
-Return null → handled as planner_invalid_action
+Return null → AI re-plans next cycle
 ```
 
-## Planner Guardrails
+## ~~Planner Guardrails~~ (HISTORICAL — deleted 2026-05-09)
 
-After the planner returns a valid decision, guardrails may override it. These are runtime-level safety nets that prevent suboptimal planner behavior.
+`applyPlannerGuardrails` and the `finalize_to_clarify` / `clarify_to_finalize` decision rewriters were deleted on 2026-05-09 (see in-source tombstone at [action-loop-session-loop.js:200](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/action-loop-session-loop.js)). They rewrote AI's decision (finalize↔clarify) based on hardcoded English instruction strings and magic state-quality heuristics. AI's decision now flows directly. If AI emits unsafe finalize or unnecessary clarify, AI sees the consequences via observation/turn outcomes and re-plans.
 
-### ~~`prefer_direct_tool`~~ (Removed)
-
-Removed in the AI-first refactor (AGRUN-129). The planner now decides all tool selection via native tool calling. There are no hardcoded regex shortcuts — the planner sees all available tools (including `execute_skill_tool` for bundled skills like `worldtime_tz`) and picks the appropriate one.
-
-### `finalize_to_clarify`
-
-**Trigger**: Planner chose `finalize` but:
-- Goal quality is not `stable`, OR
-- Evidence state is `none`
-- AND no active agent skill exists
-- AND a pending clarification exists
-
-**Override**: Replace with a `clarify` decision using the open ambiguity text.
-
-**Why**: Prevents the runtime from generating a final answer when it doesn't have enough information.
-
-### `clarify_to_finalize`
-
-**Trigger**: Planner chose `clarify` but:
-- A pending clarification exists (already asked before)
-- Evidence state is not `none`
-- Open ambiguity text exists
-- Prompt signal is `low` (simple request)
-
-**Override**: Replace with a `finalize` decision with an instruction to answer broadly.
-
-**Why**: Prevents infinite clarification loops when the runtime already has usable evidence and the ambiguity is inferable.
+The `prefer_direct_tool` shortcut was removed earlier in AGRUN-129 — planner sees all tools and picks via native tool calling.
 
 ## Planner Modes
 
@@ -453,7 +429,7 @@ What agrun.js DOES use:
 - **OODAE loop** = ReAct (reasoning + acting + observing interleaved)
 - **TodoState + autopilot** = Plan-and-Solve (structured decomposition before tool use)
 - **Evidence graph + evidence pack** = ReWOO (decoupled evidence gathering)
-- **`final-response-quality.js` + `research-coverage-guard.js`** = Basic Reflection (finalize-time critique gate)
+- **`final-response-quality.js` + `research-coverage-guard.js`** = Read-only signal reflection (post-ADR-0023: results surface to AI via `runState.finalResponseQuality.lastIssues`; runtime no longer vetoes)
 - **Session memory + tier policy** = bounded Reflexion (lessons learned without unbounded memory growth)
 
 These are **fused into one loop**, not selected by a router. New patterns from the literature should be evaluated against this loop first: if the capability is already implicit, do not add a new module just to name it.
