@@ -89,6 +89,8 @@ Per-version change summaries. See [../CHANGELOG.md](../CHANGELOG.md) for the agg
 
 MCP Chrome / browser-runtime verification runs. Each file is a single-scoped run with scope-statement.
 
+- [Long Task Lab TNO 3000-Word Report 2026-05-21](live-tests/long-task-lab-tno-3000-report-2026-05-21.md) — Chrome DevTools MCP real OpenAI Long Task Lab run for a 3000-word TNO Systems PTE LTD report; completed through workspace publish with 3149 inspector words and source-quality HBR.
+- [Long Task Lab Current Agent Inspector 2026-05-21](live-tests/long-task-lab-current-agent-inspector-2026-05-21.md) — Long Task Lab Debug tab Current Agent Activity, API exchange records, custom-provider timeout propagation, and Chrome DevTools completion proof.
 - [Node 3000 Gemini Flash-Lite Workspace Patch 2026-05-20](live-tests/node-agrun-3000-gemini-flash-lite-workspace-patch-2026-05-20.md) — Node 3000-word live evidence for workspace patch redirect, normalize_headings, Flash-Lite limited publish, and Gemini 3.5 ready control.
 - [Browser Read URL Live Smoke 2026-05-01](live-tests/browser-read-url-live-smoke-2026-05-01.md) — Browser read_url service live smoke verifies Network POST /read-url 200 and Healthy Run Inspector classification.
 - [Native Tools Readiness 2026-04-29](live-tests/native-tools-readiness-2026-04-29.md) — AGRUN-213e native tools default-readiness live provider checklist.

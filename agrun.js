@@ -4628,7 +4628,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "b73743323"
+      "5286ca958"
         
     );
   }
@@ -11810,7 +11810,8 @@
       return {
         enabled: false,
         maxFileChars: DEFAULT_MAX_FILE_CHARS$1,
-        maxOperations: DEFAULT_MAX_OPERATIONS
+        maxOperations: DEFAULT_MAX_OPERATIONS,
+        requirePublishPath: false
       };
     }
     const source = value && typeof value === "object" ? value : {};
@@ -11822,7 +11823,8 @@
     return {
       enabled,
       maxFileChars: readPositiveInteger$f(source.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1,
-      maxOperations: readPositiveInteger$f(source.maxOperations) || DEFAULT_MAX_OPERATIONS
+      maxOperations: readPositiveInteger$f(source.maxOperations) || DEFAULT_MAX_OPERATIONS,
+      requirePublishPath: source.requirePublishPath === true
     };
   }
 
@@ -17113,10 +17115,39 @@
     const protocolRequiredAction = isPublishProtocolRepairReason(publishProtocolReason)
       ? protocolRecoveryAction
       : "";
+    const emptyFinalCandidate = hasEmptyFinalCandidateDeficit(observableDeficits, runState);
 
     if (hardVetoActive && (hasProductDeficit || hasReadinessOrTerminalLoop || terminalLoopOnly)) {
       if (protocolRequiredAction) {
         return [protocolRequiredAction];
+      }
+      if (emptyFinalCandidate) {
+        if (hasSource || (hasReadinessOrTerminalLoop && !hasLength && !hasTodo)) {
+          if (!sourceHasUnreadCandidates && !readOnlyPlanningForbiddenActions.has("web_search")) {
+            actions.add("web_search");
+          }
+          actions.add("read_url");
+        }
+        actions.add("workspace_write");
+        actions.add("workspace_replace");
+        if (hasLength) {
+          actions.add("workspace_append");
+          actions.add("workspace_insert_after_section");
+        }
+        if (hasTodo) {
+          actions.add("todo_advance");
+          actions.add("todo_run_next");
+          actions.add("todo_cancel");
+        }
+        return filterReadOnlyPlanningChurnActions(
+          Array.from(actions),
+          {
+            deficits,
+            forbiddenActions: readOnlyPlanningForbiddenActions,
+            protocolRequiredAction,
+            sourceHasUnreadCandidates
+          }
+        ).slice(0, 16);
       }
       if (hasStructure && !hasSource && !hasLength && hasTodo) {
         actions.add("todo_advance");
@@ -17256,6 +17287,39 @@
         sourceHasUnreadCandidates
       }
     ).slice(0, 16);
+  }
+
+  function hasEmptyFinalCandidateDeficit(observableDeficits, runState) {
+    const structure = observableDeficitsRecord(observableDeficits, "structure");
+    const issueCodes = readStringArray$3(structure && structure.issueCodes);
+    if (issueCodes.some((code) => code === "candidate_empty" || code === "missing_candidate_content")) {
+      return true;
+    }
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    if (!workspace) return false;
+    const quality = readRecord(workspace && workspace.quality);
+    const finalCandidateStatus = readString$1l(quality && quality.finalCandidateStatus);
+    if (finalCandidateStatus === "candidate_empty" || finalCandidateStatus === "missing_candidate_content") {
+      return true;
+    }
+    const path = readFinalCandidatePathFromWorkspace(runState);
+    const files = workspace && workspace.files && typeof workspace.files === "object"
+      ? workspace.files
+      : null;
+    const file = files && path ? files[path] : null;
+    if (file && typeof file === "object") {
+      const content = typeof file.content === "string" ? file.content : "";
+      const stats = readRecord(file && file.textStats);
+      const chars = readNumber$b(stats && stats.chars);
+      const words = readNumber$b(stats && stats.words);
+      return content.trim().length === 0 && chars === 0 && words === 0;
+    }
+    return issueCodes.includes("candidate_empty");
+  }
+
+  function observableDeficitsRecord(observableDeficits, key) {
+    const source = readRecord(observableDeficits);
+    return readRecord(source && source[key]);
   }
 
   function isWorkspaceMutationGrowthHardVetoActive(runState) {
@@ -31256,6 +31320,9 @@
     const workspace = ensureWorkspace(context);
     const file = readWorkspaceFinalCandidate$1(workspace, args && args.path);
     const candidateText = readString$M(file.content);
+    const publishProtocol = inspectWorkspacePublishProtocol(workspace, file.path);
+    const finalReadiness = normalizeFinalReadiness(args && (args.finalReadiness || args.readiness));
+    const researchPublishRequired = isResearchPublishReadinessRequired(context);
     // Empty content is a legitimate I/O guard, not a behavioral push:
     // there is literally nothing to publish. AI-first decisions about
     // WHEN to publish (finalize protocol, read-after-finalize, readiness
@@ -31265,11 +31332,17 @@
     // agrun_docs/live-tests/workspace-readiness-ssot-2026-05-11.md for
     // the live e2e that documented the previous push-mode behavior.
     if (!candidateText) {
-      throw new Error(`workspace_publish_candidate: ${file.path || "final candidate"} is empty`);
+      return createWorkspacePublishBlockedResult({
+        context,
+        file,
+        finalReadiness,
+        message: `workspace_publish_candidate cannot publish ${file.path || "final candidate"} because it is empty. Draft user-facing content with workspace_write/workspace_append, or pass the non-empty draft path to workspace_finalize_candidate and workspace_publish_candidate before publishing.`,
+        publishProtocol,
+        readinessAudit: null,
+        researchPublishRequired,
+        status: "missing_candidate_content"
+      });
     }
-    const publishProtocol = inspectWorkspacePublishProtocol(workspace, file.path);
-    const finalReadiness = normalizeFinalReadiness(args && (args.finalReadiness || args.readiness));
-    const researchPublishRequired = isResearchPublishReadinessRequired(context);
     if (shouldRefreshResearchGateBeforePublish(finalReadiness)) {
       refreshResearchReportLoopGate(context && context.runState, context && context.runtimeConfig && context.runtimeConfig.researchReportLoop, {
         actionName: "workspace_publish_candidate",
@@ -63817,6 +63890,8 @@ ${user}:`]
     const sessionContext = readSessionContext$2(rawInput);
     const parts = readInputParts(rawInput);
     const conversation = readConversation(rawInput);
+    const signal = readAbortSignal$1(rawInput.signal);
+    const timeoutMs = readTimeoutMs(rawInput);
     const reasoningEffort = readReasoningEffort(rawInput);
     const reasoningSummary = readReasoningSummary(rawInput);
     const geminiThinkingConfig = readGeminiThinkingConfig(rawInput, providerId);
@@ -63870,8 +63945,10 @@ ${user}:`]
       provider,
       searchProvider,
       sessionContext,
+      signal,
       streamEndpoint,
       systemPrompt,
+      timeoutMs,
       previousResponseId,
       geminiThinkingConfig,
       reasoningEffort,
@@ -63882,6 +63959,20 @@ ${user}:`]
       webSearchEndpoint,
       webSearchModel
     };
+  }
+
+  function readAbortSignal$1(value) {
+    if (!value || typeof value !== "object") return null;
+    if (typeof value.aborted !== "boolean") return null;
+    if (typeof value.addEventListener !== "function") return null;
+    return value;
+  }
+
+  function readTimeoutMs(source) {
+    if (!Object.prototype.hasOwnProperty.call(source, "timeoutMs")) return null;
+    const value = readOptionalNumber(source, ["timeoutMs"]);
+    if (value == null || value <= 0) return null;
+    return Math.floor(value);
   }
 
   function readApiVariant(source, providerId) {
@@ -71989,10 +72080,10 @@ ${user}:`]
     if (!runState || !hasWorkspacePublishAction(session)) return null;
     const candidate = readWorkspaceCandidate(runState.virtualWorkspace);
     const draft = candidate ? null : readWorkspaceDraft(runState.virtualWorkspace);
-    const longFormContract = !candidate && !draft
-      ? readExplicitLongFormWorkspaceContract(session, runState)
+    const workspaceContract = !candidate && !draft
+      ? readExplicitWorkspacePublishContract(session, runState)
       : null;
-    if (!candidate && !draft && !longFormContract) return null;
+    if (!candidate && !draft && !workspaceContract) return null;
 
     const actionName = readString$1I(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const signal = {
@@ -72002,19 +72093,23 @@ ${user}:`]
       draftStats: draft ? cloneValue(draft.stats) : null,
       finalCandidatePath: candidate && candidate.path || "final_candidate.md",
       finalCandidateStats: candidate ? cloneValue(candidate.stats) : null,
-      reason: longFormContract ? "explicit_long_form_length_contract" : "workspace_artifact_exists",
-      requestedLength: longFormContract ? cloneValue(longFormContract.requestedLength) : null,
+      reason: workspaceContract ? workspaceContract.reason : "workspace_artifact_exists",
+      requestedLength: workspaceContract && workspaceContract.requestedLength
+        ? cloneValue(workspaceContract.requestedLength)
+        : null,
       kind: "workspace_publish_path_required",
       source: sourceLabel,
       status: "emitted"
     };
     const message = [
-      longFormContract
-        ? `Workspace publish path required: the user requested a long-form answer around ${longFormContract.requestedLength.value} ${longFormContract.requestedLength.unit}.`
+      workspaceContract
+        ? workspaceContract.reason === "explicit_long_form_length_contract"
+          ? `Workspace publish path required: the user requested a long-form answer around ${workspaceContract.requestedLength.value} ${workspaceContract.requestedLength.unit}.`
+          : "Workspace publish path required: this host configured the run to publish through the virtual workspace."
         : candidate
           ? "Workspace publish path required: a virtual workspace final candidate already exists."
           : "Workspace publish path required: a virtual workspace draft exists but final_candidate.md is missing.",
-      longFormContract
+      workspaceContract
         ? "Create or expand the answer in the virtual workspace, then use workspace_finalize_candidate, workspace_read, and workspace_publish_candidate. If evidence cannot be recovered, publish a limited workspace candidate with concrete remainingGaps."
         : candidate
           ? "Use workspace_finalize_candidate, workspace_read, TodoState sync if applicable, then workspace_publish_candidate."
@@ -72027,7 +72122,9 @@ ${user}:`]
       draft: draft ? cloneValue(draft) : null,
       kind: "workspace_publish_path_required",
       ok: false,
-      requestedLength: longFormContract ? cloneValue(longFormContract.requestedLength) : null,
+      requestedLength: workspaceContract && workspaceContract.requestedLength
+        ? cloneValue(workspaceContract.requestedLength)
+        : null,
       signal: cloneValue(signal),
       status: "emitted"
     };
@@ -72055,6 +72152,32 @@ ${user}:`]
       signal
     });
     return { action: "continue" };
+  }
+
+  function readExplicitWorkspacePublishContract(session, runState) {
+    const longFormContract = readExplicitLongFormWorkspaceContract(session, runState);
+    if (longFormContract) {
+      return {
+        reason: "explicit_long_form_length_contract",
+        requestedLength: longFormContract.requestedLength
+      };
+    }
+    const config = session && session.runtimeConfig && session.runtimeConfig.virtualWorkspace
+      && typeof session.runtimeConfig.virtualWorkspace === "object"
+      ? session.runtimeConfig.virtualWorkspace
+      : {};
+    if (
+      config.requirePublishPath === true
+      && runState
+      && runState.virtualWorkspace
+      && runState.virtualWorkspace.enabled === true
+    ) {
+      return {
+        reason: "host_required_workspace_publish_path",
+        requestedLength: null
+      };
+    }
+    return null;
   }
 
   function readExplicitLongFormWorkspaceContract(session, runState) {
