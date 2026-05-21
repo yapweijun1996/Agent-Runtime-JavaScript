@@ -131,7 +131,9 @@ All modern agentic systems use the LLM provider's native tool/function calling A
 - `src/runtime/planner-tools.js` — converts action registry to provider tool definitions
 - Provider layer now passes `tools` and parses `tool_calls` / `functionCall` responses
 
-**Adopted default**: agrun now defaults to native tools mode while preserving envelope mode as an explicit opt-out and compatibility fallback.
+**Adopted default (ADR-0003, 2026-04-29)**: native tools was the default with envelope as the explicit opt-out / compatibility fallback.
+
+**Updated default (ADR-0031, 2026-05-16)**: envelope is now the default planner mode for every provider/model after sustained Gemini-side native instability during long-running real-API live tests. Native tools is retained as an explicit advanced/debug opt-in (`plannerMode: "native_tools"`). See `agrun_docs/live-tests/node-agrun-3000-double-baseline-2026-05-16.md` for the evidence trail.
 
 ### 2. LLM Self-Correction on Errors
 

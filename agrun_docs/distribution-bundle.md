@@ -1,6 +1,16 @@
 # Distribution Bundle
 
-How `npm run build` assembles the shipped `dist/` directory, what each file is, and how downstream engineers consume it without cloning the repo.
+How `npm run build` and `npm run dist` assemble the shipped `dist/` directory, what each file is, and how downstream engineers consume it without cloning the repo.
+
+## Default command for demos and handoff
+
+Use this when you want a fresh demo-ready distribution artifact:
+
+```bash
+npm run dist
+```
+
+That command runs the full release build, copies the browser example into `dist/example/`, and then runs the dist markdown/link check. It does not run the full smoke suite; use `npm run check` when you need the PR gate.
 
 ## What `npm run build` produces
 
@@ -93,6 +103,7 @@ This means `dist/agrun.js` and `dist/example/assets/index-*.js` from the same `n
 
 | Scenario | Command |
 |---|---|
+| Build a demo-ready `dist/` artifact | `npm run dist` |
 | Default release build for engineers | `npm run build` |
 | You only changed `src/` or `skills/` | `npm run build:lib` |
 | You only changed `examples/browser/src/` | `npm run build:browser && node build/copy-browser-dist.cjs` |

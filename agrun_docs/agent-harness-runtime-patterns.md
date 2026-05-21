@@ -1,8 +1,10 @@
 # Agent Harness Runtime Patterns
 
-> **Last reviewed:** 2026-05-14 against ADR-0023..0029.
+> **Last reviewed:** 2026-05-18 against ADR-0023..0031. Overall harness grade: **B+**.
 >
 > The pattern index below remains accurate as harness-engineering vocabulary. For the **current concrete embodiment** of the "harness is a tool provider, not a decision maker" principle — including the 8 push-mode sites that were deleted to enforce it — read [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) and [ADR-0026](./adr/0026-zero-residual-push-mode.md) before changing runtime decision flow.
+>
+> **2026-05-18 status snapshot:** AI-first core done (ADR-0023/026/031), AGRUN-213a/b/c/e/217/236/237-PR1/238-code shipped. Main quality gate open: **AGRUN-214m** — 3-topic Chrome E2E (company ✓, person/handle ✗, project ✗). See [agrun project KB](https://kb.yapweijun1996.com) item "agrun harness engineering gap analysis 2026-05-18" for full breakdown.
 
 ## Purpose
 

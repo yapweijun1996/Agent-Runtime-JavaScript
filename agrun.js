@@ -115,7 +115,7 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
-    const topic = readString$1P(value.topic);
+    const topic = readString$1Q(value.topic);
     const evidenceGraph = trimEvidenceGraph(value.evidenceGraph);
     const reportLoop = trimReportLoop(value.reportLoop);
     const finalEnvelope = value.finalEnvelope && typeof value.finalEnvelope === "object"
@@ -129,10 +129,10 @@
       || researchActivation;
     if (!hasContent) return null;
     return {
-      entityKey: readString$1P(value.entityKey),
+      entityKey: readString$1Q(value.entityKey),
       evidenceGraph,
       finalEnvelope,
-      lastTurnId: readString$1P(value.lastTurnId) || null,
+      lastTurnId: readString$1Q(value.lastTurnId) || null,
       researchActivation,
       reportLoop,
       topic,
@@ -149,8 +149,8 @@
   function serializeResearchSlice(runState, options) {
     if (!runState || typeof runState !== "object") return null;
     const opts = options && typeof options === "object" ? options : {};
-    const topic = readString$1P(runState.researchState && runState.researchState.topic)
-      || readString$1P(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
+    const topic = readString$1Q(runState.researchState && runState.researchState.topic)
+      || readString$1Q(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
     const graph = runState.researchEvidenceGraph;
     const loop = runState.researchReportLoop;
     const envelope = runState.researchFinalEnvelope;
@@ -161,16 +161,16 @@
     const hasLoop = loop && typeof loop === "object"
       && (loop.enabled === true
         || (typeof loop.status === "string" && loop.status && loop.status !== "idle")
-        || readString$1P(loop.finalMode));
+        || readString$1Q(loop.finalMode));
     const hasEnvelope = envelope && typeof envelope === "object";
     if (!topic && !hasGraph && !hasLoop && !hasEnvelope) {
       return null;
     }
     return normalizeResearchSlice({
-      entityKey: readString$1P(graph && graph.entity && graph.entity.key),
+      entityKey: readString$1Q(graph && graph.entity && graph.entity.key),
       evidenceGraph: hasGraph ? graph : null,
       finalEnvelope: hasEnvelope ? envelope : null,
-      lastTurnId: readString$1P(opts.turnId) || readString$1P(runState.runId) || null,
+      lastTurnId: readString$1Q(opts.turnId) || readString$1Q(runState.runId) || null,
       researchActivation: readResearchActivation(runState),
       reportLoop: hasLoop ? loop : null,
       topic,
@@ -203,7 +203,7 @@
       if (!runState.researchState || typeof runState.researchState !== "object") {
         runState.researchState = {};
       }
-      if (!readString$1P(runState.researchState.topic)) {
+      if (!readString$1Q(runState.researchState.topic)) {
         runState.researchState.topic = normalized.topic;
       }
     }
@@ -250,25 +250,25 @@
         ? cloneValue(value.authorityCoverage)
         : null,
       enabled: value.enabled === true,
-      finalMode: readString$1P(value.finalMode) || null,
+      finalMode: readString$1Q(value.finalMode) || null,
       gateSignal: value.gateSignal && typeof value.gateSignal === "object"
         ? cloneValue(value.gateSignal)
         : null,
-      lastTopic: readString$1P(value.lastTopic) || null,
+      lastTopic: readString$1Q(value.lastTopic) || null,
       recentQueries: Array.isArray(value.recentQueries)
         ? cloneValue(value.recentQueries).slice(-20)
         : [],
       sourceMinimum: value.sourceMinimum && typeof value.sourceMinimum === "object"
         ? cloneValue(value.sourceMinimum)
         : null,
-      status: readString$1P(value.status) || "idle",
+      status: readString$1Q(value.status) || "idle",
       vetoCount: typeof value.vetoCount === "number" ? value.vetoCount : 0,
       version: typeof value.version === "number" ? value.version : 2
     };
   }
 
   function readResearchActivation(value) {
-    const explicit = readString$1P(value && value.researchActivation).toLowerCase();
+    const explicit = readString$1Q(value && value.researchActivation).toLowerCase();
     if (explicit === "long_research" || explicit === "long-web-research" || explicit === "deep-research-writer") {
       return "long_research";
     }
@@ -280,7 +280,7 @@
     return "";
   }
 
-  function readString$1P(value) {
+  function readString$1Q(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -771,7 +771,7 @@
   function createThread(options) {
     const source = options && typeof options === "object" ? options : {};
     const now = typeof source.now === "number" ? source.now : Date.now();
-    const id = readString$1O(source.id) || generateThreadId(now);
+    const id = readString$1P(source.id) || generateThreadId(now);
     return {
       budget: source.budget && typeof source.budget === "object" ? { ...source.budget } : null,
       createdAt: now,
@@ -789,7 +789,7 @@
       // 212a) hydrate cleanly without a migration step.
       todoState: normalizeTodoState(source.todoState),
       toolContext: normalizeToolContext$1(source.toolContext),
-      topic: readString$1O(source.topic)
+      topic: readString$1P(source.topic)
     };
   }
 
@@ -837,7 +837,7 @@
    */
   function findThreadById(threads, threadId) {
     const list = Array.isArray(threads) ? threads : [];
-    const target = readString$1O(threadId);
+    const target = readString$1P(threadId);
     if (!target) return null;
     return list.find((thread) => thread && thread.id === target) || null;
   }
@@ -848,7 +848,7 @@
    */
   function appendRecentUserText(thread, text) {
     const existing = Array.isArray(thread && thread.recentUserTexts) ? thread.recentUserTexts : [];
-    const trimmed = readString$1O(text);
+    const trimmed = readString$1P(text);
     if (!trimmed) return existing.slice();
     const updated = existing.concat([trimmed]);
     if (updated.length <= MAX_RECENT_USER_TEXTS) return updated;
@@ -868,7 +868,7 @@
     const record = sessionRecord && typeof sessionRecord === "object" ? sessionRecord : {};
     const normalizedList = normalizeThreadList(record.threads);
     const threads = normalizedList.length > 0 ? normalizedList : [createDefaultThread()];
-    const requestedActive = readString$1O(record.activeThreadId);
+    const requestedActive = readString$1P(record.activeThreadId);
     const activeThreadId = findThreadById(threads, requestedActive)
       ? requestedActive
       : threads[0].id;
@@ -893,8 +893,8 @@
     const source = options && typeof options === "object" ? options : {};
     const state = readThreadsState(source.sessionRecord);
     const verdict = source.verdict && typeof source.verdict === "object" ? source.verdict : null;
-    const userText = readString$1O(source.userText);
-    const turnId = readString$1O(source.turnId) || null;
+    const userText = readString$1P(source.userText);
+    const turnId = readString$1P(source.turnId) || null;
     const now = typeof source.now === "number" ? source.now : Date.now();
     const maxThreads = Number.isInteger(source.maxThreads) && source.maxThreads > 0
       ? source.maxThreads
@@ -914,7 +914,7 @@
       const newThread = createThread({
         lastActiveAt: now,
         recentUserTexts: userText ? [userText] : [],
-        topic: readString$1O(verdict.topic),
+        topic: readString$1P(verdict.topic),
         goalAnchor: userText
           ? { createdAt: now, text: userText, turnId }
           : undefined
@@ -922,13 +922,13 @@
       threads.push(newThread);
       activeThreadId = newThread.id;
     } else if (verdict.action === "pivot_back") {
-      const target = readString$1O(verdict.threadId);
+      const target = readString$1P(verdict.threadId);
       if (target && findThreadById(threads, target)) {
         activeThreadId = target;
       }
       threads = bumpThread(threads, activeThreadId, userText, now, turnId);
     } else if (verdict.action === "continue_thread") {
-      const target = readString$1O(verdict.threadId);
+      const target = readString$1P(verdict.threadId);
       if (target && findThreadById(threads, target)) {
         activeThreadId = target;
       }
@@ -994,7 +994,7 @@
       const existingAnchor = thread.goalAnchor && typeof thread.goalAnchor === "object"
         ? thread.goalAnchor
         : null;
-      const hasText = Boolean(existingAnchor && readString$1O(existingAnchor.text));
+      const hasText = Boolean(existingAnchor && readString$1P(existingAnchor.text));
       const nextGoalAnchor = !hasText && userText
         ? { createdAt: now, text: userText, turnId: turnId || null }
         : existingAnchor;
@@ -1025,7 +1025,7 @@
    * words and short noise. Exposed for topic-router scoring + tests.
    */
   function tokenizeTopicText(value) {
-    const text = readString$1O(value).toLowerCase();
+    const text = readString$1P(value).toLowerCase();
     if (!text) return [];
     const raw = text.split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean);
     const filtered = [];
@@ -1043,8 +1043,8 @@
     }
     return {
       createdAt: typeof value.createdAt === "number" ? value.createdAt : null,
-      text: readString$1O(value.text),
-      turnId: readString$1O(value.turnId) || null
+      text: readString$1P(value.text),
+      turnId: readString$1P(value.turnId) || null
     };
   }
 
@@ -1069,7 +1069,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       aggregatedSearchResults: Array.isArray(source.aggregatedSearchResults) ? source.aggregatedSearchResults.slice() : [],
-      lastQuery: readString$1O(source.lastQuery) || null,
+      lastQuery: readString$1P(source.lastQuery) || null,
       readSources: Array.isArray(source.readSources) ? source.readSources.slice() : [],
       searchPasses: Array.isArray(source.searchPasses) ? source.searchPasses.slice() : [],
       searchResults: Array.isArray(source.searchResults) ? source.searchResults.slice() : []
@@ -1078,13 +1078,13 @@
 
   function normalizeRecentUserTexts(value) {
     if (!Array.isArray(value)) return [];
-    const cleaned = value.map((item) => readString$1O(item)).filter(Boolean);
+    const cleaned = value.map((item) => readString$1P(item)).filter(Boolean);
     if (cleaned.length <= MAX_RECENT_USER_TEXTS) return cleaned;
     return cleaned.slice(-MAX_RECENT_USER_TEXTS);
   }
 
   function normalizeThreadStatus(value) {
-    const candidate = readString$1O(value).toLowerCase();
+    const candidate = readString$1P(value).toLowerCase();
     return THREAD_STATUSES.includes(candidate) ? candidate : "active";
   }
 
@@ -1094,7 +1094,7 @@
     return `t-${seedPart.slice(-4)}${randomPart.slice(-4)}`;
   }
 
-  function readString$1O(value) {
+  function readString$1P(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -1359,7 +1359,7 @@
   });
 
   function createIndexedDBSessionStore(options) {
-    const dbName = readString$1N(options && options.dbName) || DEFAULT_DB_NAME;
+    const dbName = readString$1O(options && options.dbName) || DEFAULT_DB_NAME;
     const openTimeoutMs = readPositiveNumber$4(options && options.openTimeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
     let dbPromise = null;
 
@@ -1428,7 +1428,7 @@
       async appendMemory(sessionId, entry) {
         const nextEntry = {
           ...cloneValue(entry),
-          key: `${sessionId}:${readString$1N(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
+          key: `${sessionId}:${readString$1O(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
           sessionId
         };
         await putRecord(await getDb(), "memoryEntries", nextEntry);
@@ -1700,14 +1700,14 @@
       return leftTime - rightTime;
     }
 
-    return readString$1N(left.id || left.key).localeCompare(readString$1N(right.id || right.key));
+    return readString$1O(left.id || left.key).localeCompare(readString$1O(right.id || right.key));
   }
 
   function cloneNullable$2(value) {
     return value == null ? null : cloneValue(value);
   }
 
-  function readString$1N(value) {
+  function readString$1O(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -1944,7 +1944,7 @@
   const RESOLVED_CLARIFICATION_KINDS = new Set(["confirm", "explicit_answer", "option_select"]);
 
   function isResolvedClarificationKind(value) {
-    return RESOLVED_CLARIFICATION_KINDS.has(readString$1M(value));
+    return RESOLVED_CLARIFICATION_KINDS.has(readString$1N(value));
   }
 
   function normalizeCandidateSource(value) {
@@ -1952,23 +1952,23 @@
       return null;
     }
 
-    const url = readString$1M(value.url);
+    const url = readString$1N(value.url);
 
     if (!url) {
       return null;
     }
 
     return {
-      domain: readString$1M(value.domain),
-      engine: readString$1M(value.engine),
+      domain: readString$1N(value.domain),
+      engine: readString$1N(value.engine),
       passIndex: typeof value.passIndex === "number" ? value.passIndex : null,
-      query: readString$1M(value.query),
+      query: readString$1N(value.query),
       rank: typeof value.rank === "number" ? value.rank : null,
-      source: readString$1M(value.source),
-      sourceCategory: readString$1M(value.sourceCategory),
+      source: readString$1N(value.source),
+      sourceCategory: readString$1N(value.sourceCategory),
       sourceScore: typeof value.sourceScore === "number" ? value.sourceScore : null,
-      snippet: readString$1M(value.snippet) || readString$1M(value.content),
-      title: readString$1M(value.title),
+      snippet: readString$1N(value.snippet) || readString$1N(value.content),
+      title: readString$1N(value.title),
       url
     };
   }
@@ -1978,7 +1978,7 @@
       return null;
     }
 
-    const url = readString$1M(value.url);
+    const url = readString$1N(value.url);
 
     if (!url) {
       return null;
@@ -1986,19 +1986,19 @@
 
     return {
       bytes: typeof value.bytes === "number" ? value.bytes : 0,
-      contentType: readString$1M(value.contentType),
-      error: readString$1M(value.error),
-      message: readString$1M(value.message),
-      mode: readString$1M(value.mode),
+      contentType: readString$1N(value.contentType),
+      error: readString$1N(value.error),
+      message: readString$1N(value.message),
+      mode: readString$1N(value.mode),
       ok: value.ok !== false,
       originStatus: typeof value.originStatus === "number" ? value.originStatus : null,
-      platform: readString$1M(value.platform),
-      reason: readString$1M(value.reason),
+      platform: readString$1N(value.platform),
+      reason: readString$1N(value.reason),
       status: typeof value.status === "number" ? value.status : null,
-      text: readString$1M(value.text),
+      text: readString$1N(value.text),
       textRange: normalizeTextRange$4(value.textRange),
-      tier: readString$1M(value.tier),
-      title: readString$1M(value.title),
+      tier: readString$1N(value.tier),
+      title: readString$1N(value.title),
       truncated: value.truncated === true,
       url
     };
@@ -2025,7 +2025,7 @@
 
   function normalizePendingClarification(value, fallbackQuestion) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      const fallback = readString$1M(fallbackQuestion);
+      const fallback = readString$1N(fallbackQuestion);
 
       if (!fallback) {
         return null;
@@ -2041,14 +2041,14 @@
       };
     }
 
-    const question = readString$1M(value.question);
+    const question = readString$1N(value.question);
 
     if (!question) {
       return null;
     }
 
     return {
-      id: readString$1M(value.id) || `clarify:${question.toLowerCase()}`,
+      id: readString$1N(value.id) || `clarify:${question.toLowerCase()}`,
       kind: readPendingKind(value.kind) || "clarification",
       options: Array.isArray(value.options)
         ? value.options
@@ -2056,8 +2056,8 @@
           .filter(Boolean)
         : [],
       question,
-      source: readString$1M(value.source) || "structured",
-      sourceTurn: readString$1M(value.sourceTurn) || "history"
+      source: readString$1N(value.source) || "structured",
+      sourceTurn: readString$1N(value.sourceTurn) || "history"
     };
   }
 
@@ -2066,7 +2066,7 @@
       return null;
     }
 
-    const kind = readString$1M(value.kind);
+    const kind = readString$1N(value.kind);
 
     if (!kind) {
       return null;
@@ -2074,7 +2074,7 @@
 
     return {
       kind,
-      sourceTurn: readString$1M(value.sourceTurn) || null,
+      sourceTurn: readString$1N(value.sourceTurn) || null,
       value: value.value == null ? null : cloneValue(value.value)
     };
   }
@@ -2084,8 +2084,8 @@
       return null;
     }
 
-    const key = readString$1M(value.key);
-    const text = readString$1M(value.text);
+    const key = readString$1N(value.key);
+    const text = readString$1N(value.text);
 
     if (!key || !text) {
       return null;
@@ -2146,7 +2146,7 @@
 
     let truncated = false;
     const capLong = (value) => {
-      const s = readString$1M(value);
+      const s = readString$1N(value);
       if (!s) return "";
       if (s.length <= snippetBudget) return s;
       truncated = true;
@@ -2155,22 +2155,22 @@
 
     const projected = {
       bytes: typeof readSource.bytes === "number" ? readSource.bytes : 0,
-      contentType: readString$1M(readSource.contentType),
+      contentType: readString$1N(readSource.contentType),
       error: capLong(readSource.error),
       message: capLong(readSource.message),
-      mode: readString$1M(readSource.mode),
+      mode: readString$1N(readSource.mode),
       ok: readSource.ok !== false,
       originStatus: typeof readSource.originStatus === "number" ? readSource.originStatus : null,
-      platform: readString$1M(readSource.platform),
-      reason: readString$1M(readSource.reason),
+      platform: readString$1N(readSource.platform),
+      reason: readString$1N(readSource.reason),
       snippet: capLong(readSource.snippet),
       status: typeof readSource.status === "number" ? readSource.status : null,
       text: capLong(readSource.text),
       textRange: normalizeTextRange$4(readSource.textRange),
-      tier: readString$1M(readSource.tier),
-      title: readString$1M(readSource.title),
+      tier: readString$1N(readSource.tier),
+      title: readString$1N(readSource.title),
       truncated: readSource.truncated === true || truncated,
-      url: readString$1M(readSource.url)
+      url: readString$1N(readSource.url)
     };
 
     if (truncated) {
@@ -2179,7 +2179,7 @@
     return projected;
   }
 
-  function readString$1M(value) {
+  function readString$1N(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -2246,10 +2246,10 @@
 
     return {
       ...context,
-      activeQuery: readString$1L(state.activeQuery) || context.activeQuery,
+      activeQuery: readString$1M(state.activeQuery) || context.activeQuery,
       clarificationStatus,
-      currentGoal: readString$1L(state.currentGoal) || context.currentGoal,
-      currentTopic: readString$1L(state.currentTopic) || context.currentTopic,
+      currentGoal: readString$1M(state.currentGoal) || context.currentGoal,
+      currentTopic: readString$1M(state.currentTopic) || context.currentTopic,
       lastResolution,
       openAmbiguity: pendingClarification && typeof pendingClarification.question === "string"
         ? pendingClarification.question
@@ -2297,12 +2297,12 @@
     return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
   }
 
-  function readString$1L(value) {
+  function readString$1M(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function capString(value, maxChars) {
-    const text = readString$1L(value);
+    const text = readString$1M(value);
     if (!text) return "";
     const budget = Number.isInteger(maxChars) && maxChars > 0 ? maxChars : 0;
     if (budget === 0 || text.length <= budget) return text;
@@ -2387,7 +2387,7 @@
 
     return {
       activeGoal: hasOwn$1(source, "activeGoal") ? readAnchorText(source.activeGoal) : legacy.activeGoal,
-      activeQuery: hasOwn$1(source, "activeQuery") ? readString$1K(source.activeQuery) : legacy.activeQuery,
+      activeQuery: hasOwn$1(source, "activeQuery") ? readString$1L(source.activeQuery) : legacy.activeQuery,
       activeTopic: hasOwn$1(source, "activeTopic") ? readAnchorText(source.activeTopic) : legacy.activeTopic,
       candidateSources,
       lastClarificationResolution: hasOwn$1(source, "lastClarificationResolution")
@@ -2410,7 +2410,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value)
       ? value
       : null;
-    const fallbackQuestion = readString$1K(source && source.openAmbiguity);
+    const fallbackQuestion = readString$1L(source && source.openAmbiguity);
 
     return {
       ...createEmptyInquiryContext(),
@@ -2477,16 +2477,16 @@
     }
 
     return {
-      compactedContext: readString$1K(source.compactedContext),
-      decisions: readString$1K(source.decisions),
+      compactedContext: readString$1L(source.compactedContext),
+      decisions: readString$1L(source.decisions),
       estimatedTokens: typeof source.estimatedTokens === "number" ? source.estimatedTokens : 0,
-      facts: readString$1K(source.facts),
-      history: readString$1K(source.history),
+      facts: readString$1L(source.facts),
+      history: readString$1L(source.history),
       items: Array.isArray(source.items) ? cloneValue(source.items) : [],
-      memory: readString$1K(source.memory),
-      preferences: readString$1K(source.preferences),
-      recentTurns: readString$1K(source.recentTurns),
-      summary: readString$1K(source.summary) || readString$1K(source.compactedContext)
+      memory: readString$1L(source.memory),
+      preferences: readString$1L(source.preferences),
+      recentTurns: readString$1L(source.recentTurns),
+      summary: readString$1L(source.summary) || readString$1L(source.compactedContext)
     };
   }
 
@@ -2495,7 +2495,7 @@
       return null;
     }
 
-    const kind = readString$1K(value.kind);
+    const kind = readString$1L(value.kind);
 
     if (!kind) {
       return null;
@@ -2504,10 +2504,10 @@
     return {
       clarificationReply: cloneStructuredValue$3(value.clarificationReply),
       followUpTarget: cloneStructuredValue$3(value.followUpTarget),
-      goal: readString$1K(value.goal),
+      goal: readString$1L(value.goal),
       kind,
       needsClarification: value.needsClarification === true,
-      topic: readString$1K(value.topic)
+      topic: readString$1L(value.topic)
     };
   }
 
@@ -2516,7 +2516,7 @@
       return null;
     }
 
-    const kind = readString$1K(value.kind);
+    const kind = readString$1L(value.kind);
 
     if (!kind) {
       return null;
@@ -2527,8 +2527,8 @@
       decision: cloneStructuredValue$3(value.decision),
       kind,
       pendingClarification: cloneStructuredValue$3(value.pendingClarification),
-      selectedUrl: readString$1K(value.selectedUrl) || null,
-      source: readString$1K(value.source) || null
+      selectedUrl: readString$1L(value.selectedUrl) || null,
+      source: readString$1L(value.source) || null
     };
   }
 
@@ -2542,12 +2542,12 @@
     return Object.prototype.hasOwnProperty.call(value, key);
   }
 
-  function readString$1K(value) {
+  function readString$1L(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readAnchorText(value) {
-    return readString$1K(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1L(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function projectSessionContextFromSnapshot(snapshot) {
@@ -2606,10 +2606,10 @@
       activeTopic: context.activeTopic || null,
       candidateSourceCount: context.candidateSources.length,
       hasPendingClarification: Boolean(context.pendingClarification),
-      lastClarificationResolutionKind: readString$1J(
+      lastClarificationResolutionKind: readString$1K(
         context.lastClarificationResolution && context.lastClarificationResolution.kind
       ) || null,
-      lastReadSourceUrl: readString$1J(context.lastReadSource && context.lastReadSource.url) || null,
+      lastReadSourceUrl: readString$1K(context.lastReadSource && context.lastReadSource.url) || null,
       selectedSource: context.selectedSource
         ? {
             title: context.selectedSource.title || null,
@@ -2625,7 +2625,7 @@
       : null;
   }
 
-  function readString$1J(value) {
+  function readString$1K(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -2907,8 +2907,8 @@
         throw new Error(`Approval resumeToken rejected: ${verification.reason}.`);
       }
       if (enforceSessionBinding) {
-        const claimedSessionId = readString$1I(rawToken.sessionId);
-        const providedSessionId = readString$1I(rawInput.agrunSessionId);
+        const claimedSessionId = readString$1J(rawToken.sessionId);
+        const providedSessionId = readString$1J(rawInput.agrunSessionId);
         if (claimedSessionId && providedSessionId && claimedSessionId !== providedSessionId) {
           throw new Error("Approval resumeToken session binding mismatch.");
         }
@@ -2939,7 +2939,7 @@
     } = options;
     const reason = `Action "${actionName}" requires approval.`;
     const resumable = policy === "ask";
-    const sessionId = readString$1I(rawInput && rawInput.agrunSessionId) || readString$1I(request && request.agrunSessionId);
+    const sessionId = readString$1J(rawInput && rawInput.agrunSessionId) || readString$1J(request && request.agrunSessionId);
     const projectedContextSnapshot = runState && runState.contextSnapshot
       ? createContextSnapshot(runState.contextSnapshot)
       : request && request.contextSnapshot
@@ -2996,7 +2996,7 @@
       return null;
     }
 
-    const actionName = readString$1I(value.actionName);
+    const actionName = readString$1J(value.actionName);
     const policy = readPolicy$1(value.policy);
     const resolution = readResolution(value.resolution) || "pending";
     const resumeToken = readResumeToken(value.resumeToken);
@@ -3008,7 +3008,7 @@
     return {
       actionName,
       policy,
-      reason: readString$1I(value.reason) || `Action "${actionName}" requires approval.`,
+      reason: readString$1J(value.reason) || `Action "${actionName}" requires approval.`,
       resumable: value.resumable === true,
       resolution,
       resumeToken
@@ -3028,13 +3028,13 @@
 
     return {
       ...sourceRequest,
-      agrunSessionId: readString$1I(overrides.agrunSessionId) || readString$1I(source.sessionId) || null,
-      apiKey: isServerAuth ? null : readString$1I(overrides.apiKey) || readString$1I(sourceRequest.apiKey) || null,
+      agrunSessionId: readString$1J(overrides.agrunSessionId) || readString$1J(source.sessionId) || null,
+      apiKey: isServerAuth ? null : readString$1J(overrides.apiKey) || readString$1J(sourceRequest.apiKey) || null,
       authMode,
       cachedContentMode: readCachedContentMode$1(overrides.cachedContentMode) || readCachedContentMode$1(sourceRequest.cachedContentMode) || (isServerAuth ? "disabled" : "client"),
-      endpoint: readString$1I(overrides.endpoint) || readString$1I(sourceRequest.endpoint) || null,
+      endpoint: readString$1J(overrides.endpoint) || readString$1J(sourceRequest.endpoint) || null,
       fetch: typeof overrides.fetch === "function" ? overrides.fetch : null,
-      streamEndpoint: readString$1I(overrides.streamEndpoint) || readString$1I(sourceRequest.streamEndpoint) || null
+      streamEndpoint: readString$1J(overrides.streamEndpoint) || readString$1J(sourceRequest.streamEndpoint) || null
     };
   }
 
@@ -3045,7 +3045,7 @@
     const webSearchAuthMode = rawInput && typeof rawInput === "object" && typeof rawInput.webSearchAuthMode === "string"
       ? rawInput.webSearchAuthMode.trim()
       : null;
-    const agrunSessionId = readString$1I(rawInput && rawInput.agrunSessionId) || readString$1I(request && request.agrunSessionId);
+    const agrunSessionId = readString$1J(rawInput && rawInput.agrunSessionId) || readString$1J(request && request.agrunSessionId);
     const authMode = readAuthMode$3(request && request.authMode);
     const isServerAuth = authMode === "server";
 
@@ -3071,7 +3071,7 @@
 
   function normalizeResumeDecision(decision, actionName) {
     if (decision && typeof decision === "object" && !Array.isArray(decision)) {
-      if (decision.type === "clarify" && readString$1I(decision.question)) {
+      if (decision.type === "clarify" && readString$1J(decision.question)) {
         return {
           question: decision.question.trim(),
           type: "clarify"
@@ -3083,7 +3083,7 @@
           args: decision.args && typeof decision.args === "object" && !Array.isArray(decision.args)
             ? cloneValue(decision.args)
             : {},
-          name: readString$1I(decision.name) || actionName,
+          name: readString$1J(decision.name) || actionName,
           type: "action"
         };
       }
@@ -3101,7 +3101,7 @@
       return null;
     }
 
-    const actionName = readString$1I(value.actionName);
+    const actionName = readString$1J(value.actionName);
     const policy = readPolicy$1(value.policy);
     const request = value.request && typeof value.request === "object" && !Array.isArray(value.request)
       ? cloneValue(value.request)
@@ -3123,7 +3123,7 @@
         : null,
       plannerInvalidCount: typeof value.plannerInvalidCount === "number" ? value.plannerInvalidCount : 0,
       policy,
-      reason: readString$1I(value.reason),
+      reason: readString$1J(value.reason),
       request,
       actionPatternConvergence: cloneRecordOrNull(value.actionPatternConvergence),
       terminalRepairState: cloneRecordOrNull(value.terminalRepairState),
@@ -3137,7 +3137,7 @@
       researchReportLoop: cloneRecordOrNull(value.researchReportLoop),
       virtualWorkspace: cloneRecordOrNull(value.virtualWorkspace),
       sessionContextMode: readSessionContextMode(value.sessionContextMode),
-      sessionId: readString$1I(value.sessionId) || null,
+      sessionId: readString$1J(value.sessionId) || null,
       todoState: value.todoState && typeof value.todoState === "object" && !Array.isArray(value.todoState)
         ? cloneValue(value.todoState)
         : null,
@@ -3184,7 +3184,7 @@
       : "";
   }
 
-  function readString$1I(value) {
+  function readString$1J(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3288,7 +3288,7 @@
     return null;
   }
 
-  function readString$1H(value) {
+  function readString$1I(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3300,7 +3300,7 @@
     return fallback === true;
   }
 
-  function readNumber$k(value, fallback) {
+  function readNumber$l(value, fallback) {
     return typeof value === "number" && Number.isFinite(value)
       ? value
       : fallback;
@@ -3907,7 +3907,7 @@
   ];
 
   function resolveRequestedTimeZone(value) {
-    const explicit = readString$1G(value);
+    const explicit = readString$1H(value);
     if (!explicit) {
       return null;
     }
@@ -3932,7 +3932,7 @@
   }
 
   function normalizeQuery$1(query) {
-    return readString$1G(query)
+    return readString$1H(query)
       .toLowerCase()
       .replace(/[?.!,]/g, " ")
       .replace(/\s+/g, " ");
@@ -4024,7 +4024,7 @@
     }
   }
 
-  function readString$1G(value) {
+  function readString$1H(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -4041,7 +4041,7 @@
         "profile",
         "brief"
       ],
-      "instructions": "# Deep Research Writer\n\nUse this skill whenever the user asks for a report, article, analysis,\nbrief, or comparison that should be grounded in public information.\nSingle-shot answers under-deliver on this kind of request because they\nsatisfice without verifying. Use this LOOP instead.\n\nThe process is a LOOP, not a sequence. Re-enter any phase at any time.\nLength is not evidence, but a concrete length request is still a user\nrequirement. Evidence controls what you may safely say; if evidence is\nrich enough, meet the requested depth instead of stopping early.\n\n## Activation\n\nWhen you select this skill, declare `mode: \"long_research\"` on your\nfirst plan envelope so the runtime activates the budget gate.\n\nIf you create a todo plan, keep it synchronized with the work you have\nactually completed. After finishing a phase, call `todo_advance` or\n`todo_run_next` before moving on. Do not leave Phase A active while you\nare already searching, reading, drafting, or finalizing.\n\nUse the workspace as the long-answer memory. A strong run leaves a\ndebuggable packet:\n\n- `questions.md`: what you decomposed.\n- `evidence.json`: usable facts, successful source URLs, failed/thin\n  reads, and remaining gaps.\n- `draft.md`: the full working report.\n- `critique.md`: your self-review, even if the result is \"no blocking\n  gaps\".\n- `final_candidate.md`: the exact answer to publish.\n\nDo not skip these artifacts for a concrete long report unless the user\nexplicitly asked for a shorter direct answer. The runtime will not\ncreate missing artifacts or advance TodoState for you.\n\nIf the planner context exposes\n`loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`,\nread it before any terminal action. When it forbids clean `ready`, do\nnot repeat `finalReadiness.decision=\"ready\"`. Continue with targeted\n`web_search` / `read_url` / workspace revision, or publish only\n`limited` with `evidenceSatisfied: false` and concrete non-empty\n`remainingGaps`.\n\n## Process\n\n### PHASE A — Decompose the question\n\n- Read the user's prompt carefully. Extract every concrete sub-question\n  whose answer (taken with the others) would fully answer the user's\n  request.\n- Write the list to `workspace_write questions.md`. One sub-question\n  per line. No fixed count — some prompts need 3 questions, some need\n  15.\n- If the user's prompt is ambiguous on scope (which entity, which\n  jurisdiction, which time window), ask via `ask_clarification` before\n  proceeding.\n\n### PHASE B — Research each sub-question\n\nFor each open sub-question:\n\n- Run `web_search` with the most direct query you can write.\n- Treat `web_search` as lead generation, not evidence. For deep\n  research, do not use a `web_search`-only plan as the final synthesis\n  when `read_url` is available and search results contain readable\n  candidate URLs. Choose `read_url` in a later step so you can inspect\n  page content before writing the final report.\n- If the first pass returns thin or off-topic snippets, re-query with\n  a different shape (quoted exact phrase, official-website hint,\n  domain-targeted `site:` search, alternate spelling, the entity's\n  native-language form).\n- `read_url` on the strongest 2-3 candidates per question. Prefer:\n  primary sources (official websites, registries, filings, papers,\n  standards), reputable independent media, owner-controlled domains.\n  Avoid: paid profiles, unsourced aggregators, advertorials.\n- A failed or empty `read_url` is not evidence. If a read fails, pick\n  another candidate or change the query shape before drafting from that\n  claim. Do not put failed-read URLs in `evidence.md` as supporting\n  sources.\n- Do not stop after a single failed or thin source when search results\n  still contain plausible alternatives. Try at least two different\n  source types when available: official/product pages, independent\n  analysis, standards/research papers, reputable news, or direct blog /\n  documentation pages.\n- After each search/read batch, update the workspace before doing more\n  research. Write what you learned, which URLs were readable, which\n  reads failed or were thin, and which concrete gaps remain. Do not run\n  long chains of `web_search` / `read_url` while `evidence.json`,\n  `draft.md`, and `final_candidate.md` stay empty.\n- Before starting another search/read batch, name the exact evidence gap\n  it is meant to close. If you cannot name a gap that would materially\n  improve the report, move to drafting with an honest Limitations\n  section instead of continuing research for its own sake.\n- Once `evidence.json` contains usable facts from successful reads or\n  clearly labeled search-summary evidence, your next phase is drafting.\n  Write `draft.md` before doing more broad search. Use Phase E critique\n  to decide whether another targeted research pass is needed; do not keep\n  searching while no draft exists.\n- Write evidence to `workspace_write evidence.json` (or\n  `workspace_replace evidence.json` if it already exists). Use a JSON\n  object with a `facts` array; each fact should include `claim`,\n  `source`, and `answers`. This matches the runtime workspace quality\n  convention and avoids a false \"evidence missing\" warning.\n- If no `read_url` succeeds but search produced useful leads, still\n  write `evidence.json` with `facts: []`, `candidateSources`,\n  `failedReads`, and `remainingGaps`. This makes the limitation visible\n  to Inspector and to your later readiness judgment.\n\n### PHASE C — Cross-reference (fact-check)\n\nBefore writing any claim into your draft:\n\n- Look up the claim in `evidence.json`. If 2+ independent sources back\n  it, mark it \"verified\".\n- If only 1 source: mark \"reported by <source>; not independently\n  verified\".\n- If 0 sources: do NOT write the claim. Either go back to Phase B and\n  search more, or omit the claim.\n\n### PHASE D — Draft\n\n- Decide structure based on what your evidence supports — not a fixed\n  section count. Some topics need 3 sections, some need 8, some need\n  a flat narrative.\n- Start drafting as soon as you have enough usable evidence to answer\n  the main request, or when further source work is not producing better\n  evidence. You can revise the draft later; do not wait for perfect\n  evidence while workspace remains empty.\n- Write to `workspace_write draft.md` in the user's language.\n- Stop when each evidence line has a place. Do not pad to hit a word\n  target.\n- Cite inline by pointing at source titles or domain names so the\n  reader can trace back; the explicit Sources list comes later.\n- After writing `draft.md`, read it back with `workspace_read` and\n  inspect `textStats`. If it broadly answers the prompt and is close to\n  the requested depth, move to Phase E then Phase G. Do not keep doing\n  broad search just because budget remains.\n\n### PHASE E — Self-review\n\nRead your own `draft.md`. Write `workspace_write critique.md` listing\nits weak points:\n\n- Claims without source coverage.\n- Sub-questions from `questions.md` that the draft does not answer.\n- Sections that feel thin compared to user expectations.\n- Inconsistencies between sources.\n- Logical gaps a reader would notice.\n\nIf `critique.md` is empty, proceed to Phase G. Otherwise Phase F.\nIf `draft.md` already exists and broadly answers the user's request,\nyour next step is Phase E self-review or Phase G candidate publishing,\nnot another broad `web_search`. Only return to research when critique\nnames a specific blocking evidence gap.\nIf `draft.md` already meets or nearly meets a concrete length/depth\nrequirement and critique has no blocking evidence gap, promote the draft\nto `final_candidate.md` immediately. More search is lower priority than\npublishing the polished workspace candidate.\nIf there are no blocking issues, still write `critique.md` with a short\n\"no blocking gaps\" note plus any non-blocking limitations. This gives\nInspector a concrete checkpoint.\n\n### PHASE F — Iterate\n\nFor each item in `critique.md`:\n\n- If it is a missing source: go back to Phase B for that sub-question.\n- If it is an unverified claim: go back to Phase C.\n- If it is a structural gap: revise `draft.md` via `workspace_replace`\n  or rewrite via `workspace_write`.\n- After updating, run Phase E again.\n\nKeep iterating until critique.md has no blocking items, OR evidence\nis genuinely exhausted. Evidence is exhausted by your judgment, not by a\nmagic number. It means additional search/read work is no longer likely\nto materially improve the answer because you already tried meaningfully\ndifferent query/source types, captured which reads failed or were thin,\nand can name the remaining public-information gaps.\n\nWhen evidence is exhausted with gaps, that is OK — you will declare\nthe gaps in Phase G and use a limited readiness decision.\n\n### PHASE G — Finalize\n\nPre-finalize blocking checklist (run through every time; do not skip):\n\n1. **`final_candidate.md` exists with the user-facing report.** If\n   `final_candidate_status=missing` / `empty` / `chars=0`, you must\n   `workspace_write final_candidate.md` first. Never finalize from the\n   `finalize` answer body alone.\n2. **`successfulReadUrlCount=0` is not \"evidence exhausted\" by itself.**\n   If web_search returned candidate URLs and zero `read_url` succeeded,\n   try `read_url` on at least 2 different unread candidates (different\n   domains / source types) before declaring `limited`. A single batch of\n   502/404/network errors does not count as exhaustion. Only declare\n   exhaustion after meaningfully different attempts.\n3. **TodoState items reflect what you actually did.** If `todo_progress`\n   is `stale_after_work` (you finished work but the active item still\n   shows `active` / `pending`), call `todo_run_next` or `todo_advance`\n   before any terminal action. Do not let the runtime annotate\n   unfinished items with `terminatedAt` because you skipped progress\n   updates.\n4. **Prefer `workspace_publish_candidate` over `finalize`.** When\n   `final_candidate.md` is the answer, use publish; reserve `finalize`\n   for the fallback path described below.\n\nIf any of #1–#3 is violated, do not finalize. Go back to the relevant\nphase first.\n\nThen make an explicit AI-owned readiness decision:\n\n- If `readSources` has no successful `read_url` result and web search\n  returned candidate pages, prefer `read_url` on the strongest unread\n  candidate. If that read fails, try a different domain or source type\n  before finalizing.\n- If `readSources` has zero successful reads and you choose to stop,\n  write a normal user-facing answer with an explicit Limitations section.\n  Say that the answer is based on search summaries / failed read attempts\n  only, and do not present unsupported market figures as verified facts.\n- If the only sources are thin, failed, or single-source, you may still\n  finalize only with `finalReadiness.decision=\"limited\"` and a\n  Limitations section that names the exact evidence limit.\n- If the evidence is enough for the requested depth, finalize with\n  `finalReadiness.decision=\"ready\"`.\n- If you decide not to read more, say why in the report's Limitations\n  section (for example: search-result-only evidence, public source access\n  limits, repeated `read_url` service failures, or time/budget tradeoff).\n- If workspace files exist, use `workspace_list` or `workspace_read` when\n  you need to review your own outline, evidence, draft, critique, or final\n  candidate before deciding.\n- If the draft is not ready, continue with `web_search`, `read_url`,\n  `workspace_write`, or `workspace_replace`.\n- If the draft is ready, write `final_candidate.md`, mark it ready with\n  `workspace_finalize_candidate`, read it back, inspect its text stats,\n  then publish it with `workspace_publish_candidate`.\n- If a TodoState plan exists, update it before the terminal publish:\n  mark completed phases done with `todo_run_next` / `todo_advance`; mark\n  skipped phases blocked or abandoned only when you truly stopped because\n  evidence was exhausted or the user constraint cannot be met. Do not\n  publish while Phase A is still active unless Phase A is genuinely the\n  only completed work.\n- If `draft.md` is already the full user-facing report, use\n  `workspace_write final_candidate.md` with the polished draft content\n  instead of asking the finalizer to rewrite it. The publish path should\n  send workspace content, not a newly compressed answer.\n- Never treat the `finalize` answer body as a substitute for\n  `final_candidate.md`. The final candidate must exist in the virtual\n  workspace, contain the user-facing report, be marked ready, and be\n  read back before publishing.\n\n- `workspace_write final_candidate.md` with:\n  - Direct answer to the user's request, in their language, structured\n    by what evidence supports.\n  - Inline references to sources where claims rest.\n  - A \"Limitations\" section if any sub-question stayed unanswered or\n    if any claim was single-source.\n  - A \"Sources\" list with every URL you actually read in Phase B.\n- `workspace_finalize_candidate path=final_candidate.md`.\n- `workspace_read path=final_candidate.md` and check `textStats`:\n  - For Chinese/Japanese/Korean `字` requests, use `cjkChars` and\n    `nonWhitespaceChars`.\n  - For English-style word-count requests, use `words`.\n  - Compare the stats against the user's concrete requirement yourself.\n    This comparison belongs to you, not runtime.\n  - If the candidate is much shorter than the requested length but\n    evidence supports more, revise instead of finalizing.\n  - If it is shorter because evidence is thin, finalize only as\n    `limited` and state the length/evidence limitation.\n  - If `requirementsAssessment.requirementSatisfied` would be false and\n    evidence is not exhausted, do not finalize. Continue with\n    `web_search`, `read_url`, `workspace_write`, or `workspace_replace`.\n  - If evidence is exhausted, finalize as `limited` and make\n    `requirementsAssessment` honestly explain what is unmet.\n- If the runtime returns a `readiness_continuation_signal` observation\n  after you tried to finalize, treat it as a request to continue the\n  OODAE loop, not as permission to repeat the same final answer:\n  - Immediately `workspace_read final_candidate.md` again and inspect\n    `textStats`.\n  - If `declaredUnsatisfied` includes `length` or `requirement` and\n    evidence supports more detail, revise/expand `final_candidate.md`\n    with `workspace_append`, `workspace_insert_after_section`, or\n    `workspace_replace` before any next terminal action.\n  - If `declaredUnsatisfied` includes `evidence`, continue searching or\n    reading unless evidence is genuinely exhausted by the Phase F rules.\n  - If you still finalize as `limited`, explicitly state why no more\n    useful expansion or evidence gathering is possible.\n  - Do not leave `requestedLength`, `observedLength`, or\n    `observedLengthUnit` null when the user gave a concrete length and\n    `workspace_read` returned usable `textStats`.\n  - If `final_candidate.md` is missing or empty, write it first; do not\n    publish or finalize from memory or from a prose instruction field.\n- Preferred terminal step: call\n  `workspace_publish_candidate path=final_candidate.md`. This sends the\n  selected workspace candidate directly to the user without a second\n  finalizer LLM rewrite. The candidate content itself must include any\n  needed Limitations and Sources sections.\n- If `workspace_publish_candidate` is blocked for readiness, length, or\n  TodoState sync, do not switch to direct `finalize` to escape the block.\n  Treat the block as the next observation: expand the workspace candidate,\n  gather the named missing evidence, correct `requirementsAssessment`, or\n  call `todo_run_next` / `todo_advance` before trying publish again.\n- If an acceptance convergence signal says `forbiddenReadiness=ready`,\n  the next terminal attempt cannot be clean `ready`. You must either do\n  more evidence/workspace work, or explicitly publish `limited` with\n  `evidenceSatisfied: false` and non-empty `remainingGaps`.\n- For research/report publish, include `finalReadiness` on\n  `workspace_publish_candidate` with `requirementsAssessment` populated\n  from the latest `workspace_read final_candidate.md` stats. If the\n  candidate is below the user's concrete length/depth requirement and\n  evidence supports expansion, revise before publish. Do not publish a\n  limited answer while also declaring `evidenceSatisfied: true` and\n  `remainingGaps: []`; that means you have enough material to expand. If\n  evidence is exhausted, publish only with `decision: \"limited\"`,\n  `evidenceSatisfied: false`, concrete `remainingGaps`, and\n  `lengthSatisfied: false` / `requirementSatisfied: false`.\n- Do not choose `finalize` after `workspace_finalize_candidate` when\n  `workspace_publish_candidate` is available and `final_candidate.md`\n  already contains the exact answer. `finalize` is only the fallback path\n  when publish is unavailable or the workspace candidate is not the\n  answer.\n- Fallback only if `workspace_publish_candidate` is unavailable: use\n  `finalize` with the body of final_candidate.md as the answer and an\n  explicit readiness declaration:\n  - Ready: `finalReadiness: { \"decision\": \"ready\", \"evidenceMode\":\n    \"read_sources\", \"limitations\": \"\", \"requirementsAssessment\": {\n    \"userRequirementSummary\": \"summarize the user's concrete output\n    requirements\", \"requirementSatisfied\": true, \"lengthSatisfied\":\n    true, \"evidenceSatisfied\": true, \"requestedLength\": null,\n    \"observedLength\": null, \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"summary\": \"why this is ready\" } }`\n  - Limited: `finalReadiness: { \"decision\": \"limited\", \"evidenceMode\":\n    \"search_summary_only\" | \"mixed\" | \"read_sources\", \"limitations\":\n    \"Only search summaries / failed read_url attempts / one readable\n    source were available; the report names these limits.\",\n    \"requirementsAssessment\": { \"userRequirementSummary\": \"summarize\n    the user's concrete output requirements\", \"requirementSatisfied\":\n    false, \"lengthSatisfied\": false, \"evidenceSatisfied\": false,\n    \"requestedLength\": null, \"observedLength\": null,\n    \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"remainingGaps\": [\"state the real\n    gaps\"], \"summary\": \"why this is limited\" } }`\n\n## Rules\n\n- Length follows evidence. Rich evidence → long report. Thin\n  evidence → short report + disclosed limitations. If the user asked\n  for a long concrete length and your evidence supports only a shorter\n  report, write the shorter evidence-backed report and say so. Do not\n  invent sections to hit length.\n- In the readiness JSON examples above, `requestedLength` and\n  `observedLength` are shown as `null` only as placeholders. Replace\n  them with numbers whenever the user gave a concrete length and\n  `workspace_read` gave you `textStats`.\n- You, the AI, decide `requirementsAssessment`. Runtime only records and\n  displays it with raw `textStats` / `read_url` counts. Do not rely on\n  runtime to decide whether the answer meets length, evidence, or depth\n  requirements.\n- Never invent citations. Every source URL must come from a successful\n  `read_url` you ran in this run.\n- Search-result URLs may appear only in a clearly labeled \"candidate\n  sources not fully read\" note. Do not list them as verified Sources\n  unless `read_url` succeeded.\n- Never claim a single-source fact as verified. Mark it \"reported by\n  <source>; not independently verified\".\n- Use the user's language throughout.\n- The runtime no longer back-fills workspace files. If you do not\n  write final_candidate.md, the user gets nothing.\n- If 2+ sources contradict each other on the same fact, present both\n  and disclose the contradiction; do not pick a winner without\n  evidence.\n- Workspace tools are filename-free-form (any safe path). Reserved\n  conventions (questions.md, evidence.json, draft.md, critique.md,\n  final_candidate.md) are convention-only; pick clearer names if your\n  topic needs them.\n- Quality (`workspace.quality`) is advisory; runtime never blocks\n  finalize. Decide for yourself when the report is ready.",
+      "instructions": "# Deep Research Writer\n\nUse this skill whenever the user asks for a report, article, analysis,\nbrief, or comparison that should be grounded in public information.\nSingle-shot answers under-deliver on this kind of request because they\nsatisfice without verifying. Use this LOOP instead.\n\nThe process is a LOOP, not a sequence. Re-enter any phase at any time.\nLength is not evidence, but a concrete length request is still a user\nrequirement. Evidence controls what you may safely say; if evidence is\nrich enough, meet the requested depth instead of stopping early.\n\n## Activation\n\nWhen you select this skill, declare `mode: \"long_research\"` on your\nfirst plan envelope so the runtime activates the budget gate.\n\nIf you create a todo plan, keep it synchronized with the work you have\nactually completed. After finishing a phase, call `todo_advance` or\n`todo_run_next` before moving on. Do not leave Phase A active while you\nare already searching, reading, drafting, or finalizing.\n\nUse the workspace as the long-answer memory. A strong run leaves a\ndebuggable packet:\n\n- `questions.md`: what you decomposed.\n- `evidence.json`: usable facts, successful source URLs, failed/thin\n  reads, and remaining gaps.\n- `outline.md`: the report index. Each section has a purpose, planned\n  title, and supporting source URLs.\n- `draft.md`: the full working report.\n- `critique.md`: your self-review, even if the result is \"no blocking\n  gaps\".\n- `final_candidate.md`: the exact answer to publish.\n\nDo not skip these artifacts for a concrete long report unless the user\nexplicitly asked for a shorter direct answer. The runtime will not\ncreate missing artifacts or advance TodoState for you.\n\nIf the planner context exposes\n`loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`,\nread it before any terminal action. When it forbids clean `ready`, do\nnot repeat `finalReadiness.decision=\"ready\"`. Continue with targeted\n`web_search` / `read_url` / workspace revision, or publish only\n`limited` with `evidenceSatisfied: false` and concrete non-empty\n`remainingGaps`.\n\n## Process\n\n### PHASE A — Decompose the question\n\n- Read the user's prompt carefully. Extract every concrete sub-question\n  whose answer (taken with the others) would fully answer the user's\n  request.\n- Write the list to `workspace_write questions.md`. One sub-question\n  per line. No fixed count — some prompts need 3 questions, some need\n  15.\n- If the user's prompt is ambiguous on scope (which entity, which\n  jurisdiction, which time window), ask via `ask_clarification` before\n  proceeding.\n\n### PHASE B — Research each sub-question\n\nFor each open sub-question:\n\n- Run `web_search` with the most direct query you can write.\n- Treat `web_search` as lead generation, not evidence. For deep\n  research, do not use a `web_search`-only plan as the final synthesis\n  when `read_url` is available and search results contain readable\n  candidate URLs. Choose `read_url` in a later step so you can inspect\n  page content before writing the final report.\n- If the first pass returns thin or off-topic snippets, re-query with\n  a different shape (quoted exact phrase, official-website hint,\n  domain-targeted `site:` search, alternate spelling, the entity's\n  native-language form).\n- `read_url` on the strongest 2-3 candidates per question. Prefer:\n  primary sources (official websites, registries, filings, papers,\n  standards), reputable independent media, owner-controlled domains.\n  Avoid: paid profiles, unsourced aggregators, advertorials.\n- A failed or empty `read_url` is not evidence. If a read fails, pick\n  another candidate or change the query shape before drafting from that\n  claim. Do not put failed-read URLs in `evidence.md` as supporting\n  sources.\n- Do not stop after a single failed or thin source when search results\n  still contain plausible alternatives. Try at least two different\n  source types when available: official/product pages, independent\n  analysis, standards/research papers, reputable news, or direct blog /\n  documentation pages.\n- After each search/read batch, update the workspace before doing more\n  research. Write what you learned, which URLs were readable, which\n  reads failed or were thin, and which concrete gaps remain. Do not run\n  long chains of `web_search` / `read_url` while `evidence.json`,\n  `draft.md`, and `final_candidate.md` stay empty.\n- Before starting another search/read batch, name the exact evidence gap\n  it is meant to close. If you cannot name a gap that would materially\n  improve the report, move to drafting with an honest Limitations\n  section instead of continuing research for its own sake.\n- Once `evidence.json` contains usable facts from successful reads or\n  clearly labeled search-summary evidence, your next phase is drafting.\n  Write `draft.md` before doing more broad search. Use Phase E critique\n  to decide whether another targeted research pass is needed; do not keep\n  searching while no draft exists.\n- Write evidence to `workspace_write evidence.json` (or\n  `workspace_replace evidence.json` if it already exists). Use a JSON\n  object with a `facts` array; each fact should include `claim`,\n  `source`, and `answers`. This matches the runtime workspace quality\n  convention and avoids a false \"evidence missing\" warning.\n- If no `read_url` succeeds but search produced useful leads, still\n  write `evidence.json` with `facts: []`, `candidateSources`,\n  `failedReads`, and `remainingGaps`. This makes the limitation visible\n  to Inspector and to your later readiness judgment.\n\n### PHASE C — Cross-reference (fact-check)\n\nBefore writing any claim into your draft:\n\n- Look up the claim in `evidence.json`. If 2+ independent sources back\n  it, mark it \"verified\".\n- If only 1 source: mark \"reported by <source>; not independently\n  verified\".\n- If 0 sources: do NOT write the claim. Either go back to Phase B and\n  search more, or omit the claim.\n\n### PHASE D — Draft\n\n- Decide structure based on what your evidence supports — not a fixed\n  section count. Some topics need 3 sections, some need 8, some need\n  a flat narrative.\n- Before long-form drafting, write `workspace_write outline.md` with the\n  section index: heading, role in the report, source URLs, and any gap.\n  This is your map for the draft. Do not keep broad-searching when you\n  already have enough evidence to create the index.\n- Start drafting as soon as you have enough usable evidence to answer\n  the main request, or when further source work is not producing better\n  evidence. You can revise the draft later; do not wait for perfect\n  evidence while workspace remains empty.\n- Write to `workspace_write draft.md` in the user's language.\n- If the user gave a concrete length and `lengthProgress` says the draft\n  is short, continue section-by-section from `outline.md`. Use\n  `workspace_append` to add complete new sections or\n  `workspace_insert_after_section` to expand a thin section. Avoid\n  repeating small `workspace_write` rewrites that replace the whole draft\n  without materially closing the length gap.\n- If the draft is long enough but structure audit reports duplicate\n  headings or duplicate section numbers, prefer `workspace_propose_patch`\n  before direct replacement. Use exactly one\n  `normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}`\n  operation with line numbers from `duplicate_heading_context`,\n  `duplicate_section_number_context`, or `section_number_repair_context`,\n  inspect `structureBefore` / `structureAfter`, then call\n  `workspace_apply_patch` only when the preview is valid. Do not mix this\n  with `replace` unless exact current `find` text is visible and\n  heading-only repair cannot improve structure.\n- Stop when each evidence line has a place. Do not pad with unsupported\n  filler, but do use all supported section material when the user asked\n  for a long concrete length.\n- Cite inline by pointing at source titles or domain names so the\n  reader can trace back; the explicit Sources list comes later.\n- After writing `draft.md`, read it back with `workspace_read` and\n  inspect `textStats`. If it broadly answers the prompt and is close to\n  the requested depth, move to Phase E then Phase G. Do not keep doing\n  broad search just because budget remains.\n\n### PHASE E — Self-review\n\nRead your own `draft.md`. Write `workspace_write critique.md` listing\nits weak points:\n\n- Claims without source coverage.\n- Sub-questions from `questions.md` that the draft does not answer.\n- Sections that feel thin compared to user expectations.\n- Inconsistencies between sources.\n- Logical gaps a reader would notice.\n\nIf `critique.md` is empty, proceed to Phase G. Otherwise Phase F.\nIf `draft.md` already exists and broadly answers the user's request,\nyour next step is Phase E self-review or Phase G candidate publishing,\nnot another broad `web_search`. Only return to research when critique\nnames a specific blocking evidence gap.\nIf `draft.md` already meets or nearly meets a concrete length/depth\nrequirement and critique has no blocking evidence gap, promote the draft\nto `final_candidate.md` immediately. More search is lower priority than\npublishing the polished workspace candidate.\nIf there are no blocking issues, still write `critique.md` with a short\n\"no blocking gaps\" note plus any non-blocking limitations. This gives\nInspector a concrete checkpoint.\n\n### PHASE F — Iterate\n\nFor each item in `critique.md`:\n\n- If it is a missing source: go back to Phase B for that sub-question.\n- If it is an unverified claim: go back to Phase C.\n- If it is a structural gap: prefer `workspace_propose_patch` /\n  `workspace_apply_patch` with `normalize_headings` for duplicate heading\n  or duplicate section-number repair. If patch tools are unavailable or\n  the structure problem requires more than heading-line repair, revise\n  `draft.md` via `workspace_replace` or rewrite via `workspace_write`.\n- After updating, run Phase E again.\n\nKeep iterating until critique.md has no blocking items, OR evidence\nis genuinely exhausted. Evidence is exhausted by your judgment, not by a\nmagic number. It means additional search/read work is no longer likely\nto materially improve the answer because you already tried meaningfully\ndifferent query/source types, captured which reads failed or were thin,\nand can name the remaining public-information gaps.\n\nWhen evidence is exhausted with gaps, that is OK — you will declare\nthe gaps in Phase G and use a limited readiness decision.\n\n### PHASE G — Finalize\n\nPre-finalize blocking checklist (run through every time; do not skip):\n\n1. **`final_candidate.md` exists with the user-facing report.** If\n   `final_candidate_status=missing` / `empty` / `chars=0`, you must\n   `workspace_write final_candidate.md` first. Never finalize from the\n   `finalize` answer body alone.\n2. **`successfulReadUrlCount=0` is not \"evidence exhausted\" by itself.**\n   If web_search returned candidate URLs and zero `read_url` succeeded,\n   try `read_url` on at least 2 different unread candidates (different\n   domains / source types) before declaring `limited`. A single batch of\n   502/404/network errors does not count as exhaustion. Only declare\n   exhaustion after meaningfully different attempts.\n3. **TodoState items reflect what you actually did.** If `todo_progress`\n   is `stale_after_work` (you finished work but the active item still\n   shows `active` / `pending`), call `todo_run_next` or `todo_advance`\n   before any terminal action. Do not let the runtime annotate\n   unfinished items with `terminatedAt` because you skipped progress\n   updates.\n4. **Prefer `workspace_publish_candidate` over `finalize`.** When\n   `final_candidate.md` is the answer, use publish; reserve `finalize`\n   for the fallback path described below.\n\nIf any of #1–#3 is violated, do not finalize. Go back to the relevant\nphase first.\n\nThen make an explicit AI-owned readiness decision:\n\n- If `readSources` has no successful `read_url` result and web search\n  returned candidate pages, prefer `read_url` on the strongest unread\n  candidate. If that read fails, try a different domain or source type\n  before finalizing.\n- If `readSources` has zero successful reads and you choose to stop,\n  write a normal user-facing answer with an explicit Limitations section.\n  Say that the answer is based on search summaries / failed read attempts\n  only, and do not present unsupported market figures as verified facts.\n- If the only sources are thin, failed, or single-source, you may still\n  finalize only with `finalReadiness.decision=\"limited\"` and a\n  Limitations section that names the exact evidence limit.\n- If the evidence is enough for the requested depth, finalize with\n  `finalReadiness.decision=\"ready\"`.\n- If you decide not to read more, say why in the report's Limitations\n  section (for example: search-result-only evidence, public source access\n  limits, repeated `read_url` service failures, or time/budget tradeoff).\n- If workspace files exist, use `workspace_list` or `workspace_read` when\n  you need to review your own outline, evidence, draft, critique, or final\n  candidate before deciding.\n- If the draft is not ready, continue with `web_search`, `read_url`,\n  `workspace_write`, or `workspace_replace`.\n- If the draft is ready, write `final_candidate.md`, mark it ready with\n  `workspace_finalize_candidate`, read it back, inspect its text stats,\n  then publish it with `workspace_publish_candidate`.\n- If a TodoState plan exists, update it before the terminal publish:\n  mark completed phases done with `todo_run_next` / `todo_advance`; mark\n  skipped phases blocked or abandoned only when you truly stopped because\n  evidence was exhausted or the user constraint cannot be met. Do not\n  publish while Phase A is still active unless Phase A is genuinely the\n  only completed work.\n- If `draft.md` is already the full user-facing report, use\n  `workspace_write final_candidate.md` with the polished draft content\n  instead of asking the finalizer to rewrite it. The publish path should\n  send workspace content, not a newly compressed answer.\n- Never treat the `finalize` answer body as a substitute for\n  `final_candidate.md`. The final candidate must exist in the virtual\n  workspace, contain the user-facing report, be marked ready, and be\n  read back before publishing.\n\n- `workspace_write final_candidate.md` with:\n  - Direct answer to the user's request, in their language, structured\n    by what evidence supports.\n  - Inline references to sources where claims rest.\n  - A \"Limitations\" section if any sub-question stayed unanswered or\n    if any claim was single-source.\n  - A \"Sources\" list with every URL you actually read in Phase B.\n- `workspace_finalize_candidate path=final_candidate.md`.\n- `workspace_read path=final_candidate.md` and check `textStats`:\n  - For Chinese/Japanese/Korean `字` requests, use `cjkChars` and\n    `nonWhitespaceChars`.\n  - For English-style word-count requests, use `words`.\n  - Compare the stats against the user's concrete requirement yourself.\n    This comparison belongs to you, not runtime.\n  - If the candidate is much shorter than the requested length but\n    evidence supports more, revise instead of finalizing.\n  - If it is shorter because evidence is thin, finalize only as\n    `limited` and state the length/evidence limitation.\n  - If `requirementsAssessment.requirementSatisfied` would be false and\n    evidence is not exhausted, do not finalize. Continue with\n    `web_search`, `read_url`, `workspace_write`, or `workspace_replace`.\n  - If evidence is exhausted, finalize as `limited` and make\n    `requirementsAssessment` honestly explain what is unmet.\n- If the runtime returns a `readiness_continuation_signal` observation\n  after you tried to finalize, treat it as a request to continue the\n  OODAE loop, not as permission to repeat the same final answer:\n  - Immediately `workspace_read final_candidate.md` again and inspect\n    `textStats`.\n  - If `declaredUnsatisfied` includes `length` or `requirement` and\n    evidence supports more detail, revise/expand `final_candidate.md`\n    with `workspace_append`, `workspace_insert_after_section`, or\n    `workspace_replace` before any next terminal action.\n  - If `declaredUnsatisfied` includes structure and the observation shows\n    `duplicate_heading_context`, `duplicate_section_number_context`, or\n    `section_number_repair_context`, use `workspace_propose_patch` with\n    one `normalize_headings` operation, then `workspace_apply_patch` only\n    for a valid preview before trying another terminal action.\n  - If source and length are satisfied but the remaining deficits include\n    both structure and TodoState, use the listed structure patch action\n    and sync TodoState with `todo_advance` / `todo_run_next`, or\n    `todo_cancel` for stale plan items. Do not append, insert, write,\n    replace, search, or read unless `allowedActions` explicitly requires\n    it.\n  - If `declaredUnsatisfied` includes `evidence`, continue searching or\n    reading unless evidence is genuinely exhausted by the Phase F rules.\n  - If you still finalize as `limited`, explicitly state why no more\n    useful expansion or evidence gathering is possible.\n  - Do not leave `requestedLength`, `observedLength`, or\n    `observedLengthUnit` null when the user gave a concrete length and\n    `workspace_read` returned usable `textStats`.\n  - If `final_candidate.md` is missing or empty, write it first; do not\n    publish or finalize from memory or from a prose instruction field.\n- Preferred terminal step: call\n  `workspace_publish_candidate path=final_candidate.md`. This sends the\n  selected workspace candidate directly to the user without a second\n  finalizer LLM rewrite. The candidate content itself must include any\n  needed Limitations and Sources sections.\n- If `workspace_publish_candidate` is blocked for readiness, length, or\n  TodoState sync, do not switch to direct `finalize` to escape the block.\n  Treat the block as the next observation: expand the workspace candidate,\n  gather the named missing evidence, correct `requirementsAssessment`, or\n  call `todo_run_next` / `todo_advance` before trying publish again.\n- If an acceptance convergence signal says `forbiddenReadiness=ready`,\n  the next terminal attempt cannot be clean `ready`. You must either do\n  more evidence/workspace work, or explicitly publish `limited` with\n  `evidenceSatisfied: false` and non-empty `remainingGaps`.\n- For research/report publish, include `finalReadiness` on\n  `workspace_publish_candidate` with `requirementsAssessment` populated\n  from the latest `workspace_read final_candidate.md` stats. If the\n  candidate is below the user's concrete length/depth requirement and\n  evidence supports expansion, revise before publish. Do not publish a\n  limited answer while also declaring `evidenceSatisfied: true` and\n  `remainingGaps: []`; that means you have enough material to expand. If\n  evidence is exhausted, publish only with `decision: \"limited\"`,\n  `evidenceSatisfied: false`, concrete `remainingGaps`, and\n  `lengthSatisfied: false` / `requirementSatisfied: false`.\n- Do not choose `finalize` after `workspace_finalize_candidate` when\n  `workspace_publish_candidate` is available and `final_candidate.md`\n  already contains the exact answer. `finalize` is only the fallback path\n  when publish is unavailable or the workspace candidate is not the\n  answer.\n- Fallback only if `workspace_publish_candidate` is unavailable: use\n  `finalize` with the body of final_candidate.md as the answer and an\n  explicit readiness declaration:\n  - Ready: `finalReadiness: { \"decision\": \"ready\", \"evidenceMode\":\n    \"read_sources\", \"limitations\": \"\", \"requirementsAssessment\": {\n    \"userRequirementSummary\": \"summarize the user's concrete output\n    requirements\", \"requirementSatisfied\": true, \"lengthSatisfied\":\n    true, \"evidenceSatisfied\": true, \"requestedLength\": null,\n    \"observedLength\": null, \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"summary\": \"why this is ready\" } }`\n  - Limited: `finalReadiness: { \"decision\": \"limited\", \"evidenceMode\":\n    \"search_summary_only\" | \"mixed\" | \"read_sources\", \"limitations\":\n    \"Only search summaries / failed read_url attempts / one readable\n    source were available; the report names these limits.\",\n    \"requirementsAssessment\": { \"userRequirementSummary\": \"summarize\n    the user's concrete output requirements\", \"requirementSatisfied\":\n    false, \"lengthSatisfied\": false, \"evidenceSatisfied\": false,\n    \"requestedLength\": null, \"observedLength\": null,\n    \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"remainingGaps\": [\"state the real\n    gaps\"], \"summary\": \"why this is limited\" } }`\n\n## Rules\n\n- Length follows evidence. Rich evidence → long report. Thin\n  evidence → short report + disclosed limitations. If the user asked\n  for a long concrete length and your evidence supports only a shorter\n  report, write the shorter evidence-backed report and say so. Do not\n  invent sections to hit length.\n- In the readiness JSON examples above, `requestedLength` and\n  `observedLength` are shown as `null` only as placeholders. Replace\n  them with numbers whenever the user gave a concrete length and\n  `workspace_read` gave you `textStats`.\n- You, the AI, decide `requirementsAssessment`. Runtime only records and\n  displays it with raw `textStats` / `read_url` counts. Do not rely on\n  runtime to decide whether the answer meets length, evidence, or depth\n  requirements.\n- Never invent citations. Every source URL must come from a successful\n  `read_url` you ran in this run.\n- Search-result URLs may appear only in a clearly labeled \"candidate\n  sources not fully read\" note. Do not list them as verified Sources\n  unless `read_url` succeeded.\n- Never claim a single-source fact as verified. Mark it \"reported by\n  <source>; not independently verified\".\n- Use the user's language throughout.\n- The runtime no longer back-fills workspace files. If you do not\n  write final_candidate.md, the user gets nothing.\n- If 2+ sources contradict each other on the same fact, present both\n  and disclose the contradiction; do not pick a winner without\n  evidence.\n- Workspace tools are filename-free-form (any safe path). Reserved\n  conventions (questions.md, evidence.json, draft.md, critique.md,\n  final_candidate.md) are convention-only; pick clearer names if your\n  topic needs them.\n- Quality (`workspace.quality`) is advisory; runtime never blocks\n  finalize. Decide for yourself when the report is ready.",
       "name": "deep-research-writer",
       "sourcePath": "skills/deep-research-writer/SKILL.md",
       "tags": [
@@ -4076,7 +4076,7 @@
         "article",
         "documentation"
       ],
-      "instructions": "# Long Web Research\n\nUse this skill when the user asks for deep research, a final report, a market\nscan, a literature-style review, a multi-source comparison, or an investigation\nthat cannot be answered well from one quick search.\n\nThis skill is a long-run research harness. Do not treat it as a single\n`web_search` call.\n\nActivation:\n\n- When you select this skill, declare `mode: \"long_research\"` on your first\n  plan envelope so the runtime activates the budget gate and gate-signal\n  envelope. This replaces lexical-prompt detection: the runtime will not\n  guess long-research mode from your prompt text.\n- The runtime returns a structured gate signal back to you on each cycle,\n  shaped roughly:\n  `{ sourceMinimum, authorityCoverage, claimGraph, evidenceGaps,\n     budgetStatus, finalMode }`. Read it before deciding the next action.\n- The runtime may also expose\n  `loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`.\n  If it says `forbiddenReadiness: \"ready\"`, you must not emit a clean\n  `finalReadiness.decision=\"ready\"` on the next terminal attempt. Either\n  continue with targeted `web_search` / `read_url` / workspace expansion,\n  or publish `limited` with `evidenceSatisfied: false` and concrete\n  `remainingGaps`.\n- The runtime owns mechanism (authority scoring, duplicate detection,\n  loop budget) and never writes prose. You own workflow, queries, action\n  choice, and the final report text.\n\nWorkspace (ADR-0015):\n\n- The virtual workspace is your scratchpad for long-form drafting. Use\n  `workspace_write`, `workspace_read`, `workspace_append`,\n  `workspace_insert_after_section`, `workspace_replace`,\n  `workspace_remove`, `workspace_list`, `workspace_finalize_candidate`,\n  and `workspace_publish_candidate`.\n- Filenames are free-form (any safe path; no `..`, no absolute, no\n  backslash). The runtime suggests these conventions when the response\n  is a research report: `outline.md`, `evidence.json`, `draft.md`,\n  `critique.md`, `final_candidate.md`. Use them or pick your own, but\n  if you pick a custom user-facing report path such as `report.md`, you\n  must pass that same path to `workspace_finalize_candidate` and\n  `workspace_publish_candidate`, or copy/promote it into\n  `final_candidate.md` before publishing.\n- The runtime no longer back-fills empty workspace files from your\n  final answer. If you don't author the artifact, it stays empty.\n- Quality (`workspace.quality`) is advisory: it reports which\n  conventional files are present; it does not block finalize. You\n  decide when to call `workspace_finalize_candidate` and finalize.\n- Long reports do not need to be generated in one model response. Build\n  `evidence.json`, `draft.md`, `critique.md`, and `final_candidate.md`\n  over multiple OODAE turns, then publish the selected candidate with\n  `workspace_publish_candidate` so the final answer is the workspace\n  artifact rather than a shorter finalizer rewrite.\n- Direct `finalize` is not a publish substitute for long workspace\n  reports. It asks another model pass to answer from context and may\n  compress, shorten, or omit the workspace artifact. Use\n  `workspace_publish_candidate` when the workspace file itself is the\n  answer.\n- Before terminal publish, read the selected candidate and compare\n  `textStats` against the user's concrete requirements (length, language,\n  sections, source count). Runtime reports the stats; you decide whether\n  to revise, publish ready, or publish limited.\n\nProcess:\n\n1. Restate the research topic and define the final report shape.\n2. Create a short research plan with 3 to 7 questions or sections.\n3. Use `web_search` to discover sources for each section.\n4. Use `read_url` for the strongest sources before making source-backed claims.\n5. Track evidence by source URL, title, relevance, and what claim it supports.\n6. Continue searching if important sections have weak or missing evidence.\n7. Prefer primary sources, official docs, papers, filings, standards, or direct\n   product pages when available.\n8. For handle, username, brand, or personal-profile topics, first try direct\n   first-party/owned sources such as the official website, GitHub profile,\n   project documentation, and professional profile pages before relying on\n   social mirrors or generic directories.\n9. If the first search/read pass only finds thin or weak sources, change the\n   next query shape instead of repeating it. Try quoted topic, official website,\n   GitHub, documentation, LinkedIn/profile, and `site:` targeted searches.\n10. If a source cannot be read, say so and either use a better source or mark the\n   claim as lower confidence.\n11. Keep progress visible during long runs: plan, sources read, gaps, and next\n   research step.\n12. After `draft.md` exists, read it back and write `critique.md`.\n    If critique has no blocking evidence gap, promote the draft into\n    `final_candidate.md`, call `workspace_finalize_candidate`, read\n    the candidate stats, and publish it with `workspace_publish_candidate`.\n    If your main draft is a custom path such as `report.md`, either use\n    that exact path for finalize/read/publish or copy it into\n    `final_candidate.md`; do not leave the completed report in a custom\n    path and then use direct `finalize`.\n    Include `finalReadiness.requirementsAssessment` on publish using the\n    latest `workspace_read` stats. If a concrete requested length is unmet\n    and evidence can support expansion, revise the workspace candidate instead\n    of publishing. Prefer `workspace_append` for new sections or\n    `workspace_insert_after_section` for targeted section expansion when\n    `workspace_replace` would require fragile exact-match text. If evidence is\n    exhausted, publish limited only with `evidenceSatisfied: false` and\n    concrete `remainingGaps`.\n    Do not keep doing broad search once the draft is substantive and\n    ready to be promoted.\n13. If `workspace_publish_candidate` is blocked, read the returned\n    `status`, `message`, and any workspace advisory facts before the\n    next action:\n    - `missing_finalize_after_latest_write`: call\n      `workspace_finalize_candidate` on the selected candidate after the\n      latest write/replace.\n    - `missing_latest_workspace_read`: call `workspace_read` on the same\n      candidate before writing again or publishing.\n    - `readiness_audit_failed`: fix the `finalReadiness` self-audit so it\n      matches latest `workspace_read` stats, or revise the candidate. If the\n      audit says the candidate is shorter than a requested length and more\n      user-facing material is available, continue with `workspace_append` or\n      `workspace_insert_after_section` before trying publish again.\n    - `acceptanceConvergenceSignal` / `forbiddenReadiness=ready`: your\n      repeated `ready` decision conflicts with observable acceptance facts\n      such as source minimum or Research Gate. Do not retry clean `ready`.\n      Continue evidence work, or publish only `limited` with\n      `evidenceSatisfied: false` and non-empty `remainingGaps`.\n    - `todo_state_not_synced`: call `todo_run_next` or `todo_advance`\n      to mark completed work before any terminal action. Do not switch to\n      direct `finalize` to escape an unfinished TodoState.\n    If `publish_attempts_blocked` reaches 3 or more, change the action\n    sequence instead of repeating the same write -> finalize -> publish\n    loop.\n    If publish is blocked for readiness, length, or TodoState reasons, do\n    not replace the publish path with direct `finalize`. Use the blocker\n    status as the next OODAE observation: expand with `workspace_append` /\n    `workspace_insert_after_section`, gather a named missing source with\n    `web_search` / `read_url`, or synchronize TodoState. Only publish\n    limited when the remaining blockers are concrete and recorded in\n    `requirementsAssessment.remainingGaps`.\n14. Use this `finalReadiness` shape for limited publish when the answer is\n    short or evidence-thin. Adapt values from the latest `workspace_read`\n    and read source facts; do not invent numbers:\n\n    ```json\n    {\n      \"decision\": \"limited\",\n      \"evidenceMode\": \"mixed\",\n      \"limitations\": \"One sentence naming the concrete blocker.\",\n      \"requirementsAssessment\": {\n        \"checkedReadinessAgainstUserRequest\": true,\n        \"checkedReadUrlEvidence\": true,\n        \"checkedWorkspaceStats\": true,\n        \"evidenceSatisfied\": false,\n        \"lengthSatisfied\": false,\n        \"observedLength\": 1200,\n        \"observedLengthUnit\": \"words\",\n        \"requestedLength\": 3000,\n        \"requirementSatisfied\": false,\n        \"successfulReadUrlCount\": 2,\n        \"userRequirementSummary\": \"One-line user request summary\",\n        \"remainingGaps\": [\n          \"Could not read primary source after repeated failures\",\n          \"Need more detail for section X but no usable source was available\"\n        ]\n      }\n    }\n    ```\n\n    Use the same length unit the user requested (`words` for word-count\n    requests, `chars`/`cjk_chars` for character-count requests).\n    `remainingGaps` is required when `observedLength < requestedLength`\n    and you publish as `limited`. If evidence is truly exhausted, set\n    `evidenceSatisfied: false` and list concrete blockers. Do not set\n    `evidenceSatisfied: true` while the candidate is short and\n    `remainingGaps` is empty.\n15. End with a structured report you author yourself, in the user's\n    language: executive summary, findings, evidence table, risks or\n    caveats, and recommended next steps. The runtime no longer compiles\n    a fallback report; if you do not write one, the user gets nothing.\n    Use the gate signal's `finalMode` to decide depth:\n    `full_report` means produce the full report;\n    `final_with_limitations` means produce the best answer possible and\n    clearly disclose evidence limits; `needs_more` means continue\n    researching unless budget is exhausted.\n\nRules:\n\n- Use runtime actions such as `web_search`, `read_url`, and TodoState progress\n  actions when available. Do not hardcode external HTTP calls inside the skill.\n- Do not invent citations. Every source-backed claim needs a source URL that was\n  discovered or read during the run.\n- Do not expose API keys, provider payloads, raw tool arguments, or private\n  runtime traces in the report.\n- If the task needs current information, include the research date in the final\n  report.\n- If the user asks for a short answer, use `web-research` instead of this skill.",
+      "instructions": "# Long Web Research\n\nUse this skill when the user asks for deep research, a final report, a market\nscan, a literature-style review, a multi-source comparison, or an investigation\nthat cannot be answered well from one quick search.\n\nThis skill is a long-run research harness. Do not treat it as a single\n`web_search` call.\n\nHard top rules (read before any action):\n\n- Every run MUST end with `workspace_publish_candidate`. If you ever observe\n  `terminalRepairState.budgetState === \"exhausted\"`, your single next action\n  must be `workspace_publish_candidate` — `decision=\"ready\"` only if all\n  observable deficits are satisfied, otherwise `decision=\"limited\"` with a\n  non-empty `remainingGaps` array naming each deficit. Letting the run hit\n  `max_steps_continuation` is always a failure even if the candidate is good.\n- Treat `plan` and `web_search` as expensive. Do not call `plan` twice in\n  a row without a writing / reading / publishing action in between. Do not\n  call `web_search` more than 5 times before calling `read_url` and writing\n  the first draft section. If your action history shows ≥3 `plan` calls and\n  zero `workspace_write`, switch to drafting immediately.\n- Mirror the runtime contract verbatim. `terminalRepairState.requiredRepair`\n  and `validPublishContract.validTerminalException` tell you exactly what\n  terminal action is valid; use them rather than inventing your own.\n\nActivation:\n\n- When you select this skill, declare `mode: \"long_research\"` on your first\n  plan envelope so the runtime activates the budget gate and gate-signal\n  envelope. This replaces lexical-prompt detection: the runtime will not\n  guess long-research mode from your prompt text.\n- The runtime returns a structured gate signal back to you on each cycle,\n  shaped roughly:\n  `{ sourceMinimum, authorityCoverage, claimGraph, evidenceGaps,\n     budgetStatus, finalMode }`. Read it before deciding the next action.\n- The runtime may also expose\n  `loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`.\n  If it says `forbiddenReadiness: \"ready\"`, you must not emit a clean\n  `finalReadiness.decision=\"ready\"` on the next terminal attempt. Either\n  continue with targeted `web_search` / `read_url` / workspace expansion,\n  or publish `limited` with `evidenceSatisfied: false` and concrete\n  `remainingGaps`.\n- The runtime owns mechanism (authority scoring, duplicate detection,\n  loop budget) and never writes prose. You own workflow, queries, action\n  choice, and the final report text.\n\nWorkspace (ADR-0015):\n\n- The virtual workspace is your scratchpad for long-form drafting. Use\n  `workspace_write`, `workspace_read`, `workspace_append`,\n  `workspace_insert_after_section`, `workspace_replace`,\n  `workspace_propose_patch`, `workspace_apply_patch`,\n  `workspace_remove`, `workspace_list`, `workspace_finalize_candidate`,\n  and `workspace_publish_candidate`.\n- Filenames are free-form (any safe path; no `..`, no absolute, no\n  backslash). The runtime suggests these conventions when the response\n  is a research report: `outline.md`, `evidence.json`, `draft.md`,\n  `critique.md`, `final_candidate.md`. Use them or pick your own, but\n  if you pick a custom user-facing report path such as `report.md`, you\n  must pass that same path to `workspace_finalize_candidate` and\n  `workspace_publish_candidate`, or copy/promote it into\n  `final_candidate.md` before publishing.\n- The runtime no longer back-fills empty workspace files from your\n  final answer. If you don't author the artifact, it stays empty.\n- Quality (`workspace.quality`) is advisory: it reports which\n  conventional files are present; it does not block finalize. You\n  decide when to call `workspace_finalize_candidate` and finalize.\n- Long reports do not need to be generated in one model response. Build\n  `evidence.json`, `draft.md`, `critique.md`, and `final_candidate.md`\n  over multiple OODAE turns, then publish the selected candidate with\n  `workspace_publish_candidate` so the final answer is the workspace\n  artifact rather than a shorter finalizer rewrite.\n- Direct `finalize` is not a publish substitute for long workspace\n  reports. It asks another model pass to answer from context and may\n  compress, shorten, or omit the workspace artifact. Use\n  `workspace_publish_candidate` when the workspace file itself is the\n  answer.\n- Before terminal publish, read the selected candidate and compare\n  `textStats` against the user's concrete requirements (length, language,\n  sections, source count). Runtime reports the stats; you decide whether\n  to revise, publish ready, or publish limited.\n- When a workspace action returns `lengthProgress`, treat it as the\n  current length contract. If `lengthProgress.status` is\n  `below_requested`, calculate the remaining gap from\n  `remainingLength` and expand the report with enough complete,\n  source-grounded paragraphs to materially close that gap. A short note,\n  placeholder, or 50-word patch is not useful when the remaining gap is\n  hundreds or thousands of words.\n- For long reports, use an index-first writing protocol:\n  1. After the first useful reads, write `outline.md` with the exact\n     section headings and the source URLs that support each section.\n  2. Write `draft.md` from that outline. The first draft may cover only\n     the first sections, but it must be real user-facing prose, not a\n     promise to write later.\n  3. Once a draft exists, do not repeat small `workspace_write` rewrites.\n     Use `workspace_append` for new sections or\n     `workspace_insert_after_section` for targeted expansion.\n  4. Size each writing action from `lengthProgress.remainingLength`.\n     If 2000+ words remain, add a full section-sized chunk, not a short\n     paragraph.\n  5. Keep section headings unique. A long report should grow by adding\n     planned sections under the outline, not by duplicating headings.\n- For risky structure repair, prefer the two-step patch contract when\n  available: call `workspace_propose_patch`, inspect `status`,\n  `deltaWords`, `riskFlags`, `structureBefore`, and `structureAfter`,\n  then call `workspace_apply_patch` only for a latest `preview_ready`\n  patch with no blocking risk flags. Valid operations are\n  `append{content}`, `insert_after_section{heading,content}`,\n  `replace{find,replace,replace_all?}`, and\n  `normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}`.\n  For duplicate headings or duplicate section numbers shown in\n  `duplicate_heading_context`, `duplicate_section_number_context`, or\n  `section_number_repair_context`, use exactly one `normalize_headings`\n  operation first when length is already satisfied. Do not mix it with\n  `replace` unless exact current `find` text is visible and heading-only\n  repair cannot improve structure.\n\nProcess:\n\n1. Restate the research topic and define the final report shape.\n2. Create a short research plan with 3 to 7 questions or sections.\n3. Use `web_search` to discover sources for each section.\n4. Use `read_url` for the strongest sources before making source-backed claims.\n5. Track evidence by source URL, title, relevance, and what claim it supports.\n6. Write `outline.md` as a section index once at least one useful source has\n   been read. Include the planned section title, target purpose, and supporting\n   URLs for each section.\n7. Start `draft.md` from the outline before doing more broad search. If an\n   important section has weak evidence, mark that section's evidence gap in\n   `outline.md` and do targeted search/read for that gap.\n8. Continue searching if important sections have weak or missing evidence.\n9. Prefer primary sources, official docs, papers, filings, standards, or direct\n   product pages when available.\n10. For handle, username, brand, or personal-profile topics, first try direct\n   first-party/owned sources such as the official website, GitHub profile,\n   project documentation, and professional profile pages before relying on\n   social mirrors or generic directories.\n11. If the first search/read pass only finds thin or weak sources, change the\n   next query shape instead of repeating it. Try quoted topic, official website,\n   GitHub, documentation, LinkedIn/profile, and `site:` targeted searches.\n12. If a source cannot be read, say so and either use a better source or mark the\n   claim as lower confidence.\n13. Keep progress visible during long runs: plan, sources read, gaps, and next\n   research step.\n14. After `draft.md` exists, read it back and write `critique.md`.\n    If critique has no blocking evidence gap, promote the draft into\n    `final_candidate.md`, call `workspace_finalize_candidate`, read\n    the candidate stats, and publish it with `workspace_publish_candidate`.\n    If your main draft is a custom path such as `report.md`, either use\n    that exact path for finalize/read/publish or copy it into\n    `final_candidate.md`; do not leave the completed report in a custom\n    path and then use direct `finalize`.\n    Include `finalReadiness.requirementsAssessment` on publish using the\n    latest `workspace_read` stats. If a concrete requested length is unmet\n    and evidence can support expansion, revise the workspace candidate instead\n    of publishing. Prefer `workspace_append` for new sections or\n    `workspace_insert_after_section` for targeted section expansion when\n    `workspace_replace` would require fragile exact-match text. Use the\n    latest `lengthProgress.remainingLength` to size the expansion across\n    the requested sections; distribute the missing words into real\n    analysis, examples, pattern details, and caveats backed by the sources\n    already read. If evidence is exhausted, publish limited only with\n    `evidenceSatisfied: false` and concrete `remainingGaps`.\n    Do not keep doing broad search once the draft is substantive and\n    ready to be promoted.\n13. If `workspace_publish_candidate` is blocked, read the returned\n    `status`, `message`, and any workspace advisory facts before the\n    next action:\n    - `missing_finalize_after_latest_write`: call\n      `workspace_finalize_candidate` on the selected candidate after the\n      latest write/replace.\n    - `missing_latest_workspace_read`: call `workspace_read` on the same\n      candidate before writing again or publishing.\n    - `readiness_audit_failed`: fix the `finalReadiness` self-audit so it\n      matches latest `workspace_read` stats, or revise the candidate. If the\n      audit says the candidate is shorter than a requested length and more\n      user-facing material is available, continue with `workspace_append` or\n      `workspace_insert_after_section` before trying publish again. The\n      next workspace mutation should be sized from the observable\n      remaining length, not from a generic \"add more detail\" note.\n    - `acceptanceConvergenceSignal` / `forbiddenReadiness=ready`: your\n      repeated `ready` decision conflicts with observable acceptance facts\n      such as source minimum or Research Gate. Do not retry clean `ready`.\n      Continue evidence work, or publish only `limited` with\n      `evidenceSatisfied: false` and non-empty `remainingGaps`.\n    - `todo_state_not_synced`: call `todo_run_next` or `todo_advance`\n      to mark completed work before any terminal action. Do not switch to\n      direct `finalize` to escape an unfinished TodoState.\n    If `publish_attempts_blocked` reaches 3 or more, change the action\n    sequence instead of repeating the same write -> finalize -> publish\n    loop.\n    If publish is blocked for readiness, length, or TodoState reasons, do\n    not replace the publish path with direct `finalize`. Use the blocker\n    status as the next OODAE observation: expand with `workspace_append` /\n    `workspace_insert_after_section`, gather a named missing source with\n    `web_search` / `read_url`, or synchronize TodoState. Only publish\n    limited when the remaining blockers are concrete and recorded in\n    `requirementsAssessment.remainingGaps`.\n14. Use this `finalReadiness` shape for limited publish when the answer is\n    short or evidence-thin. Adapt values from the latest `workspace_read`\n    and read source facts; do not invent numbers:\n\n    ```json\n    {\n      \"decision\": \"limited\",\n      \"evidenceMode\": \"mixed\",\n      \"limitations\": \"One sentence naming the concrete blocker.\",\n      \"requirementsAssessment\": {\n        \"checkedReadinessAgainstUserRequest\": true,\n        \"checkedReadUrlEvidence\": true,\n        \"checkedWorkspaceStats\": true,\n        \"evidenceSatisfied\": false,\n        \"lengthSatisfied\": false,\n        \"observedLength\": 1200,\n        \"observedLengthUnit\": \"words\",\n        \"requestedLength\": 3000,\n        \"requirementSatisfied\": false,\n        \"successfulReadUrlCount\": 2,\n        \"userRequirementSummary\": \"One-line user request summary\",\n        \"remainingGaps\": [\n          \"Could not read primary source after repeated failures\",\n          \"Need more detail for section X but no usable source was available\"\n        ]\n      }\n    }\n    ```\n\n    Use the same length unit the user requested (`words` for word-count\n    requests, `chars`/`cjk_chars` for character-count requests).\n    `remainingGaps` is required when `observedLength < requestedLength`\n    and you publish as `limited`. If evidence is truly exhausted, set\n    `evidenceSatisfied: false` and list concrete blockers. Do not set\n    `evidenceSatisfied: true` while the candidate is short and\n    `remainingGaps` is empty.\n15. End with a structured report you author yourself, in the user's\n    language: executive summary, findings, evidence table, risks or\n    caveats, and recommended next steps. The runtime no longer compiles\n    a fallback report; if you do not write one, the user gets nothing.\n    Use the gate signal's `finalMode` to decide depth:\n    `full_report` means produce the full report;\n    `final_with_limitations` means produce the best answer possible and\n    clearly disclose evidence limits; `needs_more` means continue\n    researching unless budget is exhausted.\n\nBudget-exhaustion exit (mandatory):\n\n- Every workspace mutation observation includes\n  `terminalRepairState.budgetState`. When that value becomes `low` or\n  `exhausted`, treat the next OODAE cycle as your last productive turn.\n- When `terminalRepairState.budgetState === \"exhausted\"`, do NOT continue\n  `plan` / `workspace_read` loops and do NOT keep rewriting the same\n  candidate. Issue exactly one terminal action that matches the observable\n  deficits:\n  - If `activeDeficits` contains only `length` (or `length` + `todo` /\n    `readiness`) and source + structure are satisfied, issue\n    `workspace_publish_candidate` with\n    `finalReadiness.decision=\"limited\"`, `lengthSatisfied: false`,\n    `requirementSatisfied: false`, and a non-empty\n    `remainingGaps=[\"length deficit: observed X / requested Y words\"]`.\n    A short-but-honest limited publish is the correct exit, not silent\n    timeout.\n  - If `activeDeficits` contains `structure`, do ONE coherent\n    `workspace_propose_patch` with `normalize_headings` using the exact\n    line numbers in `duplicate_heading_context`,\n    `duplicate_section_number_context`, or\n    `section_number_repair_context`, then\n    `workspace_apply_patch` only if the preview is valid. If patch tools\n    are unavailable, do one coherent `workspace_write` or\n    `workspace_replace` that rewrites the candidate with explicit unique\n    heading text and unique section numbers. Do not append more sections,\n    do not run more searches, and do not loop on `workspace_read`. Treat\n    this as your single repair attempt; if the structure audit still\n    fails after one repair, publish limited with\n    `remainingGaps=[\"structure audit failed: <issueCodes>\"]` instead of\n    burning more cycles on another rewrite.\n  - If source and length are already satisfied and the remaining deficits\n    are structure plus TodoState, use only the listed structure patch\n    action and TodoState sync actions. Do not append, insert, rewrite,\n    replace, search, or read unless `allowedActions` explicitly requires\n    it. Use `todo_advance` / `todo_run_next`, or `todo_cancel` for stale\n    plan items, before the publish attempt.\n  - If `activeDeficits` contains only `source`, the run already exhausted\n    budget without enough sources; publish limited with\n    `evidenceSatisfied: false` and `remainingGaps=[\"source minimum unmet:\n    readSources=X, relevantSources=Y\"]`.\n- Use `terminalRepairState.requiredRepair` and\n  `validPublishContract.validTerminalException` verbatim as the\n  contract for your terminal action. The runtime already lists what\n  terminal action is valid; mirror it instead of inventing one.\n- A `terminalizedBy: max_steps_continuation` outcome is always a harness\n  failure. If you ever see `budgetState === \"exhausted\"` and you still\n  hold a publish slot, publish limited rather than letting the run hit\n  max steps.\n\nRules:\n\n- Use runtime actions such as `web_search`, `read_url`, and TodoState progress\n  actions when available. Do not hardcode external HTTP calls inside the skill.\n- Do not invent citations. Every source-backed claim needs a source URL that was\n  discovered or read during the run.\n- Do not expose API keys, provider payloads, raw tool arguments, or private\n  runtime traces in the report.\n- If the task needs current information, include the research date in the final\n  report.\n- If the user asks for a short answer, use `web-research` instead of this skill.",
       "name": "long-web-research",
       "sourcePath": "skills/long-web-research/SKILL.md",
       "tags": [
@@ -4173,9 +4173,9 @@
       return null;
     }
 
-    const skillId = readString$1F(skill.skillId) || readString$1F(skill.id) || readString$1F(skill.name);
-    const name = readString$1F(skill.name);
-    const instructions = readString$1F(skill.instructions);
+    const skillId = readString$1G(skill.skillId) || readString$1G(skill.id) || readString$1G(skill.name);
+    const name = readString$1G(skill.name);
+    const instructions = readString$1G(skill.instructions);
 
     if (!name || !instructions) {
       return null;
@@ -4183,25 +4183,25 @@
 
     return {
       availability: normalizeAvailability$1(skill.availability),
-      category: readString$1F(skill.category),
-      checksum: readString$1F(skill.checksum),
-      description: readString$1F(skill.description),
+      category: readString$1G(skill.category),
+      checksum: readString$1G(skill.checksum),
+      description: readString$1G(skill.description),
       instructions,
       inputTypes: normalizeStringArray$2(skill.inputTypes),
       name,
-      namespace: readString$1F(skill.namespace),
+      namespace: readString$1G(skill.namespace),
       requires: normalizeStringArray$2(skill.requires),
       riskTier: normalizeRiskTier(skill.riskTier),
       skillId,
-      sourcePath: readString$1F(skill.sourcePath),
+      sourcePath: readString$1G(skill.sourcePath),
       tags: normalizeStringArray$2(skill.tags),
       tools: normalizeAgentTools(skill.tools),
-      version: readString$1F(skill.version)
+      version: readString$1G(skill.version)
     };
   }
 
   function findAgentSkill(skills, name) {
-    const target = readString$1F(name).toLowerCase();
+    const target = readString$1G(name).toLowerCase();
 
     if (!target) {
       return null;
@@ -4217,8 +4217,8 @@
       return null;
     }
 
-    const name = readString$1F(skill.name);
-    const skillId = readString$1F(skill.skillId) || readString$1F(skill.id) || name;
+    const name = readString$1G(skill.name);
+    const skillId = readString$1G(skill.skillId) || readString$1G(skill.id) || name;
 
     if (!name || !skillId) {
       return null;
@@ -4226,19 +4226,19 @@
 
     return {
       availability: normalizeAvailability$1(skill.availability),
-      category: readString$1F(skill.category),
-      checksum: readString$1F(skill.checksum),
-      description: readString$1F(skill.description),
+      category: readString$1G(skill.category),
+      checksum: readString$1G(skill.checksum),
+      description: readString$1G(skill.description),
       inputTypes: normalizeStringArray$2(skill.inputTypes),
       name,
-      namespace: readString$1F(skill.namespace),
+      namespace: readString$1G(skill.namespace),
       requires: normalizeStringArray$2(skill.requires),
       riskTier: normalizeRiskTier(skill.riskTier),
       skillId,
-      sourcePath: readString$1F(skill.sourcePath),
+      sourcePath: readString$1G(skill.sourcePath),
       tags: normalizeStringArray$2(skill.tags),
       tools: normalizeAgentToolSummaries(skill.tools),
-      version: readString$1F(skill.version)
+      version: readString$1G(skill.version)
     };
   }
 
@@ -4304,7 +4304,7 @@
 
   function findAgentSkillTool(skill, toolName) {
     const resolvedSkill = normalizeAgentSkill(skill);
-    const target = readString$1F(toolName).toLowerCase();
+    const target = readString$1G(toolName).toLowerCase();
 
     if (!resolvedSkill || !target) {
       return null;
@@ -4320,7 +4320,7 @@
 
     return Object.freeze({
       getManifest(skillIdOrName) {
-        const target = readString$1F(skillIdOrName).toLowerCase();
+        const target = readString$1G(skillIdOrName).toLowerCase();
         if (!target) return null;
         const manifest = manifests.find((item) => matchesSkillKey(item, target));
         return manifest ? createAgentSkillSummary(manifest) : null;
@@ -4331,7 +4331,7 @@
       },
 
       loadSkill(skillIdOrName) {
-        const target = readString$1F(skillIdOrName).toLowerCase();
+        const target = readString$1G(skillIdOrName).toLowerCase();
         if (!target) return null;
         return normalizedSkills.find((skill) => matchesSkillKey(skill, target)) || null;
       }
@@ -4410,8 +4410,8 @@
       return null;
     }
 
-    const name = readString$1F(tool.name);
-    const description = readString$1F(tool.description);
+    const name = readString$1G(tool.name);
+    const description = readString$1G(tool.description);
     const func = typeof tool.func === "function" ? tool.func : null;
 
     if (!name || !description || !func) {
@@ -4442,8 +4442,8 @@
       return null;
     }
 
-    const name = readString$1F(tool.name);
-    const description = readString$1F(tool.description);
+    const name = readString$1G(tool.name);
+    const description = readString$1G(tool.description);
 
     if (!name || !description) {
       return null;
@@ -4455,8 +4455,8 @@
       parameters: normalizeToolParameters(tool.parameters)
     };
 
-    if (readString$1F(tool.resultKind)) {
-      summary.resultKind = readString$1F(tool.resultKind);
+    if (readString$1G(tool.resultKind)) {
+      summary.resultKind = readString$1G(tool.resultKind);
     }
     if (normalizeRiskTier(tool.riskTier) != null) {
       summary.riskTier = normalizeRiskTier(tool.riskTier);
@@ -4480,8 +4480,8 @@
       }
 
       const prop = {
-        description: readString$1F(value.description),
-        type: readString$1F(value.type)
+        description: readString$1G(value.description),
+        type: readString$1G(value.type)
       };
       copySchemaEnum(prop, value);
       copySchemaAliases(prop, value);
@@ -4493,8 +4493,8 @@
         for (const [nk, nv] of Object.entries(value.properties)) {
           if (nv && typeof nv === "object" && !Array.isArray(nv)) {
             const nestedProp = copySchemaEnum({
-              description: readString$1F(nv.description),
-              type: readString$1F(nv.type)
+              description: readString$1G(nv.description),
+              type: readString$1G(nv.type)
             }, nv);
             copySchemaAliases(nestedProp, nv);
             nested[nk] = nestedProp;
@@ -4513,7 +4513,7 @@
       required: Array.isArray(source.required)
         ? source.required.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
         : [],
-      type: readString$1F(source.type) || "object"
+      type: readString$1G(source.type) || "object"
     };
   }
 
@@ -4558,7 +4558,7 @@
     return target;
   }
 
-  function readString$1F(value) {
+  function readString$1G(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -4602,7 +4602,7 @@
     const seen = new Set();
 
     for (const skill of Array.isArray(skills) ? skills : []) {
-      const key = readString$1F(skill && (skill.skillId || skill.name)).toLowerCase();
+      const key = readString$1G(skill && (skill.skillId || skill.name)).toLowerCase();
       if (!key) continue;
       if (seen.has(key)) {
         throw new Error(`Duplicate agent skill id "${key}".`);
@@ -4613,8 +4613,8 @@
 
   function matchesSkillKey(skill, target) {
     if (!skill || !target) return false;
-    return readString$1F(skill.skillId).toLowerCase() === target ||
-      readString$1F(skill.name).toLowerCase() === target;
+    return readString$1G(skill.skillId).toLowerCase() === target ||
+      readString$1G(skill.name).toLowerCase() === target;
   }
 
   function normalizeMaybeAsync(value, normalize) {
@@ -4628,7 +4628,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "e1c2f2c27-dirty"
+      "4f01dfa01"
         
     );
   }
@@ -5011,7 +5011,7 @@
   }
 
   function buildCurrentTurnParts(prompt, parts) {
-    const normalizedPrompt = readString$1E(prompt);
+    const normalizedPrompt = readString$1F(prompt);
     const normalizedParts = normalizeMultimodalParts(parts);
     const imageAndExtraParts = normalizedParts.filter((part) => (
       part.type === "image" ||
@@ -5078,7 +5078,7 @@
     }
 
     const label = readImageLabel(part);
-    const mimeType = readString$1E(part.mimeType) || "image/*";
+    const mimeType = readString$1F(part.mimeType) || "image/*";
     const bytes = readImageBytes(part);
     return bytes > 0
       ? `${label} (${mimeType}, ${bytes} bytes)`
@@ -5086,7 +5086,7 @@
   }
 
   function parseDataUrl(value) {
-    const source = readString$1E(value);
+    const source = readString$1F(value);
     const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/i.exec(source);
 
     if (!match) {
@@ -5095,7 +5095,7 @@
 
     return {
       data: match[2],
-      mimeType: readString$1E(match[1]) || "application/octet-stream"
+      mimeType: readString$1F(match[1]) || "application/octet-stream"
     };
   }
 
@@ -5105,13 +5105,13 @@
     }
 
     if (part.type === "text") {
-      const text = readString$1E(part.text);
+      const text = readString$1F(part.text);
       return text ? { type: "text", text } : null;
     }
 
     if (part.type === "image") {
-      const url = readString$1E(part.url);
-      const mimeType = readString$1E(part.mimeType);
+      const url = readString$1F(part.url);
+      const mimeType = readString$1F(part.mimeType);
 
       if (!url || !mimeType) {
         return null;
@@ -5130,11 +5130,11 @@
   }
 
   function readImageLabel(part) {
-    return readString$1E(part && part.filename) || "Image";
+    return readString$1F(part && part.filename) || "Image";
   }
 
   function estimateBase64Bytes(data) {
-    const text = readString$1E(data);
+    const text = readString$1F(data);
 
     if (!text) {
       return 0;
@@ -5153,7 +5153,7 @@
   }
 
   function readOptionalString$2(value) {
-    const text = readString$1E(value);
+    const text = readString$1F(value);
     return text || null;
   }
 
@@ -5163,7 +5163,7 @@
       : null;
   }
 
-  function readString$1E(value) {
+  function readString$1F(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5428,7 +5428,7 @@
    * / invalid URLs are dropped. Order is stable (first occurrence wins).
    */
   function buildThreadScopedEvidenceUrls(memoryEntries, activeThreadId) {
-    const threadId = readString$1D(activeThreadId);
+    const threadId = readString$1E(activeThreadId);
     if (!threadId) return null;
     const list = Array.isArray(memoryEntries) ? memoryEntries : [];
     if (list.length === 0) return null;
@@ -5436,7 +5436,7 @@
     for (const entry of list) {
       if (!entry || typeof entry !== "object") continue;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-      const entryThread = readString$1D(metadata.threadId) || DEFAULT_THREAD_ID;
+      const entryThread = readString$1E(metadata.threadId) || DEFAULT_THREAD_ID;
       if (entryThread !== threadId) continue;
       collectUrlsFromMetadata(metadata, urls);
     }
@@ -5457,23 +5457,23 @@
     const list = Array.isArray(entries) ? entries : [];
     if (!scope || typeof scope !== "object") return list.slice();
     if (scope.crossThread === true) return list.slice();
-    const threadId = readString$1D(scope.threadId);
+    const threadId = readString$1E(scope.threadId);
     if (!threadId) return list.slice();
     return list.filter((entry) => {
       if (!entry || typeof entry !== "object") return false;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-      const entryThread = readString$1D(metadata.threadId) || DEFAULT_THREAD_ID;
+      const entryThread = readString$1E(metadata.threadId) || DEFAULT_THREAD_ID;
       return entryThread === threadId;
     });
   }
 
   function collectUrlsFromMetadata(metadata, sink) {
-    const direct = readString$1D(metadata.url) || readString$1D(metadata.sourceUrl);
+    const direct = readString$1E(metadata.url) || readString$1E(metadata.sourceUrl);
     if (direct) sink.add(direct);
     if (Array.isArray(metadata.sources)) {
       for (const source of metadata.sources) {
         if (source && typeof source === "object") {
-          const url = readString$1D(source.url);
+          const url = readString$1E(source.url);
           if (url) sink.add(url);
         }
       }
@@ -5496,12 +5496,12 @@
 
     const context = projectSessionContextFromSnapshot(snapshot);
     return {
-      activeQuery: readString$1D(context && context.activeQuery),
-      clarificationStatus: readString$1D(context && context.clarificationStatus) || "none",
-      currentGoal: readString$1D(context && context.currentGoal),
-      currentTopic: readString$1D(context && context.currentTopic),
+      activeQuery: readString$1E(context && context.activeQuery),
+      clarificationStatus: readString$1E(context && context.clarificationStatus) || "none",
+      currentGoal: readString$1E(context && context.currentGoal),
+      currentTopic: readString$1E(context && context.currentTopic),
       lastResolution: context && context.lastResolution ? stableClone(context.lastResolution) : null,
-      openAmbiguity: readString$1D(context && context.openAmbiguity),
+      openAmbiguity: readString$1E(context && context.openAmbiguity),
       pendingClarification: context && context.pendingClarification ? stableClone(context.pendingClarification) : null
     };
   }
@@ -5513,7 +5513,7 @@
 
     const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
     const kind = readEvidenceKind(metadata.kind);
-    const status = readString$1D(metadata.status) || "confirmed";
+    const status = readString$1E(metadata.status) || "confirmed";
     const text = readEntryText$1(entry);
 
     if (!kind || status !== "confirmed" || !text) {
@@ -5521,14 +5521,14 @@
     }
 
     const slot = normalizeSlot$1(metadata.slot);
-    const threadId = readString$1D(metadata.threadId) || DEFAULT_THREAD_ID;
-    const turnId = readString$1D(metadata.turnId) || null;
-    const source = readString$1D(metadata.source) || null;
-    const supersededBy = readString$1D(metadata.supersededBy) || null;
+    const threadId = readString$1E(metadata.threadId) || DEFAULT_THREAD_ID;
+    const turnId = readString$1E(metadata.turnId) || null;
+    const source = readString$1E(metadata.source) || null;
+    const supersededBy = readString$1E(metadata.supersededBy) || null;
     const confidence = typeof metadata.confidence === "number"
       ? clampConfidence$2(metadata.confidence)
       : DEFAULT_CONFIDENCE;
-    const id = readString$1D(metadata.id)
+    const id = readString$1E(metadata.id)
       || `${threadId}|${kind}|${slot || normalizeText(text)}|${index}`;
 
     return {
@@ -5587,8 +5587,8 @@
   function anchorTurns(compacted, recentTurns, anchors) {
     const allTurns = Array.isArray(compacted) ? compacted : [];
     const recent = Array.isArray(recentTurns) ? recentTurns : [];
-    const currentGoal = readString$1D(anchors && anchors.currentGoal);
-    const currentTopic = readString$1D(anchors && anchors.currentTopic);
+    const currentGoal = readString$1E(anchors && anchors.currentGoal);
+    const currentTopic = readString$1E(anchors && anchors.currentTopic);
     const selected = new Set(recent.map((turn) => allTurns.indexOf(turn)).filter((index) => index >= 0));
     const goalIndex = findAnchorTurnIndex(allTurns, currentGoal);
     const topicIndex = findAnchorTurnIndex(allTurns, currentTopic);
@@ -5702,7 +5702,7 @@
     }
 
     for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const userText = readString$1D(turns[index] && turns[index].user);
+      const userText = readString$1E(turns[index] && turns[index].user);
       const normalizedUser = normalizeAnchorText$1(userText);
       if (!normalizedUser) {
         continue;
@@ -5725,7 +5725,7 @@
   }
 
   function readEvidenceKind(value) {
-    const normalized = readString$1D(value);
+    const normalized = readString$1E(value);
     return EVIDENCE_KINDS.includes(normalized) ? normalized : "";
   }
 
@@ -5745,17 +5745,17 @@
   }
 
   function normalizeText(value) {
-    return readString$1D(value)
+    return readString$1E(value)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
   }
 
   function normalizeAnchorText$1(value) {
-    return readString$1D(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
+    return readString$1E(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
   }
 
-  function readString$1D(value) {
+  function readString$1E(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5792,7 +5792,7 @@
     return {
       decisionsCount: countEvidenceItems(items, "decision"),
       ambiguityPresent: hasText(context && context.openAmbiguity),
-      clarificationStatus: readString$1C(context && context.clarificationStatus) || "none",
+      clarificationStatus: readString$1D(context && context.clarificationStatus) || "none",
       factsCount: countEvidenceItems(items, "fact"),
       goalPresent: hasText(context && context.currentGoal),
       historyCount: countHistoryMessages((context && (context.recentTurns || context.history)) || ""),
@@ -5817,7 +5817,7 @@
     }
 
     return [
-      readString$1C(heading) || "Session evidence:",
+      readString$1D(heading) || "Session evidence:",
       renderSection("Current goal", sessionContext.currentGoal),
       renderSection("Current topic", sessionContext.currentTopic),
       renderSection("Active query", sessionContext.activeQuery),
@@ -5931,7 +5931,7 @@
       .map((message) => {
         const role = typeof message.role === "string" ? message.role : "assistant";
         const text = stringifySessionContent(message.content);
-        return text ? `${capitalize(role)}: ${text}` : "";
+        return text ? `${capitalize$1(role)}: ${text}` : "";
       })
       .filter(Boolean)
       .join("\n");
@@ -5961,7 +5961,7 @@
     return text ? `${title}:\n${text}` : "";
   }
 
-  function readString$1C(value) {
+  function readString$1D(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5974,12 +5974,12 @@
   }
 
   function readClarificationStatus$1(value) {
-    const text = readString$1C(value);
+    const text = readString$1D(value);
     return text && text !== "none" ? text : "";
   }
 
   function hasText(value) {
-    return readString$1C(value).length > 0;
+    return readString$1D(value).length > 0;
   }
 
   function countEvidenceItems(items, kind) {
@@ -5993,7 +5993,7 @@
   }
 
   function countHistoryMessages(value) {
-    const text = readString$1C(value);
+    const text = readString$1D(value);
 
     if (!text) {
       return 0;
@@ -6007,7 +6007,7 @@
   }
 
   function countNumberedLines(value) {
-    const text = readString$1C(value);
+    const text = readString$1D(value);
 
     if (!text) {
       return 0;
@@ -6020,7 +6020,7 @@
       .length;
   }
 
-  function capitalize(value) {
+  function capitalize$1(value) {
     return value.length === 0 ? value : value[0].toUpperCase() + value.slice(1);
   }
 
@@ -6065,13 +6065,13 @@
         usage.input_tokens,
         usage.promptTokenCount
       ),
-      model: readString$1B(output.model) || null,
+      model: readString$1C(output.model) || null,
       outputTokens: readUsageNumber(
         usage.completion_tokens,
         usage.output_tokens,
         usage.candidatesTokenCount
       ),
-      provider: readString$1B(output.provider) || null,
+      provider: readString$1C(output.provider) || null,
       totalTokens: readUsageNumber(
         usage.total_tokens,
         usage.totalTokenCount,
@@ -6100,7 +6100,7 @@
   }
 
   function estimateProviderPromptTokens(request, sessionPolicy) {
-    const provider = readString$1B(request && request.provider) || "openai";
+    const provider = readString$1C(request && request.provider) || "openai";
     const sessionPrompt = buildSessionContextSystemPrompt(request && request.sessionContext);
     const bytesPerToken = readPositiveInteger$h(
       sessionPolicy && sessionPolicy.charsPerToken,
@@ -6117,7 +6117,7 @@
   function estimateOpenAIPromptTokens(request, sessionPrompt, bytesPerToken) {
     let total = OPENAI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
 
-    if (readString$1B(request && request.systemPrompt)) {
+    if (readString$1C(request && request.systemPrompt)) {
       total += estimateMessageTokens("system", request.systemPrompt, bytesPerToken);
     }
 
@@ -6132,7 +6132,7 @@
 
   function estimateGeminiPromptTokens(request, sessionPrompt, bytesPerToken) {
     let total = GEMINI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
-    const systemPrompt = [readString$1B(request && request.systemPrompt), sessionPrompt]
+    const systemPrompt = [readString$1C(request && request.systemPrompt), sessionPrompt]
       .filter(Boolean)
       .join("\n\n");
 
@@ -6159,7 +6159,7 @@
         return total;
       }
 
-      const role = readString$1B(message.role) || "user";
+      const role = readString$1C(message.role) || "user";
       return total + estimatePartsTokens(message.parts, bytesPerToken, overhead, role);
     }, 0);
   }
@@ -6168,7 +6168,7 @@
     const list = Array.isArray(parts) ? parts : [];
     const text = list
       .filter((part) => part && typeof part === "object" && !isImagePart(part))
-      .map((part) => readString$1B(part.text))
+      .map((part) => readString$1C(part.text))
       .filter(Boolean)
       .join("\n");
     const imageCount = list.filter(isImagePart).length;
@@ -6200,7 +6200,7 @@
     return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 
-  function readString$1B(value) {
+  function readString$1C(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6281,8 +6281,8 @@
     if (!ledger || typeof ledger !== "object") return null;
     if (!params || typeof params !== "object") return null;
 
-    const provider = readString$1A(params.provider);
-    const model = readString$1A(params.model);
+    const provider = readString$1B(params.provider);
+    const model = readString$1B(params.model);
     const inputTokens = readFiniteNumber$5(params.inputTokens);
     const outputTokens = readFiniteNumber$5(params.outputTokens);
     const totalTokens = readFiniteNumber$5(params.totalTokens)
@@ -6302,7 +6302,7 @@
     const cost = resolveCost(ledger, {
       provider,
       model,
-      callKind: readString$1A(params.callKind) || null,
+      callKind: readString$1B(params.callKind) || null,
       inputTokens,
       outputTokens
     });
@@ -6316,7 +6316,7 @@
     const entry = {
       ts: Number.isFinite(params.ts) ? params.ts : Date.now(),
       phase: normalizePhase(params.phase),
-      callKind: readString$1A(params.callKind) || null,
+      callKind: readString$1B(params.callKind) || null,
       provider: provider || null,
       model: model || null,
       inputTokens,
@@ -6372,7 +6372,7 @@
     const output = readFiniteNumber$5(raw.output);
     if (input == null && output == null) return null;
     const per = readPositiveNumber$2(raw.per) || DEFAULT_PRICING_PER;
-    const currency = readString$1A(raw.currency) || "USD";
+    const currency = readString$1B(raw.currency) || "USD";
     return { input, output, per, currency };
   }
 
@@ -6435,8 +6435,8 @@
   }
 
   function compositeKey(provider, model) {
-    const p = readString$1A(provider).toLowerCase();
-    const m = readString$1A(model).toLowerCase();
+    const p = readString$1B(provider).toLowerCase();
+    const m = readString$1B(model).toLowerCase();
     if (!p && !m) return "";
     return `${p || "n/a"}:${m || "n/a"}`;
   }
@@ -6463,7 +6463,7 @@
     return (input || 0) + (output || 0);
   }
 
-  function readString$1A(value) {
+  function readString$1B(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6627,6 +6627,378 @@
       args: decision.args && typeof decision.args === "object" ? decision.args : {}
     };
     return djb2Hash(stableStringify(envelope));
+  }
+
+  const PRODUCTIVE_PROGRESS_DIMENSIONS = ["workspace", "source"];
+
+  function createProgressSnapshot$1(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    const researchContext = source.researchContext && typeof source.researchContext === "object" ? source.researchContext : {};
+    const readSources = Array.isArray(researchContext.readSources) ? researchContext.readSources : [];
+    const searchResults = collectSearchResults$1(researchContext);
+    const sourceMinimum = readSourceMinimum$4(source);
+    const candidate = readCandidateSnapshot$2(source);
+    const todo = readTodoSnapshot(source);
+    const skill = readSkillSnapshot(source);
+    const memoryEntriesAdded = Array.isArray(source.memoryEntriesAdded)
+      ? source.memoryEntriesAdded.length
+      : readNumber$k(source.memoryEntriesAdded);
+
+    return {
+      candidate,
+      memoryEntriesAdded,
+      readSourceCount: readSources.length,
+      readSourceUrlCount: countDistinctReadUrls(readSources),
+      relevantSourceCount: sourceMinimum ? readNumber$k(sourceMinimum.relevantSources) : countRelevantReadSources(readSources),
+      requestedLength: readRequestedLengthStatus(source),
+      searchPassCount: Array.isArray(researchContext.searchPasses) ? researchContext.searchPasses.length : 0,
+      searchResultUrlCount: countDistinctSearchUrls(searchResults),
+      skill,
+      sourceMinimumPassed: sourceMinimum ? sourceMinimum.passed === true : false,
+      successfulReadUrlCount: readSuccessfulReadUrlCount$3(source, readSources),
+      todo,
+      toolHistoryCount: source.toolContext && Array.isArray(source.toolContext.history)
+        ? source.toolContext.history.length
+        : 0,
+      workspace: readWorkspaceSnapshot(source)
+    };
+  }
+
+  function diffProgress$1(previous, next) {
+    const before = normalizeProgressSnapshot$1(previous);
+    const after = normalizeProgressSnapshot$1(next);
+    const dimensions = [];
+    if (after.successfulReadUrlCount > before.successfulReadUrlCount ||
+        after.readSourceUrlCount > before.readSourceUrlCount ||
+        after.relevantSourceCount > before.relevantSourceCount ||
+        (after.sourceMinimumPassed === true && before.sourceMinimumPassed !== true)) {
+      dimensions.push("source");
+    }
+    if (after.searchPassCount > before.searchPassCount || after.searchResultUrlCount > before.searchResultUrlCount) {
+      dimensions.push("search");
+    }
+    const candidateTextGrew =
+      readNumber$k(after.candidate.words) > readNumber$k(before.candidate.words) ||
+      readNumber$k(after.candidate.chars) > readNumber$k(before.candidate.chars) ||
+      readNumber$k(after.candidate.cjkChars) > readNumber$k(before.candidate.cjkChars);
+    const workspaceVersionGrew = readNumber$k(after.workspace.version) > readNumber$k(before.workspace.version);
+    const lengthDeficitActive = after.requestedLength &&
+      readNumber$k(after.requestedLength.requested) > 0 &&
+      readNumber$k(after.requestedLength.observed) < readNumber$k(after.requestedLength.requested);
+    if (candidateTextGrew || (workspaceVersionGrew && !lengthDeficitActive)) {
+      dimensions.push("workspace");
+    } else if (workspaceVersionGrew) {
+      dimensions.push("workspace_churn");
+    }
+    if (readNumber$k(after.todo.done) > readNumber$k(before.todo.done) ||
+        readNumber$k(after.todo.completed) > readNumber$k(before.todo.completed)) {
+      dimensions.push("todo");
+    }
+    if (after.memoryEntriesAdded > before.memoryEntriesAdded ||
+        readNumber$k(after.skill.loadedCount) > readNumber$k(before.skill.loadedCount)) {
+      dimensions.push("memory_or_skill");
+    }
+    const uniqueDimensions = Array.from(new Set(dimensions));
+    const productiveDimensions = uniqueDimensions.filter((d) => PRODUCTIVE_PROGRESS_DIMENSIONS.includes(d));
+    const transitionalDimensions = uniqueDimensions.filter((d) => !PRODUCTIVE_PROGRESS_DIMENSIONS.includes(d));
+    return {
+      dimensions: uniqueDimensions,
+      productiveDimensions,
+      transitionalDimensions,
+      hasProgress: uniqueDimensions.length > 0,
+      hasProductiveProgress: productiveDimensions.length > 0,
+      hasTransitionalOnlyProgress: productiveDimensions.length === 0 && transitionalDimensions.length > 0
+    };
+  }
+
+  function normalizeProgressSnapshot$1(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value)
+      ? value
+      : {};
+    return {
+      candidate: {
+        chars: readNumber$k(source.candidate && source.candidate.chars),
+        cjkChars: readNumber$k(source.candidate && source.candidate.cjkChars),
+        path: readString$1A(source.candidate && source.candidate.path) || null,
+        words: readNumber$k(source.candidate && source.candidate.words)
+      },
+      memoryEntriesAdded: readNumber$k(source.memoryEntriesAdded),
+      readSourceCount: readNumber$k(source.readSourceCount),
+      readSourceUrlCount: readNumber$k(source.readSourceUrlCount),
+      relevantSourceCount: readNumber$k(source.relevantSourceCount),
+      requestedLength: {
+        observed: readNumber$k(source.requestedLength && source.requestedLength.observed),
+        requested: readNumber$k(source.requestedLength && source.requestedLength.requested),
+        statsKey: readString$1A(source.requestedLength && source.requestedLength.statsKey) || null
+      },
+      searchPassCount: readNumber$k(source.searchPassCount),
+      searchResultUrlCount: readNumber$k(source.searchResultUrlCount),
+      skill: {
+        active: readString$1A(source.skill && source.skill.active) || null,
+        lastRead: readString$1A(source.skill && source.skill.lastRead) || null,
+        loadedCount: readNumber$k(source.skill && source.skill.loadedCount)
+      },
+      sourceMinimumPassed: source.sourceMinimumPassed === true,
+      successfulReadUrlCount: readNumber$k(source.successfulReadUrlCount),
+      todo: {
+        completed: readNumber$k(source.todo && source.todo.completed),
+        done: readNumber$k(source.todo && source.todo.done),
+        version: readNumber$k(source.todo && source.todo.version)
+      },
+      toolHistoryCount: readNumber$k(source.toolHistoryCount),
+      workspace: {
+        finalCandidateReady: source.workspace && source.workspace.finalCandidateReady === true,
+        operationCount: readNumber$k(source.workspace && source.workspace.operationCount),
+        version: readNumber$k(source.workspace && source.workspace.version)
+      }
+    };
+  }
+
+  function summarizeProgressSnapshot(value) {
+    const snapshot = normalizeProgressSnapshot$1(value);
+    return {
+      candidate: snapshot.candidate,
+      readSourceCount: snapshot.readSourceCount,
+      readSourceUrlCount: snapshot.readSourceUrlCount,
+      relevantSourceCount: snapshot.relevantSourceCount,
+      searchPassCount: snapshot.searchPassCount,
+      searchResultUrlCount: snapshot.searchResultUrlCount,
+      sourceMinimumPassed: snapshot.sourceMinimumPassed,
+      successfulReadUrlCount: snapshot.successfulReadUrlCount,
+      todo: snapshot.todo,
+      workspace: snapshot.workspace
+    };
+  }
+
+  function readCandidateSnapshot$2(runState) {
+    const packet = readAcceptancePacket$3(runState);
+    const packetStats = packet && packet.candidate && packet.candidate.textStats
+      ? packet.candidate.textStats
+      : null;
+    if (packetStats) {
+      return {
+        chars: readNumber$k(packetStats.chars),
+        cjkChars: readNumber$k(packetStats.cjkChars),
+        path: readString$1A(packet.candidate.path) || null,
+        words: readNumber$k(packetStats.words)
+      };
+    }
+    const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      ? runState.virtualWorkspace
+      : null;
+    const quality = workspace && workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
+    const path = readString$1A(quality.finalCandidatePath) || "final_candidate.md";
+    const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
+      ? workspace.files[path]
+      : null;
+    const stats = file && file.textStats && typeof file.textStats === "object" ? file.textStats : {};
+    return {
+      chars: readNumber$k(stats.chars),
+      cjkChars: readNumber$k(stats.cjkChars),
+      path: file ? path : null,
+      words: readNumber$k(stats.words)
+    };
+  }
+
+  function readRequestedLengthStatus(runState) {
+    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : null;
+    const packet = loop &&
+      loop.gateSignal &&
+      loop.gateSignal.acceptancePacket &&
+      typeof loop.gateSignal.acceptancePacket === "object"
+      ? loop.gateSignal.acceptancePacket
+      : null;
+    const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
+      ? packet.requestedLength
+      : null;
+    const requestedValue = readNumber$k(requested && requested.value);
+    const statsKey = readString$1A(requested && requested.statsKey) ||
+      (readString$1A(requested && requested.unit) === "words" ? "words" : "chars");
+    if (!requestedValue || !statsKey) return null;
+    const candidateStats = packet && packet.candidate && typeof packet.candidate === "object"
+      ? (packet.candidate.textStats || packet.candidate.stats)
+      : null;
+    const workspaceStats = readWorkspaceCandidateStats(runState);
+    const observed = readNumber$k(candidateStats && candidateStats[statsKey]) ||
+      readNumber$k(workspaceStats && workspaceStats[statsKey]);
+    return {
+      observed,
+      requested: requestedValue,
+      statsKey
+    };
+  }
+
+  function hasWorkspaceArtifacts(runState) {
+    const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      ? runState.virtualWorkspace
+      : null;
+    if (!workspace) return false;
+    if (readNumber$k(workspace.version) > 0) return true;
+    const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
+      ? workspace.files
+      : null;
+    return Boolean(files && Object.keys(files).length > 0);
+  }
+
+  function hasUnfinishedTodoState(runState) {
+    const todoState = runState && runState.todoState && typeof runState.todoState === "object"
+      ? runState.todoState
+      : null;
+    if (!todoState || todoState.status !== "active") return false;
+    if (readString$1A(todoState.activeItemId)) return true;
+    if (!Array.isArray(todoState.items)) return false;
+    return todoState.items.some((item) => {
+      const status = readString$1A(item && item.status);
+      return status === "active" || status === "pending" || status === "blocked";
+    });
+  }
+
+  function readSourceMinimum$4(runState) {
+    const packet = readAcceptancePacket$3(runState);
+    if (packet && packet.evidence && packet.evidence.sourceMinimum && typeof packet.evidence.sourceMinimum === "object") {
+      return packet.evidence.sourceMinimum;
+    }
+    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : {};
+    return loop.sourceMinimum && typeof loop.sourceMinimum === "object" ? loop.sourceMinimum : null;
+  }
+
+  function readAcceptancePacket$3(runState) {
+    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : null;
+    const signal = loop && loop.gateSignal && typeof loop.gateSignal === "object"
+      ? loop.gateSignal
+      : null;
+    return signal && signal.acceptancePacket && typeof signal.acceptancePacket === "object"
+      ? signal.acceptancePacket
+      : null;
+  }
+
+  function readWorkspaceCandidateStats(runState) {
+    const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      ? runState.virtualWorkspace
+      : null;
+    const quality = workspace && workspace.quality && typeof workspace.quality === "object"
+      ? workspace.quality
+      : null;
+    const path = readString$1A(quality && quality.finalCandidatePath) || "final_candidate.md";
+    const file = workspace &&
+      workspace.files &&
+      workspace.files[path] &&
+      typeof workspace.files[path] === "object"
+      ? workspace.files[path]
+      : null;
+    return file && typeof file.textStats === "object" ? file.textStats : null;
+  }
+
+  function readWorkspaceSnapshot(runState) {
+    const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      ? runState.virtualWorkspace
+      : {};
+    const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
+    return {
+      finalCandidateReady: quality.finalCandidateReady === true,
+      operationCount: Array.isArray(workspace.operations) ? workspace.operations.length : 0,
+      version: readNumber$k(workspace.version)
+    };
+  }
+
+  function readTodoSnapshot(runState) {
+    const todoState = runState && runState.todoState && typeof runState.todoState === "object"
+      ? runState.todoState
+      : null;
+    const items = todoState && Array.isArray(todoState.items) ? todoState.items : [];
+    return {
+      completed: todoState && todoState.status === "completed" ? 1 : 0,
+      done: items.filter((item) => item && item.status === "done").length,
+      version: todoState && Number.isInteger(todoState.version) ? todoState.version : 0
+    };
+  }
+
+  function readSkillSnapshot(runState) {
+    const context = runState && runState.agentSkillContext && typeof runState.agentSkillContext === "object"
+      ? runState.agentSkillContext
+      : {};
+    const active = readSkillLabel(context.activeSkill);
+    const lastRead = readSkillLabel(context.lastReadSkill);
+    return {
+      active,
+      lastRead,
+      loadedCount: (active ? 1 : 0) + (lastRead && lastRead !== active ? 1 : 0)
+    };
+  }
+
+  function readSuccessfulReadUrlCount$3(runState, readSources) {
+    const packet = readAcceptancePacket$3(runState);
+    if (packet && packet.evidence) {
+      const value = readNullableNumber$6(packet.evidence.successfulReadUrlCount);
+      if (value != null) return value;
+    }
+    const sources = Array.isArray(readSources) ? readSources : [];
+    return sources.filter((source) => source && (source.ok === true || source.status === 200 || source.status === "ok")).length;
+  }
+
+  function countRelevantReadSources(readSources) {
+    const sources = Array.isArray(readSources) ? readSources : [];
+    return sources.filter((source) => {
+      const quality = readString$1A(source && source.quality);
+      return source && source.ok !== false && quality !== "thin" && quality !== "rejected";
+    }).length;
+  }
+
+  function collectSearchResults$1(researchContext) {
+    const results = [];
+    if (Array.isArray(researchContext.searchResults)) results.push(...researchContext.searchResults);
+    if (Array.isArray(researchContext.aggregatedSearchResults)) results.push(...researchContext.aggregatedSearchResults);
+    if (Array.isArray(researchContext.searchPasses)) {
+      for (const pass of researchContext.searchPasses) {
+        if (pass && Array.isArray(pass.results)) results.push(...pass.results);
+      }
+    }
+    return results;
+  }
+
+  function countDistinctSearchUrls(results) {
+    const urls = new Set();
+    const list = Array.isArray(results) ? results : [];
+    for (const item of list) {
+      const url = readString$1A(item && (item.url || item.link || item.href));
+      if (url) urls.add(url);
+    }
+    return urls.size;
+  }
+
+  function countDistinctReadUrls(readSources) {
+    const urls = new Set();
+    const list = Array.isArray(readSources) ? readSources : [];
+    for (const item of list) {
+      const url = readString$1A(item && item.url);
+      if (url) urls.add(url);
+    }
+    return urls.size;
+  }
+
+  function readSkillLabel(value) {
+    if (!value || typeof value !== "object") return null;
+    return readString$1A(value.name) || readString$1A(value.skillId) || null;
+  }
+
+  function readString$1A(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  function readNumber$k(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+  }
+
+  function readNullableNumber$6(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
   }
 
   function classifyReadSourceTier(value, options = {}) {
@@ -6942,7 +7314,7 @@
     const readSources = Array.isArray(runState.researchContext && runState.researchContext.readSources)
       ? runState.researchContext.readSources
       : [];
-    const searchResults = collectSearchResults$1(runState);
+    const searchResults = collectSearchResults(runState);
     const sourceQuality = summarizeSourceQuality(readSources);
     const gaps = required
       ? detectEvidenceGaps({ readSources, searchResults, sourceQuality })
@@ -7489,7 +7861,7 @@
     return readString$1y(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
 
-  function collectSearchResults$1(runState) {
+  function collectSearchResults(runState) {
     const context = runState && runState.researchContext && typeof runState.researchContext === "object"
       ? runState.researchContext
       : {};
@@ -7537,6 +7909,16 @@
   const TRANSITIONAL_ONLY_THRESHOLD = 3;
   const READ_ONLY_PLANNING_HARD_VETO_THRESHOLD = 3;
   const READ_ONLY_PLANNING_CLEAR_THRESHOLD = 2;
+  const STRUCTURE_REPAIR_NO_PROGRESS_THRESHOLD = 2;
+  // ADR-0013 / AGRUN-237 PR 3: escalate to hard_veto after this many no-progress
+  // structure repair cycles — mirrors READ_ONLY_PLANNING_HARD_VETO_THRESHOLD.
+  const STRUCTURE_REPAIR_HARD_VETO_THRESHOLD = 3;
+  // AGRUN-237-GAP-04: workspace_write overwrite oscillation — advisory when stall
+  // count reaches 2, hard_veto at 3.
+  const WORKSPACE_MUTATION_GROWTH_ADVISORY_THRESHOLD = 2;
+  const WORKSPACE_MUTATION_GROWTH_HARD_VETO_THRESHOLD = 3;
+  // delta.words below this floor (while deficit persists) counts as a stall.
+  const WORKSPACE_MUTATION_GROWTH_STALL_FLOOR = 30;
   const DEFAULT_FORBIDDEN_TERMINAL_ACTIONS = ["workspace_publish_candidate", "finalize"];
   const DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS = [
     "web_search",
@@ -7546,7 +7928,13 @@
     "workspace_read",
     "list_agent_skills",
     "read_agent_skill",
-    "use_agent_skill"
+    "use_agent_skill",
+    "execute_skill_tool"
+  ];
+  const LENGTH_DEFICIT_CHURN_ACTIONS = [
+    "workspace_read",
+    "workspace_write",
+    "workspace_replace"
   ];
   const DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES = [
     "read_url",
@@ -7558,10 +7946,31 @@
     "todo_run_next",
     "workspace_publish_candidate_limited_with_remainingGaps"
   ];
+  const DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS = [
+    "workspace_list",
+    "workspace_read",
+    "workspace_append",
+    "workspace_insert_after_section"
+  ];
+  const DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES = [
+    "workspace_write",
+    "workspace_replace",
+    "workspace_finalize_candidate",
+    "todo_advance",
+    "todo_run_next",
+    "workspace_publish_candidate_limited_with_structure_remainingGaps"
+  ];
+  const DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS = ["workspace_write", "workspace_replace"];
+  const DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES = [
+    "workspace_propose_patch",
+    "workspace_apply_patch",
+    "workspace_append",
+    "workspace_insert_after_section",
+    "workspace_finalize_candidate",
+    "workspace_publish_candidate_limited_with_remainingGaps"
+  ];
   const DEFAULT_VALID_TERMINAL_EXCEPTION =
     "workspace_publish_candidate with decision=limited + non-empty remainingGaps + false failed-dimension flags";
-  const PRODUCTIVE_PROGRESS_DIMENSIONS = ["workspace", "source"];
-
   function createActionPatternConvergenceState() {
     return {
       kind: "action_pattern_convergence",
@@ -7572,11 +7981,14 @@
       lastActionName: null,
       repeatedFingerprintCount: 0,
       repeatedSemanticFingerprintCount: 0,
+      errorRepeatCount: 0,
       stepsWithoutObservableProgress: 0,
       progressSnapshot: createProgressSnapshot$1(null),
       recentPatterns: [],
       convergenceSignal: null,
       readOnlyPlanningState: createReadOnlyPlanningState(),
+      structureRepairConvergence: createStructureRepairConvergenceState(),
+      workspaceMutationGrowthConvergence: createWorkspaceMutationGrowthConvergenceState(),
       terminalCorrectionState: createTerminalCorrectionState(),
       ignoredTerminalCorrectionCount: 0,
       latestCorrectionSignal: null,
@@ -7584,6 +7996,13 @@
       updatedAtCycle: null,
       version: 1
     };
+  }
+
+  function isActionErrorRefresh(context) {
+    const status = readString$1x(context && context.status);
+    return status === "action_error_self_correct"
+      || status === "validation_error_self_correct"
+      || status === "preflight_error_self_correct";
   }
 
   function refreshActionPatternConvergence(runState, context = {}) {
@@ -7604,7 +8023,8 @@
     const snapshot = createProgressSnapshot$1(runState);
     const progress = diffProgress$1(previous.progressSnapshot, snapshot);
     const longFormMode = isLongResearchRun(runState);
-    const effectiveHasProgress = longFormMode ? progress.hasProductiveProgress : progress.hasProgress;
+    const productiveOnlyMode = longFormMode || isStructuredReadOnlyPlanningLoop(runState, actionName);
+    const effectiveHasProgress = productiveOnlyMode ? progress.hasProductiveProgress : progress.hasProgress;
     const repeatedFingerprintCount = fingerprint && fingerprint === previous.lastFingerprint
       ? previous.repeatedFingerprintCount + 1
       : fingerprint
@@ -7625,14 +8045,26 @@
       : isTrackableAction(actionName, context)
         ? previous.stepsWithoutObservableProgress + 1
         : previous.stepsWithoutObservableProgress;
+    // ADR-0013 — track repeated throws of the same action+args. The
+    // counter increments only when the current refresh is an
+    // action-error path (validation / preflight / execute) AND the
+    // fingerprint matches the previous throw. Any non-error refresh
+    // resets it, so a single recovered action clears the signal.
+    const errorRepeatCount = isActionErrorRefresh(context)
+      ? (fingerprint && fingerprint === previous.lastFingerprint
+          ? readNumber$j(previous.errorRepeatCount) + 1
+          : 1)
+      : 0;
     const signal = buildConvergenceSignal({
       actionName,
       context,
       effectiveHasProgress,
+      errorRepeatCount,
       fingerprint,
       longFormMode,
       outcomeHash,
       progress,
+      productiveOnlyMode,
       repeatedFingerprintCount,
       repeatedSemanticFingerprintCount,
       runState,
@@ -7668,12 +8100,28 @@
       signal,
       stepsWithoutObservableProgress
     });
+    const structureRepairConvergence = updateStructureRepairConvergence({
+      actionName,
+      context,
+      previous: previous.structureRepairConvergence,
+      runState
+    });
+    const workspaceMutationGrowthConvergence = updateWorkspaceMutationGrowthConvergence({
+      actionName,
+      context,
+      previous: previous.workspaceMutationGrowthConvergence,
+      runState
+    });
     const latestCorrectionSignal = buildLatestCorrectionSignal(terminalCorrectionState, signal);
     const patternKind = semanticFingerprint ? "semantic_terminal" : "exact_action";
     const status = terminalCorrectionState.active
       ? "terminal_correction_active"
       : readOnlyPlanningState.active
         ? "read_only_planning_active"
+        : structureRepairConvergence.active
+          ? "structure_repair_active"
+        : workspaceMutationGrowthConvergence.active
+          ? "workspace_mutation_growth_active"
       : signal
       ? "repeated_no_progress"
       : progress.hasProgress
@@ -7702,11 +8150,14 @@
       lastActionName: actionName || previous.lastActionName || null,
       repeatedFingerprintCount,
       repeatedSemanticFingerprintCount,
+      errorRepeatCount,
       stepsWithoutObservableProgress,
       progressSnapshot: snapshot,
       recentPatterns,
       convergenceSignal: signal,
       readOnlyPlanningState,
+      structureRepairConvergence,
+      workspaceMutationGrowthConvergence,
       terminalCorrectionState,
       ignoredTerminalCorrectionCount: terminalCorrectionState.active
         ? terminalCorrectionState.ignoredTerminalCorrectionCount
@@ -7726,8 +8177,11 @@
       !signal &&
       !normalized.terminalCorrectionState.active &&
       !normalized.terminalRetryCooldown.active &&
+      !normalized.structureRepairConvergence.active &&
+      !normalized.workspaceMutationGrowthConvergence.active &&
       readNumber$j(normalized.terminalRetryCooldown.blockedTerminalRetryCount) === 0 &&
       normalized.repeatedFingerprintCount === 0 &&
+      readNumber$j(normalized.errorRepeatCount) === 0 &&
       normalized.stepsWithoutObservableProgress === 0
     ) {
       return null;
@@ -7741,6 +8195,7 @@
       lastSemanticFingerprint: normalized.lastSemanticFingerprint,
       repeatedFingerprintCount: normalized.repeatedFingerprintCount,
       repeatedSemanticFingerprintCount: normalized.repeatedSemanticFingerprintCount,
+      errorRepeatCount: readNumber$j(normalized.errorRepeatCount),
       stepsWithoutObservableProgress: normalized.stepsWithoutObservableProgress,
       progressSnapshot: summarizeProgressSnapshot(normalized.progressSnapshot),
       recentPatterns: normalized.recentPatterns.slice(-6).map((entry) => ({
@@ -7763,6 +8218,8 @@
         ? cloneValue(normalized.latestCorrectionSignal)
         : null,
       readOnlyPlanningState: summarizeReadOnlyPlanningState(normalized.readOnlyPlanningState),
+      structureRepairConvergence: summarizeStructureRepairConvergence(normalized.structureRepairConvergence),
+      workspaceMutationGrowthConvergence: summarizeWorkspaceMutationGrowthConvergence(normalized.workspaceMutationGrowthConvergence),
       terminalRetryCooldown: summarizeTerminalRetryCooldown(normalized.terminalRetryCooldown),
       updatedAtCycle: normalized.updatedAtCycle
     };
@@ -7771,8 +8228,8 @@
   function createReadOnlyPlanningState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
-    const forbiddenActions = readStringArray$3(source.forbiddenActions);
-    const allowedNextMoves = readStringArray$3(source.allowedNextMoves);
+    const forbiddenActions = readStringArray$5(source.forbiddenActions);
+    const allowedNextMoves = readStringArray$5(source.allowedNextMoves);
     const ignoredCount = readNumber$j(source.ignoredCount);
     const explicitEscalation = readString$1x(source.escalation);
     const escalation = explicitEscalation === "hard_veto" || explicitEscalation === "advisory"
@@ -7797,7 +8254,7 @@
       activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
       lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
       lastIgnoredAtCycle: readNullableNumber$5(source.lastIgnoredAtCycle),
-      transitionalDimensions: readStringArray$3(source.transitionalDimensions).slice(0, 8),
+      transitionalDimensions: readStringArray$5(source.transitionalDimensions).slice(0, 8),
       lastActionName: readString$1x(source.lastActionName) || null,
       clearedReason: active ? null : (readString$1x(source.clearedReason) || null)
     };
@@ -7837,6 +8294,117 @@
     };
   }
 
+  function createStructureRepairConvergenceState(value = {}) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const active = source.active === true;
+    return {
+      active,
+      status: readString$1x(source.status) || (active ? "active" : "none"),
+      reason: readString$1x(source.reason) || null,
+      forbiddenMove: readString$1x(source.forbiddenMove) || (active ? "repeat_structure_repair_without_audit_delta" : null),
+      forbiddenActions: (readStringArray$5(source.forbiddenActions).length > 0
+        ? readStringArray$5(source.forbiddenActions)
+        : DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS).slice(0, 12),
+      allowedNextMoves: (readStringArray$5(source.allowedNextMoves).length > 0
+        ? readStringArray$5(source.allowedNextMoves)
+        : DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES).slice(0, 12),
+      requiredCorrection: readString$1x(source.requiredCorrection) || null,
+      repeatedStructureNoProgressCount: readNumber$j(source.repeatedStructureNoProgressCount),
+      structureProgressCount: readNumber$j(source.structureProgressCount),
+      lastActionName: readString$1x(source.lastActionName) || null,
+      lastStructureSnapshot: normalizeStructureSnapshot(source.lastStructureSnapshot),
+      activeIssueCodes: readStringArray$5(source.activeIssueCodes).slice(0, 8),
+      repeatedHeadingSamples: normalizeStructureSamples$1(source.repeatedHeadingSamples, "heading"),
+      repeatedNumberSamples: normalizeStructureSamples$1(source.repeatedNumberSamples, "number"),
+      escalation: readString$1x(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
+      lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
+      lastNoProgressAtCycle: readNullableNumber$5(source.lastNoProgressAtCycle),
+      clearedReason: active ? null : (readString$1x(source.clearedReason) || null)
+    };
+  }
+
+  function summarizeStructureRepairConvergence(value) {
+    const state = createStructureRepairConvergenceState(value);
+    if (
+      !state.active &&
+      state.repeatedStructureNoProgressCount === 0 &&
+      state.structureProgressCount === 0 &&
+      !state.clearedReason
+    ) {
+      return {
+        active: false,
+        status: state.status,
+        clearedReason: state.clearedReason
+      };
+    }
+    return {
+      active: state.active,
+      status: state.status,
+      reason: state.reason,
+      escalation: state.escalation,
+      forbiddenMove: state.forbiddenMove,
+      forbiddenActions: state.forbiddenActions,
+      allowedNextMoves: state.allowedNextMoves,
+      requiredCorrection: state.requiredCorrection,
+      repeatedStructureNoProgressCount: state.repeatedStructureNoProgressCount,
+      structureProgressCount: state.structureProgressCount,
+      activeIssueCodes: state.activeIssueCodes,
+      repeatedHeadingSamples: state.repeatedHeadingSamples,
+      repeatedNumberSamples: state.repeatedNumberSamples,
+      lastActionName: state.lastActionName,
+      lastStructureSnapshot: summarizeStructureSnapshot(state.lastStructureSnapshot),
+      activatedAtCycle: state.activatedAtCycle,
+      lastUpdatedAtCycle: state.lastUpdatedAtCycle,
+      lastNoProgressAtCycle: state.lastNoProgressAtCycle,
+      clearedReason: state.clearedReason
+    };
+  }
+
+  function createWorkspaceMutationGrowthConvergenceState(value = {}) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const active = source.active === true;
+    return {
+      active,
+      status: readString$1x(source.status) || (active ? "active" : "none"),
+      reason: readString$1x(source.reason) || null,
+      forbiddenMove: readString$1x(source.forbiddenMove) || (active ? "repeat_workspace_write_without_growth" : null),
+      forbiddenActions: (readStringArray$5(source.forbiddenActions).length > 0
+        ? readStringArray$5(source.forbiddenActions)
+        : DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS).slice(0, 6),
+      allowedNextMoves: (readStringArray$5(source.allowedNextMoves).length > 0
+        ? readStringArray$5(source.allowedNextMoves)
+        : DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES).slice(0, 8),
+      requiredCorrection: readString$1x(source.requiredCorrection) || null,
+      stallCount: readNumber$j(source.stallCount),
+      escalation: readString$1x(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
+      lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
+      clearedReason: active ? null : (readString$1x(source.clearedReason) || null)
+    };
+  }
+
+  function summarizeWorkspaceMutationGrowthConvergence(value) {
+    const state = createWorkspaceMutationGrowthConvergenceState(value);
+    if (!state.active && state.stallCount === 0 && !state.clearedReason) {
+      return { active: false, status: state.status, clearedReason: state.clearedReason };
+    }
+    return {
+      active: state.active,
+      status: state.status,
+      reason: state.reason,
+      escalation: state.escalation,
+      forbiddenMove: state.forbiddenMove,
+      forbiddenActions: state.forbiddenActions,
+      allowedNextMoves: state.allowedNextMoves,
+      requiredCorrection: state.requiredCorrection,
+      stallCount: state.stallCount,
+      activatedAtCycle: state.activatedAtCycle,
+      lastUpdatedAtCycle: state.lastUpdatedAtCycle,
+      clearedReason: state.clearedReason
+    };
+  }
+
   function createTerminalCorrectionState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
@@ -7846,7 +8414,7 @@
       reason: readString$1x(source.reason) || null,
       actionName: readString$1x(source.actionName) || null,
       forbiddenMove: readString$1x(source.forbiddenMove) || null,
-      allowedNextMoves: readStringArray$3(source.allowedNextMoves).slice(0, 8),
+      allowedNextMoves: readStringArray$5(source.allowedNextMoves).slice(0, 8),
       requiredCorrection: readString$1x(source.requiredCorrection) || null,
       firstTriggeredAtCycle: readNullableNumber$5(source.firstTriggeredAtCycle),
       lastTriggeredAtCycle: readNullableNumber$5(source.lastTriggeredAtCycle),
@@ -7861,7 +8429,7 @@
   function createTerminalRetryCooldownState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
-    const forbiddenTerminalActions = readStringArray$3(source.forbiddenTerminalActions);
+    const forbiddenTerminalActions = readStringArray$5(source.forbiddenTerminalActions);
     return {
       active,
       status: readString$1x(source.status) || (active ? "active" : "none"),
@@ -7869,7 +8437,7 @@
       forbiddenTerminalActions: (forbiddenTerminalActions.length > 0
         ? forbiddenTerminalActions
         : DEFAULT_FORBIDDEN_TERMINAL_ACTIONS).slice(0, 8),
-      allowedNextMoves: readStringArray$3(source.allowedNextMoves).slice(0, 8),
+      allowedNextMoves: readStringArray$5(source.allowedNextMoves).slice(0, 8),
       validTerminalException: readString$1x(source.validTerminalException) || DEFAULT_VALID_TERMINAL_EXCEPTION,
       blockedTerminalRetryCount: readNumber$j(source.blockedTerminalRetryCount),
       executedPublishCount: readNumber$j(source.executedPublishCount),
@@ -7923,7 +8491,7 @@
     }
     const signalMoves = signal && Array.isArray(signal.allowedNextMoves) ? signal.allowedNextMoves : [];
     const correctionMoves = correction.allowedNextMoves || [];
-    const allowedNextMoves = readStringArray$3(correctionMoves.length > 0 ? correctionMoves : signalMoves).slice(0, 8);
+    const allowedNextMoves = readStringArray$5(correctionMoves.length > 0 ? correctionMoves : signalMoves).slice(0, 8);
     return {
       ...base,
       active: true,
@@ -8018,13 +8586,14 @@
         lastUpdatedAtCycle: cycle
       };
     }
-    const planningAction = isReadOnlyPlanningAction(actionName);
+    const planningAction = isReadOnlyPlanningAction(actionName) || isLengthDeficitChurnAction(runState, actionName);
     const preflightBlocked = isReadOnlyPlanningPreflightBlock(context);
     const ignoredCount = prior.active && planningAction && !preflightBlocked
       ? prior.ignoredCount + 1
       : prior.ignoredCount;
     const signalMoves = signal && Array.isArray(signal.allowedNextMoves) ? signal.allowedNextMoves : [];
-    const allowedNextMoves = readReadOnlyPlanningAllowedNextMoves(signalMoves);
+    const forbiddenActions = readReadOnlyPlanningForbiddenActions(runState);
+    const allowedNextMoves = readReadOnlyPlanningAllowedNextMoves(signalMoves, forbiddenActions);
     // Forbidden action while active resets the productive-streak counter:
     // AI cannot escape via 1 productive insert sandwiched in a read loop.
     const nextConsecutiveProductive = planningAction
@@ -8042,10 +8611,10 @@
           ? "read_only_planning_sequence_without_productive_progress"
           : "read_only_planning_without_productive_progress"),
       forbiddenMove: "repeat_read_only_planning_without_productive_progress",
-      forbiddenActions: DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS.slice(),
+      forbiddenActions,
       allowedNextMoves,
       requiredCorrection: readString$1x(signal && signal.requiredCorrection) ||
-        "Stop repeating search, planning, or read-only review without productive progress. Use read_url to turn search leads into sources, mutate the workspace meaningfully, sync TodoState with todo_advance/todo_run_next, or publish only a valid limited result with concrete remainingGaps.",
+        "Stop repeating search, planning, skill-tool, or read-only review without productive progress. Use read_url to turn search leads into sources, mutate the workspace meaningfully, sync TodoState with todo_advance/todo_run_next, or publish only a valid limited result with concrete remainingGaps.",
       stepsWithoutProductiveProgress: Math.max(
         prior.stepsWithoutProductiveProgress + (isTrackableAction(actionName, context) ? 1 : 0),
         readNumber$j(signal && signal.stepsWithoutObservableProgress),
@@ -8087,6 +8656,240 @@
       lastIgnoredAtCycle: null,
       clearedReason: reason || "cleared"
     };
+  }
+
+  function updateStructureRepairConvergence({
+    actionName,
+    context,
+    previous,
+    runState
+  }) {
+    const prior = createStructureRepairConvergenceState(previous);
+    const cycle = readNullableNumber$5(runState && runState.cycleCount);
+    const snapshot = readStructureSnapshot(runState);
+    const repairAction = isStructureRepairAction(actionName);
+    const terminalCompleted = isTerminalCompleted$1(actionName, context);
+
+    if (terminalCompleted || snapshot.ok === true) {
+      return clearStructureRepairConvergence(
+        prior,
+        terminalCompleted ? "terminal_completed" : "structure_resolved",
+        cycle,
+        snapshot
+      );
+    }
+
+    if (!snapshot.present || snapshot.ok !== false) {
+      return {
+        ...prior,
+        lastUpdatedAtCycle: cycle
+      };
+    }
+
+    const previousSnapshot = prior.lastStructureSnapshot;
+    const hasPreviousStructure = previousSnapshot && previousSnapshot.present === true;
+    const improved = hasPreviousStructure && isStructureImproved$1(previousSnapshot, snapshot);
+    const changed = hasPreviousStructure && snapshot.signature !== previousSnapshot.signature;
+    const noProgress = hasPreviousStructure && repairAction && !improved;
+    const repeatedNoProgress = noProgress
+      ? prior.repeatedStructureNoProgressCount + 1
+      : improved
+        ? 0
+        : prior.repeatedStructureNoProgressCount;
+    const progressCount = prior.structureProgressCount + (improved || changed ? 1 : 0);
+    const shouldActivate = prior.active ||
+      repeatedNoProgress >= STRUCTURE_REPAIR_NO_PROGRESS_THRESHOLD ||
+      readString$1x(context && context.status) === "structure_repair_preflight_block";
+
+    if (!shouldActivate) {
+      return {
+        ...prior,
+        repeatedStructureNoProgressCount: repeatedNoProgress,
+        structureProgressCount: progressCount,
+        lastActionName: readString$1x(actionName) || prior.lastActionName,
+        lastStructureSnapshot: snapshot,
+        activeIssueCodes: snapshot.issueCodes,
+        repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
+        repeatedNumberSamples: snapshot.repeatedNumberSamples,
+        lastUpdatedAtCycle: cycle,
+        lastNoProgressAtCycle: noProgress ? cycle : prior.lastNoProgressAtCycle
+      };
+    }
+
+    const computedEscalation = repeatedNoProgress >= STRUCTURE_REPAIR_HARD_VETO_THRESHOLD
+      ? "hard_veto"
+      : "advisory";
+    return {
+      active: true,
+      status: repeatedNoProgress >= STRUCTURE_REPAIR_NO_PROGRESS_THRESHOLD ? "needs_targeted_structure_rewrite" : "active",
+      reason: "structure_audit_not_improving",
+      escalation: computedEscalation,
+      forbiddenMove: "repeat_structure_repair_without_audit_delta",
+      forbiddenActions: DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS.slice(),
+      allowedNextMoves: readStructureRepairAllowedNextMoves(runState),
+      requiredCorrection: buildStructureRepairRequiredCorrection(snapshot),
+      repeatedStructureNoProgressCount: repeatedNoProgress,
+      structureProgressCount: progressCount,
+      lastActionName: readString$1x(actionName) || prior.lastActionName,
+      lastStructureSnapshot: snapshot,
+      activeIssueCodes: snapshot.issueCodes,
+      repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
+      repeatedNumberSamples: snapshot.repeatedNumberSamples,
+      activatedAtCycle: prior.activatedAtCycle != null ? prior.activatedAtCycle : cycle,
+      lastUpdatedAtCycle: cycle,
+      lastNoProgressAtCycle: noProgress ? cycle : prior.lastNoProgressAtCycle,
+      clearedReason: null
+    };
+  }
+
+  function clearStructureRepairConvergence(value, reason, cycle, snapshot) {
+    const normalized = createStructureRepairConvergenceState(value);
+    if (!normalized.active && normalized.status !== "active" && normalized.status !== "needs_targeted_structure_rewrite") {
+      return {
+        ...normalized,
+        active: false,
+        status: "none",
+        lastStructureSnapshot: normalizeStructureSnapshot(snapshot || normalized.lastStructureSnapshot),
+        clearedReason: normalized.clearedReason
+      };
+    }
+    return {
+      ...normalized,
+      active: false,
+      status: "cleared",
+      escalation: "advisory",
+      repeatedStructureNoProgressCount: 0,
+      lastStructureSnapshot: normalizeStructureSnapshot(snapshot || normalized.lastStructureSnapshot),
+      lastUpdatedAtCycle: cycle != null ? cycle : normalized.lastUpdatedAtCycle,
+      lastNoProgressAtCycle: null,
+      clearedReason: reason || "cleared"
+    };
+  }
+
+  function updateWorkspaceMutationGrowthConvergence({
+    actionName,
+    context,
+    previous,
+    runState
+  }) {
+    const prior = createWorkspaceMutationGrowthConvergenceState(previous);
+    const cycle = readNullableNumber$5(runState && runState.cycleCount);
+    const name = readString$1x(actionName);
+
+    if (isTerminalCompleted$1(actionName, context)) {
+      return {
+        ...prior,
+        active: false,
+        status: "cleared",
+        escalation: "advisory",
+        stallCount: 0,
+        clearedReason: "terminal_completed",
+        lastUpdatedAtCycle: cycle
+      };
+    }
+
+    const isMutationAction = [
+      "workspace_write",
+      "workspace_append",
+      "workspace_replace",
+      "workspace_insert_after_section"
+    ].includes(name);
+
+    if (!isMutationAction) {
+      return { ...prior, lastUpdatedAtCycle: cycle };
+    }
+
+    // Only track workspace_write stalls. append/replace/insert have separate semantics and
+    // clearing their positive delta would reset the overwrite-stall counter, masking the
+    // write→append→write oscillation that this state is designed to catch.
+    if (name !== "workspace_write") {
+      return { ...prior, lastUpdatedAtCycle: cycle };
+    }
+
+    const lengthStatus = readRequestedLengthStatus(runState);
+    const hasDeficit = lengthStatus != null
+      && readNumber$j(lengthStatus.observed) < readNumber$j(lengthStatus.requested);
+
+    if (!hasDeficit) {
+      if (!prior.active && prior.stallCount === 0) return { ...prior, lastUpdatedAtCycle: cycle };
+      return {
+        ...prior,
+        active: false,
+        status: "cleared",
+        escalation: "advisory",
+        stallCount: 0,
+        clearedReason: "length_target_met",
+        lastUpdatedAtCycle: cycle
+      };
+    }
+
+    const deltaWords = readSignedNumber(
+      context &&
+      context.output &&
+      context.output.mutationStats &&
+      context.output.mutationStats.delta &&
+      context.output.mutationStats.delta.words
+    );
+
+    const minimumEffectiveGrowth = computeMinimumEffectiveWorkspaceGrowth(lengthStatus);
+    const isStall = deltaWords < minimumEffectiveGrowth;
+
+    if (!isStall) {
+      // workspace_write itself grew positively — genuine recovery, clear the stall counter.
+      if (!prior.active && prior.stallCount === 0) return { ...prior, lastUpdatedAtCycle: cycle };
+      return {
+        ...prior,
+        active: false,
+        status: "none",
+        stallCount: 0,
+        escalation: "advisory",
+        clearedReason: prior.active ? "growth_detected" : null,
+        lastUpdatedAtCycle: cycle
+      };
+    }
+
+    const newStallCount = prior.stallCount + 1;
+    // Destructive overwrites (negative delta) activate advisory immediately on the first occurrence
+    // so the model sees the correction message without waiting for the two-stall threshold.
+    const isDestructiveOverwrite = deltaWords < 0;
+    const shouldActivate = prior.active || isDestructiveOverwrite || newStallCount >= WORKSPACE_MUTATION_GROWTH_ADVISORY_THRESHOLD;
+
+    if (!shouldActivate) {
+      return { ...prior, stallCount: newStallCount, lastUpdatedAtCycle: cycle };
+    }
+
+    const escalation = newStallCount >= WORKSPACE_MUTATION_GROWTH_HARD_VETO_THRESHOLD
+      ? "hard_veto"
+      : "advisory";
+    const deficit = readNumber$j(lengthStatus.requested) - readNumber$j(lengthStatus.observed);
+    return {
+      active: true,
+      status: "stalling_without_growth",
+      reason: "workspace_write_not_accumulating",
+      escalation,
+      forbiddenMove: "repeat_workspace_write_without_growth",
+      forbiddenActions: DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS.slice(),
+      allowedNextMoves: DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES.slice(),
+      requiredCorrection: `workspace_write is overwriting or under-growing content instead of accumulating (delta=${deltaWords} words, minimumEffectiveGrowth=${minimumEffectiveGrowth} words, deficit=${deficit} words remaining). Use workspace_propose_patch then workspace_apply_patch for risky repair, workspace_append to add content, or workspace_finalize_candidate / workspace_publish_candidate if target is met.`,
+      stallCount: newStallCount,
+      activatedAtCycle: prior.activatedAtCycle != null ? prior.activatedAtCycle : cycle,
+      lastUpdatedAtCycle: cycle,
+      clearedReason: null
+    };
+  }
+
+  function computeMinimumEffectiveWorkspaceGrowth(lengthStatus) {
+    const requested = readNumber$j(lengthStatus && lengthStatus.requested);
+    const observed = readNumber$j(lengthStatus && lengthStatus.observed);
+    const remaining = Math.max(requested - observed, 0);
+    if (remaining <= 0) return WORKSPACE_MUTATION_GROWTH_STALL_FLOOR;
+    const statsKey = readString$1x(lengthStatus && lengthStatus.statsKey);
+    if (statsKey !== "words") return WORKSPACE_MUTATION_GROWTH_STALL_FLOOR;
+    const proportionalFloor = Math.ceil(requested * 0.1);
+    return Math.min(
+      remaining,
+      Math.max(WORKSPACE_MUTATION_GROWTH_STALL_FLOOR, proportionalFloor)
+    );
   }
 
   function updateTerminalCorrectionState({
@@ -8133,7 +8936,7 @@
         reason: readString$1x(signal.reason) || "same_terminal_intent_without_observable_progress",
         actionName: readString$1x(signal.actionName) || readString$1x(actionName) || prior.actionName,
         forbiddenMove: readString$1x(signal.forbiddenMove) || "repeat_same_terminal_intent",
-        allowedNextMoves: readStringArray$3(signal.allowedNextMoves).slice(0, 8),
+        allowedNextMoves: readStringArray$5(signal.allowedNextMoves).slice(0, 8),
         requiredCorrection: readString$1x(signal.requiredCorrection) ||
           "Do not repeat the same publish/finalize terminal intent until observable progress changes, or publish a valid limited result with concrete remainingGaps.",
         firstTriggeredAtCycle: prior.firstTriggeredAtCycle != null ? prior.firstTriggeredAtCycle : cycle,
@@ -8238,21 +9041,54 @@
     actionName,
     context,
     effectiveHasProgress,
+    errorRepeatCount,
     fingerprint,
     longFormMode,
     outcomeHash,
     progress,
+    productiveOnlyMode,
     repeatedFingerprintCount,
     repeatedSemanticFingerprintCount,
     runState,
     semanticFingerprint,
     stepsWithoutObservableProgress
   }) {
-    if (effectiveHasProgress) return null;
     if (!isTrackableAction(actionName, context)) return null;
     const requiredCorrection = readRequiredCorrection(runState);
+    // ADR-0013 — `repeated_action_throw` fires when the SAME action+args
+    // has thrown >= DEFAULT_REPEAT_THRESHOLD times in a row. Highest
+    // priority signal because by definition it indicates the AI is stuck
+    // on a broken arg shape; productive progress is impossible until the
+    // AI changes args / action. This branch runs before
+    // `effectiveHasProgress` short-circuit because the harness must
+    // surface the signal even if some other action produced progress
+    // between throws (the *same* arg shape still won't work next time).
     if (
-      longFormMode === true &&
+      isActionErrorRefresh(context) &&
+      fingerprint &&
+      readNumber$j(errorRepeatCount) >= DEFAULT_REPEAT_THRESHOLD
+    ) {
+      const allowedNextMoves = readAllowedNextMoves$1(runState, {
+        longFormMode: longFormMode === true
+      });
+      return {
+        kind: "action_pattern_convergence_signal",
+        status: "repeated_no_progress",
+        patternKind: "repeated_action_throw",
+        reason: "same_action_args_thrown_repeatedly",
+        actionName: actionName || null,
+        fingerprint,
+        errorRepeatCount: readNumber$j(errorRepeatCount),
+        stepsWithoutObservableProgress,
+        forbiddenMove: "repeat_same_action_args_after_throw",
+        allowedNextMoves,
+        requiredCorrection: `Action "${actionName}" has thrown with the same arguments ${readNumber$j(errorRepeatCount)} times. Read the latest workspace state, choose different arguments, pick a different action, or publish workspace_publish_candidate with decision=limited and concrete remainingGaps explaining the blocker.`,
+        updatedAtCycle: readNullableNumber$5(runState && runState.cycleCount)
+      };
+    }
+    if (effectiveHasProgress) return null;
+    if (
+      productiveOnlyMode === true &&
       progress &&
       progress.hasProductiveProgress === false &&
       progress.hasTransitionalOnlyProgress === true &&
@@ -8314,6 +9150,21 @@
     };
   }
 
+  function isStructuredReadOnlyPlanningLoop(runState, actionName) {
+    if (!isReadOnlyPlanningAction(actionName) && !isLengthDeficitChurnAction(runState, actionName)) return false;
+    return hasUnfinishedTodoState(runState) || hasWorkspaceArtifacts(runState);
+  }
+
+  function isLengthDeficitChurnAction(runState, actionName) {
+    const name = readString$1x(actionName);
+    return LENGTH_DEFICIT_CHURN_ACTIONS.includes(name) && hasRequestedLengthDeficit(runState);
+  }
+
+  function hasRequestedLengthDeficit(runState) {
+    const requested = readRequestedLengthStatus(runState);
+    return requested && requested.requested > 0 && requested.observed > 0 && requested.observed < requested.requested;
+  }
+
   function readAllowedNextMoves$1(runState, options = {}) {
     const terminalMode = options && options.terminalMode === true;
     const longFormMode = options && options.longFormMode === true;
@@ -8347,8 +9198,20 @@
     return Array.from(new Set(moves.map(readString$1x).filter(Boolean))).slice(0, 8);
   }
 
-  function readReadOnlyPlanningAllowedNextMoves(signalMoves) {
-    const forbidden = new Set(DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS);
+  function readReadOnlyPlanningForbiddenActions(runState) {
+    const actions = new Set(DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS);
+    if (hasRequestedLengthDeficit(runState)) {
+      for (const action of LENGTH_DEFICIT_CHURN_ACTIONS) {
+        actions.add(action);
+      }
+    }
+    return Array.from(actions).slice(0, 12);
+  }
+
+  function readReadOnlyPlanningAllowedNextMoves(signalMoves, forbiddenActions) {
+    const forbidden = new Set(Array.isArray(forbiddenActions)
+      ? forbiddenActions
+      : DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS);
     const moves = [
       ...DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES,
       ...(Array.isArray(signalMoves) ? signalMoves : [])
@@ -8364,19 +9227,6 @@
       return "Do not repeat publish/finalize while TodoState has active or pending work. First use todo_advance, todo_run_next, or todo_cancel to make the visible plan match completed/obsolete work; then retry terminal publish with valid readiness.";
     }
     return "Do not repeat the same publish/finalize terminal intent until observable source/workspace progress changes, or publish a valid limited result with concrete remainingGaps.";
-  }
-
-  function hasUnfinishedTodoState(runState) {
-    const todoState = runState && runState.todoState && typeof runState.todoState === "object"
-      ? runState.todoState
-      : null;
-    if (!todoState || todoState.status !== "active") return false;
-    if (readString$1x(todoState.activeItemId)) return true;
-    if (!Array.isArray(todoState.items)) return false;
-    return todoState.items.some((item) => {
-      const status = readString$1x(item && item.status);
-      return status === "active" || status === "pending" || status === "blocked";
-    });
   }
 
   function createOutcomeHash(runState, context, actionName) {
@@ -8545,80 +9395,6 @@
     };
   }
 
-  function createProgressSnapshot$1(runState) {
-    const source = runState && typeof runState === "object" ? runState : {};
-    const researchContext = source.researchContext && typeof source.researchContext === "object" ? source.researchContext : {};
-    const readSources = Array.isArray(researchContext.readSources) ? researchContext.readSources : [];
-    const searchResults = collectSearchResults(researchContext);
-    const sourceMinimum = readSourceMinimum$4(source);
-    const candidate = readCandidateSnapshot$2(source);
-    const todo = readTodoSnapshot(source);
-    const skill = readSkillSnapshot(source);
-    const memoryEntriesAdded = Array.isArray(source.memoryEntriesAdded)
-      ? source.memoryEntriesAdded.length
-      : readNumber$j(source.memoryEntriesAdded);
-
-    return {
-      candidate,
-      memoryEntriesAdded,
-      readSourceCount: readSources.length,
-      readSourceUrlCount: countDistinctReadUrls(readSources),
-      relevantSourceCount: sourceMinimum ? readNumber$j(sourceMinimum.relevantSources) : countRelevantReadSources(readSources),
-      searchPassCount: Array.isArray(researchContext.searchPasses) ? researchContext.searchPasses.length : 0,
-      searchResultUrlCount: countDistinctSearchUrls(searchResults),
-      skill,
-      sourceMinimumPassed: sourceMinimum ? sourceMinimum.passed === true : false,
-      successfulReadUrlCount: readSuccessfulReadUrlCount$2(source, readSources),
-      todo,
-      toolHistoryCount: source.toolContext && Array.isArray(source.toolContext.history)
-        ? source.toolContext.history.length
-        : 0,
-      workspace: readWorkspaceSnapshot(source)
-    };
-  }
-
-  function diffProgress$1(previous, next) {
-    const before = normalizeProgressSnapshot$1(previous);
-    const after = normalizeProgressSnapshot$1(next);
-    const dimensions = [];
-    if (after.successfulReadUrlCount > before.successfulReadUrlCount ||
-        after.readSourceUrlCount > before.readSourceUrlCount ||
-        after.relevantSourceCount > before.relevantSourceCount ||
-        (after.sourceMinimumPassed === true && before.sourceMinimumPassed !== true)) {
-      dimensions.push("source");
-    }
-    if (after.searchPassCount > before.searchPassCount || after.searchResultUrlCount > before.searchResultUrlCount) {
-      dimensions.push("search");
-    }
-    if (
-      readNumber$j(after.candidate.words) > readNumber$j(before.candidate.words) ||
-      readNumber$j(after.candidate.chars) > readNumber$j(before.candidate.chars) ||
-      readNumber$j(after.candidate.cjkChars) > readNumber$j(before.candidate.cjkChars) ||
-      readNumber$j(after.workspace.version) > readNumber$j(before.workspace.version)
-    ) {
-      dimensions.push("workspace");
-    }
-    if (readNumber$j(after.todo.done) > readNumber$j(before.todo.done) ||
-        readNumber$j(after.todo.completed) > readNumber$j(before.todo.completed)) {
-      dimensions.push("todo");
-    }
-    if (after.memoryEntriesAdded > before.memoryEntriesAdded ||
-        readNumber$j(after.skill.loadedCount) > readNumber$j(before.skill.loadedCount)) {
-      dimensions.push("memory_or_skill");
-    }
-    const uniqueDimensions = Array.from(new Set(dimensions));
-    const productiveDimensions = uniqueDimensions.filter((d) => PRODUCTIVE_PROGRESS_DIMENSIONS.includes(d));
-    const transitionalDimensions = uniqueDimensions.filter((d) => !PRODUCTIVE_PROGRESS_DIMENSIONS.includes(d));
-    return {
-      dimensions: uniqueDimensions,
-      productiveDimensions,
-      transitionalDimensions,
-      hasProgress: uniqueDimensions.length > 0,
-      hasProductiveProgress: productiveDimensions.length > 0,
-      hasTransitionalOnlyProgress: productiveDimensions.length === 0 && transitionalDimensions.length > 0
-    };
-  }
-
   function normalizeActionPatternConvergenceState(value) {
     const source = value && typeof value === "object" && !Array.isArray(value)
       ? value
@@ -8633,6 +9409,7 @@
       lastActionName: readString$1x(source.lastActionName) || null,
       repeatedFingerprintCount: readNumber$j(source.repeatedFingerprintCount),
       repeatedSemanticFingerprintCount: readNumber$j(source.repeatedSemanticFingerprintCount),
+      errorRepeatCount: readNumber$j(source.errorRepeatCount),
       stepsWithoutObservableProgress: readNumber$j(source.stepsWithoutObservableProgress),
       progressSnapshot: normalizeProgressSnapshot$1(source.progressSnapshot),
       recentPatterns: Array.isArray(source.recentPatterns)
@@ -8642,6 +9419,8 @@
         ? cloneValue(source.convergenceSignal)
         : null,
       readOnlyPlanningState: createReadOnlyPlanningState(source.readOnlyPlanningState),
+      structureRepairConvergence: createStructureRepairConvergenceState(source.structureRepairConvergence),
+      workspaceMutationGrowthConvergence: createWorkspaceMutationGrowthConvergenceState(source.workspaceMutationGrowthConvergence),
       terminalCorrectionState,
       ignoredTerminalCorrectionCount: terminalCorrectionState.active
         ? terminalCorrectionState.ignoredTerminalCorrectionCount
@@ -8652,60 +9431,6 @@
       terminalRetryCooldown: createTerminalRetryCooldownState(source.terminalRetryCooldown),
       updatedAtCycle: readNullableNumber$5(source.updatedAtCycle),
       version: 1
-    };
-  }
-
-  function normalizeProgressSnapshot$1(value) {
-    const source = value && typeof value === "object" && !Array.isArray(value)
-      ? value
-      : {};
-    return {
-      candidate: {
-        chars: readNumber$j(source.candidate && source.candidate.chars),
-        cjkChars: readNumber$j(source.candidate && source.candidate.cjkChars),
-        path: readString$1x(source.candidate && source.candidate.path) || null,
-        words: readNumber$j(source.candidate && source.candidate.words)
-      },
-      memoryEntriesAdded: readNumber$j(source.memoryEntriesAdded),
-      readSourceCount: readNumber$j(source.readSourceCount),
-      readSourceUrlCount: readNumber$j(source.readSourceUrlCount),
-      relevantSourceCount: readNumber$j(source.relevantSourceCount),
-      searchPassCount: readNumber$j(source.searchPassCount),
-      searchResultUrlCount: readNumber$j(source.searchResultUrlCount),
-      skill: {
-        active: readString$1x(source.skill && source.skill.active) || null,
-        lastRead: readString$1x(source.skill && source.skill.lastRead) || null,
-        loadedCount: readNumber$j(source.skill && source.skill.loadedCount)
-      },
-      sourceMinimumPassed: source.sourceMinimumPassed === true,
-      successfulReadUrlCount: readNumber$j(source.successfulReadUrlCount),
-      todo: {
-        completed: readNumber$j(source.todo && source.todo.completed),
-        done: readNumber$j(source.todo && source.todo.done),
-        version: readNumber$j(source.todo && source.todo.version)
-      },
-      toolHistoryCount: readNumber$j(source.toolHistoryCount),
-      workspace: {
-        finalCandidateReady: source.workspace && source.workspace.finalCandidateReady === true,
-        operationCount: readNumber$j(source.workspace && source.workspace.operationCount),
-        version: readNumber$j(source.workspace && source.workspace.version)
-      }
-    };
-  }
-
-  function summarizeProgressSnapshot(value) {
-    const snapshot = normalizeProgressSnapshot$1(value);
-    return {
-      candidate: snapshot.candidate,
-      readSourceCount: snapshot.readSourceCount,
-      readSourceUrlCount: snapshot.readSourceUrlCount,
-      relevantSourceCount: snapshot.relevantSourceCount,
-      searchPassCount: snapshot.searchPassCount,
-      searchResultUrlCount: snapshot.searchResultUrlCount,
-      sourceMinimumPassed: snapshot.sourceMinimumPassed,
-      successfulReadUrlCount: snapshot.successfulReadUrlCount,
-      todo: snapshot.todo,
-      workspace: snapshot.workspace
     };
   }
 
@@ -8734,153 +9459,156 @@
     return next;
   }
 
-  function readCandidateSnapshot$2(runState) {
-    const packet = readAcceptancePacket$3(runState);
-    const packetStats = packet && packet.candidate && packet.candidate.textStats
-      ? packet.candidate.textStats
-      : null;
-    if (packetStats) {
-      return {
-        chars: readNumber$j(packetStats.chars),
-        cjkChars: readNumber$j(packetStats.cjkChars),
-        path: readString$1x(packet.candidate.path) || null,
-        words: readNumber$j(packetStats.words)
-      };
-    }
+  function readStructureSnapshot(runState) {
     const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
       ? runState.virtualWorkspace
       : null;
     const quality = workspace && workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const path = readString$1x(quality.finalCandidatePath) || "final_candidate.md";
-    const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
-      ? workspace.files[path]
+    const structure = quality.finalCandidateStructure && typeof quality.finalCandidateStructure === "object"
+      ? quality.finalCandidateStructure
       : null;
-    const stats = file && file.textStats && typeof file.textStats === "object" ? file.textStats : {};
+    if (!structure) return normalizeStructureSnapshot(null);
+    const issueCodes = readStringArray$5(structure.issueCodes).sort().slice(0, 8);
+    const repeatedHeadingSamples = normalizeStructureSamples$1(structure.repeatedHeadingSamples, "heading");
+    const repeatedNumberSamples = normalizeStructureSamples$1(structure.repeatedNumberSamples, "number");
+    const duplicateHeadingCount = readNumber$j(structure.duplicateHeadingCount);
+    const duplicateNumberCount = readNumber$j(structure.duplicateNumberCount);
+    const facts = {
+      duplicateHeadingCount,
+      duplicateNumberCount,
+      issueCodes,
+      ok: structure.ok === true,
+      repeatedHeadingSamples,
+      repeatedNumberSamples,
+      status: readString$1x(structure.status) || (structure.ok === true ? "pass" : "fail")
+    };
+    return normalizeStructureSnapshot({
+      ...facts,
+      present: true,
+      signature: hashCompactFacts(facts)
+    });
+  }
+
+  function normalizeStructureSnapshot(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const issueCodes = readStringArray$5(source.issueCodes).sort().slice(0, 8);
+    const repeatedHeadingSamples = normalizeStructureSamples$1(source.repeatedHeadingSamples, "heading");
+    const repeatedNumberSamples = normalizeStructureSamples$1(source.repeatedNumberSamples, "number");
+    const duplicateHeadingCount = readNumber$j(source.duplicateHeadingCount);
+    const duplicateNumberCount = readNumber$j(source.duplicateNumberCount);
+    const ok = source.ok === true;
+    const present = source.present === true;
+    const status = readString$1x(source.status) || (present ? (ok ? "pass" : "fail") : "missing");
+    const signature = readString$1x(source.signature) || hashCompactFacts({
+      duplicateHeadingCount,
+      duplicateNumberCount,
+      issueCodes,
+      ok,
+      repeatedHeadingSamples,
+      repeatedNumberSamples,
+      status
+    });
     return {
-      chars: readNumber$j(stats.chars),
-      cjkChars: readNumber$j(stats.cjkChars),
-      path: file ? path : null,
-      words: readNumber$j(stats.words)
+      duplicateHeadingCount,
+      duplicateNumberCount,
+      issueCodes,
+      ok,
+      present,
+      repeatedHeadingSamples,
+      repeatedNumberSamples,
+      signature,
+      status,
+      totalDuplicateCount: duplicateHeadingCount + duplicateNumberCount
     };
   }
 
-  function readWorkspaceSnapshot(runState) {
-    const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
-      ? runState.virtualWorkspace
-      : {};
-    const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
+  function summarizeStructureSnapshot(value) {
+    const snapshot = normalizeStructureSnapshot(value);
     return {
-      finalCandidateReady: quality.finalCandidateReady === true,
-      operationCount: Array.isArray(workspace.operations) ? workspace.operations.length : 0,
-      version: readNumber$j(workspace.version)
+      duplicateHeadingCount: snapshot.duplicateHeadingCount,
+      duplicateNumberCount: snapshot.duplicateNumberCount,
+      issueCodes: snapshot.issueCodes,
+      ok: snapshot.ok,
+      present: snapshot.present,
+      repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
+      repeatedNumberSamples: snapshot.repeatedNumberSamples,
+      signature: snapshot.signature,
+      status: snapshot.status,
+      totalDuplicateCount: snapshot.totalDuplicateCount
     };
   }
 
-  function readTodoSnapshot(runState) {
-    const todoState = runState && runState.todoState && typeof runState.todoState === "object"
-      ? runState.todoState
-      : null;
-    const items = todoState && Array.isArray(todoState.items) ? todoState.items : [];
-    return {
-      completed: todoState && todoState.status === "completed" ? 1 : 0,
-      done: items.filter((item) => item && item.status === "done").length,
-      version: todoState && Number.isInteger(todoState.version) ? todoState.version : 0
-    };
+  function normalizeStructureSamples$1(value, key) {
+    const name = key === "number" ? "number" : "heading";
+    const list = Array.isArray(value) ? value : [];
+    return list
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") return null;
+        const label = readString$1x(entry[name]);
+        const count = readNumber$j(entry.count);
+        if (!label || count <= 0) return null;
+        return { [name]: label, count };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const countDelta = readNumber$j(b.count) - readNumber$j(a.count);
+        if (countDelta !== 0) return countDelta;
+        return readString$1x(a[name]).localeCompare(readString$1x(b[name]));
+      })
+      .slice(0, 5);
   }
 
-  function readSkillSnapshot(runState) {
-    const context = runState && runState.agentSkillContext && typeof runState.agentSkillContext === "object"
-      ? runState.agentSkillContext
-      : {};
-    const active = readSkillLabel(context.activeSkill);
-    const lastRead = readSkillLabel(context.lastReadSkill);
-    return {
-      active,
-      lastRead,
-      loadedCount: (active ? 1 : 0) + (lastRead && lastRead !== active ? 1 : 0)
-    };
+  function isStructureRepairAction(actionName) {
+    return [
+      "workspace_append",
+      "workspace_finalize_candidate",
+      "workspace_insert_after_section",
+      "workspace_list",
+      "workspace_read",
+      "workspace_replace",
+      "workspace_write"
+    ].includes(readString$1x(actionName));
   }
 
-  function readSourceMinimum$4(runState) {
-    const packet = readAcceptancePacket$3(runState);
-    if (packet && packet.evidence && packet.evidence.sourceMinimum && typeof packet.evidence.sourceMinimum === "object") {
-      return packet.evidence.sourceMinimum;
+  function isStructureImproved$1(previous, next) {
+    const before = normalizeStructureSnapshot(previous);
+    const after = normalizeStructureSnapshot(next);
+    if (after.ok === true && before.ok !== true) return true;
+    if (after.issueCodes.length < before.issueCodes.length) return true;
+    if (after.totalDuplicateCount < before.totalDuplicateCount) return true;
+    if (after.duplicateHeadingCount < before.duplicateHeadingCount) return true;
+    if (after.duplicateNumberCount < before.duplicateNumberCount) return true;
+    return false;
+  }
+
+  function readStructureRepairAllowedNextMoves(runState) {
+    const moves = DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES.slice();
+    if (hasUnfinishedTodoState(runState)) {
+      moves.push("todo_cancel");
     }
-    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-      ? runState.researchReportLoop
-      : {};
-    return loop.sourceMinimum && typeof loop.sourceMinimum === "object" ? loop.sourceMinimum : null;
+    return Array.from(new Set(moves)).slice(0, 12);
   }
 
-  function readAcceptancePacket$3(runState) {
-    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-      ? runState.researchReportLoop
-      : null;
-    const signal = loop && loop.gateSignal && typeof loop.gateSignal === "object"
-      ? loop.gateSignal
-      : null;
-    return signal && signal.acceptancePacket && typeof signal.acceptancePacket === "object"
-      ? signal.acceptancePacket
-      : null;
-  }
-
-  function readSuccessfulReadUrlCount$2(runState, readSources) {
-    const packet = readAcceptancePacket$3(runState);
-    if (packet && packet.evidence) {
-      const value = readNullableNumber$5(packet.evidence.successfulReadUrlCount);
-      if (value != null) return value;
-    }
-    const sources = Array.isArray(readSources) ? readSources : [];
-    return sources.filter((source) => source && (source.ok === true || source.status === 200 || source.status === "ok")).length;
-  }
-
-  function countRelevantReadSources(readSources) {
-    const sources = Array.isArray(readSources) ? readSources : [];
-    return sources.filter((source) => {
-      const quality = readString$1x(source && source.quality);
-      return source && source.ok !== false && quality !== "thin" && quality !== "rejected";
-    }).length;
-  }
-
-  function collectSearchResults(researchContext) {
-    const results = [];
-    if (Array.isArray(researchContext.searchResults)) results.push(...researchContext.searchResults);
-    if (Array.isArray(researchContext.aggregatedSearchResults)) results.push(...researchContext.aggregatedSearchResults);
-    if (Array.isArray(researchContext.searchPasses)) {
-      for (const pass of researchContext.searchPasses) {
-        if (pass && Array.isArray(pass.results)) results.push(...pass.results);
-      }
-    }
-    return results;
-  }
-
-  function countDistinctSearchUrls(results) {
-    const urls = new Set();
-    const list = Array.isArray(results) ? results : [];
-    for (const item of list) {
-      const url = readString$1x(item && (item.url || item.link || item.href));
-      if (url) urls.add(url);
-    }
-    return urls.size;
-  }
-
-  function countDistinctReadUrls(readSources) {
-    const urls = new Set();
-    const list = Array.isArray(readSources) ? readSources : [];
-    for (const item of list) {
-      const url = readString$1x(item && item.url);
-      if (url) urls.add(url);
-    }
-    return urls.size;
+  function buildStructureRepairRequiredCorrection(snapshot) {
+    const summary = summarizeStructureSnapshot(snapshot);
+    const headingSamples = summary.repeatedHeadingSamples
+      .map((entry) => `${entry.heading} x${entry.count}`)
+      .join(" | ");
+    const numberSamples = summary.repeatedNumberSamples
+      .map((entry) => `${entry.number} x${entry.count}`)
+      .join(" | ");
+    const parts = [
+      "Repair the final candidate structure before another clean publish: produce one coherent outline with unique Markdown headings and non-duplicated section numbers.",
+      summary.issueCodes.length > 0 ? `Active issueCodes=${summary.issueCodes.join(",")}.` : "",
+      headingSamples ? `Duplicate heading samples=${headingSamples}.` : "",
+      numberSamples ? `Duplicate section-number samples=${numberSamples}.` : "",
+      "Use a targeted full rewrite or targeted heading/number normalization; do not keep reading/appending around the same broken outline."
+    ].filter(Boolean);
+    return parts.join(" ");
   }
 
   function readActionName$1(decision) {
     return readString$1x(decision && (decision.name || decision.actionName));
-  }
-
-  function readSkillLabel(value) {
-    if (!value || typeof value !== "object") return null;
-    return readString$1x(value.name) || readString$1x(value.skillId) || null;
   }
 
   function isTrackableAction(actionName, context) {
@@ -8896,6 +9624,8 @@
     const status = readString$1x(value);
     if (status === "terminal_correction_active") return status;
     if (status === "read_only_planning_active") return status;
+    if (status === "structure_repair_active") return status;
+    if (status === "workspace_mutation_growth_active") return status;
     if (status === "repeated_no_progress" || status === "progress_observed") return status;
     return "tracking";
   }
@@ -8910,7 +9640,7 @@
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readStringArray$3(value) {
+  function readStringArray$5(value) {
     return Array.isArray(value) ? value.map(readString$1x).filter(Boolean) : [];
   }
 
@@ -8921,6 +9651,11 @@
   function readNumber$j(value) {
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+  }
+
+  function readSignedNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.trunc(n) : 0;
   }
 
   function readNullableNumber$5(value) {
@@ -11103,6 +11838,7 @@
       mode: readString$1q(options.mode) || "complex_response",
       files: {},
       operations: [],
+      pendingPatch: null,
       quality: createWorkspaceQuality(),
       version: 1
     };
@@ -11153,6 +11889,7 @@
       mode: readString$1q(value.mode) || "complex_response",
       files,
       operations: normalizeOperations(value.operations),
+      pendingPatch: normalizePendingPatch(value.pendingPatch),
       quality: normalizeWorkspaceQuality(value.quality),
       version: readPositiveInteger$f(value.version) || 1
     };
@@ -11170,18 +11907,51 @@
     return false;
   }
 
-  function validateWorkspacePath(path) {
-    // ADR-0015 PR 2 — security-only validation. The 5-file allowlist was
-    // dropped so AI can pick any filename; runtime still rejects unsafe
-    // paths (absolute, parent traversal, backslash, bare empty).
+  function validateWorkspacePathRecoverable(path) {
+    // ADR-0013 — workspace path validation is recoverable, not fatal.
+    // Returns { ok, path?, error? }. Callers translate failure into an
+    // invalid_args observation rather than throwing.
     const value = readString$1q(path);
     if (!value) {
-      throw new Error("workspace path is required");
+      return { ok: false, error: "workspace_path_required", path: value };
     }
     if (value.startsWith("/") || value.includes("..") || /[\\]/.test(value)) {
-      throw new Error(`workspace path "${value}" is not allowed`);
+      return { ok: false, error: "workspace_path_not_allowed", path: value };
     }
-    return value;
+    return { ok: true, path: value };
+  }
+
+  function validateWorkspacePath(path) {
+    // ADR-0015 PR 2 — security-only validation. Kept as a sharp throw for
+    // internal helpers and tests; the recoverable variant above is what
+    // boundary helpers must call. Throwing here represents a programming
+    // error (missing recoverable check upstream), not user-visible input.
+    const result = validateWorkspacePathRecoverable(path);
+    if (!result.ok) {
+      if (result.error === "workspace_path_required") {
+        throw new Error("workspace path is required");
+      }
+      throw new Error(`workspace path "${result.path}" is not allowed`);
+    }
+    return result.path;
+  }
+
+  function describeWorkspacePathError(error) {
+    if (error === "workspace_path_required") return "workspace path is required";
+    if (error === "workspace_path_not_allowed") return "workspace path is not allowed (no absolute, no '..', no backslash)";
+    return "workspace path is invalid";
+  }
+
+  function invalidArgsResult({ action, error, message, file, extra }) {
+    return {
+      changed: false,
+      status: "invalid_args",
+      error,
+      message: message || describeWorkspacePathError(error),
+      file: file || null,
+      action,
+      ...(extra && typeof extra === "object" ? extra : {})
+    };
   }
 
   function listWorkspaceFiles(workspace) {
@@ -11194,7 +11964,16 @@
   }
 
   function readWorkspaceFile(workspace, path) {
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      return addWorkspaceFileStats({
+        ...createWorkspaceFile(readString$1q(path) || "", ""),
+        status: "invalid_args",
+        error: pathValidation.error,
+        message: describeWorkspacePathError(pathValidation.error)
+      });
+    }
+    const filePath = pathValidation.path;
     const source = normalizeVirtualWorkspace(workspace) || createEmptyVirtualWorkspace();
     // ADR-0015 PR 2 — return an empty stub when AI has not written the
     // file yet so callers see a consistent shape regardless of whether
@@ -11205,7 +11984,17 @@
 
   function readWorkspaceFinalCandidate$1(workspace, path) {
     const source = normalizeVirtualWorkspace(workspace) || createEmptyVirtualWorkspace();
-    const filePath = validateWorkspacePath(readString$1q(path) || readFinalCandidatePath(source));
+    const resolvedPath = readString$1q(path) || readFinalCandidatePath(source);
+    const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
+    if (!pathValidation.ok) {
+      return addWorkspaceFileStats({
+        ...createWorkspaceFile(resolvedPath || "", ""),
+        status: "invalid_args",
+        error: pathValidation.error,
+        message: describeWorkspacePathError(pathValidation.error)
+      });
+    }
+    const filePath = pathValidation.path;
     return addWorkspaceFileStats(cloneValue(source.files[filePath]) || createWorkspaceFile(filePath, ""));
   }
 
@@ -11215,7 +12004,18 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "read",
+        path: readString$1q(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      return workspace;
+    }
+    const filePath = pathValidation.path;
     const file = readWorkspaceFile(workspace, filePath);
     workspace.quality.lastRead = {
       observedAt: new Date().toISOString(),
@@ -11238,7 +12038,24 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "write",
+        path: readString$1q(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return {
+        ...createWorkspaceFile(readString$1q(path) || "", ""),
+        status: "invalid_args",
+        error: pathValidation.error,
+        message: describeWorkspacePathError(pathValidation.error)
+      };
+    }
+    const filePath = pathValidation.path;
     const maxFileChars = readPositiveInteger$f(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
     const nextContent = truncate$2(readString$1q(content), maxFileChars);
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
@@ -11267,7 +12084,24 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "append",
+        path: readString$1q(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return {
+        ...createWorkspaceFile(readString$1q(path) || "", ""),
+        status: "invalid_args",
+        error: pathValidation.error,
+        message: describeWorkspacePathError(pathValidation.error)
+      };
+    }
+    const filePath = pathValidation.path;
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     const current = readString$1q(file.content);
     const addition = readString$1q(content);
@@ -11301,10 +12135,41 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "insert_after_section",
+        path: readString$1q(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return invalidArgsResult({
+        action: "insert_after_section",
+        error: pathValidation.error,
+        file: null,
+        extra: { availableHeadings: [], requestedHeading: null }
+      });
+    }
+    const filePath = pathValidation.path;
     const targetHeading = normalizeHeadingText(heading);
     if (!targetHeading) {
-      throw new Error("workspace_insert_after_section requires a non-empty heading");
+      appendWorkspaceOperation(workspace, {
+        action: "insert_after_section",
+        path: filePath,
+        status: "invalid_args",
+        summary: options.summary || `heading is empty for ${filePath}`,
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return invalidArgsResult({
+        action: "insert_after_section",
+        error: "non_empty_heading_required",
+        message: "workspace_insert_after_section requires a non-empty heading",
+        file: workspace.files[filePath] || null,
+        extra: { availableHeadings: [], requestedHeading: null }
+      });
     }
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     const current = readString$1q(file.content);
@@ -11347,7 +12212,25 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "remove",
+        path: readString$1q(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return {
+        removed: false,
+        status: "invalid_args",
+        error: pathValidation.error,
+        message: describeWorkspacePathError(pathValidation.error),
+        file: { ...createWorkspaceFile(readString$1q(path) || "", "") }
+      };
+    }
+    const filePath = pathValidation.path;
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     const hadContent = readString$1q(file.content).length > 0;
     workspace.files[filePath] = createWorkspaceFile(filePath, "");
@@ -11371,14 +12254,45 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "replace",
+        path: readString$1q(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return invalidArgsResult({
+        action: "replace",
+        error: pathValidation.error,
+        file: null,
+        extra: { matchCount: 0, fuzzyAttempted: [] }
+      });
+    }
+    const filePath = pathValidation.path;
     // Use raw (un-trimmed) text for find / replacement / current so the
     // fuzzy fallback ladder below can detect trailing-whitespace and
     // smart-quote drift in AI-emitted find strings. readString trims by
     // contract, which would defeat fuzzy detection.
     const needle = typeof find === "string" ? find : "";
     if (!needle.trim()) {
-      throw new Error("workspace_replace requires non-empty find text");
+      appendWorkspaceOperation(workspace, {
+        action: "replace",
+        path: filePath,
+        status: "invalid_args",
+        summary: options.summary || `find text is empty or whitespace-only for ${filePath}`,
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return invalidArgsResult({
+        action: "replace",
+        error: "non_empty_find_text_required",
+        message: "workspace_replace requires non-empty find text",
+        file: workspace.files[filePath] || null,
+        extra: { matchCount: 0, fuzzyAttempted: [] }
+      });
     }
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     const current = typeof file.content === "string" ? file.content : "";
@@ -11453,6 +12367,507 @@
     };
   }
 
+  function proposeWorkspacePatch(runState, path, operations, options = {}) {
+    const workspace = ensureVirtualWorkspace(runState, {
+      config: options.config,
+      force: true,
+      prompt: options.prompt
+    });
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      const patch = createInvalidPendingPatch({
+        path: readString$1q(path) || "",
+        status: "invalid_args",
+        riskFlags: ["not_found"],
+        message: describeWorkspacePathError(pathValidation.error)
+      });
+      workspace.pendingPatch = patch;
+      return { ...patch, beforeContent: "", afterContent: "" };
+    }
+    const filePath = pathValidation.path;
+    const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
+    const current = typeof file.content === "string" ? file.content : "";
+    const operationList = normalizePatchOperations(operations);
+    const preview = previewWorkspacePatchContent(current, operationList, options);
+    const maxFileChars = readPositiveInteger$f(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
+    const afterContent = truncate$2(preview.content, maxFileChars);
+    const beforeStats = summarizeTextStats$2(current);
+    const afterStats = summarizeTextStats$2(afterContent);
+    const beforeStructure = inspectWorkspaceCandidateStructure(current);
+    const afterStructure = inspectWorkspaceCandidateStructure(afterContent);
+    const structureImproved = isStructureImproved(beforeStructure, afterStructure);
+    const structureRepairOperation = operationList.some((operation) => operation && operation.type === "normalize_headings");
+    const changed = current !== afterContent;
+    const riskFlags = Array.from(new Set([
+      ...preview.riskFlags,
+      ...(changed ? [] : ["no_growth"]),
+      ...(afterStats.words <= beforeStats.words && !(structureRepairOperation && structureImproved) ? ["no_growth"] : []),
+      ...(afterStats.words < beforeStats.words ? ["shrinks_candidate"] : []),
+      ...(isStructureMaybeWorse(beforeStructure, afterStructure) ? ["structure_maybe_worse"] : [])
+    ])).filter(Boolean);
+    const valid = changed && !riskFlags.some((flag) => (
+      flag === "not_found" ||
+      flag === "ambiguous" ||
+      flag === "no_growth" ||
+      flag === "structure_maybe_worse"
+    ));
+    const patch = {
+      afterHash: hashText(afterContent),
+      afterWords: afterStats.words,
+      baseVersion: readPositiveInteger$f(file.version) || 0,
+      beforeHash: hashText(current),
+      beforeWords: beforeStats.words,
+      changed,
+      createdAt: new Date().toISOString(),
+      deltaWords: afterStats.words - beforeStats.words,
+      kind: "virtual_workspace_pending_patch",
+      operations: operationList.map(summarizePatchOperation),
+      patchId: `patch-${Date.now()}-${Math.max(1, (workspace.operations || []).length + 1)}`,
+      path: filePath,
+      previewSummary: summarizePatchPreview(operationList, {
+        afterStats,
+        afterStructure,
+        beforeStats,
+        beforeStructure,
+        changed,
+        riskFlags
+      }),
+      riskFlags,
+      structureAfter: summarizePatchStructure(afterStructure),
+      structureBefore: summarizePatchStructure(beforeStructure),
+      status: valid ? "preview_ready" : "preview_blocked",
+      valid,
+      version: 1,
+      // Stored internally so apply is version-locked to the exact preview.
+      afterContent
+    };
+    workspace.pendingPatch = patch;
+    return { ...patch, beforeContent: current, afterContent };
+  }
+
+  function applyWorkspacePatch(runState, patchId, options = {}) {
+    const workspace = ensureVirtualWorkspace(runState, {
+      config: options.config,
+      force: true,
+      prompt: options.prompt
+    });
+    const pending = normalizePendingPatch(workspace.pendingPatch);
+    if (!pending) {
+      return {
+        changed: false,
+        error: "pending_patch_missing",
+        file: null,
+        message: "workspace_apply_patch requires a valid pending patch from workspace_propose_patch.",
+        patchId: readString$1q(patchId) || null,
+        status: "missing_pending_patch"
+      };
+    }
+    const requestedPatchId = readString$1q(patchId);
+    if (requestedPatchId && requestedPatchId !== pending.patchId) {
+      return {
+        changed: false,
+        error: "patch_id_mismatch",
+        expectedPatchId: pending.patchId,
+        file: null,
+        message: `workspace_apply_patch patchId mismatch: latest pending patch is ${pending.patchId}.`,
+        patchId: requestedPatchId,
+        status: "patch_id_mismatch"
+      };
+    }
+    if (pending.valid !== true) {
+      return {
+        changed: false,
+        error: "pending_patch_invalid",
+        file: null,
+        message: "workspace_apply_patch refused because the pending preview has blocking riskFlags.",
+        patchId: pending.patchId,
+        riskFlags: pending.riskFlags,
+        status: "pending_patch_invalid"
+      };
+    }
+    const file = workspace.files[pending.path] || createWorkspaceFile(pending.path, "");
+    const current = typeof file.content === "string" ? file.content : "";
+    const currentVersion = readPositiveInteger$f(file.version) || 0;
+    if (currentVersion !== pending.baseVersion || hashText(current) !== pending.beforeHash) {
+      return {
+        baseVersion: pending.baseVersion,
+        changed: false,
+        currentVersion,
+        error: "base_version_changed",
+        file: addWorkspaceFileStats(file),
+        message: `workspace_apply_patch refused because ${pending.path} changed after preview. Run workspace_propose_patch again against the latest file.`,
+        patchId: pending.patchId,
+        status: "base_version_changed"
+      };
+    }
+    const afterContent = typeof pending.afterContent === "string" ? pending.afterContent : "";
+    if (!afterContent || hashText(afterContent) !== pending.afterHash) {
+      return {
+        changed: false,
+        error: "pending_patch_preview_invalid",
+        file: addWorkspaceFileStats(file),
+        message: "workspace_apply_patch refused because the stored preview is no longer valid.",
+        patchId: pending.patchId,
+        status: "pending_patch_preview_invalid"
+      };
+    }
+    workspace.files[pending.path] = {
+      content: afterContent,
+      path: pending.path,
+      updatedAt: new Date().toISOString(),
+      version: currentVersion + 1
+    };
+    workspace.version += 1;
+    appendWorkspaceOperation(workspace, {
+      action: "apply_patch",
+      path: pending.path,
+      status: "ok",
+      summary: options.summary || `applied ${pending.patchId} to ${pending.path}`,
+      cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+    }, options);
+    workspace.pendingPatch = null;
+    refreshWorkspaceQuality(workspace);
+    syncWorkspaceLastReadToFile(workspace, workspace.files[pending.path]);
+    return {
+      baseVersion: pending.baseVersion,
+      changed: true,
+      file: workspace.files[pending.path],
+      patchId: pending.patchId,
+      riskFlags: pending.riskFlags,
+      status: "ok"
+    };
+  }
+
+  function createInvalidPendingPatch(options = {}) {
+    return {
+      afterHash: hashText(""),
+      afterWords: 0,
+      baseVersion: 0,
+      beforeHash: hashText(""),
+      beforeWords: 0,
+      changed: false,
+      createdAt: new Date().toISOString(),
+      deltaWords: 0,
+      kind: "virtual_workspace_pending_patch",
+      operations: [],
+      patchId: `patch-${Date.now()}-invalid`,
+      path: readString$1q(options.path),
+      previewSummary: readString$1q(options.message) || "Patch preview could not be created.",
+      riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString$1q).filter(Boolean) : [],
+      structureAfter: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
+      structureBefore: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
+      status: readString$1q(options.status) || "preview_blocked",
+      valid: false,
+      version: 1,
+      afterContent: ""
+    };
+  }
+
+  function normalizeHeadingPatchEntries(value) {
+    return (Array.isArray(value) ? value : [])
+      .map((entry) => {
+        const source = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {};
+        const lineNumber = readPositiveInteger$f(source.lineNumber || source.line || source.atLine);
+        const text = typeof source.text === "string"
+          ? source.text
+          : (typeof source.heading === "string" ? source.heading : "");
+        if (lineNumber == null || lineNumber <= 0 || !text.trim()) return null;
+        return {
+          lineNumber,
+          text
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 24);
+  }
+
+  function normalizePatchOperations(value) {
+    const source = Array.isArray(value) ? value : [];
+    return source
+      .map((operation) => {
+        const op = operation && typeof operation === "object" && !Array.isArray(operation) ? operation : {};
+        const type = readString$1q(op.type || op.operation || op.action);
+        if (type === "replace") {
+          return {
+            type,
+            find: typeof op.find === "string" ? op.find : "",
+            replace: typeof op.replace === "string" ? op.replace : "",
+            replace_all: op.replace_all === true
+          };
+        }
+        if (type === "append") {
+          return {
+            type,
+            content: typeof op.content === "string" ? op.content : "",
+            separator: typeof op.separator === "string" ? op.separator : undefined
+          };
+        }
+        if (type === "insert_after_section") {
+          return {
+            type,
+            content: typeof op.content === "string" ? op.content : "",
+            heading: typeof op.heading === "string" ? op.heading : "",
+            separator: typeof op.separator === "string" ? op.separator : undefined
+          };
+        }
+        if (type === "normalize_headings") {
+          return {
+            type,
+            headings: normalizeHeadingPatchEntries(op.headings || op.changes || op.items)
+          };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .slice(0, 8);
+  }
+
+  function previewWorkspacePatchContent(current, operations, options = {}) {
+    let content = typeof current === "string" ? current : "";
+    const riskFlags = [];
+    const diagnostics = [];
+    if (!Array.isArray(operations) || operations.length === 0) {
+      return { content, riskFlags: ["not_found"], diagnostics: [{ status: "invalid_args", type: "none" }] };
+    }
+    for (const operation of operations) {
+      if (!operation || typeof operation !== "object") continue;
+      if (operation.type === "replace") {
+        const needle = typeof operation.find === "string" ? operation.find : "";
+        if (!needle.trim()) {
+          riskFlags.push("not_found");
+          diagnostics.push({ status: "invalid_args", type: operation.type });
+          continue;
+        }
+        const fuzzy = locateWorkspaceFindText(content, needle);
+        if (!fuzzy.found) {
+          riskFlags.push("not_found");
+          diagnostics.push({ status: "not_found", type: operation.type, matchCount: 0 });
+          continue;
+        }
+        if (fuzzy.matchCount > 1 && operation.replace_all !== true) {
+          riskFlags.push("ambiguous");
+          diagnostics.push({ status: "ambiguous", type: operation.type, matchCount: fuzzy.matchCount });
+          continue;
+        }
+        content = content.split(fuzzy.needle).join(typeof operation.replace === "string" ? operation.replace : "");
+        diagnostics.push({ status: "ok", type: operation.type, matchCount: fuzzy.matchCount });
+        continue;
+      }
+      if (operation.type === "append") {
+        const addition = readString$1q(operation.content);
+        if (!addition) {
+          riskFlags.push("no_growth");
+          diagnostics.push({ status: "empty_content", type: operation.type });
+          continue;
+        }
+        const separator = readWorkspaceAppendSeparator(operation.separator);
+        content = content && addition ? `${content}${separator}${addition}` : content || addition;
+        diagnostics.push({ status: "ok", type: operation.type });
+        continue;
+      }
+      if (operation.type === "insert_after_section") {
+        const targetHeading = normalizeHeadingText(operation.heading);
+        const addition = readString$1q(operation.content);
+        if (!targetHeading || !addition) {
+          riskFlags.push("not_found");
+          diagnostics.push({ status: "invalid_args", type: operation.type });
+          continue;
+        }
+        const headingMatches = collectMarkdownHeadings(content)
+          .filter((heading) => heading && heading.text === targetHeading);
+        if (headingMatches.length > 1) {
+          riskFlags.push("ambiguous");
+          diagnostics.push({ status: "ambiguous", type: operation.type, matchCount: headingMatches.length });
+          continue;
+        }
+        const insertResult = insertAfterMarkdownSection(content, targetHeading, addition, options);
+        if (!insertResult.changed) {
+          riskFlags.push("not_found");
+          diagnostics.push({ status: "heading_not_found", type: operation.type, matchCount: 0 });
+          continue;
+        }
+        content = insertResult.content;
+        diagnostics.push({ status: "ok", type: operation.type, matchCount: 1 });
+        continue;
+      }
+      if (operation.type === "normalize_headings") {
+        const normalizeResult = applyNormalizeHeadingsPatch(content, operation);
+        if (!normalizeResult.changed) {
+          riskFlags.push(normalizeResult.status === "not_found" ? "not_found" : "no_growth");
+          diagnostics.push({
+            status: normalizeResult.status,
+            type: operation.type,
+            changedCount: normalizeResult.changedCount
+          });
+          continue;
+        }
+        content = normalizeResult.content;
+        diagnostics.push({
+          status: "ok",
+          type: operation.type,
+          changedCount: normalizeResult.changedCount
+        });
+      }
+    }
+    return { content, diagnostics, riskFlags };
+  }
+
+  function summarizePatchOperation(operation) {
+    if (!operation || typeof operation !== "object") return null;
+    const type = readString$1q(operation.type);
+    if (!type) return null;
+    if (type === "replace") {
+      return {
+        type,
+        findChars: typeof operation.find === "string" ? operation.find.length : 0,
+        replaceChars: typeof operation.replace === "string" ? operation.replace.length : 0,
+        replace_all: operation.replace_all === true
+      };
+    }
+    if (type === "append") {
+      return {
+        type,
+        contentChars: typeof operation.content === "string" ? operation.content.length : 0
+      };
+    }
+    if (type === "insert_after_section") {
+      return {
+        type,
+        contentChars: typeof operation.content === "string" ? operation.content.length : 0,
+        heading: normalizeHeadingText(operation.heading)
+      };
+    }
+    if (type === "normalize_headings") {
+      return {
+        type,
+        headingCount: Array.isArray(operation.headings) ? operation.headings.length : 0,
+        lineNumbers: Array.isArray(operation.headings)
+          ? operation.headings.map((entry) => readPositiveInteger$f(entry && entry.lineNumber)).filter((lineNumber) => lineNumber != null).slice(0, 12)
+          : []
+      };
+    }
+    return { type };
+  }
+
+  function summarizePatchPreview(operations, facts) {
+    const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString$1q(operation && operation.type)).filter(Boolean);
+    const beforeWords = facts && facts.beforeStats ? facts.beforeStats.words : 0;
+    const afterWords = facts && facts.afterStats ? facts.afterStats.words : 0;
+    const riskFlags = Array.isArray(facts && facts.riskFlags) ? facts.riskFlags : [];
+    const structure = facts && facts.afterStructure ? facts.afterStructure.status : "unknown";
+    return [
+      `operations=${opTypes.join("+") || "none"}`,
+      `words=${beforeWords}->${afterWords}`,
+      `deltaWords=${afterWords - beforeWords}`,
+      `changed=${facts && facts.changed ? "yes" : "no"}`,
+      `structure=${structure}`,
+      `riskFlags=${riskFlags.length ? riskFlags.join(",") : "none"}`
+    ].join("; ");
+  }
+
+  function applyNormalizeHeadingsPatch(current, operation) {
+    const content = typeof current === "string" ? current : "";
+    const changes = Array.isArray(operation && operation.headings) ? operation.headings : [];
+    if (!content || changes.length === 0) {
+      return { changed: false, changedCount: 0, content, status: "not_found" };
+    }
+    const lines = content.split(/\r?\n/);
+    const seen = new Set();
+    let changedCount = 0;
+    for (const change of changes) {
+      const lineNumber = readPositiveInteger$f(change && change.lineNumber);
+      if (lineNumber == null || lineNumber <= 0 || seen.has(lineNumber)) continue;
+      seen.add(lineNumber);
+      const index = lineNumber - 1;
+      if (index < 0 || index >= lines.length) {
+        return { changed: false, changedCount, content, status: "not_found" };
+      }
+      const currentLine = lines[index];
+      const level = readHeadingLevel(currentLine);
+      if (level == null) {
+        return { changed: false, changedCount, content, status: "not_found" };
+      }
+      const nextLine = formatNormalizedHeadingLine(currentLine, change.text);
+      if (!nextLine) {
+        return { changed: false, changedCount, content, status: "not_found" };
+      }
+      if (nextLine !== currentLine) {
+        lines[index] = nextLine;
+        changedCount += 1;
+      }
+    }
+    return {
+      changed: changedCount > 0,
+      changedCount,
+      content: lines.join("\n"),
+      status: changedCount > 0 ? "ok" : "no_growth"
+    };
+  }
+
+  function formatNormalizedHeadingLine(currentLine, replacement) {
+    const current = readString$1q(currentLine);
+    const text = readString$1q(replacement);
+    if (!current || !text) return "";
+    if (/^#{1,6}\s+\S/.test(text)) {
+      return text.replace(/\s+#+\s*$/, "").trim();
+    }
+    const level = readHeadingLevel(current);
+    if (level == null) return "";
+    const cleanText = text.replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
+    return cleanText ? `${"#".repeat(level)} ${cleanText}` : "";
+  }
+
+  function summarizePatchStructure(value) {
+    const structure = value && typeof value === "object" ? value : inspectWorkspaceCandidateStructure("");
+    return {
+      duplicateHeadingCount: readPositiveInteger$f(structure.duplicateHeadingCount) || 0,
+      duplicateNumberCount: readPositiveInteger$f(structure.duplicateNumberCount) || 0,
+      headingCount: readPositiveInteger$f(structure.headingCount) || 0,
+      issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString$1q).filter(Boolean).slice(0, 8) : [],
+      ok: structure.ok === true,
+      repeatedHeadingContexts: normalizeStructureContexts(structure.repeatedHeadingContexts, "heading"),
+      repeatedHeadingSamples: normalizeRepeatedHeadingSamples(structure.repeatedHeadingSamples),
+      repeatedNumberContexts: normalizeStructureContexts(structure.repeatedNumberContexts, "number"),
+      repeatedNumberSamples: normalizeRepeatedNumberSamples(structure.repeatedNumberSamples),
+      sectionNumberRepairHints: normalizeSectionNumberRepairHints(structure.sectionNumberRepairHints),
+      status: readString$1q(structure.status) || "unknown"
+    };
+  }
+
+  function isStructureMaybeWorse(beforeStructure, afterStructure) {
+    const before = beforeStructure && typeof beforeStructure === "object" ? beforeStructure : inspectWorkspaceCandidateStructure("");
+    const after = afterStructure && typeof afterStructure === "object" ? afterStructure : inspectWorkspaceCandidateStructure("");
+    if (before.ok && !after.ok) return true;
+    const beforeIssueCount = Array.isArray(before.issueCodes) ? before.issueCodes.length : 0;
+    const afterIssueCount = Array.isArray(after.issueCodes) ? after.issueCodes.length : 0;
+    if (afterIssueCount > beforeIssueCount) return true;
+    const beforeDuplicates = (readPositiveInteger$f(before.duplicateHeadingCount) || 0) + (readPositiveInteger$f(before.duplicateNumberCount) || 0);
+    const afterDuplicates = (readPositiveInteger$f(after.duplicateHeadingCount) || 0) + (readPositiveInteger$f(after.duplicateNumberCount) || 0);
+    return afterDuplicates > beforeDuplicates;
+  }
+
+  function isStructureImproved(beforeStructure, afterStructure) {
+    const before = beforeStructure && typeof beforeStructure === "object" ? beforeStructure : inspectWorkspaceCandidateStructure("");
+    const after = afterStructure && typeof afterStructure === "object" ? afterStructure : inspectWorkspaceCandidateStructure("");
+    if (after.ok && !before.ok) return true;
+    const beforeIssueCount = Array.isArray(before.issueCodes) ? before.issueCodes.length : 0;
+    const afterIssueCount = Array.isArray(after.issueCodes) ? after.issueCodes.length : 0;
+    if (afterIssueCount < beforeIssueCount) return true;
+    const beforeDuplicates = (readPositiveInteger$f(before.duplicateHeadingCount) || 0) + (readPositiveInteger$f(before.duplicateNumberCount) || 0);
+    const afterDuplicates = (readPositiveInteger$f(after.duplicateHeadingCount) || 0) + (readPositiveInteger$f(after.duplicateNumberCount) || 0);
+    return afterDuplicates < beforeDuplicates;
+  }
+
+  function hashText(value) {
+    const text = typeof value === "string" ? value : "";
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
   // Try to locate `needle` in `current` with progressively lenient
   // normalizers. Returns the literal substring as it appears in
   // `current` (so callers can split/replace using it), plus how many
@@ -11521,7 +12936,25 @@
       force: true,
       prompt: options.prompt
     });
-    const filePath = validateWorkspacePath(path);
+    const resolvedPath = readString$1q(path) || "final_candidate.md";
+    const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "finalize_candidate",
+        path: resolvedPath,
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
+      }, options);
+      refreshWorkspaceQuality(workspace);
+      return {
+        status: "invalid_args",
+        error: pathValidation.error,
+        message: describeWorkspacePathError(pathValidation.error),
+        file: { ...createWorkspaceFile(resolvedPath, "") }
+      };
+    }
+    const filePath = pathValidation.path;
     let file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     if (filePath === "final_candidate.md" && !readString$1q(file.content)) {
       const draft = workspace.files["draft.md"] || createWorkspaceFile("draft.md", "");
@@ -11572,16 +13005,34 @@
     const publishBlockSignal = opts.publishBlockSignal && typeof opts.publishBlockSignal === "object"
       ? opts.publishBlockSignal
       : null;
+    const terminalRepairState = opts.terminalRepairState && typeof opts.terminalRepairState === "object"
+      ? opts.terminalRepairState
+      : null;
+    const terminalRepairActive = terminalRepairState && terminalRepairState.active === true;
+    const terminalRepairAllowedActions = terminalRepairActive
+      ? readStringArray$4(terminalRepairState.allowedActions)
+      : [];
     const quality = source.quality && typeof source.quality === "object" ? source.quality : {};
     const finalCandidatePath = readFinalCandidatePath(source);
     const finalCandidateFile = source.files[finalCandidatePath] || null;
     const finalCandidateContent = readString$1q(finalCandidateFile && finalCandidateFile.content);
-    const finalCandidateStats = summarizeTextStats$1(finalCandidateContent);
+    const finalCandidateStats = summarizeTextStats$2(finalCandidateContent);
     const finalCandidateStatus = readFinalCandidateStatus(source, finalCandidatePath, quality);
-    const finalCandidateStructure = quality.finalCandidateStructure && typeof quality.finalCandidateStructure === "object"
+    const inspectedFinalCandidateStructure = inspectWorkspaceCandidateStructure(finalCandidateContent);
+    const qualityFinalCandidateStructure = quality.finalCandidateStructure && typeof quality.finalCandidateStructure === "object"
       ? quality.finalCandidateStructure
-      : inspectWorkspaceCandidateStructure(finalCandidateContent);
+      : null;
+    const qualityStructureIsEmptyDefault = finalCandidateContent &&
+      qualityFinalCandidateStructure &&
+      Array.isArray(qualityFinalCandidateStructure.issueCodes) &&
+      qualityFinalCandidateStructure.issueCodes.includes("candidate_empty");
+    const finalCandidateStructure = qualityFinalCandidateStructure && !qualityStructureIsEmptyDefault
+      ? qualityFinalCandidateStructure
+      : inspectedFinalCandidateStructure;
     const publishProtocol = inspectWorkspacePublishProtocol(source, finalCandidatePath);
+    const pendingPatch = source.pendingPatch && typeof source.pendingPatch === "object"
+      ? source.pendingPatch
+      : null;
     const checks = Array.isArray(quality.checks)
       ? quality.checks.map((check) => {
         const code = readString$1q(check && check.code);
@@ -11598,7 +13049,7 @@
     });
     const files = promptFiles
       .map((file) => {
-        const stats = summarizeTextStats$1(file.content);
+        const stats = summarizeTextStats$2(file.content);
         return [
           `${file.path} v${file.version} stats=${formatTextStats$1(stats)}:`,
           truncate$2(file.content, maxFilePreviewChars)
@@ -11634,15 +13085,27 @@
         `final_candidate_words=${finalCandidateStats.words}`,
         `final_candidate_structure=${finalCandidateStructure.status || "unknown"}${Array.isArray(finalCandidateStructure.issueCodes) && finalCandidateStructure.issueCodes.length > 0 ? ` (${finalCandidateStructure.issueCodes.join(",")})` : ""}`,
         finalCandidateStructure.status === "fail"
-          ? `structure_repair_required=${finalCandidateStructure.reason}. Use workspace_read, then workspace_write/replace/insert_after_section to produce one coherent report with unique section headings before publishing.`
+          ? formatStructureRepairAdvisory(finalCandidateStructure, terminalRepairAllowedActions)
           : null,
         finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.repeatedHeadingSamples) && finalCandidateStructure.repeatedHeadingSamples.length > 0
           ? `duplicate_heading_samples=${finalCandidateStructure.repeatedHeadingSamples.map((entry) => `${entry.heading} x${entry.count}`).join(" | ")}`
           : null,
+        finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.repeatedHeadingContexts) && finalCandidateStructure.repeatedHeadingContexts.length > 0
+          ? `duplicate_heading_context=${formatStructureContextLine(finalCandidateStructure.repeatedHeadingContexts, "heading")}`
+          : null,
         finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.repeatedNumberSamples) && finalCandidateStructure.repeatedNumberSamples.length > 0
           ? `duplicate_section_number_samples=${finalCandidateStructure.repeatedNumberSamples.map((entry) => `${entry.number} x${entry.count}`).join(" | ")}`
           : null,
+        finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.repeatedNumberContexts) && finalCandidateStructure.repeatedNumberContexts.length > 0
+          ? `duplicate_section_number_context=${formatStructureContextLine(finalCandidateStructure.repeatedNumberContexts, "number")}`
+          : null,
+        finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.sectionNumberRepairHints) && finalCandidateStructure.sectionNumberRepairHints.length > 0
+          ? `section_number_repair_context=${formatSectionNumberRepairHints(finalCandidateStructure.sectionNumberRepairHints)}`
+          : null,
         `publish_protocol_state=finalized_after_write:${publishProtocol.finalizedAfterLatestWrite ? "yes" : "no"}, read_after_finalize:${publishProtocol.readAfterFinalize ? "yes" : "no"}`,
+        pendingPatch
+          ? `pending_patch=patchId:${pendingPatch.patchId}, path:${pendingPatch.path}, status:${pendingPatch.status}, deltaWords:${pendingPatch.deltaWords}, riskFlags:${Array.isArray(pendingPatch.riskFlags) && pendingPatch.riskFlags.length > 0 ? pendingPatch.riskFlags.join(",") : "none"}`
+          : "pending_patch=none",
         checks.length > 0 ? `quality_checks=${checks.join(" | ")}` : "quality_checks=none",
         cyclesUsed != null ? `cycles_used=${cyclesUsed}` : null,
         cyclesMax != null ? `cycles_max=${cyclesMax}` : null,
@@ -11652,10 +13115,53 @@
         publishBlockSignal && publishBlockSignal.count > 0
           ? `publish_attempts_blocked=${publishBlockSignal.count} (lastStatus=${publishBlockSignal.lastStatus || "n/a"}, byStatus=${formatPublishBlockStatusCounts(publishBlockSignal.statusCounts)})${publishBlockSignal.count >= 3 ? " — META-PATTERN: you have been blocked 3+ times. Read the lastStatus and choose a corrected action sequence; do not repeat the same failing publish loop." : ""}`
           : null,
-        "Facts above are read-only observations. AI owns the next move: workspace_read/list to review, web_search/read_url for evidence, workspace_write/append/insert_after_section/replace to improve, workspace_finalize_candidate when ready, workspace_publish_candidate to send the selected candidate verbatim, or finalize with limitations if you judge evidence is exhausted."
+        terminalRepairActive
+          ? `Facts above are read-only observations. Terminal repair is active; the next action must come from terminalRepairState.allowedActions only: ${terminalRepairAllowedActions.length > 0 ? terminalRepairAllowedActions.join(", ") : "(none)"}. Do not use workspace_read/list/write/replace/append/insert/finalize unless that exact action is listed there.`
+          : "Facts above are read-only observations. AI owns the next move: workspace_read/list to review, web_search/read_url for evidence, workspace_write/append/insert_after_section/replace or workspace_propose_patch/apply_patch to improve, workspace_finalize_candidate when ready, workspace_publish_candidate to send the selected candidate verbatim, or finalize with limitations if you judge evidence is exhausted."
       ].filter(Boolean).join("\n"),
       "Use these artifacts as draft context only. Do not expose workspace operation logs or internal workspace headings in the final answer."
     ].filter(Boolean).join("\n\n");
+  }
+
+  function formatStructureRepairAdvisory(finalCandidateStructure, allowedActions) {
+    const reason = readString$1q(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
+    const actions = Array.isArray(allowedActions) ? allowedActions : [];
+    const canPatch = actions.includes("workspace_propose_patch") || actions.includes("workspace_apply_patch");
+    const canRewrite = actions.includes("workspace_write") || actions.includes("workspace_replace");
+    if (canPatch && !canRewrite) {
+      return `structure_repair_required=${reason}. Use workspace_propose_patch first and workspace_apply_patch only for a valid preview. Do not append or insert new sections when length is already satisfied.`;
+    }
+    return `structure_repair_required=${reason}. Produce one coherent report with unique section headings before publishing. If the selected candidate text is already projected or was just read, do not repeat workspace_read; use workspace_write or workspace_replace for a full-outline repair.`;
+  }
+
+  function formatStructureContextLine(contexts, key) {
+    return (Array.isArray(contexts) ? contexts : [])
+      .map((context) => {
+        const label = readString$1q(context && context[key]);
+        const occurrences = (Array.isArray(context && context.occurrences) ? context.occurrences : [])
+          .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString$1q(occurrence.raw)}"`)
+          .filter(Boolean)
+          .join(", ");
+        return label && occurrences ? `${label} -> ${occurrences}` : null;
+      })
+      .filter(Boolean)
+      .slice(0, 5)
+      .join(" | ");
+  }
+
+  function formatSectionNumberRepairHints(hints) {
+    return (Array.isArray(hints) ? hints : [])
+      .map((hint) => {
+        const lineNumber = readPositiveInteger$f(hint && hint.lineNumber);
+        const currentNumber = readString$1q(hint && hint.currentNumber);
+        const candidateNumber = readPositiveInteger$f(hint && hint.candidateNumber);
+        const raw = truncate$2(readString$1q(hint && hint.raw), 160);
+        if (lineNumber == null || !currentNumber || candidateNumber == null || !raw) return null;
+        return `lineNumber ${lineNumber} currentNumber ${currentNumber} candidateNumber ${candidateNumber} raw "${raw}"`;
+      })
+      .filter(Boolean)
+      .slice(0, 12)
+      .join(" | ");
   }
 
   function selectWorkspacePromptFiles(source, options = {}) {
@@ -11785,7 +13291,7 @@
       finalCandidatePath,
       finalCandidateReady: Boolean(finalCandidate),
       finalCandidateStructure,
-      finalCandidateStats: summarizeTextStats$1(finalCandidate),
+      finalCandidateStats: summarizeTextStats$2(finalCandidate),
       issueCodes,
       status: finalCandidate
         ? finalCandidateStructure.ok ? "ready" : "needs_structure_repair"
@@ -11830,6 +13336,31 @@
       .map(([number, count]) => ({ count, number }))
       .sort((a, b) => Number(a.number) - Number(b.number))
       .slice(0, maxSamples);
+    const repeatedHeadingContexts = repeatedHeadingSamples
+      .map((sample) => ({
+        count: sample.count,
+        heading: sample.heading,
+        occurrences: headings
+          .filter((heading) => heading.normalized === sample.heading)
+          .map((heading) => ({
+            lineNumber: heading.lineNumber,
+            raw: truncate$2(heading.raw, 160)
+          }))
+          .slice(0, 8)
+      }));
+    const repeatedNumberContexts = repeatedNumberSamples
+      .map((sample) => ({
+        count: sample.count,
+        number: sample.number,
+        occurrences: headings
+          .filter((heading) => heading.number === sample.number && heading.level <= 3)
+          .map((heading) => ({
+            lineNumber: heading.lineNumber,
+            raw: truncate$2(heading.raw, 160)
+          }))
+          .slice(0, 8)
+      }));
+    const sectionNumberRepairHints = buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSamples);
     const firstHeading = headings[0] || null;
     const title = readString$1q(firstHeading && firstHeading.raw);
     const normalizedTitle = readString$1q(firstHeading && firstHeading.normalized);
@@ -11854,11 +13385,39 @@
       reason: ok
         ? "candidate structure is clean"
         : `candidate has structural issues: ${issueCodes.join(", ")}`,
+      repeatedHeadingContexts,
       repeatedHeadingSamples,
+      repeatedNumberContexts,
       repeatedNumberSamples,
+      sectionNumberRepairHints,
       status: ok ? "pass" : "fail",
       title: title || normalizedTitle
     };
+  }
+
+  function buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSamples) {
+    const repeatedNumbers = new Set((Array.isArray(repeatedNumberSamples) ? repeatedNumberSamples : [])
+      .map((entry) => readString$1q(entry && entry.number))
+      .filter(Boolean));
+    if (repeatedNumbers.size === 0) return [];
+    const levelCounters = new Map();
+    return (Array.isArray(headings) ? headings : [])
+      .filter((heading) => heading && heading.number != null && heading.level <= 3)
+      .map((heading) => {
+        const level = readPositiveInteger$f(heading.level) || 0;
+        const next = (levelCounters.get(level) || 0) + 1;
+        levelCounters.set(level, next);
+        if (!repeatedNumbers.has(readString$1q(heading.number))) return null;
+        return {
+          candidateNumber: next,
+          currentNumber: readString$1q(heading.number),
+          level,
+          lineNumber: heading.lineNumber,
+          raw: truncate$2(heading.raw, 160)
+        };
+      })
+      .filter(Boolean)
+      .slice(0, Math.max(1, readPositiveInteger$f(maxSamples) || 5) * 3);
   }
 
   function readFinalCandidatePath(workspace) {
@@ -11901,7 +13460,7 @@
     workspace.quality.lastRead = {
       observedAt: readString$1q(file.updatedAt) || new Date().toISOString(),
       path: readString$1q(file.path),
-      textStats: summarizeTextStats$1(file.content)
+      textStats: summarizeTextStats$2(file.content)
     };
   }
 
@@ -11955,7 +13514,7 @@
       finalCandidatePath: "final_candidate.md",
       finalCandidateReady: false,
       finalCandidateStructure: inspectWorkspaceCandidateStructure(""),
-      finalCandidateStats: summarizeTextStats$1(""),
+      finalCandidateStats: summarizeTextStats$2(""),
       lastRead: null,
       lastIssueCodes: [],
       status: "needs_draft"
@@ -11991,7 +13550,7 @@
       hasContent: content.length > 0,
       path: readString$1q(file && file.path),
       size: content.length,
-      textStats: summarizeTextStats$1(content),
+      textStats: summarizeTextStats$2(content),
       updatedAt: readString$1q(file && file.updatedAt) || null,
       version: readPositiveInteger$f(file && file.version) || 0
     };
@@ -12001,7 +13560,7 @@
     const source = file && typeof file === "object" ? file : createWorkspaceFile("", "");
     return {
       ...source,
-      textStats: summarizeTextStats$1(source.content)
+      textStats: summarizeTextStats$2(source.content)
     };
   }
 
@@ -12021,6 +13580,37 @@
       })
       .filter(Boolean)
       .slice(-DEFAULT_MAX_OPERATIONS);
+  }
+
+  function normalizePendingPatch(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const pathValidation = validateWorkspacePathRecoverable(source.path);
+    if (!pathValidation.ok) return null;
+    const patchId = readString$1q(source.patchId);
+    if (!patchId) return null;
+    return {
+      afterContent: typeof source.afterContent === "string" ? source.afterContent : "",
+      afterHash: readString$1q(source.afterHash),
+      afterWords: readPositiveInteger$f(source.afterWords) || 0,
+      baseVersion: readPositiveInteger$f(source.baseVersion) || 0,
+      beforeHash: readString$1q(source.beforeHash),
+      beforeWords: readPositiveInteger$f(source.beforeWords) || 0,
+      changed: source.changed === true,
+      createdAt: readString$1q(source.createdAt) || null,
+      deltaWords: typeof source.deltaWords === "number" && Number.isFinite(source.deltaWords) ? source.deltaWords : 0,
+      kind: "virtual_workspace_pending_patch",
+      operations: Array.isArray(source.operations) ? source.operations.map(summarizePatchOperation).filter(Boolean).slice(0, 8) : [],
+      patchId,
+      path: pathValidation.path,
+      previewSummary: readString$1q(source.previewSummary),
+      riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString$1q).filter(Boolean).slice(0, 8) : [],
+      structureAfter: summarizePatchStructure(source.structureAfter),
+      structureBefore: summarizePatchStructure(source.structureBefore),
+      status: readString$1q(source.status) || "preview_blocked",
+      valid: source.valid === true,
+      version: readPositiveInteger$f(source.version) || 1
+    };
   }
 
   function normalizeWorkspaceQuality(value) {
@@ -12072,11 +13662,35 @@
         : [],
       ok: source.ok === true,
       reason: readString$1q(source.reason) || "n/a",
+      repeatedHeadingContexts: normalizeStructureContexts(source.repeatedHeadingContexts, "heading"),
       repeatedHeadingSamples: normalizeRepeatedHeadingSamples(source.repeatedHeadingSamples),
+      repeatedNumberContexts: normalizeStructureContexts(source.repeatedNumberContexts, "number"),
       repeatedNumberSamples: normalizeRepeatedNumberSamples(source.repeatedNumberSamples),
+      sectionNumberRepairHints: normalizeSectionNumberRepairHints(source.sectionNumberRepairHints),
       status: readString$1q(source.status) || "unknown",
       title: truncate$2(readString$1q(source.title), 200)
     };
+  }
+
+  function normalizeSectionNumberRepairHints(value) {
+    return (Array.isArray(value) ? value : [])
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") return null;
+        const lineNumber = readPositiveInteger$f(entry.lineNumber);
+        const candidateNumber = readPositiveInteger$f(entry.candidateNumber);
+        const currentNumber = readString$1q(entry.currentNumber);
+        const raw = readString$1q(entry.raw);
+        if (lineNumber == null || candidateNumber == null || !currentNumber || !raw) return null;
+        return {
+          candidateNumber,
+          currentNumber,
+          level: readPositiveInteger$f(entry.level) || 0,
+          lineNumber,
+          raw: truncate$2(raw, 160)
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 12);
   }
 
   function normalizeRepeatedHeadingSamples(value) {
@@ -12103,6 +13717,35 @@
         return {
           count: readPositiveInteger$f(entry.count) || 1,
           number
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+  }
+
+  function normalizeStructureContexts(value, key) {
+    return (Array.isArray(value) ? value : [])
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") return null;
+        const label = readString$1q(entry[key]);
+        if (!label) return null;
+        const occurrences = (Array.isArray(entry.occurrences) ? entry.occurrences : [])
+          .map((occurrence) => {
+            if (!occurrence || typeof occurrence !== "object") return null;
+            const lineNumber = readPositiveInteger$f(occurrence.lineNumber);
+            const raw = readString$1q(occurrence.raw);
+            if (lineNumber == null || !raw) return null;
+            return {
+              lineNumber,
+              raw: truncate$2(raw, 160)
+            };
+          })
+          .filter(Boolean)
+          .slice(0, 8);
+        return {
+          count: readPositiveInteger$f(entry.count) || occurrences.length || 1,
+          [key]: key === "number" ? label : truncate$2(label, 120),
+          occurrences
         };
       })
       .filter(Boolean)
@@ -12187,7 +13830,12 @@
    * decide its next move).
    */
   function inspectWorkspacePublishProtocol(workspace, path) {
-    const filePath = validateWorkspacePath(path || "final_candidate.md");
+    // Read-only inspector — invalid path returns a neutral protocol view
+    // so the planner block stays observable without throwing. Callers that
+    // care about validity (publish action) check filePath themselves.
+    const resolvedPath = readString$1q(path) || "final_candidate.md";
+    const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
+    const filePath = pathValidation.ok ? pathValidation.path : resolvedPath;
     const source = normalizeVirtualWorkspace(workspace);
     const operations = source && Array.isArray(source.operations) ? source.operations : [];
     let latestWriteIndex = -1;
@@ -12231,7 +13879,7 @@
     return "drafted";
   }
 
-  function summarizeTextStats$1(value) {
+  function summarizeTextStats$2(value) {
     const text = readString$1q(value);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
@@ -12268,6 +13916,12 @@
 
   function readString$1q(value) {
     return typeof value === "string" ? value.trim() : "";
+  }
+
+  function readStringArray$4(value) {
+    return Array.isArray(value)
+      ? value.map(readString$1q).filter(Boolean)
+      : [];
   }
 
   function readPositiveInteger$f(value) {
@@ -12320,7 +13974,7 @@
       requestedLength,
       sourceMinimum
     });
-    const successfulReadUrlCount = readSuccessfulReadUrlCount$1(runState, packet);
+    const successfulReadUrlCount = readSuccessfulReadUrlCount$2(runState, packet);
     const researchState = readResearchState(runState, packet);
     const finalReadiness = readFinalReadiness$1(runState, context);
     const conflictCodes = readConflictCodes({
@@ -12785,7 +14439,7 @@
     };
   }
 
-  function readSuccessfulReadUrlCount$1(runState, packet) {
+  function readSuccessfulReadUrlCount$2(runState, packet) {
     const packetCount = packet && packet.evidence && Number.isFinite(packet.evidence.successfulReadUrlCount)
       ? packet.evidence.successfulReadUrlCount
       : null;
@@ -13045,12 +14699,8 @@
     const requiredAttemptBeforeLimited = Array.from(new Set(
       recoverableDeficits.map((entry) => entry.requiredAttempt).filter(Boolean)
     ));
-    const validLimitedAllowed = recoverableDeficits.length === 0;
-    const forbiddenMoves = validLimitedAllowed
-      ? []
-      : ["clean_ready", "limited_without_recovery_attempt"];
-    const status = readStatus({ recoverableDeficits, validLimitedAllowed });
-    const convergence = buildRequirementRecoveryConvergence({
+    const baselineValidLimitedAllowed = recoverableDeficits.length === 0;
+    let convergence = buildRequirementRecoveryConvergence({
       candidate,
       context,
       deficits,
@@ -13061,9 +14711,31 @@
       runState,
       sourceMinimum,
       sourceSignals,
-      validLimitedAllowed,
+      validLimitedAllowed: baselineValidLimitedAllowed,
       workspaceSignals
     });
+    const terminalRepairLimitedAllowed = shouldAllowTerminalRepairLimited({
+      convergence,
+      recoverableDeficits,
+      runState,
+      workspaceSignals
+    });
+    const validLimitedAllowed = baselineValidLimitedAllowed || terminalRepairLimitedAllowed;
+    if (terminalRepairLimitedAllowed && convergence.recommendedContract !== "valid_limited_allowed") {
+      convergence = {
+        ...convergence,
+        recommendedContract: "valid_limited_allowed",
+        terminalPattern: {
+          kind: "terminal_repair_valid_limited_allowed",
+          threshold: REPEATED_INVALID_TERMINAL_THRESHOLD,
+          message: "Terminal repair is active and workspace recovery is low-budget or repeatedly ineffective; valid limited publish is allowed with concrete remainingGaps."
+        }
+      };
+    }
+    const forbiddenMoves = validLimitedAllowed
+      ? []
+      : ["clean_ready", "limited_without_recovery_attempt"];
+    const status = readStatus({ recoverableDeficits, validLimitedAllowed });
     const nextMoveContract = buildNextMoveContract({
       convergence,
       recoverableDeficits,
@@ -13170,6 +14842,25 @@
     if (recoverableDeficits.some((entry) => entry.dimension === "source")) return "needs_evidence_recovery";
     if (recoverableDeficits.some((entry) => entry.dimension === "length")) return "needs_workspace_recovery";
     return "tracking";
+  }
+
+  function shouldAllowTerminalRepairLimited({ convergence, recoverableDeficits, runState, workspaceSignals }) {
+    const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
+      ? runState.terminalRepairState
+      : null;
+    if (!repair || repair.active !== true) return false;
+    if (!Array.isArray(recoverableDeficits) || recoverableDeficits.length === 0) return false;
+    const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString$1o(entry && entry.dimension)).filter(Boolean)));
+    if (dimensions.includes("source")) return false;
+    if (dimensions.some((dimension) => dimension !== "length")) return false;
+    if (!workspaceSignals || workspaceSignals.expansionAttempted !== true) return false;
+    const normalized = normalizeRequirementRecoveryConvergenceState(convergence);
+    const lengthState = normalized.dimensionStates.length;
+    return normalized.budgetState === "low" ||
+      normalized.budgetState === "exhausted" ||
+      readNumber$e(normalized.repeatedInvalidTerminalCount) >= REPEATED_INVALID_TERMINAL_THRESHOLD ||
+      readNumber$e(lengthState.attempts) >= 3 ||
+      readNumber$e(lengthState.repeatedNoProgressCount) >= 2;
   }
 
   function buildNextMoveContract({ convergence, recoverableDeficits, requiredAttemptBeforeLimited, validLimitedAllowed }) {
@@ -13281,7 +14972,7 @@
       : hasAnyProgress
         ? 0
         : previousConvergence.repeatedInvalidTerminalCount;
-    const budgetState = readBudgetState(runState, candidate, context);
+    const budgetState = readBudgetState$1(runState, candidate, context);
     const recommendedContract = readRecommendedContract({
       budgetState,
       repeatedInvalidTerminalCount,
@@ -13336,7 +15027,7 @@
       readSources: sourceMinimum ? readNumber$e(sourceMinimum.readSources) : null,
       relevantSourceDeficit: deficits.relevantSourceDeficit,
       relevantSources: sourceMinimum ? readNumber$e(sourceMinimum.relevantSources) : null,
-      successfulReadUrlCount: readSuccessfulReadUrlCount(runState)
+      successfulReadUrlCount: readSuccessfulReadUrlCount$1(runState)
     };
   }
 
@@ -13387,7 +15078,7 @@
       readNumber$e(deficits && deficits.relevantSourceDeficit) > 0;
   }
 
-  function readSuccessfulReadUrlCount(runState) {
+  function readSuccessfulReadUrlCount$1(runState) {
     const packet = readAcceptancePacket$1(runState);
     const packetCount = packet && packet.evidence && Number.isFinite(Number(packet.evidence.successfulReadUrlCount))
       ? Number(packet.evidence.successfulReadUrlCount)
@@ -13435,7 +15126,7 @@
     return control === "continue";
   }
 
-  function readBudgetState(runState, candidate, context) {
+  function readBudgetState$1(runState, candidate, context) {
     const cyclesRemaining = readCyclesRemaining(runState);
     const limits = readWorkspaceRecoveryLimits(context);
     const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
@@ -14923,6 +16614,14 @@
   const DEFAULT_VALID_PUBLISH_EXCEPTION =
     "workspace_publish_candidate with finalReadiness.decision=limited, non-empty remainingGaps, and false flags for failed dimensions";
 
+  // ADR-0013 / AGRUN-237 PR 2: escalate to hard_veto after this many ignored terminal
+  // attempts when budget is exhausted — mirrors READ_ONLY_PLANNING_HARD_VETO_THRESHOLD.
+  const TERMINAL_REPAIR_HARD_VETO_THRESHOLD = 3;
+  // AGRUN-237-GAP-01: high-water-mark fires hard_veto regardless of budget when the model
+  // ignores too many advisory blocks — prevents 87-cycle wasted loops on weak models.
+  // Value 6 fires at ~cycle 65 in a 90-step run (25 cycles remaining), based on v8/v9b data.
+  const TERMINAL_REPAIR_HIGH_WATER_MARK = 6;
+
   function createTerminalRepairState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
@@ -14931,10 +16630,13 @@
       active,
       mode: readString$1l(source.mode) || (active ? "terminal_repair" : "none"),
       reason: readString$1l(source.reason) || null,
-      activeDeficits: readStringArray$2(source.activeDeficits).slice(0, 8),
+      activeDeficits: readStringArray$3(source.activeDeficits).slice(0, 8),
       observableDeficits: normalizeObservableDeficits(source.observableDeficits),
-      allowedActions: readStringArray$2(source.allowedActions).slice(0, 16),
-      forbiddenDecisions: readStringArray$2(source.forbiddenDecisions).slice(0, 8),
+      allowedActions: readStringArray$3(source.allowedActions).slice(0, 16),
+      budgetState: readString$1l(source.budgetState) || "unknown",
+      escalation: readString$1l(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      forbiddenDecisions: readStringArray$3(source.forbiddenDecisions).slice(0, 8),
+      requiredRepair: readString$1l(source.requiredRepair) || null,
       validPublishContract: normalizeValidPublishContract(source.validPublishContract),
       ignoredCount: readNumber$b(source.ignoredCount),
       activatedAtCycle: readNullableNumber$1(source.activatedAtCycle),
@@ -14960,7 +16662,7 @@
     const snapshot = createProgressSnapshot(runState);
     const progress = diffProgress(previous.progressSnapshot, snapshot);
     const actionName = readString$1l(context.actionName);
-    readRecord(context.output);
+    const output = readRecord(context.output);
     const completedTerminal = isTerminalCompleted(actionName, context);
 
     if (completedTerminal) {
@@ -14974,8 +16676,26 @@
       activeDeficits: facts.activeDeficits
     });
 
-    if (previous.active && progress.hasProgress && !facts.forceActive && facts.activeDeficits.length === 0) {
-      return clearTerminalRepairState(previous, progress.reason || "observable_progress", cycle, snapshot);
+    const publishProtocolActionPending = isPublishProtocolRepairReason(previous.reason) &&
+      readString$1l(context && context.status) === "before_action";
+    const publishProtocolTransitionPending =
+      readString$1l(previous.reason) === "missing_finalize_after_latest_write" &&
+      actionName === "workspace_finalize_candidate" &&
+      (readString$1l(output && output.kind) === "virtual_workspace_finalize_candidate" ||
+        readString$1l(context && context.status) === "after_workspace_finalize_candidate");
+    if (
+      previous.active &&
+      !facts.forceActive &&
+      facts.activeDeficits.length === 0 &&
+      !publishProtocolActionPending &&
+      !publishProtocolTransitionPending
+    ) {
+      return clearTerminalRepairState(
+        previous,
+        progress.hasProgress ? progress.reason || "observable_progress" : "observable_deficits_resolved",
+        cycle,
+        snapshot
+      );
     }
 
     const shouldActivate = previous.active || facts.forceActive;
@@ -14992,26 +16712,46 @@
       !completedTerminal &&
       !validLimited &&
       !progress.hasProgress;
-    const ignoredCount = previous.ignoredCount + (ignoredTerminal ? 1 : 0);
+    const ignoredRecovery = previous.active &&
+      !ignoredTerminal &&
+      isNoProgressRecoveryAttempt(actionName, output, facts) &&
+      !progress.hasProgress;
+    const ignoredCount = previous.ignoredCount + (ignoredTerminal || ignoredRecovery ? 1 : 0);
     const activeDeficits = facts.activeDeficits;
-    const validPublishContract = buildValidPublishContract(activeDeficits, facts.observableDeficits);
+    const activeReason = resolveActiveRepairReason(previous, facts, actionName, context);
+    // ADR-0033 Tier A.8 (X1 fix) — compute escalation BEFORE buildAllowedActions
+    // so the allowed-action whitelist can open the workspace_publish_candidate
+    // (limited) escape valve once hard_veto fires on a structure-stuck loop.
+    // Without this, lite-tier runs get pinned: structureRepairConvergence forbids
+    // publish, AI re-tries finalize, ignoredCount climbs, hard_veto fires, and the
+    // only "exit" remains structure repair the model cannot do cleanly.
+    const escalation =
+      (ignoredCount >= TERMINAL_REPAIR_HARD_VETO_THRESHOLD && facts.budgetState === "exhausted") ||
+      ignoredCount >= TERMINAL_REPAIR_HIGH_WATER_MARK
+        ? "hard_veto"
+        : "advisory";
+    const allowedActions = buildAllowedActions(activeDeficits, facts.budgetState, activeReason, facts.observableDeficits, runState, escalation);
+    const validPublishContract = buildValidPublishContract(activeDeficits, facts.observableDeficits, facts.budgetState, escalation);
 
     return {
       kind: "terminal_repair_state",
       active: true,
       mode: "terminal_repair",
-      reason: facts.reason || previous.reason || "terminal_repair_required",
+      reason: activeReason,
       activeDeficits,
       observableDeficits: facts.observableDeficits,
-      allowedActions: buildAllowedActions(activeDeficits),
+      allowedActions,
+      budgetState: facts.budgetState,
+      escalation,
       forbiddenDecisions: ["ready", "finalize", "final_answer", "plain_workspace_publish_candidate"],
+      requiredRepair: buildRequiredRepair(activeDeficits, facts.observableDeficits, allowedActions, facts.budgetState),
       validPublishContract,
       ignoredCount,
       activatedAtCycle: previous.active && previous.activatedAtCycle != null
         ? previous.activatedAtCycle
         : cycle,
       lastUpdatedAtCycle: cycle,
-      lastIgnoredAtCycle: ignoredTerminal ? cycle : previous.lastIgnoredAtCycle,
+      lastIgnoredAtCycle: ignoredTerminal || ignoredRecovery ? cycle : previous.lastIgnoredAtCycle,
       progressSnapshot: snapshot,
       clearedReason: null,
       version: 1
@@ -15029,7 +16769,10 @@
       activeDeficits: state.activeDeficits,
       observableDeficits: state.observableDeficits,
       allowedActions: state.allowedActions,
+      budgetState: state.budgetState,
+      escalation: state.escalation,
       forbiddenDecisions: state.forbiddenDecisions,
+      requiredRepair: state.requiredRepair,
       validPublishContract: state.validPublishContract,
       ignoredCount: state.ignoredCount,
       activatedAtCycle: state.activatedAtCycle,
@@ -15039,35 +16782,186 @@
     };
   }
 
-  function isValidTerminalRepairPublishArgs(args, terminalRepairState) {
+  function isValidTerminalRepairPublishArgs(args, terminalRepairState, options = {}) {
+    return explainTerminalRepairPublishArgs(args, terminalRepairState, options).valid;
+  }
+
+  function explainTerminalRepairPublishArgs(args, terminalRepairState, options = {}) {
     const state = createTerminalRepairState(terminalRepairState);
     const source = args && typeof args === "object" && !Array.isArray(args) ? args : {};
     const readiness = source.finalReadiness && typeof source.finalReadiness === "object"
       ? source.finalReadiness
       : {};
-    if (readString$1l(readiness.decision) !== "limited") return false;
+    const reasons = [];
+    if (readString$1l(readiness.decision) !== "limited") {
+      reasons.push("missing_limited_decision");
+    }
     const assessment = readiness.requirementsAssessment && typeof readiness.requirementsAssessment === "object"
       ? readiness.requirementsAssessment
       : {};
-    const gaps = readStringArray$2(assessment.remainingGaps);
-    if (gaps.length === 0) return false;
+    if (!readiness.requirementsAssessment || typeof readiness.requirementsAssessment !== "object") {
+      reasons.push("missing_requirements_assessment");
+    }
+    const gaps = readTerminalRepairGaps(assessment, readiness);
+    if (gaps.length === 0) {
+      reasons.push("missing_remaining_gaps");
+    }
     const deficits = state.activeDeficits;
-    const hasDeficit = deficits.length > 0 || state.active === true;
-    if (hasDeficit && assessment.requirementSatisfied !== false) return false;
-    if (deficits.some((name) => name === "source" || name === "readiness" || name === "terminal_loop") &&
-        assessment.evidenceSatisfied !== false) {
-      return false;
+    const effectiveDeficits = resolvePublishValidationDeficits(deficits, source, state, options);
+    const hasDeficit = effectiveDeficits.length > 0 || state.active === true;
+    if (hasDeficit && assessment.requirementSatisfied !== false) {
+      reasons.push("requirement_satisfied_must_be_false");
     }
-    if (deficits.includes("length") && assessment.lengthSatisfied !== false) {
-      return false;
+    if (effectiveDeficits.includes("source") && assessment.evidenceSatisfied !== false) {
+      reasons.push("evidence_satisfied_must_be_false_for_source_deficit");
     }
-    if (deficits.includes("structure")) {
-      return false;
+    if (effectiveDeficits.includes("length") && assessment.lengthSatisfied !== false) {
+      reasons.push("length_satisfied_must_be_false_for_length_deficit");
     }
-    if (deficits.includes("todo") && !mentionsGap(gaps, ["todo", "task", "progress", "plan"])) {
-      return false;
+    if (effectiveDeficits.includes("structure")) {
+      if (!isBudgetConstrainedForLimitedPublish(state)) {
+        reasons.push("structure_deficit_must_be_repaired_before_publish");
+      } else if (!mentionsStructureGap(gaps)) {
+        reasons.push("remaining_gaps_must_name_structure_deficit");
+      }
     }
-    return true;
+    if (effectiveDeficits.includes("todo") && !mentionsGap(gaps, ["todo", "task", "progress", "plan"])) {
+      reasons.push("remaining_gaps_must_name_todo_deficit");
+    }
+    return {
+      activeDeficits: deficits.slice(0, 8),
+      effectiveDeficits: effectiveDeficits.slice(0, 8),
+      valid: reasons.length === 0,
+      reasons
+    };
+  }
+
+  function getPublishProtocolRequiredActionForReason(reason) {
+    const value = readString$1l(reason);
+    if (value === "missing_finalize_after_latest_write") return "workspace_finalize_candidate";
+    if (value === "missing_latest_workspace_read") return "workspace_read";
+    return "";
+  }
+
+  function isPublishProtocolRequiredActionForRepair(terminalRepairState, actionName) {
+    const state = terminalRepairState && typeof terminalRepairState === "object" && !Array.isArray(terminalRepairState)
+      ? terminalRepairState
+      : {};
+    const requiredAction = getPublishProtocolRequiredActionForReason(state.reason);
+    return Boolean(requiredAction && requiredAction === readString$1l(actionName));
+  }
+
+  function resolvePublishProtocolActionContract(runState) {
+    const publishProtocol = readCurrentPublishProtocol(runState);
+    if (!publishProtocol) return null;
+    if (publishProtocol.finalizedAfterLatestWrite !== true) {
+      return {
+        allowedActions: ["workspace_finalize_candidate"],
+        protocol: publishProtocol,
+        reason: "missing_finalize_after_latest_write",
+        requiredAction: "workspace_finalize_candidate",
+        ready: false
+      };
+    }
+    if (publishProtocol.readAfterLatestContentChange !== true) {
+      return {
+        allowedActions: ["workspace_read"],
+        protocol: publishProtocol,
+        reason: "missing_latest_workspace_read",
+        requiredAction: "workspace_read",
+        ready: false
+      };
+    }
+    return {
+      allowedActions: ["workspace_publish_candidate"],
+      protocol: publishProtocol,
+      reason: "publish_protocol_ready",
+      requiredAction: "",
+      ready: true
+    };
+  }
+
+  function resolvePublishValidationDeficits(deficits, actionArgs, terminalRepairState, options) {
+    const sourceDeficits = Array.isArray(deficits) ? deficits : [];
+    if (!sourceDeficits.includes("length")) return sourceDeficits.slice();
+    const length = terminalRepairState &&
+      terminalRepairState.observableDeficits &&
+      terminalRepairState.observableDeficits.length &&
+      typeof terminalRepairState.observableDeficits.length === "object"
+      ? terminalRepairState.observableDeficits.length
+      : null;
+    const requested = readNumber$b(length && length.requested);
+    const unit = readString$1l(length && length.unit) || "words";
+    const path = readString$1l(actionArgs && actionArgs.path);
+    if (!path || !requested) return sourceDeficits.slice();
+    const stats = readWorkspaceFileStats(options && options.runState, path);
+    const observed = readNumber$b(stats && stats[unit]);
+    if (observed >= requested) {
+      return sourceDeficits.filter((name) => name !== "length");
+    }
+    return sourceDeficits.slice();
+  }
+
+  function readTerminalRepairGaps(assessment, readiness) {
+    const gaps = readStringArray$3(assessment && assessment.remainingGaps);
+    if (gaps.length > 0) return gaps;
+    const fallback = readString$1l(
+      readiness && (readiness.limitations || readiness.limitation || readiness.remainingGap)
+    ) || readString$1l(
+      assessment && (assessment.limitations || assessment.limitation || assessment.remainingGap)
+    );
+    return fallback ? [fallback] : [];
+  }
+
+  function isBudgetConstrainedForLimitedPublish(terminalRepairState) {
+    const budgetState = readString$1l(terminalRepairState && terminalRepairState.budgetState);
+    // ADR-0033 Tier A.8 (X1 fix) — hard_veto means AI has hit the wall on
+    // structure repair (ignoredCount past the high-water mark). Even on
+    // "enough" budget the rational next move is publish_limited with structure
+    // noted in remainingGaps. Treat hard_veto state as constrained for the
+    // purpose of allowing a limited publish contract.
+    const escalation = readString$1l(terminalRepairState && terminalRepairState.escalation);
+    return budgetState === "low" || budgetState === "exhausted" || escalation === "hard_veto";
+  }
+
+  function mentionsStructureGap(gaps) {
+    return mentionsGap(gaps, [
+      "structure",
+      "heading",
+      "headings",
+      "section",
+      "sections",
+      "duplicate",
+      "number",
+      "numbering",
+      "outline"
+    ]);
+  }
+
+  function readWorkspaceFileStats(runState, path) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    const files = workspace && workspace.files && typeof workspace.files === "object"
+      ? workspace.files
+      : null;
+    const file = files && path ? files[path] : null;
+    const stats = readRecord(file && file.textStats);
+    if (stats) return stats;
+    if (file && typeof file === "object" && typeof file.content === "string") {
+      return summarizeTextStats$1(file.content);
+    }
+    return null;
+  }
+
+  function summarizeTextStats$1(value) {
+    const text = readString$1l(value);
+    const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
+    const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
+    return {
+      chars: text.length,
+      cjkChars: cjkChars.length,
+      nonWhitespaceChars: text.replace(/\s/g, "").length,
+      words: latinWords.length
+    };
   }
 
   function readRepairFacts(runState, context) {
@@ -15076,9 +16970,11 @@
     const lengthStatus = readLengthStatus(packet, runState);
     const structure = readStructureStatus(runState);
     const todo = readTodoStatus(runState);
+    const actionName = readString$1l(context && context.actionName);
     const actionPattern = readRecord(runState && runState.actionPatternConvergence);
     const correction = readRecord(actionPattern && actionPattern.terminalCorrectionState);
     const cooldown = readRecord(actionPattern && actionPattern.terminalRetryCooldown);
+    const readOnlyPlanning = readRecord(actionPattern && actionPattern.readOnlyPlanningState);
     const output = readRecord(context && context.output);
     const publishBlocked = readString$1l(output && output.kind) === "virtual_workspace_publish_blocked" ||
       readString$1l(output && output.kind) === "terminal_correction_preflight_block" ||
@@ -15106,25 +17002,33 @@
           readSources: readNumber$b(sourceMinimum.readSources),
           relevantSourceDeficit,
           relevantSources: readNumber$b(sourceMinimum.relevantSources),
-          successfulReadUrlCount: readNumber$b(packet && packet.evidence && packet.evidence.successfulReadUrlCount)
+          successfulReadUrlCount: readSuccessfulReadUrlCount(runState, packet)
         };
       }
     }
 
     if (lengthStatus && lengthStatus.requested > 0 && lengthStatus.observed < lengthStatus.requested) {
+      const alternativeCandidate = findWorkspaceLengthCandidate(
+        runState,
+        lengthStatus.statsKey,
+        lengthStatus.requested,
+        lengthStatus.observed,
+        lengthStatus.path
+      );
       deficits.push("length");
       observableDeficits.length = {
         observed: lengthStatus.observed,
         requested: lengthStatus.requested,
         unit: lengthStatus.unit,
-        deficit: Math.max(lengthStatus.requested - lengthStatus.observed, 0)
+        deficit: Math.max(lengthStatus.requested - lengthStatus.observed, 0),
+        alternativeCandidate
       };
     }
 
     if (structure && structure.ok === false) {
       deficits.push("structure");
       observableDeficits.structure = {
-        issueCodes: readStringArray$2(structure.issueCodes).slice(0, 8),
+        issueCodes: readStringArray$3(structure.issueCodes).slice(0, 8),
         reason: readString$1l(structure.reason) || readString$1l(structure.status) || "structure_not_ready",
         repeatedHeadingSamples: normalizeStructureSamples(structure.repeatedHeadingSamples, "heading"),
         repeatedNumberSamples: normalizeStructureSamples(structure.repeatedNumberSamples, "number"),
@@ -15146,45 +17050,360 @@
     }
 
     const finalizedStructureBlocked = structure && structure.ok === false && isFinalizedCandidateSelected(runState);
+    const readOnlyPlanningActive = readOnlyPlanning && readOnlyPlanning.active === true;
 
     const activeDeficits = Array.from(new Set(deficits)).slice(0, 8);
+    const budgetState = readBudgetState(runState, context);
+    const budgetConstrained = budgetState === "low" || budgetState === "exhausted";
+    const proactiveBudgetRepair = budgetConstrained &&
+      activeDeficits.length > 0 &&
+      shouldProactivelyActivateBudgetRepair(lengthStatus);
+    const todoOnlyTerminalAttempt = isTerminalAttempt(actionName, context) &&
+      activeDeficits.includes("todo") &&
+      !activeDeficits.some((name) => name === "source" || name === "length" || name === "structure");
     return {
       activeDeficits,
+      budgetState,
       forceActive: publishBlocked ||
+        todoOnlyTerminalAttempt ||
         finalizedStructureBlocked ||
+        proactiveBudgetRepair ||
+        (readOnlyPlanningActive && activeDeficits.length > 0) ||
         (correction && correction.active === true) ||
         (cooldown && cooldown.active === true),
       observableDeficits,
-      reason: readString$1l(output && (output.status || output.reason)) ||
+      reason: readOutputRepairReason(output) ||
         readString$1l(correction && correction.reason) ||
         readString$1l(cooldown && cooldown.reason) ||
         (finalizedStructureBlocked ? "finalized_candidate_structure_not_ready" : null) ||
+        (proactiveBudgetRepair ? `${budgetState}_budget_with_observable_deficits` : null) ||
+        (readOnlyPlanningActive && activeDeficits.length > 0 ? "read_only_planning_with_observable_deficits" : null) ||
+        (todoOnlyTerminalAttempt ? "todo_state_not_synced" : null) ||
         (activeDeficits.length > 0 ? "observable_deficits_block_terminal_ready" : null)
     };
   }
 
-  function buildAllowedActions(deficits) {
-    const actions = new Set(["workspace_publish_candidate"]);
-    if (deficits.includes("source") || deficits.includes("readiness") || deficits.includes("terminal_loop")) {
-      actions.add("web_search");
-      actions.add("read_url");
-    }
+  function shouldProactivelyActivateBudgetRepair(lengthStatus) {
+    return Boolean(lengthStatus && lengthStatus.requested > 0);
+  }
+
+  function buildAllowedActions(deficits, budgetState, reason, observableDeficits, runState, escalation) {
+    const actions = new Set();
+    // ADR-0033 Tier A.8 (X1 fix) — treat hard_veto state as a budget-constrained
+    // exit condition for the structure-deficit branch, so AI can publish a
+    // limited candidate (with structure in remainingGaps) instead of being
+    // pinned into an unfixable repair loop.
+    const hardVetoActive = readString$1l(escalation) === "hard_veto";
+    const lowBudget = budgetState === "low" || budgetState === "exhausted" || hardVetoActive;
+    const hasSource = deficits.includes("source");
+    const hasLength = deficits.includes("length");
+    const hasStructure = deficits.includes("structure");
+    const hasTodo = deficits.includes("todo");
+    const hasReadinessOrTerminalLoop = deficits.includes("readiness") || deficits.includes("terminal_loop");
+    const hasProductDeficit = hasSource || hasLength || hasStructure;
     const terminalLoopOnly = deficits.includes("terminal_loop") &&
       !deficits.some((name) => name === "source" || name === "length" || name === "structure" || name === "todo");
-    if (deficits.includes("length") || deficits.includes("structure") || terminalLoopOnly) {
+    const publishProtocolReason = readString$1l(reason);
+    const readOnlyPlanningForbiddenActions = readOnlyPlanningHardVetoForbiddenActions(runState);
+    const workspaceMutationGrowthHardVeto = isWorkspaceMutationGrowthHardVetoActive(runState);
+    const workspacePatchSurface = getWorkspacePatchRepairSurface(runState);
+    const sourceHasUnreadCandidates = hasUnreadSourceCandidates(runState);
+    const publishProtocolContract = resolvePublishProtocolActionContract(runState);
+    const protocolRecoveryAction = readString$1l(publishProtocolContract && publishProtocolContract.requiredAction);
+    const protocolRequiredAction = isPublishProtocolRepairReason(publishProtocolReason)
+      ? protocolRecoveryAction
+      : "";
+
+    if (hardVetoActive && (hasProductDeficit || hasReadinessOrTerminalLoop || terminalLoopOnly)) {
+      if (protocolRequiredAction) {
+        return [protocolRequiredAction];
+      }
+      if (hasStructure && !hasSource && !hasLength && hasTodo) {
+        actions.add("todo_advance");
+        actions.add("todo_run_next");
+        actions.add("todo_cancel");
+        if (budgetState === "low" || budgetState === "exhausted") {
+          actions.add("workspace_publish_candidate");
+        }
+        return Array.from(actions).slice(0, 16);
+      }
+      return ["workspace_publish_candidate"];
+    }
+
+    if (hasTodo && !hasProductDeficit) {
+      if (lowBudget) {
+        actions.add("todo_cancel");
+      }
+      actions.add("todo_advance");
+      actions.add("todo_run_next");
+      actions.add("todo_cancel");
+      actions.add("workspace_publish_candidate");
+      return Array.from(actions).slice(0, 16);
+    }
+
+    if (!hasSource && !hasLength && !hasStructure && !hasTodo && publishProtocolReason === "missing_finalize_after_latest_write") {
+      return [
+        "workspace_finalize_candidate"
+      ];
+    }
+    if (!hasSource && !hasLength && !hasStructure && !hasTodo && publishProtocolReason === "missing_latest_workspace_read") {
+      return [
+        "workspace_read"
+      ];
+    }
+
+    if (hasSource || (hasReadinessOrTerminalLoop && !hasLength && !hasStructure && !hasTodo)) {
+      if (!sourceHasUnreadCandidates && !readOnlyPlanningForbiddenActions.has("web_search")) {
+        actions.add("web_search");
+      }
+      actions.add("read_url");
+    }
+    if (hasStructure) {
+      const structureOnly = !hasSource && !hasLength;
+      if (structureOnly) {
+        addWorkspacePatchRepairActions(actions, workspacePatchSurface, {
+          allowBlockedRetry: true
+        });
+        if (hasTodo) {
+          actions.add("todo_advance");
+          actions.add("todo_run_next");
+          actions.add("todo_cancel");
+        }
+        if (lowBudget) {
+          if (protocolRequiredAction || protocolRecoveryAction) {
+            actions.add(protocolRequiredAction || protocolRecoveryAction);
+          } else {
+            actions.add("workspace_publish_candidate");
+          }
+        }
+      } else {
+        if (workspaceMutationGrowthHardVeto) {
+          addWorkspacePatchRepairActions(actions, workspacePatchSurface);
+        } else {
+          if (!hasSource && workspacePatchSurface !== "blocked_preview") {
+            addWorkspacePatchRepairActions(actions, workspacePatchSurface);
+          }
+          actions.add("workspace_write");
+          actions.add("workspace_replace");
+        }
+        if (hasLength) {
+          actions.add("workspace_append");
+          actions.add("workspace_insert_after_section");
+        }
+        if (lowBudget) {
+          if (protocolRequiredAction || protocolRecoveryAction) {
+            actions.add(protocolRequiredAction || protocolRecoveryAction);
+          } else {
+            actions.add("workspace_publish_candidate");
+          }
+        }
+      }
+    } else if (hasLength) {
+      const length = observableDeficits && observableDeficits.length && typeof observableDeficits.length === "object"
+        ? observableDeficits.length
+        : null;
+      const alternativeCandidate = length && length.alternativeCandidate && typeof length.alternativeCandidate === "object"
+        ? length.alternativeCandidate
+        : null;
+      if (alternativeCandidate && alternativeCandidate.path) {
+        actions.add("workspace_finalize_candidate");
+        actions.add("workspace_read");
+        actions.add("workspace_publish_candidate");
+      } else {
+        if (lowBudget) {
+          if (protocolRequiredAction || protocolRecoveryAction) {
+            actions.add(protocolRequiredAction || protocolRecoveryAction);
+          }
+        }
+        if (workspaceMutationGrowthHardVeto) {
+          addWorkspacePatchRepairActions(actions, workspacePatchSurface);
+        }
+        actions.add("workspace_append");
+        actions.add("workspace_insert_after_section");
+        if (!lowBudget) {
+          actions.add("workspace_read");
+          if (!workspaceMutationGrowthHardVeto) {
+            actions.add("workspace_write");
+            actions.add("workspace_replace");
+          }
+        }
+      }
+    } else if (terminalLoopOnly && !lowBudget) {
       actions.add("workspace_read");
-      actions.add("workspace_write");
+      if (workspaceMutationGrowthHardVeto) {
+        addWorkspacePatchRepairActions(actions, workspacePatchSurface);
+      } else {
+        actions.add("workspace_write");
+        actions.add("workspace_replace");
+      }
       actions.add("workspace_append");
       actions.add("workspace_insert_after_section");
-      actions.add("workspace_replace");
-      actions.add("workspace_finalize_candidate");
     }
-    if (deficits.includes("todo")) {
+    if (hasTodo && !hasSource && !hasLength && !hasStructure) {
       actions.add("todo_advance");
       actions.add("todo_run_next");
       actions.add("todo_cancel");
     }
-    return Array.from(actions).slice(0, 16);
+    if (!hasStructure && lowBudget && !protocolRequiredAction) {
+      actions.add("workspace_publish_candidate");
+    }
+    return filterReadOnlyPlanningChurnActions(
+      Array.from(actions),
+      {
+        deficits,
+        forbiddenActions: readOnlyPlanningForbiddenActions,
+        protocolRequiredAction,
+        sourceHasUnreadCandidates
+      }
+    ).slice(0, 16);
+  }
+
+  function isWorkspaceMutationGrowthHardVetoActive(runState) {
+    const convergence = readRecord(runState && runState.actionPatternConvergence);
+    const state = readRecord(convergence && convergence.workspaceMutationGrowthConvergence);
+    return Boolean(state && state.active === true && readString$1l(state.escalation) === "hard_veto");
+  }
+
+  function addWorkspacePatchRepairActions(actions, surface, options = {}) {
+    if (!actions || typeof actions.add !== "function") return;
+    if (surface === "blocked_preview") {
+      if (options.allowBlockedRetry === true) {
+        actions.add("workspace_propose_patch");
+      }
+      return;
+    }
+    if (surface === "apply_ready") {
+      actions.add("workspace_apply_patch");
+      return;
+    }
+    actions.add("workspace_propose_patch");
+    actions.add("workspace_apply_patch");
+  }
+
+  function getWorkspacePatchRepairSurface(runState) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    const pendingPatch = readRecord(workspace && workspace.pendingPatch);
+    if (!pendingPatch) return "fresh";
+    const status = readString$1l(pendingPatch.status);
+    if (pendingPatch.valid === true && status === "preview_ready") {
+      return "apply_ready";
+    }
+    if (status === "preview_blocked") {
+      return "blocked_preview";
+    }
+    return "fresh";
+  }
+
+  function readOnlyPlanningHardVetoForbiddenActions(runState) {
+    const convergence = readRecord(runState && runState.actionPatternConvergence);
+    const state = readRecord(convergence && convergence.readOnlyPlanningState);
+    if (!state || state.active !== true) return new Set();
+    if (readString$1l(state.escalation) !== "hard_veto") return new Set();
+    return new Set(readStringArray$3(state.forbiddenActions));
+  }
+
+  function hasUnreadSourceCandidates(runState) {
+    const context = readRecord(runState && runState.researchContext);
+    const readSources = Array.isArray(context && context.readSources) ? context.readSources : [];
+    const readUrls = new Set(readSources.map(readCandidateUrl).filter(Boolean));
+    const candidates = [
+      ...(Array.isArray(runState && runState.readUrlRecoverySignal && runState.readUrlRecoverySignal.alternateSourceCandidates)
+        ? runState.readUrlRecoverySignal.alternateSourceCandidates
+        : []),
+      ...(Array.isArray(context && context.aggregatedSearchResults) ? context.aggregatedSearchResults : []),
+      ...(Array.isArray(context && context.searchResults) ? context.searchResults : []),
+      ...readSearchPassItems(context && context.searchPasses)
+    ];
+    return candidates.some((candidate) => {
+      const url = readCandidateUrl(candidate);
+      return Boolean(url && !readUrls.has(url));
+    });
+  }
+
+  function readSearchPassItems(searchPasses) {
+    if (!Array.isArray(searchPasses)) return [];
+    const items = [];
+    for (const pass of searchPasses) {
+      if (Array.isArray(pass && pass.items)) items.push(...pass.items);
+      if (Array.isArray(pass && pass.rankedItems)) items.push(...pass.rankedItems);
+    }
+    return items;
+  }
+
+  function readCandidateUrl(candidate) {
+    const source = readRecord(candidate);
+    if (!source) return "";
+    return readString$1l(source.url) || readString$1l(source.link) || readString$1l(source.href);
+  }
+
+  function filterReadOnlyPlanningChurnActions(actions, options = {}) {
+    const source = Array.isArray(actions) ? actions : [];
+    const forbidden = options.forbiddenActions instanceof Set ? options.forbiddenActions : new Set();
+    if (forbidden.size === 0) return source;
+    const deficits = Array.isArray(options.deficits) ? options.deficits : [];
+    const remove = new Set();
+    if (deficits.includes("source") && options.sourceHasUnreadCandidates === true) {
+      remove.add("web_search");
+    }
+    if (deficits.includes("length") && !deficits.includes("structure")) {
+      for (const actionName of ["workspace_read", "workspace_write", "workspace_replace"]) {
+        remove.add(actionName);
+      }
+    }
+    if (remove.size === 0) return source;
+    const filtered = source.filter((actionName) => {
+      if (!remove.has(actionName)) return true;
+      if (actionName === readString$1l(options.protocolRequiredAction)) return true;
+      return !forbidden.has(actionName);
+    });
+    return filtered.length > 0 ? filtered : source;
+  }
+
+  function resolveActiveRepairReason(previous, facts, actionName, context) {
+    const previousReason = readString$1l(previous && previous.reason);
+    const factReason = readString$1l(facts && facts.reason);
+    const name = readString$1l(actionName);
+    const status = readString$1l(context && context.status);
+    const output = readRecord(context && context.output);
+    if (
+      previousReason === "missing_finalize_after_latest_write" &&
+      name === "workspace_finalize_candidate" &&
+      (readString$1l(output && output.kind) === "virtual_workspace_finalize_candidate" || status === "after_workspace_finalize_candidate")
+    ) {
+      const publishProtocol = readRecord(output && output.publishProtocol);
+      if (publishProtocol && publishProtocol.readAfterLatestContentChange === true) {
+        return factReason || "terminal_repair_required";
+      }
+      return "missing_latest_workspace_read";
+    }
+    if (
+      previousReason === "missing_latest_workspace_read" &&
+      name === "workspace_read" &&
+      (readString$1l(output && output.kind) === "virtual_workspace_read" || status === "after_workspace_read")
+    ) {
+      return factReason || "terminal_repair_required";
+    }
+    if (isPublishProtocolRepairReason(previousReason)) {
+      return previousReason;
+    }
+    return factReason || previousReason || "terminal_repair_required";
+  }
+
+  function isPublishProtocolRepairReason(value) {
+    const reason = readString$1l(value);
+    return reason === "missing_finalize_after_latest_write" || reason === "missing_latest_workspace_read";
+  }
+
+  function readOutputRepairReason(output) {
+    const status = readString$1l(output && output.status);
+    const reason = readString$1l(output && output.reason);
+    for (const value of [status, reason]) {
+      if (!value) continue;
+      if (value === "ok" || value === "complete" || value === "completed") continue;
+      if (value.startsWith("after_") || value.startsWith("before_")) continue;
+      return value;
+    }
+    return null;
   }
 
   function normalizeStructureSamples(value, key) {
@@ -15203,21 +17422,175 @@
       .slice(0, 6);
   }
 
-  function buildValidPublishContract(deficits, observableDeficits) {
+  function buildValidPublishContract(deficits, observableDeficits, budgetState, escalation) {
+    const requiresEvidenceFalse = deficits.includes("source");
+    // ADR-0033 Tier A.8 (X1 fix) — hard_veto state counts as constrained so the
+    // contract surface stops insisting on structure repair when AI can't make
+    // progress. AI must still mention structure in remainingGaps to publish.
+    const hardVetoActive = readString$1l(escalation) === "hard_veto";
+    const constrained = budgetState === "low" || budgetState === "exhausted" || hardVetoActive;
     return {
       decision: "limited",
       remainingGaps: "non-empty string array with concrete blockers",
-      evidenceSatisfied: deficits.some((name) => name === "source" || name === "readiness" || name === "terminal_loop")
+      evidenceSatisfied: requiresEvidenceFalse
         ? false
         : "match observed evidence facts",
       lengthSatisfied: deficits.includes("length") ? false : "match observed candidate stats",
       requirementSatisfied: deficits.length > 0 ? false : "match observed facts",
       structureRequirement: deficits.includes("structure")
-        ? "must repair structure before terminal publish"
+        ? (constrained
+          ? "low/exhausted budget may publish limited only with concrete structure remainingGaps"
+          : "must repair structure before terminal publish")
         : "not blocking",
+      budgetState: budgetState || "unknown",
       observableDeficits: cloneValue(observableDeficits),
+      requiredArgsExample: buildValidLimitedArgsExample(deficits, observableDeficits),
       validTerminalException: DEFAULT_VALID_PUBLISH_EXCEPTION
     };
+  }
+
+  function buildValidLimitedArgsExample(deficits, observableDeficits) {
+    const length = observableDeficits && observableDeficits.length && typeof observableDeficits.length === "object"
+      ? observableDeficits.length
+      : null;
+    const source = observableDeficits && observableDeficits.source && typeof observableDeficits.source === "object"
+      ? observableDeficits.source
+      : null;
+    const todo = observableDeficits && observableDeficits.todo && typeof observableDeficits.todo === "object"
+      ? observableDeficits.todo
+      : null;
+    const structure = observableDeficits && observableDeficits.structure && typeof observableDeficits.structure === "object"
+      ? observableDeficits.structure
+      : null;
+    const remainingGaps = [];
+    if (source) {
+      remainingGaps.push(`Source evidence is still short: readSources=${source.readSources}/${source.minReadSources}, relevantSources=${source.relevantSources}/${source.minRelevantSources}.`);
+    }
+    if (length) {
+      remainingGaps.push(`Length is still short: observed ${length.observed}/${length.requested} ${length.unit}.`);
+    }
+    if (structure) {
+      const issueCodes = Array.isArray(structure.issueCodes) && structure.issueCodes.length > 0
+        ? structure.issueCodes.join(",")
+        : (readString$1l(structure.reason) || "structure_not_ready");
+      remainingGaps.push(`Structure is still not ready: ${issueCodes}.`);
+    }
+    if (todo) {
+      remainingGaps.push(`TodoState is not fully synchronized: ${todo.unfinishedCount || 0} unfinished task(s) remain.`);
+    }
+    if (deficits.includes("readiness")) {
+      remainingGaps.push("Previous publish readiness payload did not match observable runtime facts.");
+    }
+    if (deficits.includes("terminal_loop")) {
+      remainingGaps.push("Repeated terminal attempts did not produce observable progress before budget ended.");
+    }
+    if (remainingGaps.length === 0) {
+      remainingGaps.push("Terminal repair requires limited publish because observable facts still block clean ready.");
+    }
+    return {
+      finalReadiness: {
+        decision: "limited",
+        evidenceMode: "read_sources",
+        requirementsAssessment: {
+          checkedReadinessAgainstUserRequest: true,
+          checkedReadUrlEvidence: true,
+          checkedWorkspaceStats: true,
+          evidenceSatisfied: deficits.includes("source") ? false : true,
+          lengthSatisfied: deficits.includes("length") ? false : true,
+          observedLength: length ? length.observed : null,
+          observedLengthUnit: length ? length.unit : null,
+          remainingGaps,
+          requestedLength: length ? length.requested : null,
+          requirementSatisfied: false,
+          successfulReadUrlCount: source ? source.successfulReadUrlCount : null,
+          summary: "Limited publish because terminal repair facts show remaining observable deficits."
+        }
+      }
+    };
+  }
+
+  function buildRequiredRepair(deficits, observableDeficits, allowedActions, budgetState) {
+    const parts = [];
+    const structure = observableDeficits && observableDeficits.structure && typeof observableDeficits.structure === "object"
+      ? observableDeficits.structure
+      : null;
+    const length = observableDeficits && observableDeficits.length && typeof observableDeficits.length === "object"
+      ? observableDeficits.length
+      : null;
+    const source = observableDeficits && observableDeficits.source && typeof observableDeficits.source === "object"
+      ? observableDeficits.source
+      : null;
+    const todo = observableDeficits && observableDeficits.todo && typeof observableDeficits.todo === "object"
+      ? observableDeficits.todo
+      : null;
+    if (deficits.includes("source") && source) {
+      const exhausted = budgetState === "exhausted";
+      parts.push(`Source deficit: need ${source.readSourceDeficit || 0} more read source(s) and ${source.relevantSourceDeficit || 0} more relevant source(s); use web_search/read_url before clean publish.${exhausted ? " Budget is exhausted: if you cannot improve source relevance immediately, publish only valid limited finalReadiness now with decision=limited, evidenceSatisfied=false, requirementSatisfied=false, and remainingGaps naming the source relevance gap." : ""}`);
+    }
+    if (deficits.includes("structure") && structure) {
+      const constrained = budgetState === "low" || budgetState === "exhausted";
+      const canPatch = Array.isArray(allowedActions) &&
+        (allowedActions.includes("workspace_propose_patch") || allowedActions.includes("workspace_apply_patch"));
+      const canRewrite = Array.isArray(allowedActions) &&
+        (allowedActions.includes("workspace_write") || allowedActions.includes("workspace_replace"));
+      const repairVerb = canPatch && !canRewrite
+        ? "Structure deficit: propose a structured patch against the current candidate, inspect deltaWords/riskFlags, then apply only a valid preview; do not append or insert new sections when length is already satisfied."
+        : "Structure deficit: use one coherent workspace_write/workspace_replace repair with unique headings/section numbers; do not repeat workspace_read or small append/insert loops.";
+      const headingSamples = Array.isArray(structure.repeatedHeadingSamples)
+        ? structure.repeatedHeadingSamples.map((entry) => `${entry.heading} x${entry.count}`).join(" | ")
+        : "";
+      const numberSamples = Array.isArray(structure.repeatedNumberSamples)
+        ? structure.repeatedNumberSamples.map((entry) => `${entry.number} x${entry.count}`).join(" | ")
+        : "";
+      parts.push([
+        repairVerb,
+        Array.isArray(structure.issueCodes) && structure.issueCodes.length > 0 ? `issueCodes=${structure.issueCodes.join(",")}.` : "",
+        headingSamples ? `duplicateHeadings=${headingSamples}.` : "",
+        numberSamples ? `duplicateNumbers=${numberSamples}.` : "",
+        constrained ? "Budget is constrained: if one coherent rewrite cannot repair structure immediately, publish only valid limited finalReadiness now with decision=limited, requirementSatisfied=false, and remainingGaps naming the concrete structure/heading/section issue." : ""
+      ].filter(Boolean).join(" "));
+    }
+    if (deficits.includes("length") && length) {
+      const alternative = length.alternativeCandidate && typeof length.alternativeCandidate === "object"
+        ? length.alternativeCandidate
+        : null;
+      if (alternative && alternative.path) {
+        parts.push(`Length deficit: selected final candidate has ${length.observed}/${length.requested} ${length.unit}, but workspace file ${alternative.path} has ${alternative.observed}/${alternative.requested} ${alternative.unit}; use workspace_finalize_candidate with that path, then workspace_read it before publishing.`);
+      } else {
+        const constrained = budgetState === "low" || budgetState === "exhausted";
+        parts.push(`Length deficit: observed ${length.observed}/${length.requested} ${length.unit}; the next workspace mutation must add enough user-facing material to close the ${length.deficit} ${length.unit} gap.${constrained ? " Budget is constrained: if the gap cannot be closed immediately with the allowed workspace action, publish only valid limited finalReadiness now with decision=limited, lengthSatisfied=false, requirementSatisfied=false, and remainingGaps naming the length gap." : ""}`);
+      }
+    }
+    if (deficits.includes("todo") && todo) {
+      const hasProductDeficit = deficits.some((name) => name === "source" || name === "length" || name === "structure");
+      const onlyStructureProductDeficit = deficits.includes("structure") &&
+        !deficits.includes("source") &&
+        !deficits.includes("length");
+      const todoActionsVisible = Array.isArray(allowedActions) &&
+        (allowedActions.includes("todo_advance") || allowedActions.includes("todo_run_next") || allowedActions.includes("todo_cancel"));
+      if (hasProductDeficit && onlyStructureProductDeficit && todoActionsVisible) {
+        parts.push(`Todo deficit: ${todo.unfinishedCount || 0} unfinished item(s) remain after source/length gates are satisfied; keep structure repair AI-owned with the patch surface and sync stale TodoState with todo_advance/todo_run_next, or use todo_cancel if the remaining plan is obsolete.`);
+      } else if (hasProductDeficit) {
+        parts.push(`Todo deficit: ${todo.unfinishedCount || 0} unfinished item(s), but Todo actions are transitional until source/length/structure product deficits are resolved.`);
+      } else {
+        parts.push(`Todo deficit: ${todo.unfinishedCount || 0} unfinished item(s) remain after source/length/structure gates are resolved; sync TodoState with todo_advance/todo_run_next, or use todo_cancel if the remaining plan is stale, before a clean ready publish.`);
+      }
+    }
+    if (Array.isArray(allowedActions) && allowedActions.length > 0) {
+      parts.push(`Allowed recovery actions now: ${allowedActions.join(", ")}.`);
+    }
+    return parts.join(" ");
+  }
+
+  function readBudgetState(runState, context) {
+    const cycle = readNumber$b(runState && runState.cycleCount);
+    const maxSteps = readNumber$b(runState && runState.maxSteps) ||
+      readNumber$b(context && context.runtimeConfig && context.runtimeConfig.maxSteps);
+    if (!maxSteps) return "unknown";
+    const remaining = Math.max(maxSteps - cycle, 0);
+    if (remaining === 0) return "exhausted";
+    if (remaining <= 10) return "low";
+    return "enough";
   }
 
   function readAcceptancePacket(runState) {
@@ -15245,20 +17618,58 @@
       readCandidateStatsFromWorkspace(runState);
     return {
       observed: readNumber$b(stats && stats[statsKey]),
+      path: readString$1l(candidate && candidate.path) || readFinalCandidatePathFromWorkspace(runState),
       requested: requestedValue,
       statsKey,
       unit: readString$1l(requested && requested.unit) || statsKey
     };
   }
 
-  function readCandidateStatsFromWorkspace(runState) {
+  function readFinalCandidatePathFromWorkspace(runState) {
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const quality = readRecord(workspace && workspace.quality);
-    const path = readString$1l(quality && quality.finalCandidatePath) || "final_candidate.md";
+    return readString$1l(quality && quality.finalCandidatePath) || "final_candidate.md";
+  }
+
+  function readCurrentPublishProtocol(runState) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    if (!workspace) return null;
+    return inspectWorkspacePublishProtocol(workspace, readFinalCandidatePathFromWorkspace(runState));
+  }
+
+  function readCandidateStatsFromWorkspace(runState) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    const path = readFinalCandidatePathFromWorkspace(runState);
     const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
       ? workspace.files[path]
       : null;
     return readRecord(file && file.textStats);
+  }
+
+  function findWorkspaceLengthCandidate(runState, statsKey, requested, observed, currentPath) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    const files = workspace && workspace.files && typeof workspace.files === "object"
+      ? workspace.files
+      : null;
+    if (!files) return null;
+    const selectedPath = readString$1l(currentPath) || readFinalCandidatePathFromWorkspace(runState);
+    let best = null;
+    for (const [path, file] of Object.entries(files)) {
+      const safePath = readString$1l(path);
+      if (!safePath || safePath === selectedPath) continue;
+      const stats = readRecord(file && file.textStats);
+      const value = readNumber$b(stats && stats[statsKey]);
+      if (value < requested || value <= observed) continue;
+      if (!best || value > best.observed) {
+        best = {
+          path: safePath,
+          observed: value,
+          requested,
+          unit: statsKey
+        };
+      }
+    }
+    return best;
   }
 
   function readStructureStatus(runState) {
@@ -15303,7 +17714,7 @@
     const todo = readTodoStatus(runState);
     const workspace = readRecord(runState && runState.virtualWorkspace);
     return {
-      successfulReadUrlCount: readNumber$b(packet && packet.evidence && packet.evidence.successfulReadUrlCount),
+      successfulReadUrlCount: readSuccessfulReadUrlCount(runState, packet),
       readSources: readNumber$b(sourceMinimum && sourceMinimum.readSources),
       relevantSources: readNumber$b(sourceMinimum && sourceMinimum.relevantSources),
       sourceMinimumPassed: sourceMinimum && sourceMinimum.passed === true,
@@ -15330,6 +17741,13 @@
       structureOk: source.structureOk === true,
       todoUnfinishedCount: readNumber$b(source.todoUnfinishedCount)
     };
+  }
+
+  function readSuccessfulReadUrlCount(runState, packet) {
+    const packetCount = packet && packet.evidence && Number.isFinite(Number(packet.evidence.successfulReadUrlCount))
+      ? readNumber$b(packet.evidence.successfulReadUrlCount)
+      : 0;
+    return Math.max(packetCount, countSuccessfulReadUrlArtifacts(runState));
   }
 
   function diffProgress(previous, next) {
@@ -15361,9 +17779,14 @@
       ...createTerminalRepairState(previous),
       active: false,
       mode: "none",
+      reason: null,
       activeDeficits: [],
+      observableDeficits: normalizeObservableDeficits(null),
       allowedActions: [],
+      budgetState: "unknown",
       forbiddenDecisions: [],
+      requiredRepair: null,
+      validPublishContract: normalizeValidPublishContract(null),
       ignoredCount: 0,
       lastUpdatedAtCycle: cycle,
       progressSnapshot: normalizeProgressSnapshot(snapshot),
@@ -15384,6 +17807,17 @@
     if (readString$1l(output && output.kind) === "final_response") return true;
     if (readString$1l(output && output.control) === "complete") return true;
     return readString$1l(context && context.status) === "complete";
+  }
+
+  function isNoProgressRecoveryAttempt(actionName, output, facts) {
+    const name = readString$1l(actionName);
+    if (name !== "workspace_propose_patch") return false;
+    const result = readRecord(output);
+    if (readString$1l(result && result.status) !== "preview_blocked") return false;
+    const deficits = Array.isArray(facts && facts.activeDeficits) ? facts.activeDeficits : [];
+    return deficits.includes("structure") &&
+      !deficits.includes("length") &&
+      !deficits.includes("source");
   }
 
   function readActionArgs$1(context) {
@@ -15411,13 +17845,17 @@
       lengthSatisfied: source.lengthSatisfied === false ? false : readString$1l(source.lengthSatisfied) || "match observed candidate stats",
       requirementSatisfied: source.requirementSatisfied === false ? false : readString$1l(source.requirementSatisfied) || "match observed facts",
       structureRequirement: readString$1l(source.structureRequirement) || "not blocking",
+      budgetState: readString$1l(source.budgetState) || "unknown",
       observableDeficits: normalizeObservableDeficits(source.observableDeficits),
+      requiredArgsExample: source.requiredArgsExample && typeof source.requiredArgsExample === "object" && !Array.isArray(source.requiredArgsExample)
+        ? cloneValue(source.requiredArgsExample)
+        : null,
       validTerminalException: readString$1l(source.validTerminalException) || DEFAULT_VALID_PUBLISH_EXCEPTION
     };
   }
 
   function mentionsGap(gaps, keywords) {
-    const text = readStringArray$2(gaps).join(" ").toLowerCase();
+    const text = readStringArray$3(gaps).join(" ").toLowerCase();
     return keywords.some((keyword) => text.includes(keyword));
   }
 
@@ -15429,7 +17867,7 @@
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readStringArray$2(value) {
+  function readStringArray$3(value) {
     return Array.isArray(value) ? value.map(readString$1l).filter(Boolean) : [];
   }
 
@@ -21608,6 +24046,156 @@
     return typeof value === "string" ? value.trim() : "";
   }
 
+  /**
+   * SSOT for every LLM-facing string the terminal-repair preflight emits to
+   * the planner.
+   *
+   * Why this exists (2026-05-16):
+   *   "Terminal repair mode is active..." was duplicated across
+   *   `action-loop-action.js` (terminal repair preflight block, two
+   *   variants for invalid publish vs action-not-allowed) and
+   *   `action-loop-session-loop.js` (direct final/finalize suppression
+   *   during terminal repair). Tuning the wording for a planner model
+   *   required editing two files in lockstep, which is the same
+   *   patch-thinking that motivated `todo-prompt-strings.js`. This module
+   *   centralizes the catalog so both sites import the same SSOT.
+   *
+   * Layering:
+   *   - `block.*` strings are surfaced from
+   *     `maybeBlockTerminalRepairAction` in `action-loop-action.js`.
+   *   - `directTerminalBlock.*` strings are surfaced from
+   *     `maybeBlockDirectTerminalDuringRepair` in
+   *     `action-loop-session-loop.js`.
+   *   - Functions take named-parameter objects so future fields are
+   *     additive, not positional.
+   *
+   * No host-override surface is exposed yet (todo-prompt-strings.js carries
+   * one via runtimeConfig). When a host needs to tune these, add the
+   * deep-merge normalizer pattern from todo-prompt-strings.js; defaults
+   * here preserve existing call-site behavior verbatim so adding the
+   * config surface later is purely additive.
+   */
+
+  const DEFAULT_TERMINAL_REPAIR_STRINGS = Object.freeze({
+    block: Object.freeze({
+      invalidPublish: ({ protocolHint }) =>
+        "Terminal repair mode is active: workspace_publish_candidate is "
+        + "allowed only with finalReadiness.decision='limited', non-empty "
+        + "concrete remainingGaps, evidenceSatisfied=false only when source "
+        + "deficits remain, lengthSatisfied=false for length deficits, and "
+        + "requirementSatisfied=false while any core deficit remains."
+        + (protocolHint || ""),
+      actionNotAllowed: ({ actionName }) =>
+        `Terminal repair mode is active: ${actionName} is not an allowed `
+        + "recovery action for the current deficits. Choose one of the "
+        + "allowedActions, or publish only a valid limited workspace "
+        + "candidate.",
+      // ADR-0033 Part 4 Tier A.6 (B2 fix) — deficit-aware hard veto recovery instruction.
+      // Previously this message forced workspace_publish_candidate with decision='limited'
+      // regardless of budgetState, which pushed AI to ship a short "limited" report even
+      // when budget remained for more content work. Live data (tier-a-2026-05-20 run2:
+      // 56 hard_veto fires with budgetState='enough') showed AI ignored the publish push
+      // and kept retrying finalize because publishing 437 words as "limited" felt wrong.
+      // Fix: when budget is NOT exhausted, surface the FIRST allowed deficit-clearing
+      // action with a per-deficit hint built from observableDeficits. AI still chooses
+      // freely; runtime is only restating what is available, not picking for AI.
+      hardVetoActionNotAllowed: ({
+        actionName,
+        ignoredCount,
+        budgetState,
+        activeDeficits,
+        allowedActions,
+        observableDeficits
+      }) => {
+        const budgetExhausted = (typeof budgetState === "string" && budgetState.trim().toLowerCase()) === "exhausted";
+        const deficits = Array.isArray(activeDeficits) ? activeDeficits : [];
+        const allowed = Array.isArray(allowedActions) ? allowedActions : [];
+        const firstAllowed = allowed.find((name) => name && name !== actionName) || allowed[0] || null;
+        const deficitHint = buildTerminalRepairDeficitHint(deficits, observableDeficits);
+
+        const recovery = budgetExhausted
+          ? "Budget is exhausted. Call workspace_publish_candidate NOW with finalReadiness.decision='limited', "
+            + "non-empty concrete remainingGaps naming each observable deficit, and false flags for each failed "
+            + "dimension (evidenceSatisfied, lengthSatisfied, requirementSatisfied). See requiredArgsExample "
+            + "for the exact contract."
+          : firstAllowed
+            ? `Continue recovery work before any further finalize. ${deficitHint} Take an allowed next action `
+              + `(e.g. ${firstAllowed}${allowed.length > 1 ? `, or ${allowed.slice(1, 3).filter((n) => n !== actionName).join(", ")}` : ""}). `
+              + "Only call workspace_publish_candidate with decision='limited' if no recovery is possible."
+            : `Continue recovery work before any further finalize. ${deficitHint} Only call workspace_publish_candidate `
+              + "with decision='limited' if no recovery is possible.";
+
+        return `HARD VETO — ${actionName} has been blocked ${ignoredCount} time(s) while terminal repair is `
+          + `active (budgetState=${budgetState || "unknown"}). Any further ${actionName} call will continue `
+          + `to be blocked. ${recovery}`;
+      }
+    }),
+    directTerminalBlock: Object.freeze({
+      message:
+        "Terminal repair mode is active. Direct final/finalize cannot "
+        + "bypass workspace publish or valid limited contract."
+    })
+  });
+
+  // ADR-0033 Part 4 Tier A.6 (B2 fix) — turn the raw activeDeficits/observableDeficits
+  // numbers into a single AI-facing sentence per deficit kind. Salience matters: a weak
+  // model needs ONE concrete next-step suggestion, not a list of forbidden actions.
+  function buildTerminalRepairDeficitHint(deficits, observableDeficits) {
+    if (!Array.isArray(deficits) || deficits.length === 0) return "";
+    const od = (observableDeficits && typeof observableDeficits === "object") ? observableDeficits : {};
+    const parts = [];
+    for (const deficit of deficits.slice(0, 3)) {
+      if (deficit === "length") {
+        const observed = readDeficitNumber(od.lengthObservedWords, od.lengthObserved);
+        const requested = readDeficitNumber(od.lengthRequestedWords, od.lengthRequested);
+        const range = (observed != null && requested != null)
+          ? `current ${observed} words, target ${requested} words`
+          : "length is below the target";
+        parts.push(
+          `Length deficit (${range}): write more substantive content with workspace_append to the candidate `
+          + "path (typical 200-2000+ chars per call). Do NOT call workspace_write again — it would erase the draft."
+        );
+      } else if (deficit === "source") {
+        const observed = readDeficitNumber(od.sourceObserved, od.sourceCount);
+        const minimum = readDeficitNumber(od.sourceMinimum);
+        const range = (observed != null && minimum != null)
+          ? `have ${observed} of ${minimum} required authoritative sources`
+          : "source minimum is not met";
+        parts.push(
+          `Source deficit (${range}): run web_search for an authoritative page, then read_url to add it to readSources. `
+          + "Search snippets alone do not satisfy the source requirement."
+        );
+      } else if (deficit === "structure") {
+        parts.push(
+          "Structure deficit (duplicate headings or broken outline): call workspace_read on the candidate, then "
+          + "workspace_replace or workspace_write a single coherent outline with unique section headings."
+        );
+      } else if (deficit === "todo") {
+        parts.push(
+          "Todo deficit (TodoState is out of sync with current progress): call todo_run_next, todo_advance, or "
+          + "todo_cancel to align the plan with the workspace state before any terminal attempt."
+        );
+      } else if (deficit === "readiness") {
+        parts.push(
+          "Readiness deficit (evidence is too thin to support the requested answer): collect more authoritative "
+          + "sources via web_search + read_url, or expand the workspace draft, before any terminal attempt."
+        );
+      }
+    }
+    return parts.join(" ");
+  }
+
+  function readDeficitNumber(...candidates) {
+    for (const value of candidates) {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim()) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    return null;
+  }
+
   const TODO_PLANNING_PLACEHOLDER_ID = "auto-planning";
   const TODO_PLANNING_PLACEHOLDER_LABEL = "Planning task breakdown";
 
@@ -22951,7 +25539,7 @@
     });
     if (hasVerificationItem) return null;
 
-    if (typeof context.pushStep === "function") {
+    if (context && typeof context.pushStep === "function") {
       context.pushStep("todo-plan-verifier-nudge", {
         itemCount: items.length,
         reason: "plan completed without any verify/test/check item"
@@ -22991,12 +25579,12 @@
 
     pushStep("read-url-requested", {
       maxBytes: typeof actionArgs?.maxBytes === "number" ? actionArgs.maxBytes : null,
-      method: readString$1H(actionArgs && actionArgs.method) || "GET",
-      mode: readString$1H(actionArgs && actionArgs.mode) || "auto",
+      method: readString$1I(actionArgs && actionArgs.method) || "GET",
+      mode: readString$1I(actionArgs && actionArgs.mode) || "auto",
       textLength: typeof actionArgs?.textLength === "number" ? actionArgs.textLength : null,
       textStart: typeof actionArgs?.textStart === "number" ? actionArgs.textStart : null,
       timeoutMs: typeof actionArgs?.timeoutMs === "number" ? actionArgs.timeoutMs : null,
-      url: readString$1H(actionArgs && actionArgs.url)
+      url: readString$1I(actionArgs && actionArgs.url)
     });
   }
 
@@ -23007,12 +25595,12 @@
 
     if (output.ok === false) {
       pushStep("read-url-failed", {
-        error: readString$1H(output.error),
-        message: readString$1H(output.message),
+        error: readString$1I(output.error),
+        message: readString$1I(output.message),
         originStatus: typeof output.originStatus === "number" ? output.originStatus : null,
-        reason: readString$1H(output.reason),
+        reason: readString$1I(output.reason),
         status: typeof output.status === "number" ? output.status : null,
-        url: readString$1H(output.url)
+        url: readString$1I(output.url)
       });
       return;
     }
@@ -23020,8 +25608,8 @@
     const quality = explainReadSourceQuality(output, { query });
     pushStep("read-url-completed", {
       bytes: typeof output.bytes === "number" ? output.bytes : 0,
-      contentType: readString$1H(output.contentType),
-      mode: readString$1H(output.mode),
+      contentType: readString$1I(output.contentType),
+      mode: readString$1I(output.mode),
       originStatus: typeof output.originStatus === "number" ? output.originStatus : null,
       qualityReason: quality.reason,
       qualitySignals: quality.signals,
@@ -23029,7 +25617,7 @@
       textRange: normalizeTextRange$3(output.textRange),
       tier: quality.tier,
       truncated: output.truncated === true,
-      url: readString$1H(output.url)
+      url: readString$1I(output.url)
     });
   }
 
@@ -23040,24 +25628,24 @@
 
     return {
       bytes: typeof source.bytes === "number" ? source.bytes : 0,
-      contentType: readString$1H(source.contentType),
-      error: readString$1H(source.error),
-      message: readString$1H(source.message),
-      mode: readString$1H(source.mode),
+      contentType: readString$1I(source.contentType),
+      error: readString$1I(source.error),
+      message: readString$1I(source.message),
+      mode: readString$1I(source.mode),
       ok: source.ok !== false,
       originStatus: typeof source.originStatus === "number" ? source.originStatus : null,
-      platform: readString$1H(source.platform),
-      reason: readString$1H(source.reason),
-      screenshotDataUrl: readString$1H(source.screenshotDataUrl),
-      screenshotMimeType: readString$1H(source.screenshotMimeType),
+      platform: readString$1I(source.platform),
+      reason: readString$1I(source.reason),
+      screenshotDataUrl: readString$1I(source.screenshotDataUrl),
+      screenshotMimeType: readString$1I(source.screenshotMimeType),
       sourceQualityDetail,
       status: typeof source.status === "number" ? source.status : null,
-      text: readString$1H(source.text),
+      text: readString$1I(source.text),
       textRange: normalizeTextRange$3(source.textRange),
       tier,
-      title: readString$1H(source.title),
+      title: readString$1I(source.title),
       truncated: source.truncated === true,
-      url: readString$1H(source.url)
+      url: readString$1I(source.url)
     };
   }
 
@@ -23087,7 +25675,7 @@
     const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
     const candidateSources = createSearchInquirySources(output);
 
-    inquiryContext.activeQuery = readString$1H(output && output.query) || inquiryContext.activeQuery;
+    inquiryContext.activeQuery = readString$1I(output && output.query) || inquiryContext.activeQuery;
     inquiryContext.candidateSources = candidateSources;
     inquiryContext.lastSearchResults = candidateSources.slice();
 
@@ -23132,15 +25720,15 @@
         ? runState.contextSnapshot.inquiryContext
         : null;
 
-    return readString$1H(inquiryContext && inquiryContext.activeQuery)
-      || readString$1H(runState && runState.researchContext && runState.researchContext.lastQuery)
-      || readString$1H(request && request.prompt);
+    return readString$1I(inquiryContext && inquiryContext.activeQuery)
+      || readString$1I(runState && runState.researchContext && runState.researchContext.lastQuery)
+      || readString$1I(request && request.prompt);
   }
 
   function syncPendingClarification(runState, output) {
     const snapshot = ensureContextSnapshot(runState);
     const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
-    const question = readString$1H(output && output.question) || readString$1H(output && output.text);
+    const question = readString$1I(output && output.question) || readString$1I(output && output.text);
 
     if (!question) {
       return;
@@ -23173,7 +25761,7 @@
   }
 
   function findCandidateSource(candidateSources, url) {
-    const normalizedUrl = readString$1H(url);
+    const normalizedUrl = readString$1I(url);
 
     if (!normalizedUrl) {
       return null;
@@ -23182,7 +25770,7 @@
     return (Array.isArray(candidateSources) ? candidateSources : []).find((item) => (
       item &&
       typeof item === "object" &&
-      readString$1H(item.url) === normalizedUrl
+      readString$1I(item.url) === normalizedUrl
     )) || null;
   }
 
@@ -23251,62 +25839,20 @@
         key: validation.key,
         reason: validation.reason
       });
-
-      const selfCorrection = runtimeConfig && runtimeConfig.selfCorrection;
-      const canSelfCorrect = selfCorrection &&
-        selfCorrection.enabled === true &&
-        typeof runState.selfCorrectionCount === "number" &&
-        runState.selfCorrectionCount < selfCorrection.maxRetries;
-
-      if (canSelfCorrect) {
-        runState.selfCorrectionCount = (runState.selfCorrectionCount || 0) + 1;
-        actionHistory.push({
-          actionName,
-          error: validation.error,
-          kind: "action_error",
-          summary: `${actionName} rejected before execution: ${validation.error}. Planner must supply correct args (${validation.reason} on "${validation.key}").`
-        });
-        runState.observation = {
-          actionName,
-          kind: "error",
-          message: validation.error
-        };
-        refreshActionPattern({
-          actionName,
-          decision,
-          output: { error: validation.error, ok: false },
-          pushStep,
-          runState,
-          status: "validation_error_self_correct"
-        });
-        if (Array.isArray(runState.failedTools)) {
-          runState.failedTools.push({
-            tool: actionName,
-            status: "failed",
-            reason: validation.error,
-            cycle: runState.cycleCount
-          });
-        }
-        return { done: false };
-      }
-
-      return {
-        done: true,
-        result: finalizeActionLoopFailure({
-          actionName,
-          code: ERROR_CODES.ACTION_EXECUTE_ERROR,
-          cause: new Error(validation.error),
-          cycleRecord,
-          memoryEntriesAdded,
-          normalizedInput,
-          output: null,
-          pushStep,
-          rawInput,
-          runState,
-          runtimeState,
-          steps
-        })
-      };
+      // ADR-0013 — validation errors are recoverable; helper surfaces the
+      // failure as observation. No fatal terminator; maxSteps is the only
+      // upper bound for action errors.
+      return recordRecoverableActionError({
+        stage: "validation",
+        actionName,
+        decision,
+        errorMessage: validation.error,
+        validationReason: validation.reason,
+        validationKey: validation.key,
+        actionHistory,
+        pushStep,
+        runState
+      });
     }
 
     if (typeof action.preflight === "function") {
@@ -23332,68 +25878,24 @@
           key: null,
           reason: "preflight"
         });
-
-        const selfCorrection = runtimeConfig && runtimeConfig.selfCorrection;
-        const canSelfCorrect = selfCorrection &&
-          selfCorrection.enabled === true &&
-          typeof runState.selfCorrectionCount === "number" &&
-          runState.selfCorrectionCount < selfCorrection.maxRetries;
-
-        if (canSelfCorrect) {
-          runState.selfCorrectionCount = (runState.selfCorrectionCount || 0) + 1;
-          actionHistory.push({
-            actionName,
-            error: preflightError,
-            kind: "action_error",
-            summary: `${actionName} rejected before execution: ${preflightError}. Planner must supply correct args (preflight).`
-          });
-          runState.observation = {
-            actionName,
-            kind: "error",
-            message: preflightError
-          };
-          refreshActionPattern({
-            actionName,
-            decision,
-            output: { error: preflightError, ok: false },
-            pushStep,
-            runState,
-            status: "preflight_error_self_correct"
-          });
-          if (Array.isArray(runState.failedTools)) {
-            runState.failedTools.push({
-              tool: actionName,
-              status: "failed",
-              reason: preflightError,
-              cycle: runState.cycleCount
-            });
-          }
-          return { done: false };
-        }
-
-        return {
-          done: true,
-          result: finalizeActionLoopFailure({
-            actionName,
-            code: ERROR_CODES.ACTION_EXECUTE_ERROR,
-            cause: new Error(preflightError),
-            cycleRecord,
-            memoryEntriesAdded,
-            normalizedInput,
-            output: null,
-            pushStep,
-            rawInput,
-            runState,
-            runtimeState,
-            steps
-          })
-        };
+        // ADR-0013 — preflight errors are recoverable; helper surfaces as observation.
+        return recordRecoverableActionError({
+          stage: "preflight",
+          actionName,
+          decision,
+          errorMessage: preflightError,
+          actionHistory,
+          pushStep,
+          runState
+        });
       }
     }
 
     const actionPatternBlock = maybeBlockActionPatternRepeat({
+      actionArgs,
       actionName,
       decision,
+      request,
       pushStep,
       runState
     });
@@ -23563,7 +26065,7 @@
       runState.actState = {
         actionName,
         control: actionResult.control,
-        outputKind: readString$1H(actionResult.output && actionResult.output.kind) || "object"
+        outputKind: readString$1I(actionResult.output && actionResult.output.kind) || "object"
       };
       runState.lastAction = actionName;
       runState.pendingApproval = null;
@@ -23644,7 +26146,12 @@
         { actionName }
       );
       if (todoProgressDecision && todoProgressDecision.name === "todo_run_next") {
-        const todoProgressResult = applyTodoRunNextToRunState(runState, todoProgressDecision.args);
+        const todoProgressResult = applyTodoRunNextToRunState(runState, todoProgressDecision.args, {
+          pushStep,
+          request,
+          runState,
+          runtimeConfig
+        });
         pushStep("todo-autopilot-action-progress", {
           actionName,
           summary: todoProgressResult.summary,
@@ -23761,7 +26268,7 @@
         steps
       });
     } catch (error) {
-      const { error: normalizedError, message: errorMessage } = normalizeThrownError(error);
+      const { message: errorMessage } = normalizeThrownError(error);
 
       pushStep("action-execute-error", {
         actionName,
@@ -23775,93 +26282,25 @@
         debug.log(`action error | ${actionName}`, { error: errorMessage });
       }
 
-      const selfCorrection = runtimeConfig && runtimeConfig.selfCorrection;
-      const canSelfCorrect = selfCorrection &&
-        selfCorrection.enabled === true &&
-        typeof runState.selfCorrectionCount === "number" &&
-        runState.selfCorrectionCount < selfCorrection.maxRetries;
+      pushStep("action-error-self-correcting", {
+        actionName,
+        attempt: (runState.selfCorrectionCount || 0) + 1,
+        error: errorMessage
+      });
 
-      if (canSelfCorrect) {
-        runState.selfCorrectionCount = (runState.selfCorrectionCount || 0) + 1;
-
-        pushStep("action-error-self-correcting", {
-          actionName,
-          attempt: runState.selfCorrectionCount,
-          error: errorMessage,
-          maxRetries: selfCorrection.maxRetries
-        });
-
-        const priorFailures = countRecentActionErrors(actionHistory, actionName);
-        actionHistory.push({
-          actionName,
-          error: errorMessage,
-          kind: "action_error",
-          summary: priorFailures > 0
-            ? `${actionName} failed again (${priorFailures + 1} consecutive failures): ${errorMessage}. Do NOT retry the exact same ${actionName} call. Choose a different action, different arguments, or finalize with available information if you judge that is best.`
-            : `${actionName} failed: ${errorMessage}. The planner should try a different approach.`
-        });
-
-        runState.lastAction = actionName;
-        runState.observation = {
-          actionName,
-          kind: "error",
-          message: errorMessage
-        };
-        refreshActionPattern({
-          actionName,
-          decision,
-          output: { error: errorMessage, ok: false },
-          pushStep,
-          runState,
-          status: "action_error_self_correct"
-        });
-        refreshTerminalRepair({
-          actionName,
-          decision,
-          output: { error: errorMessage, ok: false },
-          pushStep,
-          runState,
-          status: "action_error_self_correct"
-        });
-
-        if (Array.isArray(runState.failedTools)) {
-          runState.failedTools.push({
-            tool: actionName,
-            status: "failed",
-            reason: errorMessage,
-            cycle: runState.cycleCount
-          });
-        }
-
-        return { done: false };
-      }
-
-      if (Array.isArray(runState.failedTools)) {
-        runState.failedTools.push({
-          tool: actionName,
-          status: "failed",
-          reason: errorMessage,
-          cycle: runState.cycleCount
-        });
-      }
-
-      return {
-        done: true,
-        result: finalizeActionLoopFailure({
-          actionName,
-          cause: normalizedError,
-          code: ERROR_CODES.ACTION_EXECUTE_ERROR,
-          cycleRecord,
-          memoryEntriesAdded,
-          normalizedInput,
-          output: null,
-          pushStep,
-          rawInput,
-          runState,
-          runtimeState,
-          steps
-        })
-      };
+      // ADR-0013 — action execute errors are recoverable observations.
+      // The previous canSelfCorrect / fatal split has been removed; every
+      // throw flows through the same observation path so the planner can
+      // react. maxSteps and explicit caller abort are the only run terminators.
+      return recordRecoverableActionError({
+        stage: "execute",
+        actionName,
+        decision,
+        errorMessage,
+        actionHistory,
+        pushStep,
+        runState
+      });
     }
   }
 
@@ -23884,17 +26323,17 @@
       return undefined;
     }
 
-    const explicitOutput = readString$1H(output && output.skill);
+    const explicitOutput = readString$1I(output && output.skill);
     if (explicitOutput) {
       return explicitOutput;
     }
 
-    const explicitDecision = readString$1H(decision && decision.args && decision.args.skillName);
+    const explicitDecision = readString$1I(decision && decision.args && decision.args.skillName);
     if (explicitDecision) {
       return explicitDecision;
     }
 
-    return readString$1H(runState.agentSkillContext && runState.agentSkillContext.activeSkill && runState.agentSkillContext.activeSkill.name) || undefined;
+    return readString$1I(runState.agentSkillContext && runState.agentSkillContext.activeSkill && runState.agentSkillContext.activeSkill.name) || undefined;
   }
 
   function readToolName$1(actionName, output, decision) {
@@ -23902,8 +26341,8 @@
       return undefined;
     }
 
-    return readString$1H(output && output.tool) ||
-      readString$1H(decision && decision.args && decision.args.toolName) ||
+    return readString$1I(output && output.tool) ||
+      readString$1I(decision && decision.args && decision.args.toolName) ||
       undefined;
   }
 
@@ -23912,7 +26351,7 @@
       return undefined;
     }
 
-    return readString$1H(output.query) || undefined;
+    return readString$1I(output.query) || undefined;
   }
 
   function markActionProgress(runState, actionName, output) {
@@ -23926,8 +26365,8 @@
 
   function refreshLongRunAcceptanceGate(options) {
     if (!options || typeof options !== "object") return null;
-    const actionName = readString$1H(options && options.actionName);
-    const status = readString$1H(options && options.status);
+    const actionName = readString$1I(options && options.actionName);
+    const status = readString$1I(options && options.status);
     if (!shouldRefreshLongRunAcceptanceGate$1(actionName, status)) return null;
     const loop = refreshResearchReportLoopGate(
       options.runState,
@@ -24053,6 +26492,18 @@
         consecutiveExecutedPublishCount: evaluator.terminalRetryCooldown
           ? evaluator.terminalRetryCooldown.consecutiveExecutedPublishCount
           : 0,
+        structureRepairActive: evaluator.structureRepairConvergence
+          ? evaluator.structureRepairConvergence.active === true
+          : false,
+        repeatedStructureNoProgressCount: evaluator.structureRepairConvergence
+          ? evaluator.structureRepairConvergence.repeatedStructureNoProgressCount
+          : 0,
+        workspaceMutationGrowthActive: evaluator.workspaceMutationGrowthConvergence
+          ? evaluator.workspaceMutationGrowthConvergence.active === true
+          : false,
+        workspaceMutationGrowthStallCount: evaluator.workspaceMutationGrowthConvergence
+          ? evaluator.workspaceMutationGrowthConvergence.stallCount
+          : 0,
         status: evaluator.status,
         stepsWithoutObservableProgress: evaluator.stepsWithoutObservableProgress
       });
@@ -24088,56 +26539,87 @@
       ? runState.terminalRepairState
       : null;
     if (!repair || repair.active !== true) return null;
-    const actionName = readString$1H(options && options.actionName);
+    const actionName = readString$1I(options && options.actionName);
     if (!actionName) return null;
     const allowedActions = Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1H).filter(Boolean)
+      ? repair.allowedActions.map(readString$1I).filter(Boolean)
       : [];
     const allowed = allowedActions.includes(actionName);
     const isPublish = actionName === "workspace_publish_candidate";
-    const validPublish = isPublish && isValidTerminalRepairPublishArgs(options.actionArgs, repair);
+    const publishValidation = isPublish
+      ? explainTerminalRepairPublishArgs(options.actionArgs, repair, { runState })
+      : { valid: false, reasons: [] };
+    const validPublish = isPublish && publishValidation.valid;
     if (allowed && (!isPublish || validPublish)) return null;
 
     const ignoredCount = readFiniteNumber$1(repair.ignoredCount) + 1;
     const reason = isPublish && !validPublish
       ? "terminal_repair_invalid_publish"
       : "terminal_repair_action_not_allowed";
-    const message = isPublish && !validPublish
-      ? "Terminal repair mode is active: workspace_publish_candidate is allowed only with finalReadiness.decision='limited', non-empty concrete remainingGaps, evidenceSatisfied=false for source deficits, lengthSatisfied=false for length deficits, and requirementSatisfied=false while any core deficit remains."
-      : `Terminal repair mode is active: ${actionName} is not an allowed recovery action for the current deficits. Choose one of the allowedActions, or publish only a valid limited workspace candidate.`;
+    const escalation = readString$1I(repair.escalation);
+    const isHardVeto = escalation === "hard_veto" && reason === "terminal_repair_action_not_allowed";
+    const protocolHint = buildTerminalRepairProtocolHint(repair);
+    const message = isHardVeto
+      ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
+          actionName,
+          ignoredCount,
+          budgetState: repair.budgetState,
+          activeDeficits: repair.activeDeficits,
+          allowedActions: repair.allowedActions,
+          observableDeficits: repair.observableDeficits
+        })
+      : isPublish && !validPublish
+        ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.invalidPublish({ protocolHint })
+        : DEFAULT_TERMINAL_REPAIR_STRINGS.block.actionNotAllowed({ actionName });
     const output = {
       ok: false,
       control: "continue",
-      kind: "terminal_repair_preflight_block",
+      kind: isHardVeto ? "terminal_repair_hard_veto_block" : "terminal_repair_preflight_block",
       status: "blocked",
       reason,
       actionName,
       activeDeficits: Array.isArray(repair.activeDeficits) ? repair.activeDeficits.slice(0, 8) : [],
       allowedActions: allowedActions.slice(0, 16),
       forbiddenDecisions: Array.isArray(repair.forbiddenDecisions) ? repair.forbiddenDecisions.slice(0, 8) : [],
+      escalation: escalation || "advisory",
       ignoredCount,
+      invalidPublishReasons: isPublish ? publishValidation.reasons.slice(0, 8) : [],
       terminalRepairState: {
         active: true,
         mode: repair.mode || "terminal_repair",
         reason: repair.reason || null,
+        requiredRepair: repair.requiredRepair || null,
         validPublishContract: cloneValue(repair.validPublishContract || null)
       },
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
       message
     };
     if (typeof options.pushStep === "function") {
-      options.pushStep("terminal-repair-action-blocked", {
+      options.pushStep(isHardVeto ? "terminal-repair-hard-veto-blocked" : "terminal-repair-action-blocked", {
         actionName,
         activeDeficits: output.activeDeficits,
+        escalation: output.escalation,
         ignoredCount,
+        invalidPublishReasons: output.invalidPublishReasons,
         reason
       });
     }
     return { message, output };
   }
 
+  function buildTerminalRepairProtocolHint(repair) {
+    const reason = readString$1I(repair && repair.reason);
+    if (reason === "missing_finalize_after_latest_write") {
+      return " Current publish protocol blocker requires workspace_finalize_candidate for the candidate, then workspace_read, before another publish attempt.";
+    }
+    if (reason === "missing_latest_workspace_read") {
+      return " Current publish protocol blocker requires workspace_read of the latest candidate before another publish attempt.";
+    }
+    return "";
+  }
+
   function maybeBlockTerminalCorrectionRetry(options) {
-    const actionName = readString$1H(options && options.actionName);
+    const actionName = readString$1I(options && options.actionName);
     if (actionName !== "workspace_publish_candidate") return null;
     const runState = options && options.runState;
     const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
@@ -24159,7 +26641,8 @@
     const repairState = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
       ? runState.terminalRepairState
       : { active: true, activeDeficits: ["terminal_loop"] };
-    if (isValidTerminalRepairPublishArgs(options.actionArgs, repairState)) return null;
+    const publishValidation = explainTerminalRepairPublishArgs(options.actionArgs, repairState, { runState });
+    if (publishValidation.valid) return null;
     const blockedTerminalRetryCount = readFiniteNumber$1(cooldown && cooldown.blockedTerminalRetryCount) + 1;
     const message = "Terminal correction is escalated: do not repeat clean ready or plain workspace_publish_candidate after repeated publish/finalize no-progress. Do evidence/workspace/TodoState recovery first, or publish only a valid limited finalReadiness with non-empty remainingGaps and false flags for failed dimensions.";
     const output = {
@@ -24180,13 +26663,14 @@
         forbiddenTerminalActions: Array.isArray(cooldown && cooldown.forbiddenTerminalActions)
           ? cooldown.forbiddenTerminalActions.slice(0, 8)
           : ["workspace_publish_candidate", "finalize"],
-        validTerminalException: readString$1H(cooldown && cooldown.validTerminalException) ||
+        validTerminalException: readString$1I(cooldown && cooldown.validTerminalException) ||
           "workspace_publish_candidate with decision=limited + non-empty remainingGaps + false failed-dimension flags",
         blockedTerminalRetryCount,
         executedPublishCount: readFiniteNumber$1(cooldown && cooldown.executedPublishCount),
         consecutiveExecutedPublishCount: readFiniteNumber$1(cooldown && cooldown.consecutiveExecutedPublishCount),
-        reason: readString$1H(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
+        reason: readString$1I(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
       },
+      invalidPublishReasons: publishValidation.reasons.slice(0, 8),
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
       message
     };
@@ -24203,12 +26687,56 @@
   }
 
   function maybeBlockActionPatternRepeat(options) {
-    const actionName = readString$1H(options && options.actionName);
+    const actionName = readString$1I(options && options.actionName);
     if (!actionName || actionName === "workspace_publish_candidate" || actionName === "finalize") return null;
     const runState = options && options.runState;
     const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
       ? runState.actionPatternConvergence
       : null;
+    const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
+      ? runState.terminalRepairState
+      : null;
+    const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
+      ? repair.allowedActions.map(readString$1I).filter(Boolean)
+      : [];
+    const unnecessaryClarificationBlock = maybeBlockUnnecessaryLongResearchClarification({
+      actionName,
+      pushStep: options && options.pushStep,
+      request: options && options.request,
+      runState
+    });
+    if (unnecessaryClarificationBlock) return unnecessaryClarificationBlock;
+    const searchWithoutReadBlock = maybeBlockLongResearchSearchWithoutRead({
+      actionName,
+      pushStep: options && options.pushStep,
+      runState
+    });
+    if (searchWithoutReadBlock) return searchWithoutReadBlock;
+    // workspaceMutationGrowthConvergence hard_veto is not overridable by terminal
+    // repair — write-overwrite oscillation indicates AI confusion that repair cannot
+    // resolve. Check this BEFORE the repairAllowedActions bypass.
+    const earlyMutationGrowthBlock = maybeBlockWorkspaceMutationGrowthLoop({
+      actionName,
+      convergence,
+      pushStep: options && options.pushStep
+    });
+    if (earlyMutationGrowthBlock && readString$1I(earlyMutationGrowthBlock.output && earlyMutationGrowthBlock.output.escalation) === "hard_veto") {
+      return earlyMutationGrowthBlock;
+    }
+    const lengthRewriteBlock = maybeBlockLengthDeficitRewrite({
+      actionArgs: options && options.actionArgs,
+      actionName,
+      pushStep: options && options.pushStep,
+      runState
+    });
+    if (lengthRewriteBlock) return lengthRewriteBlock;
+    if (repairAllowedActions.includes(actionName)) return null;
+    const satisfiedMutationBlock = maybeBlockSatisfiedCandidateMutation({
+      actionName,
+      pushStep: options && options.pushStep,
+      runState
+    });
+    if (satisfiedMutationBlock) return satisfiedMutationBlock;
     const sourceDeficitAfterPublishBlock = maybeBlockWorkspaceSourceDeficitAfterPublishBlock({
       actionName,
       pushStep: options && options.pushStep,
@@ -24222,20 +26750,33 @@
       runState
     });
     if (workspaceNoProgressBlock) return workspaceNoProgressBlock;
-    const readOnlyPlanningBlock = maybeBlockReadOnlyPlanningLoop({
+    const structureRepairBlock = maybeBlockStructureRepairLoop({
       actionName,
       convergence,
       pushStep: options && options.pushStep
+    });
+    if (structureRepairBlock) return structureRepairBlock;
+    const mutationGrowthBlock = maybeBlockWorkspaceMutationGrowthLoop({
+      actionName,
+      convergence,
+      pushStep: options && options.pushStep
+    });
+    if (mutationGrowthBlock) return mutationGrowthBlock;
+    const readOnlyPlanningBlock = maybeBlockReadOnlyPlanningLoop({
+      actionName,
+      convergence,
+      pushStep: options && options.pushStep,
+      runState
     });
     if (readOnlyPlanningBlock) return readOnlyPlanningBlock;
     const signal = convergence && convergence.convergenceSignal && typeof convergence.convergenceSignal === "object"
       ? convergence.convergenceSignal
       : null;
     if (!signal) return null;
-    if (readString$1H(signal.patternKind) !== "exact_action") return null;
-    if (readString$1H(signal.forbiddenMove) !== "repeat_same_action_args") return null;
+    if (readString$1I(signal.patternKind) !== "exact_action") return null;
+    if (readString$1I(signal.forbiddenMove) !== "repeat_same_action_args") return null;
     const currentFingerprint = fingerprintAction(options.decision);
-    if (!currentFingerprint || currentFingerprint !== readString$1H(signal.fingerprint)) return null;
+    if (!currentFingerprint || currentFingerprint !== readString$1I(signal.fingerprint)) return null;
     const repeatCount = readFiniteNumber$1(signal.repeatCount) || readFiniteNumber$1(convergence.repeatedFingerprintCount);
     const message = `Action pattern convergence is active: do not repeat ${actionName} with the same arguments after ${repeatCount} no-progress attempt(s). Change arguments, choose a different recovery action, mutate the workspace meaningfully, gather evidence, or publish only a valid limited result when allowed.`;
     const output = {
@@ -24266,25 +26807,291 @@
     return { message, output };
   }
 
+  function maybeBlockUnnecessaryLongResearchClarification(options) {
+    const actionName = readString$1I(options && options.actionName);
+    if (actionName !== "ask_clarification") return null;
+    const runState = options && options.runState;
+    if (!isLongResearchHarnessActive(runState, {
+      prompt: readString$1I(options && options.request && options.request.prompt)
+    })) {
+      return null;
+    }
+    if (hasOpenClarificationNeed(runState)) return null;
+    if (!hasResearchProgressSignal(runState)) return null;
+    const sourceFacts = readResearchSourceFacts(runState);
+    const candidateCount = countResearchCandidateUrls(runState);
+    const message = [
+      "Long research clarification guard: no open ambiguity is recorded for this run.",
+      "Missing terminology coverage, thin search results, or weak source confidence are research limitations, not user ambiguity.",
+      "Continue with read_url on an unread candidate, write/update the workspace with visible limitations, or publish limited only with concrete remainingGaps if evidence is exhausted."
+    ].join(" ");
+    const output = {
+      ok: false,
+      control: "continue",
+      kind: "long_research_clarification_preflight_block",
+      status: "blocked",
+      reason: "clarification_without_open_ambiguity",
+      actionName,
+      forbiddenMove: "ask_clarification_without_open_ambiguity",
+      allowedNextMoves: buildLongResearchAllowedNextMoves(runState, {
+        preferReadUrl: candidateCount > 0 && sourceFacts.successfulReadUrlCount === 0
+      }),
+      researchFacts: {
+        candidateUrlCount: candidateCount,
+        searchPassCount: countSearchPasses(runState),
+        successfulReadUrlCount: sourceFacts.successfulReadUrlCount,
+        sourceMinimum: sourceFacts.sourceMinimum
+      },
+      message
+    };
+    if (typeof (options && options.pushStep) === "function") {
+      options.pushStep("long-research-clarification-blocked", {
+        candidateUrlCount: candidateCount,
+        reason: output.reason,
+        searchPassCount: output.researchFacts.searchPassCount,
+        successfulReadUrlCount: sourceFacts.successfulReadUrlCount
+      });
+    }
+    return { message, output };
+  }
+
+  function maybeBlockLongResearchSearchWithoutRead(options) {
+    const actionName = readString$1I(options && options.actionName);
+    if (actionName !== "web_search") return null;
+    const runState = options && options.runState;
+    if (!isLongResearchHarnessActive(runState, {
+      prompt: readString$1I(options && options.request && options.request.prompt)
+    })) return null;
+    const searchPassCount = countSearchPasses(runState);
+    if (searchPassCount < 2) return null;
+    const sourceFacts = readResearchSourceFacts(runState);
+    const candidateCount = countResearchCandidateUrls(runState);
+    if (candidateCount === 0) return null;
+    const sourceMinimum = sourceFacts.sourceMinimum;
+    const readSources = readFiniteNumber$1(sourceMinimum && sourceMinimum.readSources);
+    const minReadSources = readFiniteNumber$1(sourceMinimum && sourceMinimum.minReadSources);
+    const relevantSources = readFiniteNumber$1(sourceMinimum && sourceMinimum.relevantSources);
+    const minRelevantSources = readFiniteNumber$1(sourceMinimum && sourceMinimum.minRelevantSources);
+    const sourceMinimumUnmet = Boolean(
+      sourceMinimum &&
+      sourceMinimum.passed !== true &&
+      (
+        (minReadSources > 0 && readSources < minReadSources) ||
+        (minRelevantSources > 0 && relevantSources < minRelevantSources)
+      )
+    );
+    const unreadCandidatesAvailable = candidateCount > sourceFacts.successfulReadUrlCount;
+    if (sourceFacts.successfulReadUrlCount > 0 && (!sourceMinimumUnmet || !unreadCandidatesAvailable)) {
+      return null;
+    }
+    const hasNoSuccessfulRead = sourceFacts.successfulReadUrlCount === 0;
+    const message = [
+      hasNoSuccessfulRead
+        ? `Long research evidence handoff is active: ${searchPassCount} search pass(es) already produced ${candidateCount} candidate URL(s), but no successful read_url evidence exists.`
+        : `Long research source minimum is still unmet: ${readSources}/${minReadSources} read source(s), ${relevantSources}/${minRelevantSources} relevant source(s), and ${candidateCount} candidate URL(s) are available.`,
+      "More broad web_search calls are lower-value than reading an unread candidate or documenting a concrete source blocker.",
+      "Use read_url on an unread candidate, or publish limited only if the remaining source blockers are concrete."
+    ].join(" ");
+    const output = {
+      ok: false,
+      control: "continue",
+      kind: "long_research_search_read_handoff_block",
+      status: "blocked",
+      reason: hasNoSuccessfulRead
+        ? "search_candidates_exist_without_read_url"
+        : "source_minimum_unmet_with_unread_candidates",
+      actionName,
+      forbiddenMove: hasNoSuccessfulRead
+        ? "repeat_web_search_before_reading_candidates"
+        : "repeat_web_search_before_meeting_source_minimum",
+      allowedNextMoves: buildLongResearchAllowedNextMoves(runState, { preferReadUrl: true }),
+      researchFacts: {
+        candidateUrlCount: candidateCount,
+        searchPassCount,
+        successfulReadUrlCount: sourceFacts.successfulReadUrlCount,
+        sourceMinimum: sourceFacts.sourceMinimum
+      },
+      message
+    };
+    if (typeof (options && options.pushStep) === "function") {
+      options.pushStep("long-research-search-read-handoff-blocked", {
+        candidateUrlCount: candidateCount,
+        reason: output.reason,
+        searchPassCount,
+        successfulReadUrlCount: sourceFacts.successfulReadUrlCount
+      });
+    }
+    return { message, output };
+  }
+
+  function isLongResearchHarnessActive(runState, options = {}) {
+    if (isResearchQualityGateRequired(runState, options)) return true;
+    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : null;
+    if (!loop) return false;
+    if (loop.enabled === true) return true;
+    const status = readString$1I(loop.status);
+    if (status && status !== "idle" && status !== "none") return true;
+    return Boolean(
+      loop.gateSignal &&
+      loop.gateSignal.acceptancePacket &&
+      typeof loop.gateSignal.acceptancePacket === "object"
+    );
+  }
+
+  function hasOpenClarificationNeed(runState) {
+    const plannerState = runState && runState.plannerState && typeof runState.plannerState === "object"
+      ? runState.plannerState
+      : {};
+    const inquiryContext = runState && runState.inquiryContext && typeof runState.inquiryContext === "object"
+      ? runState.inquiryContext
+      : {};
+    if (plannerState.hasOpenAmbiguity === true) return true;
+    if (readString$1I(plannerState.openAmbiguity)) return true;
+    if (plannerState.pendingClarification && typeof plannerState.pendingClarification === "object") return true;
+    if (inquiryContext.pendingClarification && typeof inquiryContext.pendingClarification === "object") return true;
+    if (readString$1I(inquiryContext.openAmbiguity)) return true;
+    return false;
+  }
+
+  function hasResearchProgressSignal(runState) {
+    if (!runState || typeof runState !== "object") return false;
+    if (countSearchPasses(runState) > 0) return true;
+    if (countResearchCandidateUrls(runState) > 0) return true;
+    const facts = readResearchSourceFacts(runState);
+    if (facts.successfulReadUrlCount > 0) return true;
+    const workspace = runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      ? runState.virtualWorkspace
+      : null;
+    if (!workspace) return false;
+    const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
+      ? workspace.files
+      : {};
+    return Object.values(files).some((file) => readString$1I(file && file.content));
+  }
+
+  function countSearchPasses(runState) {
+    const context = runState && runState.researchContext && typeof runState.researchContext === "object"
+      ? runState.researchContext
+      : {};
+    return Array.isArray(context.searchPasses) ? context.searchPasses.length : 0;
+  }
+
+  function countResearchCandidateUrls(runState) {
+    const context = runState && runState.researchContext && typeof runState.researchContext === "object"
+      ? runState.researchContext
+      : {};
+    const candidates = [];
+    for (const key of ["aggregatedSearchResults", "searchResults"]) {
+      const items = Array.isArray(context[key]) ? context[key] : [];
+      candidates.push(...items);
+    }
+    const passes = Array.isArray(context.searchPasses) ? context.searchPasses : [];
+    for (const pass of passes) {
+      if (!pass || typeof pass !== "object") continue;
+      const items = Array.isArray(pass.items)
+        ? pass.items
+        : Array.isArray(pass.results)
+          ? pass.results
+          : Array.isArray(pass.rankedItems)
+            ? pass.rankedItems
+            : [];
+      candidates.push(...items);
+    }
+    const urls = new Set();
+    for (const item of candidates) {
+      const url = readString$1I(item && item.url);
+      if (url) urls.add(url);
+    }
+    return urls.size;
+  }
+
+  function readResearchSourceFacts(runState) {
+    const context = runState && runState.researchContext && typeof runState.researchContext === "object"
+      ? runState.researchContext
+      : {};
+    const readSources = Array.isArray(context.readSources) ? context.readSources : [];
+    const successfulReadUrlCount = readSources.filter((source) => source && source.ok !== false).length;
+    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : {};
+    const packet = loop.gateSignal &&
+      loop.gateSignal.acceptancePacket &&
+      typeof loop.gateSignal.acceptancePacket === "object"
+      ? loop.gateSignal.acceptancePacket
+      : {};
+    const sourceMinimum = packet.evidence &&
+      packet.evidence.sourceMinimum &&
+      typeof packet.evidence.sourceMinimum === "object"
+      ? packet.evidence.sourceMinimum
+      : loop.sourceMinimum && typeof loop.sourceMinimum === "object"
+        ? loop.sourceMinimum
+        : null;
+    const packetSuccessful = readFiniteNumber$1(packet.evidence && packet.evidence.successfulReadUrlCount);
+    return {
+      successfulReadUrlCount: Math.max(successfulReadUrlCount, packetSuccessful),
+      sourceMinimum: sourceMinimum ? {
+        minReadSources: readFiniteNumber$1(sourceMinimum.minReadSources) || readFiniteNumber$1(sourceMinimum.minReads),
+        minRelevantSources: readFiniteNumber$1(sourceMinimum.minRelevantSources) || readFiniteNumber$1(sourceMinimum.minRelevant),
+        passed: sourceMinimum.passed === true,
+        readSources: readFiniteNumber$1(sourceMinimum.readSources) || readFiniteNumber$1(sourceMinimum.reads),
+        relevantSources: readFiniteNumber$1(sourceMinimum.relevantSources) || readFiniteNumber$1(sourceMinimum.relevant)
+      } : null
+    };
+  }
+
+  function buildLongResearchAllowedNextMoves(runState, options = {}) {
+    const moves = [];
+    if (options.preferReadUrl === true) moves.push("read_url");
+    const workspaceDeficit = readWorkspaceLengthDeficit(runState);
+    if (workspaceDeficit) {
+      moves.push("workspace_append", "workspace_insert_after_section");
+    } else {
+      moves.push("workspace_write", "workspace_append");
+    }
+    moves.push("workspace_publish_candidate_limited_with_remainingGaps");
+    return Array.from(new Set(moves));
+  }
+
   function maybeBlockReadOnlyPlanningLoop(options) {
-    const actionName = readString$1H(options && options.actionName);
+    const actionName = readString$1I(options && options.actionName);
+    const runState = options && options.runState;
+    const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
+      ? runState.terminalRepairState
+      : null;
+    const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
+      ? repair.allowedActions.map(readString$1I).filter(Boolean)
+      : [];
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
       : null;
     const state = convergence && convergence.readOnlyPlanningState && typeof convergence.readOnlyPlanningState === "object"
       ? convergence.readOnlyPlanningState
       : null;
+    if (repairAllowedActions.includes(actionName)) {
+      if (isPublishProtocolRequiredActionForRepair(repair, actionName)) return null;
+      // Repair allowlist is bypassed only when readOnlyPlanningState has NOT reached hard_veto
+      // for this specific action. Hard_veto means the model has repeatedly ignored the advisory
+      // and the action is demonstrably causing churn — override the repair allowance.
+      const isHardVetoForAction = state && state.active === true &&
+        readString$1I(state.escalation) === "hard_veto" &&
+        Array.isArray(state.forbiddenActions) &&
+        state.forbiddenActions.map(readString$1I).filter(Boolean).includes(actionName);
+      if (!isHardVetoForAction) return null;
+    }
     if (!state || state.active !== true) return null;
+    if (readString$1I(state.escalation) !== "hard_veto") return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1H).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1I).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
     const ignoredCount = readFiniteNumber$1(state.ignoredCount) + 1;
-    const message = `Read-only planning convergence is active: do not repeat ${actionName} after search/planning/read-only steps without source or workspace progress. Use read_url, a meaningful workspace mutation, TodoState sync, or a valid limited publish with concrete remainingGaps.`;
+    const message = `HARD VETO — read-only planning has blocked ${actionName} ${ignoredCount} time(s) without source or workspace progress. The harness will reject any further ${actionName} calls. You MUST call workspace_publish_candidate NOW with finalReadiness.decision='limited' and non-empty concrete remainingGaps listing what research is still needed.`;
     const output = {
       ok: false,
       control: "continue",
-      kind: "read_only_planning_preflight_block",
+      kind: "read_only_planning_hard_veto_block",
       status: "blocked",
       reason: "read_only_planning_without_productive_progress",
       actionName,
@@ -24298,8 +27105,9 @@
       message
     };
     if (typeof options.pushStep === "function") {
-      options.pushStep("read-only-planning-action-blocked", {
+      options.pushStep("read-only-planning-hard-veto-blocked", {
         actionName,
+        escalation: "hard_veto",
         forbiddenMove: output.forbiddenMove,
         ignoredCount,
         reason: output.reason,
@@ -24310,7 +27118,7 @@
   }
 
   function maybeBlockWorkspaceNoProgressLoop(options) {
-    const actionName = readString$1H(options && options.actionName);
+    const actionName = readString$1I(options && options.actionName);
     if (actionName !== "workspace_read" && actionName !== "workspace_replace") return null;
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
@@ -24419,8 +27227,222 @@
     return { message, output };
   }
 
+  function maybeBlockSatisfiedCandidateMutation(options) {
+    const actionName = readString$1I(options && options.actionName);
+    if (![
+      "workspace_write",
+      "workspace_append",
+      "workspace_insert_after_section",
+      "workspace_replace"
+    ].includes(actionName)) {
+      return null;
+    }
+    const runState = options && options.runState;
+    if (readWorkspaceSourceDeficit(runState) || hasWorkspaceStructureDeficit(runState) || readWorkspaceLengthDeficit(runState)) {
+      return null;
+    }
+    const lengthStatus = readCurrentWorkspaceLengthStatus(runState);
+    if (!lengthStatus || lengthStatus.requested <= 0 || lengthStatus.observed < lengthStatus.requested) return null;
+    const message = `Workspace candidate already satisfies observable source, length, and structure gates (${lengthStatus.observed}/${lengthStatus.requested} ${lengthStatus.unit}). More workspace mutation can introduce duplicate headings or regressions. Use workspace_read, workspace_finalize_candidate, TodoState sync, or workspace_publish_candidate instead.`;
+    const output = {
+      ok: false,
+      control: "continue",
+      kind: "action_pattern_preflight_block",
+      status: "blocked",
+      reason: "satisfied_candidate_mutation",
+      actionName,
+      forbiddenMove: "mutate_after_observable_gates_satisfied",
+      allowedNextMoves: [
+        "workspace_read",
+        "workspace_finalize_candidate",
+        "todo_advance",
+        "todo_run_next",
+        "workspace_publish_candidate"
+      ],
+      observableFacts: {
+        observed: lengthStatus.observed,
+        requested: lengthStatus.requested,
+        unit: lengthStatus.unit
+      },
+      message
+    };
+    if (typeof (options && options.pushStep) === "function") {
+      options.pushStep("action-pattern-repeat-blocked", {
+        actionName,
+        forbiddenMove: output.forbiddenMove,
+        observed: lengthStatus.observed,
+        reason: output.reason,
+        requested: lengthStatus.requested
+      });
+    }
+    return { message, output };
+  }
+
+  function maybeBlockLengthDeficitRewrite(options) {
+    const actionName = readString$1I(options && options.actionName);
+    if (actionName !== "workspace_write" && actionName !== "workspace_replace") return null;
+    const runState = options && options.runState;
+    const deficit = readWorkspaceLengthDeficit(runState);
+    if (!deficit || deficit.observed <= 0) return null;
+    const structureDeficit = hasWorkspaceStructureDeficit(runState);
+    const args = options && options.actionArgs && typeof options.actionArgs === "object"
+      ? options.actionArgs
+      : {};
+    const proposedText = actionName === "workspace_write"
+      ? readString$1I(args.content || args.text || args.markdown)
+      : "";
+    const proposedWords = actionName === "workspace_replace"
+      ? estimateWorkspaceReplaceWords(runState, args)
+      : proposedText
+        ? countLatinWords(proposedText)
+        : 0;
+    const proposedGrowth = proposedWords - deficit.observed;
+    const minimumEffectiveGrowth = computeMinimumEffectiveLengthDeficitGrowth(deficit);
+    const materiallyGrows = proposedGrowth >= minimumEffectiveGrowth;
+    if (proposedWords >= deficit.requested || (proposedWords > deficit.observed && materiallyGrows)) return null;
+    const remaining = Math.max(deficit.requested - deficit.observed, 0);
+    const growthHint = minimumEffectiveGrowth > 0
+      ? ` A replacement under the target must grow by at least ${minimumEffectiveGrowth} ${deficit.unit} from the current observed length; this proposal grows by ${Math.max(proposedGrowth, 0)}.`
+      : "";
+    const message = `${structureDeficit ? "Length + structure repair" : "Length-only repair"} is active: current candidate has ${deficit.observed}/${deficit.requested} ${deficit.unit}. ${actionName} would not increase the candidate enough and can erase prior expansion.${growthHint} Use workspace_append or workspace_insert_after_section with enough user-facing material to close the ${remaining} ${deficit.unit} gap, or rewrite with content that preserves/grows the current length before workspace_read/finalize/publish.`;
+    const output = {
+      ok: false,
+      control: "continue",
+      kind: "action_pattern_preflight_block",
+      status: "blocked",
+      reason: "length_deficit_rewrite_without_growth",
+      actionName,
+      forbiddenMove: "rewrite_under_length_deficit_without_growth",
+      allowedNextMoves: [
+        "workspace_append",
+        "workspace_insert_after_section",
+        "workspace_read",
+        "workspace_finalize_candidate",
+        "workspace_publish_candidate_limited_with_remainingGaps"
+      ],
+      observableDeficit: {
+        observed: deficit.observed,
+        minimumEffectiveGrowth,
+        proposed: proposedWords,
+        proposedGrowth,
+        requested: deficit.requested,
+        unit: deficit.unit
+      },
+      message
+    };
+    if (typeof (options && options.pushStep) === "function") {
+      options.pushStep("action-pattern-repeat-blocked", {
+        actionName,
+        forbiddenMove: output.forbiddenMove,
+        observed: deficit.observed,
+        proposed: proposedWords,
+        reason: output.reason,
+        requested: deficit.requested
+      });
+    }
+    return { message, output };
+  }
+
+  function maybeBlockStructureRepairLoop(options) {
+    const actionName = readString$1I(options && options.actionName);
+    const convergence = options && options.convergence && typeof options.convergence === "object"
+      ? options.convergence
+      : null;
+    const state = convergence && convergence.structureRepairConvergence && typeof convergence.structureRepairConvergence === "object"
+      ? convergence.structureRepairConvergence
+      : null;
+    if (!state || state.active !== true) return null;
+    const forbiddenActions = Array.isArray(state.forbiddenActions)
+      ? state.forbiddenActions.map(readString$1I).filter(Boolean)
+      : [];
+    if (!forbiddenActions.includes(actionName)) return null;
+    const repeatedStructureNoProgressCount = readFiniteNumber$1(state.repeatedStructureNoProgressCount);
+    const isHardVeto = readString$1I(state.escalation) === "hard_veto";
+    const message = isHardVeto
+      ? `HARD VETO — structure repair convergence has blocked ${actionName} ${repeatedStructureNoProgressCount} time(s) without improving the structure audit. You MUST call workspace_write or workspace_replace NOW to produce a fully rewritten, deduplicated outline (unique headings AND unique section numbers), then workspace_finalize_candidate. If the structure cannot be fixed, call workspace_publish_candidate with finalReadiness.decision='limited', false flags for each failed dimension, and non-empty concrete remainingGaps naming every structure issue. Any other action will be blocked.`
+      : `Structure repair convergence is active: ${actionName} will not fix the duplicate headings or section numbers. Use a targeted workspace_write/workspace_replace full-outline repair, sync TodoState, or publish only a valid limited result that names the structure gap.`;
+    const output = {
+      ok: false,
+      control: "continue",
+      kind: isHardVeto ? "structure_repair_hard_veto_block" : "structure_repair_preflight_block",
+      status: "blocked",
+      reason: "structure_repair_without_audit_delta",
+      actionName,
+      escalation: isHardVeto ? "hard_veto" : "advisory",
+      forbiddenMove: "repeat_structure_repair_without_audit_delta",
+      forbiddenActions,
+      allowedNextMoves: Array.isArray(state.allowedNextMoves)
+        ? state.allowedNextMoves.slice(0, 12)
+        : ["workspace_write", "workspace_replace", "workspace_finalize_candidate", "todo_advance", "workspace_publish_candidate_limited_with_structure_remainingGaps"],
+      repeatedStructureNoProgressCount,
+      activeIssueCodes: Array.isArray(state.activeIssueCodes) ? state.activeIssueCodes.slice(0, 8) : [],
+      repeatedHeadingSamples: Array.isArray(state.repeatedHeadingSamples) ? state.repeatedHeadingSamples.slice(0, 5) : [],
+      repeatedNumberSamples: Array.isArray(state.repeatedNumberSamples) ? state.repeatedNumberSamples.slice(0, 5) : [],
+      requiredCorrection: readString$1I(state.requiredCorrection) || null,
+      message
+    };
+    if (typeof options.pushStep === "function") {
+      options.pushStep(isHardVeto ? "structure-repair-hard-veto-blocked" : "structure-repair-action-blocked", {
+        actionName,
+        escalation: output.escalation,
+        forbiddenMove: output.forbiddenMove,
+        reason: output.reason,
+        repeatedStructureNoProgressCount,
+        activeIssueCodes: output.activeIssueCodes
+      });
+    }
+    return { message, output };
+  }
+
+  function maybeBlockWorkspaceMutationGrowthLoop(options) {
+    const actionName = readString$1I(options && options.actionName);
+    const convergence = options && options.convergence && typeof options.convergence === "object"
+      ? options.convergence
+      : null;
+    const state = convergence && convergence.workspaceMutationGrowthConvergence && typeof convergence.workspaceMutationGrowthConvergence === "object"
+      ? convergence.workspaceMutationGrowthConvergence
+      : null;
+    if (!state || state.active !== true) return null;
+    const forbiddenActions = Array.isArray(state.forbiddenActions)
+      ? state.forbiddenActions.map(readString$1I).filter(Boolean)
+      : [];
+    if (!forbiddenActions.includes(actionName)) return null;
+    const stallCount = readFiniteNumber$1(state.stallCount);
+    const isHardVeto = readString$1I(state.escalation) === "hard_veto";
+    const message = isHardVeto
+      ? `HARD VETO — workspace mutation has stalled ${stallCount} time(s) with tiny deltas while a length deficit persists. workspace_write overwrites the file, and workspace_replace can loop without growing the report. You MUST use workspace_propose_patch then workspace_apply_patch for a validated repair, workspace_append or workspace_insert_after_section to add content, OR call workspace_finalize_candidate / workspace_publish_candidate_limited_with_remainingGaps if you cannot meet the target.`
+      : `Workspace mutation oscillation detected: ${stallCount} consecutive mutation(s) added too little while the length target is unmet. Avoid overwrite/replace loops; use workspace_propose_patch/workspace_apply_patch or workspace_append/workspace_insert_after_section to accumulate content instead.`;
+    const output = {
+      ok: false,
+      control: "continue",
+      kind: isHardVeto ? "workspace_mutation_growth_hard_veto_block" : "workspace_mutation_growth_preflight_block",
+      status: "blocked",
+      reason: "workspace_write_not_accumulating",
+      actionName,
+      escalation: isHardVeto ? "hard_veto" : "advisory",
+      forbiddenMove: "repeat_workspace_write_without_growth",
+      forbiddenActions,
+      allowedNextMoves: Array.isArray(state.allowedNextMoves)
+        ? state.allowedNextMoves.slice(0, 8)
+        : ["workspace_propose_patch", "workspace_apply_patch", "workspace_append", "workspace_finalize_candidate", "workspace_publish_candidate_limited_with_remainingGaps"],
+      stallCount,
+      requiredCorrection: readString$1I(state.requiredCorrection) || null,
+      message
+    };
+    if (typeof options.pushStep === "function") {
+      options.pushStep(isHardVeto ? "workspace-mutation-growth-hard-veto-blocked" : "workspace-mutation-growth-action-blocked", {
+        actionName,
+        escalation: output.escalation,
+        forbiddenMove: output.forbiddenMove,
+        reason: output.reason,
+        stallCount
+      });
+    }
+    return { message, output };
+  }
+
   function maybeBlockWorkspaceSourceDeficitAfterPublishBlock(options) {
-    const actionName = readString$1H(options && options.actionName);
+    const actionName = readString$1I(options && options.actionName);
     if (![
       "workspace_append",
       "workspace_finalize_candidate",
@@ -24453,7 +27475,7 @@
       observableDeficit: sourceDeficit,
       publishBlockSignal: {
         count: readFiniteNumber$1(runState.publishBlockSignal.count),
-        lastStatus: readString$1H(runState.publishBlockSignal.lastStatus) || null
+        lastStatus: readString$1I(runState.publishBlockSignal.lastStatus) || null
       },
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
       message
@@ -24471,6 +27493,15 @@
   }
 
   function buildValidLimitedPublishArgsExample(runState) {
+    const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
+      ? runState.terminalRepairState
+      : null;
+    const repairContract = repair && repair.validPublishContract && typeof repair.validPublishContract === "object"
+      ? repair.validPublishContract
+      : null;
+    if (repairContract && repairContract.requiredArgsExample && typeof repairContract.requiredArgsExample === "object") {
+      return cloneValue(repairContract.requiredArgsExample);
+    }
     const packet = runState &&
       runState.researchReportLoop &&
       runState.researchReportLoop.gateSignal &&
@@ -24491,7 +27522,7 @@
       : candidate.textStats && typeof candidate.textStats === "object"
         ? candidate.textStats
         : {};
-    const statsKey = readString$1H(requested.statsKey) || "words";
+    const statsKey = readString$1I(requested.statsKey) || "words";
     const observed = readFiniteNumber$1(stats[statsKey]);
     const requestedLength = readFiniteNumber$1(requested.value);
     const lengthSatisfied = requestedLength > 0 ? observed >= requestedLength : false;
@@ -24507,7 +27538,7 @@
           evidenceSatisfied: false,
           lengthSatisfied,
           observedLength: observed,
-          observedLengthUnit: readString$1H(requested.unit) || statsKey,
+          observedLengthUnit: readString$1I(requested.unit) || statsKey,
           remainingGaps: ["Source minimum / read_url evidence is still insufficient."],
           requestedLength: requestedLength || null,
           requirementSatisfied: false,
@@ -24562,7 +27593,7 @@
     const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
-    const statsKey = readString$1H(requested && requested.statsKey);
+    const statsKey = readString$1I(requested && requested.statsKey);
     const requestedValue = readFiniteNumber$1(requested && requested.value);
     if (!statsKey || requestedValue <= 0) return null;
     const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
@@ -24581,7 +27612,7 @@
       requested: requestedValue,
       satisfied: observed >= requestedValue,
       statsKey,
-      unit: readString$1H(requested.unit) || statsKey
+      unit: readString$1I(requested.unit) || statsKey
     };
   }
 
@@ -24601,15 +27632,65 @@
     if (!structure || structure.ok !== false) return null;
     return {
       ok: false,
-      status: readString$1H(structure.status) || "fail",
-      reason: readString$1H(structure.reason) || "candidate structure is not publishable",
+      status: readString$1I(structure.status) || "fail",
+      reason: readString$1I(structure.reason) || "candidate structure is not publishable",
       issueCodes: Array.isArray(structure.issueCodes)
-        ? structure.issueCodes.map(readString$1H).filter(Boolean).slice(0, 8)
+        ? structure.issueCodes.map(readString$1I).filter(Boolean).slice(0, 8)
         : []
     };
   }
 
   function readWorkspaceLengthDeficit(runState) {
+    const status = readCurrentWorkspaceLengthStatus(runState);
+    if (!status || status.observed >= status.requested) return null;
+    return status;
+  }
+
+  function estimateWorkspaceReplaceWords(runState, args) {
+    const source = args && typeof args === "object" && !Array.isArray(args) ? args : {};
+    const path = readString$1I(source.path);
+    const find = typeof source.find === "string" ? source.find : "";
+    const replace = typeof source.replace === "string"
+      ? source.replace
+      : typeof source.replacement === "string"
+        ? source.replacement
+        : typeof source.newText === "string"
+          ? source.newText
+          : typeof source.text === "string"
+            ? source.text
+            : "";
+    if (!path || !find.trim()) return 0;
+    const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      ? runState.virtualWorkspace
+      : null;
+    const files = workspace && workspace.files && typeof workspace.files === "object"
+      ? workspace.files
+      : null;
+    const file = files && files[path] && typeof files[path] === "object" ? files[path] : null;
+    const current = typeof (file && file.content) === "string" ? file.content : "";
+    if (!current || !current.includes(find)) return 0;
+    const next = source.replace_all === true
+      ? current.split(find).join(replace)
+      : current.replace(find, replace);
+    return countLatinWords(next);
+  }
+
+  function computeMinimumEffectiveLengthDeficitGrowth(deficit) {
+    const source = deficit && typeof deficit === "object" ? deficit : {};
+    const requested = readFiniteNumber$1(source.requested);
+    const observed = readFiniteNumber$1(source.observed);
+    const remaining = Math.max(requested - observed, 0);
+    if (remaining <= 0) return 0;
+    const statsKey = readString$1I(source.statsKey);
+    const unit = readString$1I(source.unit);
+    if (statsKey !== "words" && unit !== "words") return 1;
+    return Math.min(
+      remaining,
+      Math.max(30, Math.ceil(requested * 0.1))
+    );
+  }
+
+  function readCurrentWorkspaceLengthStatus(runState) {
     const packet = runState &&
       runState.researchReportLoop &&
       runState.researchReportLoop.gateSignal &&
@@ -24620,7 +27701,7 @@
     const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
-    const statsKey = readString$1H(requested && requested.statsKey);
+    const statsKey = readString$1I(requested && requested.statsKey);
     const requestedValue = readFiniteNumber$1(requested && requested.value);
     if (!statsKey || requestedValue <= 0) return null;
     const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
@@ -24634,17 +27715,23 @@
         ? candidate.textStats
         : null;
     const observed = readFiniteNumber$1(stats && stats[statsKey]);
-    if (observed >= requestedValue) return null;
     return {
       observed,
       requested: requestedValue,
       statsKey,
-      unit: readString$1H(requested.unit) || statsKey
+      unit: readString$1I(requested.unit) || statsKey
     };
   }
 
   function readFiniteNumber$1(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  }
+
+  function countLatinWords(value) {
+    const text = readString$1I(value);
+    if (!text) return 0;
+    const words = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g);
+    return Array.isArray(words) ? words.length : 0;
   }
 
   function shouldRefreshLongRunAcceptanceGate$1(actionName, status) {
@@ -24693,6 +27780,95 @@
       }
     }
     return count;
+  }
+
+  // ADR-0013 — Recoverable action errors must surface as AI-observable
+  // observations, not as fatal `runState.status = "failed"` exits. This
+  // helper consolidates the three action error sites (validation,
+  // preflight, execute) that previously each had their own
+  // canSelfCorrect / fatal split. All three now always produce an
+  // observation; the planner gets the error in its next prompt and
+  // chooses what to do (different args, different action, valid limited
+  // publish, etc). maxSteps is the only terminal bound for action errors
+  // from here forward.
+  function recordRecoverableActionError({
+    stage,
+    actionName,
+    decision,
+    errorMessage,
+    validationReason,
+    validationKey,
+    actionHistory,
+    pushStep,
+    runState
+  }) {
+    runState.selfCorrectionCount = (runState.selfCorrectionCount || 0) + 1;
+
+    const summary = stage === "execute"
+      ? (countRecentActionErrors(actionHistory, actionName) > 0
+          ? `${actionName} failed again (${countRecentActionErrors(actionHistory, actionName) + 1} consecutive failures): ${errorMessage}. Do NOT retry the exact same ${actionName} call. Choose a different action, different arguments, or finalize with available information if you judge that is best.`
+          : `${actionName} failed: ${errorMessage}. The planner should try a different approach.`)
+      : stage === "validation"
+        ? `${actionName} rejected before execution: ${errorMessage}. Planner must supply correct args (${validationReason || "invalid_args"}${validationKey ? ` on "${validationKey}"` : ""}).`
+        : `${actionName} rejected before execution: ${errorMessage}. Planner must supply correct args (preflight).`;
+
+    actionHistory.push({
+      actionName,
+      error: errorMessage,
+      kind: "action_error",
+      summary
+    });
+
+    if (stage === "execute") {
+      runState.lastAction = actionName;
+    }
+
+    runState.observation = {
+      actionName,
+      kind: "error",
+      message: errorMessage,
+      stage
+    };
+
+    const refreshStatus = stage === "validation"
+      ? "validation_error_self_correct"
+      : stage === "preflight"
+        ? "preflight_error_self_correct"
+        : "action_error_self_correct";
+
+    refreshActionPattern({
+      actionName,
+      decision,
+      output: { error: errorMessage, ok: false, errorStage: stage },
+      pushStep,
+      runState,
+      status: refreshStatus
+    });
+
+    // terminal repair only refreshes from execute path historically; keep
+    // that scope (validation/preflight never reached the repair refresh).
+    if (stage === "execute") {
+      refreshTerminalRepair({
+        actionName,
+        decision,
+        output: { error: errorMessage, ok: false, errorStage: stage },
+        pushStep,
+        runState,
+        status: refreshStatus
+      });
+    }
+
+    if (Array.isArray(runState.failedTools)) {
+      runState.failedTools.push({
+        tool: actionName,
+        status: "failed",
+        reason: errorMessage,
+        stage,
+        cycle: runState.cycleCount
+      });
+    }
+
+    return { done: false };
   }
 
   function readActionResultCount(actionName, output) {
@@ -27500,7 +30676,7 @@
         summary: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_write to create a reusable virtual draft artifact. Do not put private reasoning here; write only artifact text that can be reviewed or published."
+      guidance: "Use workspace_write to CREATE or fully REPLACE a virtual draft file. CAUTION: workspace_write REPLACES ALL existing content — if the file already has substantial content, use workspace_append to ADD more without losing existing work. Only use workspace_write when starting a new file or deliberately rewriting from scratch. The action result reports lengthProgress; if remainingLength is still large, use workspace_append to expand further rather than calling workspace_write again."
     },
     tier: 0,
     execute: executeWorkspaceWriteAction,
@@ -27534,6 +30710,58 @@
     preflight: preflightWorkspaceMutationRequiresRead
   });
 
+  const workspaceProposePatchAction = Object.freeze({
+    description: "Preview a structured patch against one virtual workspace file without changing file content. Operation shapes: append{content}, insert_after_section{heading,content}, replace{find,replace,replace_all?}, normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}; replace does not accept full-document content.",
+    name: "workspace_propose_patch",
+    plan: STANDALONE_PLAN_ACTION,
+    planner: {
+      aliases: ["propose_workspace_patch", "workspace_patch_preview", "draft_propose_patch"],
+      argsExample: {
+        operations: [
+          {
+            type: "normalize_headings",
+            headings: [
+              { lineNumber: 42, text: "## 4. Anti-patterns in Harness Design" }
+            ]
+          }
+        ],
+        path: "final_candidate.md",
+        summary: "preview heading normalization patch"
+      },
+      argsSchema: {
+        operations: { type: "array", required: true },
+        path: { type: "string", required: true },
+        summary: { type: "string" }
+      },
+      decisionType: "action",
+      guidance: "Use workspace_propose_patch before risky report repair. Valid operations are exactly: {type:\"append\",content:\"...\"}, {type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}, {type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}, or {type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate headings/section numbers shown in duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context; runtime changes only those Markdown heading lines and validates structure. If length is already satisfied and the visible issue is duplicate heading/section-number context, send exactly one normalize_headings operation. Do not mix normalize_headings with replace unless the exact current find text is visible in the prompt and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not send {type:\"replace\",content:\"full document\"}; replace needs find+replace and will be blocked without a non-empty find. It returns deltaWords/riskFlags and does not mutate the file. If riskFlags include no_growth, not_found, ambiguous, or structure_maybe_worse, revise the patch or use workspace_append/workspace_insert_after_section only when those actions are currently allowed instead of finalizing."
+    },
+    tier: 0,
+    execute: executeWorkspaceProposePatchAction,
+    preflight: preflightWorkspacePath
+  });
+
+  const workspaceApplyPatchAction = Object.freeze({
+    description: "Apply the latest valid workspace_propose_patch preview using patchId and baseVersion guards.",
+    name: "workspace_apply_patch",
+    plan: STANDALONE_PLAN_ACTION,
+    planner: {
+      aliases: ["apply_workspace_patch", "workspace_patch_apply"],
+      argsExample: {
+        patchId: "patch-1234567890-7",
+        summary: "apply previewed expansion"
+      },
+      argsSchema: {
+        patchId: { type: "string" },
+        summary: { type: "string" }
+      },
+      decisionType: "action",
+      guidance: "Use workspace_apply_patch only after workspace_propose_patch returned status=preview_ready with positive deltaWords and no blocking riskFlags. It applies only the latest valid pending patch; patchId mismatch, stale baseVersion, invalid preview, no_growth, not_found, ambiguous, or structure_maybe_worse are observable errors."
+    },
+    tier: 0,
+    execute: executeWorkspaceApplyPatchAction
+  });
+
   const workspaceAppendAction = Object.freeze({
     description: "Append user-visible text to a virtual workspace draft file without rewriting the whole artifact.",
     name: "workspace_append",
@@ -27552,7 +30780,7 @@
         summary: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_append when a long draft is too short and you need to add new user-facing material without relying on exact replacement text."
+      guidance: "Use workspace_append to ADD new content to an existing draft without replacing existing work. This is the preferred tool when lengthProgress.remainingLength is large — append enough complete, source-grounded prose to materially reduce that remaining length. Do NOT call workspace_write again after an append; that would erase all existing content. Do not append a placeholder, note, or tiny patch."
     },
     tier: 0,
     execute: executeWorkspaceAppendAction,
@@ -27579,7 +30807,7 @@
         summary: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_insert_after_section to expand a specific Markdown section when workspace_replace would require fragile exact text. If the heading is not found you will get heading_not_found with availableHeadings so you can pick an existing anchor or call workspace_append instead."
+      guidance: "Use workspace_insert_after_section to expand a specific Markdown section when workspace_replace would require fragile exact text. If lengthProgress.remainingLength is large, insert enough complete, source-grounded prose to materially reduce that remaining length. If the heading is not found you will get heading_not_found with availableHeadings so you can pick an existing anchor or call workspace_append instead."
     },
     tier: 0,
     execute: executeWorkspaceInsertAfterSectionAction,
@@ -27640,22 +30868,36 @@
     plan: STANDALONE_PLAN_ACTION,
     planner: {
       aliases: ["publish_workspace_candidate", "workspace_publish", "publish_final_candidate"],
+      // ADR-0033 Tier A.10 (X1.5.b fix, 2026-05-20 evening) — argsExample shows a
+      // CONCRETE limited-contract publish whose remainingGaps entries are real
+      // sentences a model can copy verbatim. Earlier X1.5 example used template
+      // strings ("replace this with..."); empirical data (X1 fix live test)
+      // showed lite-tier flash-lite parsed those as instructions to remove and
+      // emitted remainingGaps:[] (empty array), failing publish validation. The
+      // example below contains plain English sentences mirroring what
+      // requiredArgsExample renders from real run state, so the model can copy
+      // the shape AND the substance.
       argsExample: {
         finalReadiness: {
-          decision: "ready",
+          decision: "limited",
           evidenceMode: "read_sources",
-          limitations: "",
+          limitations: "Source minimum unmet and length below target; publishing what is grounded so far.",
           requirementsAssessment: {
             checkedReadinessAgainstUserRequest: true,
             checkedReadUrlEvidence: true,
             checkedWorkspaceStats: true,
-            evidenceSatisfied: true,
-            lengthSatisfied: true,
-            observedLength: 1200,
-            observedLengthUnit: "chars",
-            requestedLength: 1200,
-            requirementSatisfied: true,
-            successfulReadUrlCount: 3,
+            evidenceSatisfied: false,
+            lengthSatisfied: false,
+            observedLength: 1048,
+            observedLengthUnit: "words",
+            remainingGaps: [
+              "Length is still short: observed 1048 / requested 3000 words.",
+              "Source minimum unmet: 2 of 3 successful read_url required for clean ready.",
+              "Structure repair pending: duplicate headings and section numbers detected in final_candidate.md."
+            ],
+            requestedLength: 3000,
+            requirementSatisfied: false,
+            successfulReadUrlCount: 2,
             userRequirementSummary: "user-facing report with the requested depth"
           }
         },
@@ -27706,7 +30948,7 @@
         path: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_publish_candidate after workspace_finalize_candidate and a workspace_read of the selected candidate when that candidate is the final user-facing answer. Always include finalReadiness with requirementsAssessment based on the latest workspace_read stats, read_url evidence count, requested length, and any concrete remainingGaps. This terminal action publishes the candidate content directly; do not use finalize if you want to avoid LLM re-summarization. If a TodoState plan exists, update completed/blocked/abandoned phases before this terminal action because runtime only observes stale TodoState and will not mark items done."
+      guidance: "Use workspace_publish_candidate after workspace_finalize_candidate and a workspace_read of the selected candidate when that candidate is the final user-facing answer. Always include finalReadiness with requirementsAssessment based on the latest workspace_read stats, read_url evidence count, requested length, and any concrete remainingGaps. If TerminalRepairState exposes a validPublishContract, do not send a plain or ready publish; either perform the allowed recovery action or publish with decision='limited' and false flags for the failed observable dimensions named in that contract. This terminal action publishes the candidate content directly; do not use finalize if you want to avoid LLM re-summarization. If a TodoState plan exists, update completed/blocked/abandoned phases before this terminal action because runtime only observes stale TodoState and will not mark items done."
     },
     tier: 0,
     execute: executeWorkspacePublishCandidateAction,
@@ -27745,13 +30987,15 @@
       control: "continue",
       output: {
         file,
-        kind: "virtual_workspace_read"
+        kind: "virtual_workspace_read",
+        lengthProgress: summarizeLengthProgress(context, file)
       },
-      summary: `workspace_read(${file.path}, ${formatTextStats(file.textStats)})`
+      summary: summarizeWorkspaceRead(file, context)
     };
   }
 
   async function executeWorkspaceWriteAction(context, args) {
+    const beforeFile = readWorkspaceFile(ensureWorkspace(context), args && args.path);
     const file = writeWorkspaceFile(context.runState, args && args.path, args && args.content, {
       config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
       maxFileChars: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxFileChars,
@@ -27764,13 +31008,16 @@
       output: {
         file: summarizeFile(file),
         kind: "virtual_workspace_write",
+        lengthProgress: summarizeLengthProgress(context, file),
+        mutationStats: summarizeMutationStats(beforeFile, file, args && args.content),
         quality: context.runState.virtualWorkspace.quality
       },
-      summary: `workspace_write(${file.path}, chars=${file.content.length})`
+      summary: summarizeWorkspaceMutation("workspace_write", file, context)
     };
   }
 
   async function executeWorkspaceReplaceAction(context, args) {
+    const beforeFile = readWorkspaceFile(ensureWorkspace(context), args && args.path);
     const result = replaceWorkspaceFile(context.runState, args && args.path, args && args.find, args && args.replace, {
       config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
       maxFileChars: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxFileChars,
@@ -27792,7 +31039,9 @@
         fuzzyAttempted: Array.isArray(result.fuzzyAttempted) ? result.fuzzyAttempted : [],
         fuzzyMatch: result.fuzzyMatch || null,
         kind: "virtual_workspace_replace",
+        lengthProgress: summarizeLengthProgress(context, result.file),
         matchCount: typeof result.matchCount === "number" ? result.matchCount : null,
+        mutationStats: summarizeMutationStats(beforeFile, result.file, args && args.replace),
         quality: context.runState.virtualWorkspace.quality,
         replacedAll: result.replacedAll === true,
         status,
@@ -27800,13 +31049,110 @@
           ? "Widen the find text with surrounding context until it is unique, or call workspace_replace again with replace_all:true to replace every occurrence."
           : status === "not_found"
             ? "Run workspace_read to refresh your view of the file, then retry workspace_replace with text that appears verbatim in the latest content."
-            : null
+            : status === "invalid_args"
+              ? "Provide a non-empty find string and a valid workspace path (no absolute, no '..', no backslash), then retry."
+              : null,
+        error: result.error || null,
+        message: result.message || null
       },
       summary: `${summaryParts.join(", ")})`
     };
   }
 
+  async function executeWorkspaceProposePatchAction(context, args) {
+    const beforeFile = readWorkspaceFile(ensureWorkspace(context), args && args.path);
+    const result = proposeWorkspacePatch(context.runState, args && args.path, args && args.operations, {
+      config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
+      maxFileChars: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxFileChars,
+      prompt: context.request && context.request.prompt,
+      summary: args && args.summary
+    });
+    return {
+      control: "continue",
+      output: {
+        afterWords: result.afterWords,
+        baseVersion: result.baseVersion,
+        beforeWords: result.beforeWords,
+        changed: result.changed,
+        deltaWords: result.deltaWords,
+        file: summarizeFile(beforeFile),
+        kind: "virtual_workspace_propose_patch",
+        operations: Array.isArray(result.operations) ? result.operations : [],
+        patchId: result.patchId,
+        path: result.path,
+        previewSummary: result.previewSummary,
+        riskFlags: Array.isArray(result.riskFlags) ? result.riskFlags : [],
+        status: result.status,
+        structureAfter: result.structureAfter || null,
+        structureBefore: result.structureBefore || null,
+        suggestion: suggestWorkspacePatchNextStep(result),
+        valid: result.valid === true
+      },
+      summary: `workspace_propose_patch(${result.path || "<invalid>"}, status=${result.status}, deltaWords=${result.deltaWords}, riskFlags=${Array.isArray(result.riskFlags) && result.riskFlags.length ? result.riskFlags.join("|") : "none"})`
+    };
+  }
+
+  function suggestWorkspacePatchNextStep(result) {
+    const status = result && result.status;
+    const operations = Array.isArray(result && result.operations) ? result.operations : [];
+    const riskFlags = Array.isArray(result && result.riskFlags) ? result.riskFlags : [];
+    const hasInvalidReplaceShape = operations.some((operation) => (
+      operation &&
+      operation.type === "replace" &&
+      (operation.findChars || 0) === 0
+    ));
+    if (hasInvalidReplaceShape) {
+      return "Patch replace operations require non-empty find and replace fields. Do not use replace+content for full rewrites; use append/insert_after_section, or quote exact current text in find and new text in replace.";
+    }
+    if (riskFlags.includes("ambiguous")) {
+      return "A replace or heading match is ambiguous. Use a longer exact find string, pass replace_all:true only when every match should change, or use append/insert_after_section.";
+    }
+    if (riskFlags.includes("not_found")) {
+      return "Patch target was not found. Use text visible in the latest workspace projection/read, or switch to append/insert_after_section.";
+    }
+    if (riskFlags.includes("no_growth")) {
+      return "Patch did not grow the candidate or improve structure. Add substantial user-facing content with append/insert_after_section when allowed, or use normalize_headings with lineNumber entries from duplicate_heading_context to repair duplicate headings.";
+    }
+    if (riskFlags.includes("structure_maybe_worse")) {
+      return "Patch may worsen structure. Avoid duplicate headings/section numbers; use append/insert under an existing unique heading or publish limited with concrete structure gaps.";
+    }
+    if (status === "preview_ready") {
+      return "Preview is valid: call workspace_apply_patch with this patchId before finalizing or publishing.";
+    }
+    return "Revise the patch using valid operation shapes, or use workspace_append/workspace_insert_after_section when exact replacement is fragile.";
+  }
+
+  async function executeWorkspaceApplyPatchAction(context, args) {
+    const result = applyWorkspacePatch(context.runState, args && args.patchId, {
+      config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
+      maxOperations: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxOperations,
+      prompt: context.request && context.request.prompt,
+      summary: args && args.summary
+    });
+    const file = result.file && typeof result.file === "object" ? result.file : null;
+    return {
+      control: "continue",
+      output: {
+        baseVersion: result.baseVersion,
+        changed: result.changed === true,
+        currentVersion: result.currentVersion,
+        error: result.error || null,
+        expectedPatchId: result.expectedPatchId || null,
+        file: file ? summarizeFile(file) : null,
+        kind: "virtual_workspace_apply_patch",
+        lengthProgress: file ? summarizeLengthProgress(context, file) : null,
+        message: result.message || null,
+        patchId: result.patchId || null,
+        quality: context.runState.virtualWorkspace && context.runState.virtualWorkspace.quality,
+        riskFlags: Array.isArray(result.riskFlags) ? result.riskFlags : [],
+        status: result.status
+      },
+      summary: `workspace_apply_patch(${result.patchId || "<none>"}, status=${result.status}, changed=${result.changed ? "yes" : "no"})`
+    };
+  }
+
   async function executeWorkspaceAppendAction(context, args) {
+    const beforeFile = readWorkspaceFile(ensureWorkspace(context), args && args.path);
     const file = appendWorkspaceFile(context.runState, args && args.path, args && args.content, {
       config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
       maxFileChars: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxFileChars,
@@ -27820,13 +31166,16 @@
       output: {
         file: summarizeFile(file),
         kind: "virtual_workspace_append",
+        lengthProgress: summarizeLengthProgress(context, file),
+        mutationStats: summarizeMutationStats(beforeFile, file, args && args.content),
         quality: context.runState.virtualWorkspace.quality
       },
-      summary: `workspace_append(${file.path}, chars=${file.content.length})`
+      summary: summarizeWorkspaceMutation("workspace_append", file, context)
     };
   }
 
   async function executeWorkspaceInsertAfterSectionAction(context, args) {
+    const beforeFile = readWorkspaceFile(ensureWorkspace(context), args && args.path);
     const result = insertAfterWorkspaceSection(context.runState, args && args.path, args && args.heading, args && args.content, {
       config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
       maxFileChars: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxFileChars,
@@ -27845,6 +31194,8 @@
         file: summarizeFile(result.file),
         heading: result.heading,
         kind: "virtual_workspace_insert_after_section",
+        lengthProgress: summarizeLengthProgress(context, result.file),
+        mutationStats: summarizeMutationStats(beforeFile, result.file, args && args.content),
         quality: context.runState.virtualWorkspace.quality,
         requestedHeading: result.requestedHeading || result.heading,
         status,
@@ -27852,9 +31203,13 @@
           ? availableHeadings.length > 0
             ? `Heading "${result.requestedHeading || result.heading}" not found. Available headings: ${availableHeadings.map((entry) => entry.text).join(" | ")}. Pick one of these (case/punctuation will be normalized), or call workspace_append if no anchor is needed.`
             : `Heading "${result.requestedHeading || result.heading}" not found and the file has no Markdown headings yet. Call workspace_append or rewrite the file with workspace_write first.`
-          : null
+          : status === "invalid_args"
+            ? "Provide a non-empty heading and a valid workspace path (no absolute, no '..', no backslash), then retry."
+            : null,
+        error: result.error || null,
+        message: result.message || null
       },
-      summary: `workspace_insert_after_section(${result.file.path}, status=${status}, availableHeadings=${availableHeadings.length})`
+      summary: `${summarizeWorkspaceMutation("workspace_insert_after_section", result.file, context)}, status=${status}, availableHeadings=${availableHeadings.length}`
     };
   }
 
@@ -27878,16 +31233,19 @@
   }
 
   async function executeWorkspaceFinalizeCandidateAction(context, args) {
+    const candidatePath = args && args.path || "final_candidate.md";
     const quality = finalizeWorkspaceCandidate(context.runState, args && args.path || "final_candidate.md", {
       config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
       maxOperations: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxOperations,
       prompt: context.request && context.request.prompt,
       summary: args && args.summary
     });
+    const workspace = context && context.runState && context.runState.virtualWorkspace;
     return {
       control: "continue",
       output: {
         kind: "virtual_workspace_finalize_candidate",
+        publishProtocol: inspectWorkspacePublishProtocol(workspace, candidatePath),
         quality
       },
       summary: `workspace_finalize_candidate(ready=${quality.finalCandidateReady ? "yes" : "no"})`
@@ -27959,7 +31317,7 @@
         status: "readiness_audit_failed"
       });
     }
-    const todoSyncAudit = inspectPublishTodoStateSync(context);
+    const todoSyncAudit = inspectPublishTodoStateSync(context, finalReadiness, file.path);
     if (!todoSyncAudit.ok) {
       return createWorkspacePublishBlockedResult({
         context,
@@ -28174,7 +31532,7 @@
       };
     }
     const structureAudit = inspectWorkspaceCandidateStructure(file.content);
-    if (!structureAudit.ok) {
+    if (!structureAudit.ok && !canPublishLimitedWithStructureDeficit(context, finalReadiness, file.path)) {
       return {
         ok: false,
         message: `workspace_publish_candidate blocked because the final candidate has structural issues (${structureAudit.issueCodes.join(", ")}). ${structureAudit.reason}. Read the candidate and repair it into one coherent user-facing report with unique section headings before publishing.`
@@ -28309,6 +31667,9 @@
         message: `workspace_publish_candidate limited publish needs concrete remainingGaps when observedLength ${observedLength} is below requestedLength ${requestedLength} and evidenceSatisfied=false. Add requirementsAssessment.remainingGaps as a non-empty string array, or continue evidence/workspace work with web_search/read_url plus workspace_append/workspace_insert_after_section and publish later.`
       };
     }
+    if (canPublishLimitedWithTerminalRepair(context, finalReadiness, file.path)) {
+      return { ok: true };
+    }
     const sourceReadinessIssue = inspectSourceMinimumPublishReadiness({
       assessment,
       finalReadiness,
@@ -28330,6 +31691,36 @@
       };
     }
     return { ok: true };
+  }
+
+  function canPublishLimitedWithTerminalRepair(context, finalReadiness, publishPath) {
+    const repair = context &&
+      context.runState &&
+      context.runState.terminalRepairState &&
+      typeof context.runState.terminalRepairState === "object"
+      ? context.runState.terminalRepairState
+      : null;
+    if (!repair || repair.active !== true) return false;
+    if (!Array.isArray(repair.allowedActions) || !repair.allowedActions.includes("workspace_publish_candidate")) {
+      return false;
+    }
+    return isValidTerminalRepairPublishArgs({ finalReadiness, path: publishPath }, repair, {
+      runState: context && context.runState
+    });
+  }
+
+  function canPublishLimitedWithStructureDeficit(context, finalReadiness, publishPath) {
+    const repair = context &&
+      context.runState &&
+      context.runState.terminalRepairState &&
+      typeof context.runState.terminalRepairState === "object"
+      ? context.runState.terminalRepairState
+      : null;
+    if (!repair || repair.active !== true) return false;
+    if (!Array.isArray(repair.activeDeficits) || !repair.activeDeficits.includes("structure")) return false;
+    return isValidTerminalRepairPublishArgs({ finalReadiness, path: publishPath }, repair, {
+      runState: context && context.runState
+    });
   }
 
   function shouldRefreshResearchGateBeforePublish(finalReadiness) {
@@ -28422,7 +31813,7 @@
     return null;
   }
 
-  function inspectPublishTodoStateSync(context) {
+  function inspectPublishTodoStateSync(context, finalReadiness, publishPath) {
     const todoState = context && context.runState && context.runState.todoState;
     if (!todoState || typeof todoState !== "object") return { ok: true };
     if (todoState.terminatedAt) return { ok: true };
@@ -28433,6 +31824,12 @@
       return status === "active" || status === "pending" || status === "blocked";
     });
     if (unfinished.length === 0) return { ok: true };
+    if (canPublishLimitedWithUnfinishedTodo(context, finalReadiness, publishPath)) {
+      return {
+        ok: true,
+        status: "todo_state_limited_with_remaining_gaps"
+      };
+    }
     const activeItem = findActiveTodoItem$1(todoState, items);
     const activeLabel = readString$M(activeItem && activeItem.label) || readString$M(unfinished[0] && unfinished[0].label) || "current TodoState item";
     const statusSummary = countTodoStatuses(items);
@@ -28441,6 +31838,20 @@
       status: "todo_state_not_synced",
       message: `workspace_publish_candidate cannot be terminal while TodoState still has unfinished work. Active item: "${activeLabel}". Counts: done=${statusSummary.done}, active=${statusSummary.active}, pending=${statusSummary.pending}, blocked=${statusSummary.blocked}, abandoned=${statusSummary.abandoned}, total=${statusSummary.total}. If the work is complete, choose todo_run_next or todo_advance before publishing; if the plan changed, use todo_plan or todo_cancel. Runtime will not auto-complete TodoState for the AI.`
     };
+  }
+
+  function canPublishLimitedWithUnfinishedTodo(context, finalReadiness, publishPath) {
+    const repair = context &&
+      context.runState &&
+      context.runState.terminalRepairState &&
+      typeof context.runState.terminalRepairState === "object"
+      ? context.runState.terminalRepairState
+      : null;
+    if (!repair || repair.active !== true) return false;
+    if (!Array.isArray(repair.activeDeficits) || !repair.activeDeficits.includes("todo")) return false;
+    return isValidTerminalRepairPublishArgs({ finalReadiness, path: publishPath }, repair, {
+      runState: context && context.runState
+    });
   }
 
   function findActiveTodoItem$1(todoState, items) {
@@ -28505,6 +31916,7 @@
   // because writing into an empty slot is unambiguous. Missing runState
   // (preflight unit tests pass {} as context) also skips the check; the
   // gate runs at action execute time with full context.
+
   function preflightWorkspaceMutationRequiresRead(context, args) {
     validateWorkspacePath(args && args.path);
     const runState = context && context.runState;
@@ -28526,15 +31938,83 @@
     }
   }
 
+  function summarizeLengthProgress(context, file) {
+    const requested = extractRequestedLengthContract(readTerminalContractText(context));
+    if (!requested) return null;
+    const safeFile = file && typeof file === "object" ? file : {};
+    const stats = safeFile.textStats && typeof safeFile.textStats === "object"
+      ? safeFile.textStats
+      : summarizeTextStats(safeFile.content);
+    const observed = readNumber$5(stats[requested.statsKey]);
+    const remaining = Math.max(0, requested.value - observed);
+    return {
+      lengthSatisfied: remaining === 0,
+      observedLength: observed,
+      observedLengthUnit: requested.unit,
+      remainingLength: remaining,
+      requestedLength: requested.value,
+      statsKey: requested.statsKey,
+      status: remaining === 0 ? "satisfied" : "below_requested"
+    };
+  }
+
+  function summarizeMutationStats(beforeFile, afterFile, addedContent) {
+    const beforeStats = summarizeFileStats(beforeFile);
+    const afterStats = summarizeFileStats(afterFile);
+    return {
+      addedTextStats: summarizeTextStats(addedContent),
+      delta: {
+        chars: afterStats.chars - beforeStats.chars,
+        cjkChars: afterStats.cjkChars - beforeStats.cjkChars,
+        nonWhitespaceChars: afterStats.nonWhitespaceChars - beforeStats.nonWhitespaceChars,
+        words: afterStats.words - beforeStats.words
+      }
+    };
+  }
+
+  function summarizeWorkspaceRead(file, context) {
+    const progress = summarizeLengthProgress(context, file);
+    const base = `workspace_read(${file.path}, ${formatTextStats(file.textStats)}`;
+    if (!progress) return `${base})`;
+    return `${base}, requested${capitalize(progress.observedLengthUnit)}=${progress.requestedLength}, remaining${capitalize(progress.observedLengthUnit)}=${progress.remainingLength})`;
+  }
+
+  function summarizeWorkspaceMutation(actionName, file, context) {
+    const safeFile = file && typeof file === "object" ? file : {};
+    const stats = summarizeFileStats(safeFile);
+    const progress = summarizeLengthProgress(context, safeFile);
+    const path = readString$M(safeFile.path) || "<unknown>";
+    const pieces = [`${actionName}(${path}`, `chars=${stats.chars}`, `words=${stats.words}`];
+    if (progress) {
+      pieces.push(`requested${capitalize(progress.observedLengthUnit)}=${progress.requestedLength}`);
+      pieces.push(`remaining${capitalize(progress.observedLengthUnit)}=${progress.remainingLength}`);
+    }
+    return `${pieces.join(", ")})`;
+  }
+
+  function summarizeFileStats(file) {
+    const safeFile = file && typeof file === "object" ? file : {};
+    if (safeFile.textStats && typeof safeFile.textStats === "object") {
+      return {
+        chars: readNumber$5(safeFile.textStats.chars),
+        cjkChars: readNumber$5(safeFile.textStats.cjkChars),
+        nonWhitespaceChars: readNumber$5(safeFile.textStats.nonWhitespaceChars),
+        words: readNumber$5(safeFile.textStats.words)
+      };
+    }
+    return summarizeTextStats(safeFile.content);
+  }
+
   function summarizeFile(file) {
-    const content = typeof file.content === "string" ? file.content : "";
+    const safe = file && typeof file === "object" ? file : {};
+    const content = typeof safe.content === "string" ? safe.content : "";
     return {
       hasContent: content.length > 0,
-      path: file.path,
+      path: typeof safe.path === "string" ? safe.path : null,
       size: content.length,
       textStats: summarizeTextStats(content),
-      updatedAt: file.updatedAt || null,
-      version: file.version || 0
+      updatedAt: safe.updatedAt || null,
+      version: safe.version || 0
     };
   }
 
@@ -28544,6 +32024,12 @@
 
   function readNumber$5(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  }
+
+  function capitalize(value) {
+    const source = readString$M(value);
+    if (!source) return "";
+    return source.slice(0, 1).toUpperCase() + source.slice(1);
   }
 
   function summarizeTextStats(value) {
@@ -28987,6 +32473,7 @@
   // ---------------------------------------------------------------------------
 
   const DEFAULT_SEARCH_TIMEOUT_MS = 15000;
+  const DEFAULT_GROUNDING_TIMEOUT_MS = 40000;
   const DEFAULT_LLM_TIMEOUT_MS = 60000;
   const DEFAULT_SEARCH_DEADLINE_MS = 45000;
   const DEFAULT_MAX_RETRIES = 2;
@@ -29314,8 +32801,8 @@
       headers: buildGeminiGroundingHeaders(apiKey, authMode),
       method: "POST"
     }, {
-      timeoutMs: request.timeoutMs || DEFAULT_SEARCH_TIMEOUT_MS,
-      maxRetries: 1,
+      timeoutMs: request.timeoutMs || DEFAULT_GROUNDING_TIMEOUT_MS,
+      maxRetries: 0,
       signal: request.signal
     });
     const payload = await readJsonPayload$1(response);
@@ -30327,7 +33814,7 @@
     const searchPlan = planWebSearch({
       maxPasses: readPositiveInteger$c(args && args.maxPasses) || readPositiveInteger$c(context.request && context.request.maxPasses),
       query: originalQuery,
-      siteHints: readStringArray$1(args && args.siteHints) || readStringArray$1(context.request && context.request.siteHints),
+      siteHints: readStringArray$2(args && args.siteHints) || readStringArray$2(context.request && context.request.siteHints),
       strategy: readString$G(args && args.strategy) || readString$G(context.request && context.request.strategy)
     });
     const readSources = Array.isArray(context && context.runState && context.runState.researchContext && context.runState.researchContext.readSources)
@@ -30668,7 +34155,7 @@
       : null;
   }
 
-  function readStringArray$1(value) {
+  function readStringArray$2(value) {
     return Array.isArray(value)
       ? value.map((item) => readString$G(item)).filter(Boolean)
       : null;
@@ -30722,6 +34209,8 @@
       workspaceReadAction,
       workspaceWriteAction,
       workspaceReplaceAction,
+      workspaceProposePatchAction,
+      workspaceApplyPatchAction,
       workspaceAppendAction,
       workspaceInsertAfterSectionAction,
       workspaceRemoveAction,
@@ -52824,6 +56313,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
     const system = buildSystemPrompt$1(request);
     const tools = convertGeminiTools(request.tools);
     const abortSignal = mergeAbortSignals$1([request.signal, createTimeoutSignal$1(request.timeoutMs || DEFAULT_LLM_TIMEOUT_MS)]);
+    const providerOptions = buildGeminiProviderOptions(request);
     const requestBody = createProviderRequestTrace({
       apiVariant: request.apiVariant,
       authMode: request.authMode,
@@ -52833,7 +56323,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
       model: request.model,
       prompt: request.prompt,
       provider: "gemini",
-      providerOptions: null,
+      providerOptions,
       sessionContext: request.sessionContext,
       system,
       toolChoice: request.toolChoice,
@@ -52848,6 +56338,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
         messages,
         tools: tools || undefined,
         toolChoice: request.toolChoice === "required" ? "required" : undefined,
+        providerOptions,
         abortSignal,
         maxRetries: 1
       });
@@ -52906,6 +56397,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
       messages: options.messages,
       tools: options.tools,
       toolChoice: options.toolChoice,
+      providerOptions: options.providerOptions || undefined,
       abortSignal: options.abortSignal,
       maxRetries: 1
     });
@@ -52925,6 +56417,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
     const tools = convertGeminiTools(request.tools);
     const safeOnToken = typeof onToken === "function" ? onToken : null;
     const abortSignal = mergeAbortSignals$1([request.signal, createTimeoutSignal$1(request.timeoutMs || DEFAULT_LLM_TIMEOUT_MS)]);
+    const providerOptions = buildGeminiProviderOptions(request);
     const requestBody = createProviderRequestTrace({
       apiVariant: request.apiVariant,
       authMode: request.authMode,
@@ -52934,7 +56427,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
       model: request.model,
       prompt: request.prompt,
       provider: "gemini",
-      providerOptions: null,
+      providerOptions,
       sessionContext: request.sessionContext,
       system,
       toolChoice: request.toolChoice,
@@ -52949,6 +56442,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
         messages,
         tools: tools || undefined,
         toolChoice: request.toolChoice === "required" ? "required" : undefined,
+        providerOptions,
         abortSignal,
         maxRetries: 1,
         onToken: safeOnToken
@@ -53006,6 +56500,7 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
       messages: options.messages,
       tools: options.tools,
       toolChoice: options.toolChoice,
+      providerOptions: options.providerOptions || undefined,
       abortSignal: options.abortSignal,
       maxRetries: options.maxRetries
     });
@@ -53023,6 +56518,26 @@ Learn more: \x1B[34m${moreInfoURL}\x1B[0m
       toolCalls: extractToolCalls$1(await result.toolCalls),
       usage: (await result.usage) || null
     };
+  }
+
+  function buildGeminiProviderOptions(request) {
+    const thinkingConfig = request && request.geminiThinkingConfig && typeof request.geminiThinkingConfig === "object" && !Array.isArray(request.geminiThinkingConfig)
+      ? request.geminiThinkingConfig
+      : null;
+    if (!thinkingConfig) return null;
+    const normalizedThinkingConfig = {};
+    if (typeof thinkingConfig.thinkingLevel === "string" && thinkingConfig.thinkingLevel.trim()) {
+      normalizedThinkingConfig.thinkingLevel = thinkingConfig.thinkingLevel.trim();
+    }
+    if (typeof thinkingConfig.thinkingBudget === "number" && Number.isFinite(thinkingConfig.thinkingBudget)) {
+      normalizedThinkingConfig.thinkingBudget = thinkingConfig.thinkingBudget;
+    }
+    if (typeof thinkingConfig.includeThoughts === "boolean") {
+      normalizedThinkingConfig.includeThoughts = thinkingConfig.includeThoughts;
+    }
+    return Object.keys(normalizedThinkingConfig).length > 0
+      ? { google: { thinkingConfig: normalizedThinkingConfig } }
+      : null;
   }
 
   function createGeminiProvider(request, fetchImpl, mode) {
@@ -59736,16 +63251,16 @@ ${user}:`]
 
     try {
       const providerStartedAt = Date.now();
-      const result = await generateText({
-        model,
-        system: system || undefined,
-        messages,
-        tools: tools || undefined,
-        toolChoice: normalizeOpenAIToolChoice(request.toolChoice),
-        providerOptions: providerOptions || undefined,
+      const result = await generateTextWithEmptyResponseRepair({
         abortSignal,
-        timeout: timeoutMs,
-        maxRetries: 1
+        messages,
+        model,
+        providerOptions,
+        request,
+        system,
+        timeoutMs,
+        toolChoice: normalizeOpenAIToolChoice(request.toolChoice),
+        tools
       });
 
       const toolCalls = extractToolCalls(result.toolCalls);
@@ -59779,6 +63294,65 @@ ${user}:`]
         response: { body: readErrorResponseBody(error), status: readErrorStatus(error) }
       });
     }
+  }
+
+  async function generateTextWithEmptyResponseRepair({
+    abortSignal,
+    messages,
+    model,
+    providerOptions,
+    request,
+    system,
+    timeoutMs,
+    toolChoice,
+    tools
+  }) {
+    const options = {
+      model,
+      system: system || undefined,
+      messages,
+      tools: tools || undefined,
+      toolChoice,
+      providerOptions: providerOptions || undefined,
+      abortSignal,
+      timeout: timeoutMs,
+      maxRetries: 1
+    };
+    const result = await generateText(options);
+    if (hasAssistantContent(result)) return result;
+
+    const repairMessages = [
+      ...messages,
+      {
+        role: "user",
+        content: "The previous provider response was empty. Return a non-empty response that follows the existing system and developer instructions exactly."
+      }
+    ];
+    return await generateText({
+      ...options,
+      messages: repairMessages,
+      maxRetries: 0,
+      providerOptions: addOpenAIRequestMetadata(providerOptions, { agrun_empty_response_repair: "true" })
+    });
+  }
+
+  function hasAssistantContent(result) {
+    if (!result || typeof result !== "object") return false;
+    if (typeof result.text === "string" && result.text.length > 0) return true;
+    return Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
+  }
+
+  function addOpenAIRequestMetadata(providerOptions, metadata) {
+    return {
+      ...(providerOptions || {}),
+      openai: {
+        ...((providerOptions && providerOptions.openai) || {}),
+        metadata: {
+          ...((providerOptions && providerOptions.openai && providerOptions.openai.metadata) || {}),
+          ...metadata
+        }
+      }
+    };
   }
 
   async function requestOpenAIChatCompletionStreaming(request, fetchImpl, onToken) {
@@ -60125,14 +63699,14 @@ ${user}:`]
     const currentTopic = readOptionalString$1(sessionContext, ["currentTopic"]);
     const activeQuery = readOptionalString$1(sessionContext, ["activeQuery"]);
     const facts = readOptionalString$1(sessionContext, ["facts"]);
-    const lastReadSource = readStructuredValue(sessionContext.lastReadSource);
-    const lastResolution = readStructuredValue(sessionContext.lastResolution);
+    const lastReadSource = readStructuredValue$1(sessionContext.lastReadSource);
+    const lastResolution = readStructuredValue$1(sessionContext.lastResolution);
     const openAmbiguity = readOptionalString$1(sessionContext, ["openAmbiguity"]);
-    const pendingClarification = readStructuredValue(sessionContext.pendingClarification);
+    const pendingClarification = readStructuredValue$1(sessionContext.pendingClarification);
     const preferences = readOptionalString$1(sessionContext, ["preferences"]);
     const decisions = readOptionalString$1(sessionContext, ["decisions"]);
     const recentTurns = readOptionalString$1(sessionContext, ["recentTurns"]);
-    const selectedSource = readStructuredValue(sessionContext.selectedSource);
+    const selectedSource = readStructuredValue$1(sessionContext.selectedSource);
     const items = readSessionEvidenceItems(sessionContext.items);
 
     if (!history && !memory && !summary && !compactedContext && !clarificationStatus && !currentGoal && !currentTopic && !activeQuery && !facts && !lastReadSource && !lastResolution && !openAmbiguity && !pendingClarification && !preferences && !decisions && !recentTurns && !selectedSource && items.length === 0) {
@@ -60190,7 +63764,7 @@ ${user}:`]
       .filter(Boolean);
   }
 
-  function readStructuredValue(value) {
+  function readStructuredValue$1(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
@@ -60239,12 +63813,13 @@ ${user}:`]
     const webSearchEndpoint = readOptionalString$1(rawInput, ["webSearchEndpoint"]);
     const webSearchModel = readOptionalString$1(rawInput, ["webSearchModel"]);
     const multimodal = readMultimodalSummary(rawInput);
-    const contextSnapshot = readStructuredValue(rawInput.contextSnapshot);
+    const contextSnapshot = readStructuredValue$1(rawInput.contextSnapshot);
     const sessionContext = readSessionContext$2(rawInput);
     const parts = readInputParts(rawInput);
     const conversation = readConversation(rawInput);
     const reasoningEffort = readReasoningEffort(rawInput);
     const reasoningSummary = readReasoningSummary(rawInput);
+    const geminiThinkingConfig = readGeminiThinkingConfig(rawInput, providerId);
     const previousResponseId = readPreviousResponseId(rawInput, providerId, apiVariant);
     const responseFormat = readResponseFormat(rawInput, providerId, apiVariant);
 
@@ -60298,6 +63873,7 @@ ${user}:`]
       streamEndpoint,
       systemPrompt,
       previousResponseId,
+      geminiThinkingConfig,
       reasoningEffort,
       reasoningSummary,
       responseFormat,
@@ -60320,6 +63896,49 @@ ${user}:`]
     if (effort == null) return null;
     if (["none", "minimal", "low", "medium", "high", "xhigh"].includes(effort)) return effort;
     throw new Error('Provider reasoningEffort must be "none", "minimal", "low", "medium", "high", or "xhigh".');
+  }
+
+  function readGeminiThinkingConfig(source, providerId) {
+    const candidates = [
+      source && source.geminiThinkingConfig,
+      source && source.thinkingConfig,
+      source && source.providerOptions && source.providerOptions.google && source.providerOptions.google.thinkingConfig
+    ].filter((value) => value && typeof value === "object" && !Array.isArray(value));
+    const topLevel = {};
+    if (Object.prototype.hasOwnProperty.call(source, "thinkingLevel")) topLevel.thinkingLevel = source.thinkingLevel;
+    if (Object.prototype.hasOwnProperty.call(source, "thinkingBudget")) topLevel.thinkingBudget = source.thinkingBudget;
+    if (Object.prototype.hasOwnProperty.call(source, "includeThoughts")) topLevel.includeThoughts = source.includeThoughts;
+    if (Object.keys(topLevel).length > 0) candidates.push(topLevel);
+    if (candidates.length === 0) return null;
+    if (providerId !== "gemini") {
+      throw new Error('Provider thinkingConfig is only supported when providerId="gemini".');
+    }
+
+    const config = {};
+    for (const candidate of candidates) {
+      if (Object.prototype.hasOwnProperty.call(candidate, "thinkingLevel")) {
+        const level = typeof candidate.thinkingLevel === "string" ? candidate.thinkingLevel.trim() : "";
+        if (!["minimal", "low", "medium", "high"].includes(level)) {
+          throw new Error('Gemini thinkingLevel must be "minimal", "low", "medium", or "high".');
+        }
+        config.thinkingLevel = level;
+      }
+      if (Object.prototype.hasOwnProperty.call(candidate, "thinkingBudget")) {
+        const budget = candidate.thinkingBudget;
+        if (typeof budget !== "number" || !Number.isFinite(budget) || Math.floor(budget) !== budget) {
+          throw new Error("Gemini thinkingBudget must be an integer number.");
+        }
+        config.thinkingBudget = budget;
+      }
+      if (Object.prototype.hasOwnProperty.call(candidate, "includeThoughts")) {
+        if (typeof candidate.includeThoughts !== "boolean") {
+          throw new Error("Gemini includeThoughts must be a boolean.");
+        }
+        config.includeThoughts = candidate.includeThoughts;
+      }
+    }
+
+    return Object.keys(config).length > 0 ? config : null;
   }
 
   function readPreviousResponseId(source, providerId, apiVariant) {
@@ -60455,12 +64074,23 @@ ${user}:`]
       return false;
     }
 
-    return SUPPORTED_PROVIDERS.includes(readString$D(rawInput, "provider", "providerId")) &&
-      readString$D(rawInput, "prompt").length > 0;
+    if (readString$D(rawInput, "prompt").length === 0) {
+      return false;
+    }
+
+    if (isInjectedTransport(rawInput.transport)) {
+      return true;
+    }
+
+    return SUPPORTED_PROVIDERS.includes(readString$D(rawInput, "provider", "providerId"));
   }
 
   function normalizeToolLoopProviderRequest(rawInput) {
     const provider = readString$D(rawInput, "provider", "providerId");
+
+    if (isInjectedTransport(rawInput && rawInput.transport)) {
+      return normalizeInjectedTransportRequest(rawInput, provider);
+    }
 
     if (!SUPPORTED_PROVIDERS.includes(provider)) {
       throw new Error(`Unsupported provider "${provider || "unknown"}".`);
@@ -60471,8 +64101,13 @@ ${user}:`]
 
   async function requestProviderCompletion(request, overrides) {
     const options = createRequestOptions(request, overrides);
-    const breaker = request && request.circuitBreaker;
     const providerKey = options.provider;
+
+    if (isInjectedTransport(options.transport)) {
+      return options.transport.complete(options);
+    }
+
+    const breaker = request && request.circuitBreaker;
 
     if (breaker && !breaker.canRequest(providerKey)) {
       throw createCircuitOpenError(providerKey, breaker.getState(providerKey));
@@ -60498,8 +64133,13 @@ ${user}:`]
 
   async function requestProviderCompletionStreaming(request, overrides, onToken) {
     const options = createRequestOptions(request, overrides);
-    const breaker = request && request.circuitBreaker;
     const providerKey = options.provider;
+
+    if (isInjectedTransport(options.transport)) {
+      return options.transport.stream(options, onToken);
+    }
+
+    const breaker = request && request.circuitBreaker;
 
     if (breaker && !breaker.canRequest(providerKey)) {
       throw createCircuitOpenError(providerKey, breaker.getState(providerKey));
@@ -60544,10 +64184,67 @@ ${user}:`]
       timeoutMs: readPositiveInteger$b(config.timeoutMs) || request.timeoutMs || null,
       tools: hasOwn(config, "tools") ? config.tools : null,
       toolChoice: hasOwn(config, "toolChoice") ? config.toolChoice : null,
+      geminiThinkingConfig: hasOwn(config, "geminiThinkingConfig")
+        ? readStructuredValue(config.geminiThinkingConfig)
+        : request.geminiThinkingConfig || null,
       reasoningEffort: readOptionalString(config, "reasoningEffort") || request.reasoningEffort || null,
       reasoningSummary: hasOwn(config, "reasoningSummary")
         ? readNullableString(config.reasoningSummary)
-        : request.reasoningSummary || null
+        : request.reasoningSummary || null,
+      transport: isInjectedTransport(request.transport) ? request.transport : null
+    };
+  }
+
+  // Test/observability seam: callers (test helpers, replay tools, evals)
+  // may inject a transport object exposing `complete(options)` and
+  // `stream(options, onToken)`. When present, it bypasses the production
+  // openai/gemini dispatch and the circuit breaker entirely. Not exposed
+  // from src/index.js — only consumed by trusted in-repo callers.
+  function isInjectedTransport(value) {
+    return Boolean(
+      value &&
+      typeof value === "object" &&
+      typeof value.complete === "function" &&
+      typeof value.stream === "function"
+    );
+  }
+
+  function normalizeInjectedTransportRequest(rawInput, providerLabel) {
+    const prompt = readString$D(rawInput, "prompt");
+    if (prompt.length === 0) {
+      throw new Error("Transport-injected provider request requires a non-empty prompt.");
+    }
+
+    const transport = rawInput.transport;
+    const label = providerLabel || (typeof transport.provider === "string" && transport.provider) || "transport";
+
+    return {
+      apiKey: "",
+      apiVariant: "chat",
+      authMode: "client",
+      cachedContentMode: "disabled",
+      conversation: Array.isArray(rawInput.conversation) ? rawInput.conversation : [],
+      contextSnapshot: readStructuredValue(rawInput.contextSnapshot),
+      endpoint: null,
+      fetch: typeof rawInput.fetch === "function" ? rawInput.fetch : null,
+      model: readString$D(rawInput, "model", "modelId") || (typeof transport.model === "string" && transport.model) || "injected-transport",
+      parts: Array.isArray(rawInput.parts) ? rawInput.parts : [],
+      prompt,
+      provider: label,
+      searchProvider: readOptionalString(rawInput, "searchProvider"),
+      sessionContext: readStructuredValue(rawInput.sessionContext),
+      streamEndpoint: null,
+      systemPrompt: readOptionalString(rawInput, "systemPrompt", "system"),
+      transport,
+      geminiThinkingConfig: null,
+      previousResponseId: null,
+      reasoningEffort: null,
+      reasoningSummary: null,
+      responseFormat: null,
+      webSearchApiKey: readOptionalString(rawInput, "webSearchApiKey"),
+      webSearchAuthMode: readOptionalString(rawInput, "webSearchAuthMode"),
+      webSearchEndpoint: readOptionalString(rawInput, "webSearchEndpoint"),
+      webSearchModel: readOptionalString(rawInput, "webSearchModel")
     };
   }
 
@@ -60583,6 +64280,13 @@ ${user}:`]
     if (typeof value !== "string") return null;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  function readStructuredValue(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    return JSON.parse(JSON.stringify(value));
   }
 
   function createCircuitOpenError(providerKey, state) {
@@ -60935,14 +64639,15 @@ ${user}:`]
 
   function selectPlannerActions(actions, options = {}) {
     const source = Array.isArray(actions) ? actions : [];
-    const skillActionSurface = resolveSkillActionSurface(options);
     const terminalRepair = resolveTerminalRepairState(options);
     const actionPatternConvergence = resolveActionPatternConvergence(options);
     const allowedRepairActions = terminalRepair && terminalRepair.active === true
-      ? new Set(readStringArray(terminalRepair.allowedActions))
+      ? new Set(readStringArray$1(terminalRepair.allowedActions))
       : null;
     const repeatedActionName = resolveRepeatedNoProgressActionName(actionPatternConvergence);
     const readOnlyPlanningForbiddenActions = resolveReadOnlyPlanningForbiddenActions(actionPatternConvergence);
+    const structureRepairForbiddenActions = resolveStructureRepairForbiddenActions(actionPatternConvergence);
+    const workspaceMutationGrowthForbiddenActions = resolveWorkspaceMutationGrowthForbiddenActions(actionPatternConvergence);
 
     return source.filter((action) => {
       const name = readString$A(action && action.name);
@@ -60950,24 +64655,26 @@ ${user}:`]
         return false;
       }
 
-      if (allowedRepairActions && !allowedRepairActions.has(name)) {
+      // Hard-veto convergence signals override everything, including the repair allowlist.
+      // These only return non-null when escalation === "hard_veto", so advisory signals still
+      // defer to the repair allowlist below.
+      if (
+        readOnlyPlanningForbiddenActions &&
+        readOnlyPlanningForbiddenActions.has(name) &&
+        !isPublishProtocolRequiredActionForRepair(terminalRepair, name)
+      ) return false;
+      if (workspaceMutationGrowthForbiddenActions && workspaceMutationGrowthForbiddenActions.has(name)) return false;
+
+      if (allowedRepairActions) {
+        return allowedRepairActions.has(name);
+      }
+
+      if (repeatedActionName && name === repeatedActionName) {
         return false;
       }
 
-      if (allowedRepairActions && repeatedActionName && name === repeatedActionName) {
+      if (structureRepairForbiddenActions && structureRepairForbiddenActions.has(name)) {
         return false;
-      }
-
-      if (readOnlyPlanningForbiddenActions && readOnlyPlanningForbiddenActions.has(name)) {
-        return false;
-      }
-
-      if (SKILL_SETUP_ACTION_NAMES.has(name)) {
-        return skillActionSurface === "full";
-      }
-
-      if (name === DIRECT_TOOL_ACTION_NAME) {
-        return skillActionSurface === "full";
       }
 
       return true;
@@ -60979,22 +64686,6 @@ ${user}:`]
       const name = readString$A(action && action.name);
       return SKILL_ACTION_NAMES.has(name);
     });
-  }
-
-  function resolveSkillActionSurface(options) {
-    if (hasNamedSkill(options.activeAgentSkill) || hasNamedSkill(options.lastReadAgentSkill)) {
-      return "full";
-    }
-
-    if (isExplicitSkillRequest(options.prompt, options.availableAgentSkills)) {
-      return "full";
-    }
-
-    if (matchesComplexSkillIntent(options.prompt, options.availableAgentSkills)) {
-      return "full";
-    }
-
-    return "full";
   }
 
   function resolveTerminalRepairState(options) {
@@ -61042,97 +64733,35 @@ ${user}:`]
       ? value.readOnlyPlanningState
       : null;
     if (!state || state.active !== true) return null;
-    const forbiddenActions = readStringArray(state.forbiddenActions);
+    if (readString$A(state.escalation) !== "hard_veto") return null;
+    const forbiddenActions = readStringArray$1(state.forbiddenActions);
     return forbiddenActions.length > 0 ? new Set(forbiddenActions) : null;
   }
 
-  function isExplicitSkillRequest(prompt, availableAgentSkills) {
-    const text = readString$A(prompt).toLowerCase();
-    if (!text) {
-      return false;
-    }
-
-    if (/\b(agent skill|agent skills|skill|skills)\b/.test(text)) {
-      return true;
-    }
-
-    return (Array.isArray(availableAgentSkills) ? availableAgentSkills : []).some((skill) => {
-      const name = readString$A(skill && skill.name).toLowerCase();
-      return Boolean(name) && text.includes(name);
-    });
+  function resolveStructureRepairForbiddenActions(value) {
+    const state = value && value.structureRepairConvergence && typeof value.structureRepairConvergence === "object"
+      ? value.structureRepairConvergence
+      : null;
+    if (!state || state.active !== true) return null;
+    const forbiddenActions = readStringArray$1(state.forbiddenActions);
+    return forbiddenActions.length > 0 ? new Set(forbiddenActions) : null;
   }
 
-  function hasNamedSkill(skill) {
-    return Boolean(readString$A(skill && skill.name));
-  }
-
-  function matchesComplexSkillIntent(prompt, availableAgentSkills) {
-    const promptTokens = tokenizeIntent(prompt);
-    if (promptTokens.length === 0) {
-      return false;
-    }
-
-    return (Array.isArray(availableAgentSkills) ? availableAgentSkills : []).some((skill) => {
-      const haystack = [
-        readString$A(skill && skill.name),
-        readString$A(skill && skill.description),
-        ...(Array.isArray(skill && skill.tools)
-          ? skill.tools.flatMap((tool) => [readString$A(tool && tool.name), readString$A(tool && tool.description)])
-          : [])
-      ].join(" ");
-      const overlapCount = tokenizeIntent(haystack)
-        .filter((token) => promptTokens.includes(token))
-        .length;
-      return overlapCount >= 2;
-    });
-  }
-
-  function tokenizeIntent(value) {
-    const text = readString$A(value).toLowerCase();
-    if (!text) {
-      return [];
-    }
-
-    const stopwords = new Set([
-      "a",
-      "an",
-      "and",
-      "agent",
-      "for",
-      "from",
-      "get",
-      "in",
-      "is",
-      "it",
-      "js",
-      "local",
-      "now",
-      "of",
-      "on",
-      "or",
-      "requested",
-      "return",
-      "the",
-      "this",
-      "time",
-      "to",
-      "using",
-      "with"
-    ]);
-
-    return Array.from(new Set(
-      text
-        .split(/[^a-z0-9_+-]+/i)
-        .map((token) => token.trim())
-        .filter((token) => token.length >= 3 && !stopwords.has(token))
-    ));
+  function resolveWorkspaceMutationGrowthForbiddenActions(value) {
+    const state = value && value.workspaceMutationGrowthConvergence && typeof value.workspaceMutationGrowthConvergence === "object"
+      ? value.workspaceMutationGrowthConvergence
+      : null;
+    if (!state || state.active !== true) return null;
+    if (readString$A(state.escalation) !== "hard_veto") return null;
+    const forbiddenActions = readStringArray$1(state.forbiddenActions);
+    return forbiddenActions.length > 0 ? new Set(forbiddenActions) : null;
   }
 
   function readString$A(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readStringArray(value) {
+  function readStringArray$1(value) {
     return Array.isArray(value) ? value.map(readString$A).filter(Boolean) : [];
   }
 
@@ -61351,10 +64980,7 @@ ${user}:`]
   });
 
   function resolvePlannerMode({
-    actions,
-    configuredMode,
-    model,
-    provider
+    configuredMode
   } = {}) {
     const normalizedConfiguredMode = normalizeConfiguredPlannerMode(configuredMode);
     if (normalizedConfiguredMode !== "auto") {
@@ -61365,24 +64991,10 @@ ${user}:`]
       });
     }
 
-    const providerId = readProviderId(provider);
-    const modelId = readModelId(model);
-    if (
-      providerId === "gemini" &&
-      isGeminiLiteModel(modelId) &&
-      hasComplexNativePlanSurface(actions)
-    ) {
-      return Object.freeze({
-        configuredMode: "auto",
-        effectiveMode: "envelope",
-        reason: "gemini_lite_complex_native_plan_surface"
-      });
-    }
-
     return Object.freeze({
       configuredMode: "auto",
-      effectiveMode: "native_tools",
-      reason: providerId ? "provider_default_native_tools" : "default_native_tools"
+      effectiveMode: "envelope",
+      reason: "default_envelope"
     });
   }
 
@@ -61392,39 +65004,43 @@ ${user}:`]
       : DEFAULT_PLANNER_CAPABILITIES;
   }
 
+  // ADR-0033 Tier A — lite-tier model detection for compact-prompt policy.
+  // Name-string heuristic with explicit `modelTier` config override.
+  // Hosts can pass `request.modelTier: "lite"|"capable"` to force a tier when
+  // the heuristic is wrong (e.g. a future "*-mini" model that is actually
+  // capable, or a non-marker model that the host wants to treat as lite).
+  const LITE_TIER_MARKERS = Object.freeze([
+    "flash-lite",
+    "flash",
+    "mini",
+    "haiku",
+    "nano"
+  ]);
+
+  // Word-boundary regex prevents false positives like "mini" matching inside
+  // "gemini-3-pro-preview". `\b` treats `-`, `.`, ` ` and start/end of string
+  // as boundaries while keeping inner-segment markers (e.g. "haiku" in
+  // "claude-3-5-haiku-20241022") detectable.
+  const LITE_TIER_PATTERN = new RegExp(
+    `\\b(?:${LITE_TIER_MARKERS.join("|")})\\b`,
+    "i"
+  );
+
+  function isLiteTierModel(model, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const tierOverride = readModelTierOverride(opts.modelTier);
+    if (tierOverride === "lite") return true;
+    if (tierOverride === "capable") return false;
+    const id = readModelId(model);
+    if (!id) return false;
+    return LITE_TIER_PATTERN.test(id);
+  }
+
   function normalizeConfiguredPlannerMode(value) {
     if (value === "native_tools" || value === "envelope") {
       return value;
     }
     return "auto";
-  }
-
-  function hasComplexNativePlanSurface(actions) {
-    return (Array.isArray(actions) ? actions : []).some((action) => {
-      if (!action || typeof action !== "object") return false;
-      if (readString$y(action.name) === "execute_skill_tool") return true;
-      const schema = action.planner && typeof action.planner === "object"
-        ? action.planner.argsSchema
-        : null;
-      return hasNestedObjectSchema(schema);
-    });
-  }
-
-  function hasNestedObjectSchema(schema, depth = 0) {
-    if (!schema || typeof schema !== "object") return false;
-    const type = readString$y(schema.type).toLowerCase();
-    if (depth > 0 && (type === "object" || type === "array")) return true;
-    if (schema.properties && typeof schema.properties === "object") {
-      return Object.values(schema.properties).some((child) => hasNestedObjectSchema(child, depth + 1));
-    }
-    if (schema.items && typeof schema.items === "object") {
-      return hasNestedObjectSchema(schema.items, depth + 1);
-    }
-    return false;
-  }
-
-  function isGeminiLiteModel(model) {
-    return /\blite\b/i.test(model) || /flash-lite/i.test(model);
   }
 
   function readProviderId(value) {
@@ -61435,8 +65051,10 @@ ${user}:`]
     return typeof value === "string" ? value.trim().toLowerCase() : "";
   }
 
-  function readString$y(value) {
-    return typeof value === "string" ? value.trim() : "";
+  function readModelTierOverride(value) {
+    const tier = typeof value === "string" ? value.trim().toLowerCase() : "";
+    if (tier === "lite" || tier === "capable") return tier;
+    return "";
   }
 
   function buildEnvelopeLines(availableActions, options) {
@@ -61565,7 +65183,7 @@ ${user}:`]
     const entries = actionDefinitions
       .filter((action) => action && action.decisionType !== "clarify")
       .map((action) => {
-        const name = readString$x(action.name);
+        const name = readString$y(action.name);
         if (!name) return null;
         return `${name} args=${JSON.stringify(action.argsExample || {})}`;
       })
@@ -61601,36 +65219,35 @@ ${user}:`]
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
     if (quality.finalCandidateReady === true) return true;
     return Object.values(workspace.files || {}).some((file) => (
-      readString$x(file && file.content).length > 0
+      readString$y(file && file.content).length > 0
     ));
   }
 
   function readEnvelopeModeSelection(actionDefinitions, opts) {
-    const effectivePlannerMode = readString$x(opts.effectivePlannerMode);
+    const effectivePlannerMode = readString$y(opts.effectivePlannerMode);
     if (effectivePlannerMode === "native_tools" || effectivePlannerMode === "envelope") {
       return Object.freeze({
-        configuredMode: readString$x(opts.plannerMode) || "auto",
+        configuredMode: readString$y(opts.plannerMode) || "auto",
         effectiveMode: effectivePlannerMode,
-        reason: readString$x(opts.plannerModeReason) || "caller_effective_mode"
+        reason: readString$y(opts.plannerModeReason) || "caller_effective_mode"
       });
     }
 
     const request = opts.request && typeof opts.request === "object" ? opts.request : {};
     return resolvePlannerMode({
-      actions: actionDefinitions,
       configuredMode: opts.plannerMode,
       model: request.model,
       provider: request.provider
     });
   }
 
-  function readString$x(value) {
+  function readString$y(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function toSkillCatalogCompact(skill) {
     if (!skill || typeof skill !== "object") return null;
-    const name = readString$w(skill.name);
+    const name = readString$x(skill.name);
     if (!name) return null;
     const tools = Array.isArray(skill.tools) ? skill.tools : [];
     const toolArgHints = tools
@@ -61638,28 +65255,28 @@ ${user}:`]
       .filter(Boolean);
     return {
       name,
-      description: readString$w(skill.description),
+      description: readString$x(skill.description),
       toolCount: tools.length,
       ...(toolArgHints.length > 0 ? { toolArgHints } : {}),
       toolNames: tools
-        .map((t) => readString$w(t && t.name))
+        .map((t) => readString$x(t && t.name))
         .filter(Boolean)
     };
   }
 
   function toSkillCatalogSummary(skill) {
     if (!skill || typeof skill !== "object") return null;
-    const name = readString$w(skill.name);
+    const name = readString$x(skill.name);
     if (!name) return null;
     return {
       name,
-      description: readString$w(skill.description),
+      description: readString$x(skill.description),
       tools: Array.isArray(skill.tools)
         ? skill.tools
             .map((t) => {
-              const toolName = readString$w(t && t.name);
+              const toolName = readString$x(t && t.name);
               if (!toolName) return null;
-              const entry = { name: toolName, description: readString$w(t.description) };
+              const entry = { name: toolName, description: readString$x(t.description) };
               const argHint = toCompactArgHint(t && t.parameters);
               if (argHint) {
                 entry.args = argHint.args;
@@ -61679,14 +65296,14 @@ ${user}:`]
       return null;
     }
 
-    const name = readString$w(skill.name);
+    const name = readString$x(skill.name);
     if (!name) {
       return null;
     }
 
     const includeInstructions = Boolean(options && options.includeInstructions);
     const value = {
-      description: readString$w(skill.description),
+      description: readString$x(skill.description),
       name,
       tools: Array.isArray(skill.tools)
         ? skill.tools.map(createToolPromptValue).filter(Boolean)
@@ -61694,7 +65311,7 @@ ${user}:`]
     };
 
     if (includeInstructions) {
-      const body = readString$w(skill.instructions);
+      const body = readString$x(skill.instructions);
       if (body) {
         value.instructions = body;
       }
@@ -61733,12 +65350,12 @@ ${user}:`]
     return `${text.slice(0, maxChars - 3)}...`;
   }
 
-  function readString$w(value) {
+  function readString$x(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function toEnumBearingToolArgHint(tool) {
-    const name = readString$w(tool && tool.name);
+    const name = readString$x(tool && tool.name);
     if (!name || !hasSchemaEnum(tool && tool.parameters)) {
       return null;
     }
@@ -61783,7 +65400,7 @@ ${user}:`]
   }
 
   function describePromptProperty(prop) {
-    const type = readString$w(prop && prop.type) || "string";
+    const type = readString$x(prop && prop.type) || "string";
     if (type === "object" && prop && prop.properties && typeof prop.properties === "object" && !Array.isArray(prop.properties)) {
       const nested = Object.entries(prop.properties)
         .map(([key, value]) => `${key}:${describePromptProperty(value)}`);
@@ -61820,13 +65437,13 @@ ${user}:`]
       return null;
     }
 
-    const name = readString$w(tool.name);
+    const name = readString$x(tool.name);
     if (!name) {
       return null;
     }
 
     return {
-      description: readString$w(tool.description),
+      description: readString$x(tool.description),
       name,
       parameters: clonePromptParameters(tool.parameters)
     };
@@ -61849,8 +65466,8 @@ ${user}:`]
       properties: Object.fromEntries(
         Object.entries(properties).map(([key, value]) => {
           const prop = {
-            description: readString$w(value && value.description),
-            type: readString$w(value && value.type)
+            description: readString$x(value && value.description),
+            type: readString$x(value && value.type)
           };
           copySchemaEnum(prop, value);
           if (value && value.properties && typeof value.properties === "object" && !Array.isArray(value.properties)) {
@@ -61858,8 +65475,8 @@ ${user}:`]
               Object.entries(value.properties).map(([nk, nv]) => [
                 nk,
                 copySchemaEnum({
-                  description: readString$w(nv && nv.description),
-                  type: readString$w(nv && nv.type)
+                  description: readString$x(nv && nv.description),
+                  type: readString$x(nv && nv.type)
                 }, nv)
               ])
             );
@@ -61870,7 +65487,7 @@ ${user}:`]
       required: Array.isArray(parameters.required)
         ? parameters.required.filter((value) => typeof value === "string" && value.trim())
         : [],
-      type: readString$w(parameters.type) || "object"
+      type: readString$x(parameters.type) || "object"
     };
   }
 
@@ -61887,19 +65504,19 @@ ${user}:`]
       : null;
     const summary = {
       kind: "plan_validation_feedback",
-      actionName: readString$v(observation.actionName) || "plan",
-      error: readString$v(output.error),
+      actionName: readString$w(observation.actionName) || "plan",
+      error: readString$w(output.error),
       stage: "validation"
     };
     if (feedback) {
-      summary.code = readString$v(feedback.code);
-      summary.detail = readString$v(feedback.detail);
+      summary.code = readString$w(feedback.code);
+      summary.detail = readString$w(feedback.detail);
     }
     summary.contract = "type:\"plan\" actions must be independent non-mutating actions whose policy is allow. State-mutating or approval-gated actions need their own standalone type:\"action\" envelope.";
     return summary;
   }
 
-  function readString$v(value) {
+  function readString$w(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -61910,11 +65527,11 @@ ${user}:`]
       : null;
     const opts = options && typeof options === "object" ? options : {};
     return {
-      actionName: readString$w(value.actionName) || null,
-      kind: readString$w(value.kind) || null,
-      message: readString$w(value.message) || null,
+      actionName: readString$x(value.actionName) || null,
+      kind: readString$x(value.kind) || null,
+      message: readString$x(value.message) || null,
       output: summarizeObservationOutputForPrompt(output, opts),
-      source: readString$w(value.source) || null
+      source: readString$x(value.source) || null
     };
   }
 
@@ -61928,7 +65545,7 @@ ${user}:`]
     const snippetChars = readPositiveInteger$a(opts.snippetChars) || 360;
     return {
       count: source.length,
-      lastQuery: readString$w(context.lastQuery) || null,
+      lastQuery: readString$x(context.lastQuery) || null,
       results: source.slice(0, maxResults).map((item, index) => summarizeSearchResult(item, index, snippetChars)).filter(Boolean),
       omitted: Math.max(0, source.length - maxResults)
     };
@@ -61937,36 +65554,55 @@ ${user}:`]
   function summarizeObservationOutputForPrompt(output, options = {}) {
     if (!output) return null;
     const opts = options && typeof options === "object" ? options : {};
-    const kind = readString$w(output.kind);
+    const kind = readString$x(output.kind);
     if (kind === "web_search_result") {
       return {
         count: readNumber$4(output.count),
         items: summarizeSearchResults(output.items, { lastQuery: output.lastExecutedQuery || output.query }, opts.searchResults).results,
         kind,
-        lastExecutedQuery: readString$w(output.lastExecutedQuery) || null,
-        originalQuery: readString$w(output.originalQuery) || null,
-        provider: readString$w(output.provider) || null,
-        query: readString$w(output.query) || null,
+        lastExecutedQuery: readString$x(output.lastExecutedQuery) || null,
+        originalQuery: readString$x(output.originalQuery) || null,
+        provider: readString$x(output.provider) || null,
+        query: readString$x(output.query) || null,
         searchPasses: summarizeSearchPasses(output.searchPasses),
         status: output.status == null ? null : String(output.status),
         verification: summarizeSearchVerification(output.verification)
       };
     }
-    if (kind === "read_url_result" || readString$w(output.url)) {
+    if (kind === "read_url_result" || readString$x(output.url)) {
       const readUrlPreviewChars = readPositiveInteger$a(opts.readUrlPreviewChars) || 1200;
       return {
-        error: readString$w(output.error) || null,
+        error: readString$x(output.error) || null,
         kind: kind || "read_url_result",
-        message: readString$w(output.message) || null,
+        message: readString$x(output.message) || null,
         ok: output.ok !== false,
-        reason: readString$w(output.reason) || null,
+        reason: readString$x(output.reason) || null,
         recovery: summarizeReadUrlRecovery(output.recovery),
         status: typeof output.status === "number" ? output.status : null,
-        textPreview: serializePromptValue$2(readString$w(output.text) || readString$w(output.content), readUrlPreviewChars),
-        title: truncateForPrompt(readString$w(output.title), 180),
+        textPreview: serializePromptValue$2(readString$x(output.text) || readString$x(output.content), readUrlPreviewChars),
+        title: truncateForPrompt(readString$x(output.title), 180),
         truncated: output.truncated === true,
-        url: readString$w(output.url) || null
+        url: readString$x(output.url) || null
       };
+    }
+    if (kind === "virtual_workspace_read") {
+      const wsReadPreviewChars = readPositiveInteger$a(opts.workspaceReadPreviewChars) || 2000;
+      const file = output.file && typeof output.file === "object" ? output.file : {};
+      const content = typeof file.content === "string" ? file.content : "";
+      return {
+        kind,
+        file: {
+          path: readString$x(file.path) || null,
+          textStats: file.textStats || null,
+          content: content.length > wsReadPreviewChars
+            ? `${content.slice(0, wsReadPreviewChars)}…[truncated, ${content.length - wsReadPreviewChars} more chars]`
+            : content
+        },
+        lengthProgress: output.lengthProgress || null
+      };
+    }
+    if (WORKSPACE_MUTATION_KINDS.has(kind)) {
+      return summarizeWorkspaceMutationForPrompt(output, kind);
     }
     return summarizeGenericOutputForPrompt(output, opts);
   }
@@ -61974,12 +65610,12 @@ ${user}:`]
   function summarizeReadUrlRecovery(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     const options = Array.isArray(value.nextActionOptions)
-      ? value.nextActionOptions.map(readString$w).filter(Boolean).slice(0, 4)
+      ? value.nextActionOptions.map(readString$x).filter(Boolean).slice(0, 4)
       : [];
     return {
-      kind: readString$w(value.kind) || "read_url_recovery",
+      kind: readString$x(value.kind) || "read_url_recovery",
       nextActionOptions: options,
-      reason: readString$w(value.reason) || null,
+      reason: readString$x(value.reason) || null,
       retryable: value.retryable === true,
       status: typeof value.status === "number" ? value.status : null
     };
@@ -61987,12 +65623,12 @@ ${user}:`]
 
   function summarizeSearchResult(item, index, snippetChars) {
     if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-    const url = readString$w(item.url);
-    const title = readString$w(item.title) || (url ? `Result ${index + 1}` : "");
-    const snippet = readString$w(item.snippet) || readString$w(item.content) || readString$w(item.description);
+    const url = readString$x(item.url);
+    const title = readString$x(item.title) || (url ? `Result ${index + 1}` : "");
+    const snippet = readString$x(item.snippet) || readString$x(item.content) || readString$x(item.description);
     if (!title && !url && !snippet) return null;
     return {
-      domain: readString$w(item.domain) || null,
+      domain: readString$x(item.domain) || null,
       rank: typeof item.rank === "number" ? item.rank : index + 1,
       score: readNumber$4(item.sourceScore) || readNumber$4(item.score) || null,
       snippet: truncateForPrompt(snippet, snippetChars),
@@ -62007,10 +65643,10 @@ ${user}:`]
       if (!pass || typeof pass !== "object" || Array.isArray(pass)) return null;
       return {
         count: readNumber$4(pass.count),
-        error: readString$w(pass.error) || null,
-        kind: readString$w(pass.kind) || null,
-        provider: readString$w(pass.provider) || null,
-        query: readString$w(pass.query) || null,
+        error: readString$x(pass.error) || null,
+        kind: readString$x(pass.kind) || null,
+        provider: readString$x(pass.provider) || null,
+        query: readString$x(pass.query) || null,
         status: pass.status == null ? null : String(pass.status)
       };
     }).filter(Boolean);
@@ -62019,9 +65655,54 @@ ${user}:`]
   function summarizeSearchVerification(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     return {
-      state: readString$w(value.state) || null,
-      reason: readString$w(value.reason) || null
+      state: readString$x(value.state) || null,
+      reason: readString$x(value.reason) || null
     };
+  }
+
+  const WORKSPACE_MUTATION_KINDS = new Set([
+    "virtual_workspace_write",
+    "virtual_workspace_append",
+    "virtual_workspace_replace",
+    "virtual_workspace_insert_after_section"
+  ]);
+
+  function summarizeWorkspaceMutationForPrompt(output, kind) {
+    const file = output.file && typeof output.file === "object" ? output.file : {};
+    const quality = output.quality && typeof output.quality === "object" ? output.quality : null;
+    const mutStats = output.mutationStats && typeof output.mutationStats === "object" ? output.mutationStats : null;
+    const result = {
+      kind,
+      file: {
+        path: readString$x(file.path) || null,
+        textStats: file.textStats || null
+      },
+      lengthProgress: output.lengthProgress || null,
+      quality: quality ? {
+        finalCandidateReady: quality.finalCandidateReady === true,
+        status: readString$x(quality.status) || null
+      } : null,
+      mutationStats: mutStats ? {
+        delta: mutStats.delta || null,
+        addedTextStats: mutStats.addedTextStats || null
+      } : null
+    };
+    if (output.changed !== undefined) result.changed = output.changed;
+    if (typeof output.matchCount === "number") result.matchCount = output.matchCount;
+    const status = readString$x(output.status);
+    if (status) result.status = status;
+    const suggestion = readString$x(output.suggestion);
+    if (suggestion) result.suggestion = suggestion;
+    const error = readString$x(output.error);
+    if (error) result.error = error;
+    const heading = readString$x(output.heading);
+    if (heading) result.heading = heading;
+    if (Array.isArray(output.availableHeadings) && output.availableHeadings.length > 0) {
+      result.availableHeadings = output.availableHeadings.slice(0, 8).map((h) => (
+        h && typeof h === "object" ? { text: readString$x(h.text), level: h.level } : null
+      )).filter(Boolean);
+    }
+    return result;
   }
 
   function summarizeGenericOutputForPrompt(output, options = {}) {
@@ -62038,7 +65719,7 @@ ${user}:`]
   }
 
   function truncateForPrompt(value, maxChars) {
-    const text = readString$w(value);
+    const text = readString$x(value);
     if (!text) return "";
     if (text.length <= maxChars) return text;
     return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
@@ -62069,12 +65750,16 @@ ${user}:`]
     "If loopState.requirementRecoveryEvaluator.validLimitedAllowed=false, do not publish limited yet unless you first perform the required recovery attempt or can name a concrete unrecoverable blocker; use its allowed next moves for evidence/workspace recovery.",
     "If loopState.requirementRecoveryEvaluator.convergence.repeatedInvalidTerminalCount>=2, do not repeat the same workspace_publish_candidate/finalize payload. If validLimitedAllowed=false, perform recovery work first. If validLimitedAllowed=true, publish only with a corrected valid limited finalReadiness matching the observed deficits and concrete remainingGaps.",
     "If loopState.actionPatternConvergence.convergenceSignal forbids repeat_same_action_args, do not call the same action with the same args again; change arguments, choose a different recovery action, or publish valid limited with concrete remainingGaps if recovery is exhausted.",
+    "If loopState.actionPatternConvergence.convergenceSignal.patternKind=repeated_action_throw or errorRepeatCount>=2, the same action+args has thrown repeatedly during execution. Action errors are AI-observable observations (ADR-0013), so the run continues — but do NOT retry the same args. Run workspace_read to refresh state, pick different arguments, choose a different action, or publish workspace_publish_candidate with decision=limited and concrete remainingGaps naming the blocker.",
     "If loopState.actionPatternConvergence.convergenceSignal forbids repeat_same_terminal_intent, do not repeat workspace_publish_candidate/finalize with the same terminal intent; do evidence/workspace recovery or publish a valid limited result with concrete remainingGaps.",
     "If loopState.actionPatternConvergence.terminalCorrectionState.active=true, the publish/finalize no-progress correction is sticky: do not repeat workspace_publish_candidate/finalize again until observable source/workspace/TodoState progress changes. Use the listed allowedNextMoves such as todo_advance/todo_run_next/todo_cancel, evidence/workspace recovery, or publish valid limited with concrete remainingGaps matching observed deficits.",
     "If loopState.actionPatternConvergence.terminalRetryCooldown.active=true, clean ready, direct finalize, and plain workspace_publish_candidate are cooling down; choose recovery work, TodoState sync, or only a valid limited workspace_publish_candidate with non-empty remainingGaps and false flags for failed dimensions.",
-    "If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, do not choose more web_search, todo_plan, todo_inspect, workspace_list, workspace_read, or skill-setup planning loops. Create productive progress instead: read_url a candidate source, mutate the workspace meaningfully, sync TodoState with todo_advance/todo_run_next, or publish only valid limited with concrete remainingGaps. The escalation field shows how strict this is: 'advisory' = AI choice with rising ignoredCount; 'hard_veto' = the harness will refuse listed forbiddenActions on preflight. Treat ignoredCount as a serious warning — once it reaches 3 the runtime starts blocking forbidden actions and your only valid moves are the listed allowedNextMoves.",
+    "If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, do not choose more web_search, todo_plan, todo_inspect, workspace_list, workspace_read, execute_skill_tool, or skill-setup planning loops. Create productive progress instead: read_url a candidate source, mutate the workspace meaningfully, sync TodoState with todo_advance/todo_run_next, or publish only valid limited with concrete remainingGaps. The escalation field shows how strict this is: 'advisory' = AI choice with rising ignoredCount; 'hard_veto' = the harness will refuse listed forbiddenActions on preflight. Treat ignoredCount as a serious warning — once it reaches 3 the runtime starts blocking forbidden actions and your only valid moves are the listed allowedNextMoves.",
+    "If loopState.actionPatternConvergence.structureRepairConvergence.active=true, the final candidate structure audit is not improving. Do not keep workspace_read/workspace_list/append/insert loops around the same broken outline. Use workspace_propose_patch then workspace_apply_patch for risky repairs when available, or a targeted workspace_write/workspace_replace full-outline repair that removes duplicate heading/section-number samples, then workspace_finalize_candidate, or publish valid limited with concrete structure remainingGaps. The escalation field shows enforcement: 'advisory'=AI choice with rising repeatedStructureNoProgressCount; 'hard_veto'=the harness will HARD BLOCK workspace_read/workspace_list/append/insert on preflight — once repeatedStructureNoProgressCount>=3 your ONLY valid moves are workspace_write/workspace_replace (full dedup rewrite), patch preview/apply when surfaced, or workspace_publish_candidate with decision=limited and concrete structure remainingGaps.",
+    "If source and length are satisfied but terminal repair still shows structure plus todo deficits, do not append, insert, write, replace, search, or read for churn. Use the listed patch action to repair headings/section numbers, and use todo_advance/todo_run_next/todo_cancel to make TodoState match the work already completed before publishing.",
+    "If workspace_propose_patch and workspace_apply_patch are available during long-report repair, use two steps: first propose the patch and inspect deltaWords/riskFlags/status; then apply only when status=preview_ready, deltaWords is positive or structure improved, and riskFlags has no no_growth/not_found/ambiguous/structure_maybe_worse. Valid patch operation shapes are append{content}, insert_after_section{heading,content}, replace{find,replace,replace_all?}, and normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first with duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context line numbers to fix duplicate headings/section numbers. If length is already satisfied and the visible issue is duplicate heading/section-number context, send exactly one normalize_headings operation; do not mix it with replace unless exact current find text is visible and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not use replace{content}; replace requires exact current find text plus replacement. If preview has no_growth or not_found, revise the patch or use workspace_append/workspace_insert_after_section only when those actions are currently allowed; do not finalize.",
     "If loopState.actionPatternConvergence.latestCorrectionSignal.status=escalated or terminalCorrectionState.ignoredTerminalCorrectionCount>=2, your next decision must be recovery work, TodoState sync, or a valid limited workspace_publish_candidate; clean ready and plain publish/finalize retry are invalid.",
-    "If loopState.terminalRepairState.active=true, terminal repair mode is active: do not use final/finalize/final_answer or plain workspace_publish_candidate. Choose one listed allowedAction that creates observable recovery, or call workspace_publish_candidate only with the valid limited contract shown there.",
+    "If loopState.terminalRepairState.active=true, terminal repair mode is active: do not use final/finalize/final_answer or plain workspace_publish_candidate. Choose one listed allowedAction that creates observable recovery, or call workspace_publish_candidate only with the valid limited contract shown there. The escalation field shows enforcement: 'advisory'=AI choice with rising ignoredCount; 'hard_veto'=the harness will HARD BLOCK finalize/final_answer on preflight — this fires when ignoredCount>=3 AND budget exhausted, OR when ignoredCount>=6 regardless of budget. When escalation=hard_veto your ONLY valid move is workspace_publish_candidate with decision=limited and concrete remainingGaps.",
     "If loopState.readUrlRecoverySignal.status is needs_alternate_source or source_blocked, do not retry the same non-retryable failed URL; read an alternate candidate, run refined web_search, or publish limited with evidenceSatisfied=false and concrete remainingGaps if evidence is exhausted.",
     "Actions marked standalone-only by action metadata must be emitted as standalone type:\"action\" envelopes, not inside type:\"plan\".",
     "When you choose finalize, the instruction must end the turn and must not ask the user a follow-up question.",
@@ -62106,12 +65791,16 @@ ${user}:`]
     "If loopState.requirementRecoveryEvaluator says validLimitedAllowed=false, continue the listed recovery work before publishing limited.",
     "If loopState.requirementRecoveryEvaluator.convergence shows repeated terminal attempts without progress, stop repeating the same publish/finalize payload; perform recovery work or correct finalReadiness to a valid limited contract.",
     "If loopState.actionPatternConvergence shows repeated_no_progress, do not repeat the same action+args. Change args, choose a different action, continue recovery, or publish a valid limited result with concrete remainingGaps.",
+    "If loopState.actionPatternConvergence.convergenceSignal.patternKind=repeated_action_throw, the same action+args has thrown repeatedly. Action errors are observations (ADR-0013); the run continues. Pick different args, choose a different currently allowed action, or publish valid limited with remainingGaps.",
     "If loopState.actionPatternConvergence shows patternKind=semantic_terminal, stop repeating the same publish/finalize intent; observable facts must change or the limited readiness contract must be valid.",
     "If loopState.actionPatternConvergence.terminalCorrectionState.active=true, stop terminal retry loops; perform evidence/workspace/TodoState recovery from allowedNextMoves or publish valid limited with concrete remainingGaps.",
     "If loopState.actionPatternConvergence.terminalRetryCooldown.active=true, do not clean ready, direct finalize, or plain publish; recover first or publish valid limited only.",
-    "If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, stop search/plan/read-only loops and choose productive evidence or workspace recovery. escalation=hard_veto means the runtime preflight will reject forbiddenActions; once ignoredCount>=3 only allowedNextMoves are valid.",
+    "If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, stop search/plan/skill-tool/read-only loops and choose productive evidence or workspace recovery. escalation=hard_veto means the runtime preflight will reject forbiddenActions; once ignoredCount>=3 only allowedNextMoves are valid.",
+    "If loopState.actionPatternConvergence.structureRepairConvergence.active=true, stop broad structure repair loops. In hard_veto terminal repair, choose only terminalRepairState.allowedActions; if repair cannot continue, call workspace_publish_candidate with decision=limited and concrete structure remainingGaps. Outside hard_veto terminal repair, prefer workspace_propose_patch/workspace_apply_patch when surfaced, or use workspace_write/workspace_replace to rewrite one coherent outline with unique headings/section numbers, then finalize/publish, or valid limited with structure gaps.",
+    "If source and length are satisfied but structure+todo deficits remain, use the listed patch action for heading/section-number repair and sync TodoState with todo_advance/todo_run_next/todo_cancel; do not append/insert/write/replace/search/read unless the current allowedActions explicitly require it.",
+    "Patch repair rule: call workspace_propose_patch first, inspect deltaWords/riskFlags/status, then workspace_apply_patch only for preview_ready with positive deltaWords or improved structure and no blocking riskFlags. Patch shapes: append{content}, insert_after_section{heading,content}, replace{find,replace,replace_all?}, normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate heading/section-number repair using duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context line numbers. If length is already satisfied and duplicate heading/section-number context is the visible issue, send exactly one normalize_headings operation; do not mix it with replace unless exact current find text is visible and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Never use replace{content}. If no_growth/not_found appears, revise the patch or use append/insert only when those actions are currently allowed; do not finalize.",
     "If loopState.actionPatternConvergence.latestCorrectionSignal.status=escalated or terminalCorrectionState.ignoredTerminalCorrectionCount>=2, do not clean ready and do not retry plain publish/finalize; recover first or publish valid limited only.",
-    "If loopState.terminalRepairState.active=true, terminal repair mode filters the next action surface. Use an allowed recovery action or valid limited publish only; direct final/finalize is invalid.",
+    "If loopState.terminalRepairState.active=true, terminal repair mode filters the next action surface. Use only terminalRepairState.allowedActions. If escalation=hard_veto and workspace_publish_candidate is in allowedActions, publish limited now with the focused block's requiredArgsExample; direct final/finalize is invalid.",
     "If the user explicitly asks the visible answer to include finalReadiness.decision, your finalize.finalReadiness.decision and finalize.instruction must match, and the instruction should include one plain-text line like `finalReadiness.decision: ready` or `finalReadiness.decision: limited`.",
     "Return JSON only."
   ];
@@ -62131,15 +65820,6 @@ ${user}:`]
         : "",
       opts.request && opts.request.prompt
     );
-    // AGRUN-212a Phase E — windowed TodoState block. Built by
-    // `buildTodoStateBlockForCycle`; bounded at active item ±2 so prompt
-    // size does not grow with plan length. Empty when no plan exists.
-    const todoStateBlock = compactDuplicateTodoStateBlock(
-      typeof opts.todoStateBlock === "string"
-        ? opts.todoStateBlock.trim()
-        : "",
-      opts.request && opts.request.prompt
-    );
     const extraDirectives = Array.isArray(opts.plannerDirectives)
       ? opts.plannerDirectives.filter((line) => typeof line === "string" && line.trim())
       : [];
@@ -62148,7 +65828,6 @@ ${user}:`]
     return [
       ...(roleBlock ? [roleBlock, ""] : []),
       ...(goalAnchorBlock ? [goalAnchorBlock, ""] : []),
-      ...(todoStateBlock ? [todoStateBlock, ""] : []),
       ...(dynamicSystemPrompt ? [dynamicSystemPrompt, ""] : []),
       ...buildSystemPromptLines(actionDefinitions, {
         compactSystemPrompt,
@@ -62159,8 +65838,7 @@ ${user}:`]
         effectivePlannerMode: opts.effectivePlannerMode,
         plannerMode: opts.plannerMode,
         request: opts.request,
-        runState: opts.runState,
-        todoState: opts.todoState
+        runState: opts.runState
       }),
       ...(compactSystemPrompt ? [] : buildGuidanceLines(actionDefinitions)),
       // Caller-supplied directives: appended last so override-by-recency applies.
@@ -62195,6 +65873,33 @@ ${user}:`]
 
     if (!compactSystemPrompt && hasAction("use_agent_skill")) {
       lines.push("Once you load a skill via read_agent_skill, follow its SKILL.md workflow. Use use_agent_skill when a skill must stay active across multiple later steps.");
+    }
+
+    // ADR-0033 Part 4 Tier A.5 (B1 + B4 fix) — load-bearing workspace rules for ALL modes
+    // including compact. The audit (2026-05-20 evening) identified four load-bearing lines
+    // previously gated on `!compactSystemPrompt`:
+    //   - workspace_write vs workspace_append decomposition rule (B1)
+    //   - content-length neutrality / 500-char mimicry counter (combined with B1)
+    //   - canonical path handling for publish (B4 — root cause of v16 run2 split-file failure)
+    //   - read-before-write inspection rule
+    //   - publish structural cleanliness rule
+    // Verbose lines (textStats explainer, TodoState advisory, recovery hints for rare cases)
+    // remain non-compact only — those add noise without affecting lite-tier failure modes.
+    if (hasAction("workspace_write")) {
+      lines.push("Workspace write rule: use workspace_write ONLY for the first write to a path or a deliberate full rewrite — it REPLACES the entire file. For every subsequent addition to the same file, use workspace_append. Calling workspace_write twice on the same path without intent to discard prior work erases the draft. The `content` field accepts text of any length; write substantial chunks (typical 200-2000+ characters per call) when remainingLength is large.");
+      lines.push("Before writing or appending to an existing path, inspect it once with workspace_read when workspace_read is currently allowed. If terminalRepairState/actionPatternConvergence forbids workspace_read, use visible workspace facts and the allowedActions surface instead.");
+    }
+    if (hasAction("workspace_propose_patch") && hasAction("workspace_apply_patch")) {
+      lines.push("When source and length are satisfied but terminal repair still shows structure plus todo deficits, use the listed patch action for heading/section-number repair and sync TodoState with todo_advance/todo_run_next/todo_cancel before publishing. Do not append, insert, write, replace, search, or read unless current allowedActions explicitly require it.");
+      lines.push("Workspace patch rule: for risky long-report repair, call workspace_propose_patch first and read status/deltaWords/riskFlags. Valid operations are {type:\"append\",content:\"...\"}, {type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}, {type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}, or {type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate heading/section-number repair using duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context line numbers. If length is already satisfied and duplicate heading/section-number context is the visible issue, send exactly one normalize_headings operation; do not mix it with replace unless exact current find text is visible and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not send {type:\"replace\",content:\"full document\"}; replace without find/replace will be blocked. Only then call workspace_apply_patch for the latest preview_ready patch. If riskFlags include no_growth, not_found, ambiguous, or structure_maybe_worse, change the patch or use workspace_append/workspace_insert_after_section only when those actions are currently allowed; do not finalize.");
+    }
+    if (hasAction("workspace_publish_candidate")) {
+      // B4 — canonical path handling. flash-lite v16 run2 wrote 579 words to report.md
+      // and 428 words to final_candidate.md (1007 total) but scored only 426 because
+      // publish defaulted to final_candidate.md and ignored report.md.
+      lines.push("Canonical publish rule: workspace_publish_candidate defaults to `final_candidate.md`. If you drafted in a different path (e.g. report.md), you MUST either (a) pass that same path explicitly to workspace_publish_candidate, or (b) copy/append the content into final_candidate.md before publishing. Content in unpublished paths does not count toward the final answer length.");
+      // Publish structural cleanliness (LOAD-BEARING — terminalRepair flags structure deficits)
+      lines.push("Before publishing, make the report structurally clean: one coherent title, unique section headings/numbers, no repeated conclusion blocks, no raw user prompt copied into the title. If the workspace shows final_candidate_structure=fail, repair with workspace_read + workspace_replace only when workspace_read is currently allowed; under terminalRepairState hard_veto, follow terminalRepairState.allowedActions and valid limited contract.");
     }
 
     if (!compactSystemPrompt && hasAction("workspace_write")) {
@@ -62252,7 +65957,7 @@ ${user}:`]
   function buildGuidanceLines(availableActions) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     return actionDefinitions
-      .map((action) => readString$w(action.guidance))
+      .map((action) => readString$x(action.guidance))
       .filter(Boolean);
   }
 
@@ -62286,7 +65991,7 @@ ${user}:`]
           const summary = entry.summary || entry.actionName || entry.kind || "step";
           return `${index + 1}. ${summary}`;
         }).join("\n");
-    const requestPrompt = readString$w(options.request && options.request.prompt);
+    const requestPrompt = readString$x(options.request && options.request.prompt);
     const promptSessionContext = dedupePromptSessionContext(sessionContext, requestPrompt);
     const sessionContextBlock = hasSessionContext(promptSessionContext)
       ? buildSessionContextPromptBlock(
@@ -62315,15 +66020,15 @@ ${user}:`]
       actionPatternConvergence: summarizeActionPatternConvergence(options.actionPatternConvergence || (options.runState && options.runState.actionPatternConvergence)),
       terminalRepairState: summarizeTerminalRepairState(options.terminalRepairState || (options.runState && options.runState.terminalRepairState)),
       readUrlRecoverySignal: summarizeReadUrlRecoverySignal(options.readUrlRecoverySignal || (options.runState && options.runState.readUrlRecoverySignal)),
-      readSources: summarizeReadSources$1(options.readSources, projectionProfile.readSources),
+      readSources: summarizeReadSources$1(options.readSources || (options.runState && options.runState.researchContext && options.runState.researchContext.readSources), projectionProfile.readSources),
       researchReportLoop: summarizeResearchReportLoop(
-        options.researchReportLoop,
-        options.researchEvidenceGraph,
-        options.researchContext
+        options.researchReportLoop || (options.runState && options.runState.researchReportLoop),
+        options.researchEvidenceGraph || (options.runState && options.runState.researchEvidenceGraph),
+        options.researchContext || (options.runState && options.runState.researchContext)
       ),
       researchAcceptanceEvaluator: summarizeResearchAcceptanceEvaluator(options.researchAcceptanceEvaluator),
       requirementRecoveryEvaluator: summarizeRequirementRecoveryEvaluator(options.requirementRecoveryEvaluator || (options.runState && options.runState.requirementRecoveryEvaluator)),
-      searchResults: summarizeSearchResults(options.searchResults, options.researchContext, projectionProfile.searchResults),
+      searchResults: summarizeSearchResults(options.searchResults, options.researchContext || (options.runState && options.runState.researchContext), projectionProfile.searchResults),
       virtualWorkspace: summarizeVirtualWorkspace$1(virtualWorkspace)
     };
 
@@ -62348,35 +66053,56 @@ ${user}:`]
       loopState.turnCount = options.turnCount || 0;
     }
 
+    const resolvedTodoStateBlock = compactDuplicateTodoStateBlock(
+      typeof options.todoStateBlock === "string" ? options.todoStateBlock.trim() : "",
+      options.request && options.request.prompt
+    );
+    const focusedTerminalRepairBlock = buildFocusedTerminalRepairPromptBlock(loopState.terminalRepairState);
+    const focusedResearchPhaseBlock = focusedTerminalRepairBlock
+      ? ""
+      : buildFocusedResearchPhasePromptBlock(loopState, {
+          runState: options.runState
+        });
+
     return [
+      focusedTerminalRepairBlock || null,
+      focusedTerminalRepairBlock ? "" : null,
+      focusedResearchPhaseBlock || null,
+      focusedResearchPhaseBlock ? "" : null,
       `User request: ${options.request.prompt}`,
       sessionContextBlock ? "" : null,
       sessionContextBlock || null,
       "",
       "Normalization state:",
       JSON.stringify({
-        clarificationStatus: readString$w(plannerState.clarificationStatus) || "none",
+        clarificationStatus: readString$x(plannerState.clarificationStatus) || "none",
         hasPendingClarification: Boolean(plannerState.pendingClarification),
-        evidenceState: readString$w(plannerState.evidenceState) || "none"
+        evidenceState: readString$x(plannerState.evidenceState) || "none"
       }, null, 2),
       "",
       "Available actions:",
       actionDescriptions,
       "",
       "Loop state:",
-      JSON.stringify(loopState, null, 2),
+      JSON.stringify(loopState),
       showSkillSurface ? "" : null,
       showSkillSurface ? "Active skill tools:" : null,
       showSkillSurface ? formatActiveSkillTools(options.activeAgentSkill) : null,
       showSkillSurface ? "" : null,
+      resolvedTodoStateBlock ? "" : null,
+      resolvedTodoStateBlock ? "Plan state:" : null,
+      resolvedTodoStateBlock || null,
       "Action history:",
       historyBlock,
       virtualWorkspace ? "" : null,
       virtualWorkspace
-        ? buildVirtualWorkspacePromptBlock(virtualWorkspace, {
+          ? buildVirtualWorkspacePromptBlock(virtualWorkspace, {
             ...projectionProfile.virtualWorkspace,
             cyclesUsed: readNullableNumber(options.runState && options.runState.cycleCount),
             cyclesMax: readNullableNumber(options.runState && options.runState.maxSteps),
+            terminalRepairState: options.runState && options.runState.terminalRepairState
+              ? options.runState.terminalRepairState
+              : null,
             publishBlockSignal: options.runState && options.runState.publishBlockSignal
               ? options.runState.publishBlockSignal
               : null
@@ -62390,7 +66116,7 @@ ${user}:`]
   // or a copy with safe types when valid.
   function summarizeActionFailureSignalForPrompt(signal) {
     if (!signal || typeof signal !== "object") return null;
-    const actionName = readString$w(signal.actionName);
+    const actionName = readString$x(signal.actionName);
     if (!actionName) return null;
     const consecutiveCount = Number.isInteger(signal.consecutiveCount) && signal.consecutiveCount > 0
       ? signal.consecutiveCount
@@ -62419,7 +66145,7 @@ ${user}:`]
   }
 
   function compactDuplicateGoalAnchorBlock(goalAnchorBlock, requestPrompt) {
-    const block = readString$w(goalAnchorBlock);
+    const block = readString$x(goalAnchorBlock);
     const requestKey = normalizePromptDuplicateKey$1(requestPrompt);
     if (!block || !requestKey) return block;
     const sections = [];
@@ -62427,7 +66153,7 @@ ${user}:`]
     let match;
     while ((match = pattern.exec(block)) !== null) {
       const header = match[1];
-      const body = readString$w(match[2]);
+      const body = readString$x(match[2]);
       if (!body) continue;
       if (normalizePromptDuplicateKey$1(body) === requestKey) continue;
       sections.push(`${header}${body}`);
@@ -62436,7 +66162,7 @@ ${user}:`]
   }
 
   function compactDuplicateTodoStateBlock(todoStateBlock, requestPrompt) {
-    const block = readString$w(todoStateBlock);
+    const block = readString$x(todoStateBlock);
     const requestKey = normalizePromptDuplicateKey$1(requestPrompt);
     if (!block || !requestKey) return block;
     return block
@@ -62481,7 +66207,7 @@ ${user}:`]
   }
 
   function normalizePromptDuplicateKey$1(value) {
-    return readString$w(value).replace(/\s+/g, " ").trim().toLowerCase();
+    return readString$x(value).replace(/\s+/g, " ").trim().toLowerCase();
   }
 
   function normalizeToolContext(toolContext, projection = {}) {
@@ -62512,14 +66238,14 @@ ${user}:`]
         }
 
         return {
-          error: readString$w(item.error) || null,
-          mode: readString$w(item.mode) || null,
+          error: readString$x(item.error) || null,
+          mode: readString$x(item.mode) || null,
           ok: item.ok !== false,
           status: typeof item.status === "number" ? item.status : null,
-          textPreview: serializePromptValue$2(readString$w(item.text), previewChars),
+          textPreview: serializePromptValue$2(readString$x(item.text), previewChars),
           textRange: summarizeReadSourceTextRange(item.textRange),
           truncated: item.truncated === true,
-          url: readString$w(item.url) || null
+          url: readString$x(item.url) || null
         };
       })
       .filter(Boolean);
@@ -62542,6 +66268,40 @@ ${user}:`]
       ? options.runState
       : {};
     const cycleCount = readNumber$3(runState.cycleCount);
+    if (isHardVetoTerminalRepairPromptState(options && (options.terminalRepairState || runState.terminalRepairState))) {
+      return {
+        observation: {
+          genericOutputChars: 220,
+          readUrlPreviewChars: 300,
+          searchResults: {
+            maxResults: 2,
+            snippetChars: 160
+          }
+        },
+        readSources: {
+          previewChars: 100,
+          sourceLimit: 3
+        },
+        searchResults: {
+          maxResults: 2,
+          snippetChars: 160
+        },
+        summary: {
+          mode: "terminal_repair_hard_veto_focused",
+          reason: "terminal_repair_hard_veto_requires_contract_projection",
+          cycleCount
+        },
+        toolContext: {
+          historyEntryChars: 220,
+          lastResultChars: 360,
+          recentHistoryCount: 1
+        },
+        virtualWorkspace: {
+          maxFilePreviewChars: 700,
+          maxFiles: 3
+        }
+      };
+    }
     const hasLongRunState = hasPromptTodoState(runState.todoState)
       || hasPromptVirtualWorkspace((options && options.virtualWorkspace) || runState.virtualWorkspace)
       || hasPromptSkillState(options && options.activeAgentSkill)
@@ -62593,6 +66353,352 @@ ${user}:`]
     };
   }
 
+  function buildFocusedTerminalRepairPromptBlock(terminalRepairState) {
+    if (!isHardVetoTerminalRepairPromptState(terminalRepairState)) return "";
+    const state = terminalRepairState && typeof terminalRepairState === "object" && !Array.isArray(terminalRepairState)
+      ? terminalRepairState
+      : {};
+    const allowedActions = Array.isArray(state.allowedActions)
+      ? state.allowedActions.map(readString$x).filter(Boolean)
+      : [];
+    const forbiddenLines = [];
+    if (!allowedActions.includes("workspace_read")) {
+      forbiddenLines.push("workspace_read is FORBIDDEN now because it is not in terminalRepairState.allowedActions.");
+    }
+    const validPublishContract = state.validPublishContract && typeof state.validPublishContract === "object"
+      ? state.validPublishContract
+      : {};
+    const requiredArgsExample = validPublishContract.requiredArgsExample && typeof validPublishContract.requiredArgsExample === "object"
+      ? validPublishContract.requiredArgsExample
+      : null;
+    const focused = {
+      mode: "terminal_repair_hard_veto_focused",
+      active: true,
+      escalation: "hard_veto",
+      rule: allowedActions.includes("workspace_publish_candidate")
+        ? "workspace_publish_candidate is available, so publish limited now. Do not choose repair/finalize actions; use validPublishContract.requiredArgsExample as args."
+        : "Choose only one terminalRepairState.allowedActions protocol action. Do not choose actions outside this list.",
+      primaryAction: allowedActions.includes("workspace_publish_candidate")
+        ? "workspace_publish_candidate"
+        : (allowedActions[0] || null),
+      allowedActions,
+      forbidden: forbiddenLines,
+      activeDeficits: Array.isArray(state.activeDeficits) ? state.activeDeficits.slice(0, 8) : [],
+      patchOperationContract: allowedActions.includes("workspace_propose_patch") ? {
+        validShapes: [
+          "{type:\"append\",content:\"...\"}",
+          "{type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}",
+          "{type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}",
+          "{type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}"
+        ],
+        invalidShape: "{type:\"replace\",content:\"full document\"}",
+        recovery: "For duplicate headings or section numbers when length is already satisfied, send exactly one normalize_headings operation with duplicate_heading_context or section_number_repair_context line numbers. If you cannot quote exact current text for replace, use append/insert_after_section when allowed or publish limited with concrete remainingGaps."
+      } : null,
+      requiredRepair: readString$x(state.requiredRepair) || null,
+      validPublishContract: {
+        decision: validPublishContract.decision || "limited",
+        evidenceSatisfied: validPublishContract.evidenceSatisfied,
+        lengthSatisfied: validPublishContract.lengthSatisfied,
+        requirementSatisfied: validPublishContract.requirementSatisfied,
+        remainingGaps: validPublishContract.remainingGaps || "non-empty string array with concrete blockers",
+        requiredArgsExample
+      },
+      observationOverride: "Older observations or generic rules that suggest workspace_read/finalize/plain ready do not override this focused hard_veto contract."
+    };
+    return [
+      "Focused terminal repair contract:",
+      JSON.stringify(focused, null, 2)
+    ].join("\n");
+  }
+
+  function buildFocusedResearchPhasePromptBlock(loopState, options = {}) {
+    const state = loopState && typeof loopState === "object" && !Array.isArray(loopState)
+      ? loopState
+      : {};
+    const runState = options && options.runState && typeof options.runState === "object"
+      ? options.runState
+      : {};
+    const researchReportLoop = state.researchReportLoop && typeof state.researchReportLoop === "object"
+      ? state.researchReportLoop
+      : null;
+    const searchResults = state.searchResults && typeof state.searchResults === "object"
+      ? state.searchResults
+      : null;
+    const readSources = Array.isArray(state.readSources) ? state.readSources : [];
+    const virtualWorkspace = state.virtualWorkspace && typeof state.virtualWorkspace === "object"
+      ? state.virtualWorkspace
+      : null;
+    const researchActive = isLongResearchPromptState(runState, researchReportLoop);
+    if (!researchActive) return "";
+
+    const candidateUrlCount = readNumber$3(searchResults && searchResults.count);
+    const successfulReadUrlCount = countPromptSuccessfulReadSources(readSources, researchReportLoop);
+    const searchPassCount = countPromptSearchPasses(researchReportLoop, runState);
+    const sourceMinimum = readPromptSourceMinimum(researchReportLoop);
+    const sourceMinimumUnmet = isPromptSourceMinimumUnmet(sourceMinimum);
+    const hasUnreadCandidate = candidateUrlCount > successfulReadUrlCount;
+    const length = readPromptCandidateLength(researchReportLoop, virtualWorkspace);
+    const requestedLength = readPromptRequestedLength(researchReportLoop);
+    const hasOpenAmbiguity = Boolean(
+      state.pendingClarification ||
+      (state.inquiryContext && typeof state.inquiryContext === "object" && (
+        state.inquiryContext.pendingClarification ||
+        readString$x(state.inquiryContext.openAmbiguity)
+      ))
+    );
+    const phase = selectResearchPhase({
+      candidateUrlCount,
+      hasDraft: length.observed > 0,
+      readSourceCount: successfulReadUrlCount,
+      requestedLength: requestedLength.value,
+      observedLength: length.observed,
+      searchPassCount,
+      sourceMinimumUnmet
+    });
+    const contract = {
+      mode: "research_phase_contract_focused",
+      active: true,
+      phase,
+      rule: "Use these as current research facts and choose the next action yourself. Runtime must not write the report or pick sources for you.",
+      clarificationPolicy: hasOpenAmbiguity
+        ? "An open ambiguity is recorded; ask only if it blocks the report scope."
+        : "No open ambiguity is recorded. If a term is non-standard or evidence is thin, continue research/drafting and disclose the limitation; do not ask clarification just because coverage is weak.",
+      evidenceHandoff: {
+        candidateUrlCount,
+        searchPassCount,
+        successfulReadUrlCount,
+        sourceMinimum,
+        nextMove: candidateUrlCount > 0 && hasUnreadCandidate && (successfulReadUrlCount === 0 || sourceMinimumUnmet)
+          ? "read_url an unread candidate before more broad web_search or clarification; source minimum is not met yet."
+          : "continue targeted evidence or workspace drafting based on concrete gaps."
+      },
+      workspaceGrowth: {
+        candidatePath: length.path,
+        observedLength: length.observed,
+        requestedLength: requestedLength.value,
+        unit: requestedLength.unit,
+        nextMove: requestedLength.value > 0 && length.observed > 0 && length.observed < requestedLength.value
+          ? "grow the candidate with workspace_append or workspace_insert_after_section; use workspace_write/replace only when preserving or increasing current length."
+          : "draft or publish according to visible evidence and workspace facts."
+      },
+      reportWritingProtocol: buildResearchReportWritingProtocol({
+        observedLength: length.observed,
+        phase,
+        readSourceCount: successfulReadUrlCount,
+        requestedLength: requestedLength.value,
+        unit: requestedLength.unit
+      }),
+      forbiddenWhenNoOpenAmbiguity: hasOpenAmbiguity ? [] : ["ask_clarification"],
+      allowedNextMoveHints: buildResearchPhaseAllowedMoveHints({
+        candidateUrlCount,
+        observedLength: length.observed,
+        requestedLength: requestedLength.value,
+        sourceMinimumUnmet,
+        successfulReadUrlCount
+      })
+    };
+    return [
+      "Focused research phase contract:",
+      JSON.stringify(contract, null, 2)
+    ].join("\n");
+  }
+
+  function isLongResearchPromptState(runState, researchReportLoop, searchResults) {
+    if (readString$x(runState && runState.researchActivation) === "long_research") return true;
+    if (isPromptResearchReportLoopActive(researchReportLoop)) return true;
+    const selectedSkill = readString$x(runState && runState.selectedSkill);
+    return selectedSkill === "long-web-research" || selectedSkill === "deep-research-writer";
+  }
+
+  function buildResearchReportWritingProtocol(facts) {
+    const phase = readString$x(facts && facts.phase);
+    const observed = readNumber$3(facts && facts.observedLength);
+    const requested = readNumber$3(facts && facts.requestedLength);
+    const unit = readString$x(facts && facts.unit) || "words";
+    const remaining = requested > 0 ? Math.max(requested - observed, 0) : 0;
+    const base = {
+      sourceOrder: "web_search finds leads; read_url creates evidence; write from read evidence, not search snippets alone.",
+      indexFirst: "After useful reads, create or update outline.md with section titles and source URLs before drafting.",
+      drafting: "Write real user-facing prose into draft.md/final_candidate.md. Do not write promises, placeholders, or summaries of what you will write later.",
+      growthRule: "After a draft exists, prefer workspace_append or workspace_insert_after_section for new section-sized content. Do not repeat small workspace_write rewrites that replace the draft without materially closing the length gap."
+    };
+    if (phase === "draft_from_evidence") {
+      return {
+        ...base,
+        nextWritingMove: "write outline.md, then write draft.md with the first complete sourced sections."
+      };
+    }
+    if (phase === "grow_workspace_candidate" && remaining > 0) {
+      return {
+        ...base,
+        remainingLength: remaining,
+        remainingLengthUnit: unit,
+        nextWritingMove: `expand by full sections from outline.md; add enough sourced prose to materially reduce the ${remaining} ${unit} gap before finalizing.`
+      };
+    }
+    return base;
+  }
+
+  function isPromptResearchReportLoopActive(researchReportLoop) {
+    const loop = researchReportLoop && typeof researchReportLoop === "object"
+      ? researchReportLoop
+      : null;
+    if (!loop) return false;
+    const status = readString$x(loop.status);
+    if (status && status !== "idle" && status !== "none") return true;
+    if (loop.acceptancePacket && typeof loop.acceptancePacket === "object") return true;
+    if (loop.gateSignal && typeof loop.gateSignal === "object" && (
+      readString$x(loop.gateSignal.status) ||
+      readString$x(loop.gateSignal.finalMode)
+    )) return true;
+    if (Array.isArray(loop.evidenceGaps) && loop.evidenceGaps.length > 0) return true;
+    if (Array.isArray(loop.recentSearches) && loop.recentSearches.length > 0) return true;
+    return false;
+  }
+
+  function countPromptSuccessfulReadSources(readSources, researchReportLoop) {
+    const direct = readSources.filter((source) => source && source.ok !== false).length;
+    const packetCount = readNumber$3(
+      researchReportLoop &&
+      researchReportLoop.acceptancePacket &&
+      researchReportLoop.acceptancePacket.evidence &&
+      researchReportLoop.acceptancePacket.evidence.successfulReadUrlCount
+    );
+    const sourceMinimumReads = readNumber$3(
+      researchReportLoop &&
+      researchReportLoop.sourceMinimum &&
+      researchReportLoop.sourceMinimum.reads
+    );
+    return Math.max(direct, packetCount, sourceMinimumReads);
+  }
+
+  function countPromptSearchPasses(researchReportLoop, runState) {
+    const recent = researchReportLoop && Array.isArray(researchReportLoop.recentSearches)
+      ? researchReportLoop.recentSearches.length
+      : 0;
+    const context = runState && runState.researchContext && typeof runState.researchContext === "object"
+      ? runState.researchContext
+      : {};
+    const passes = Array.isArray(context.searchPasses) ? context.searchPasses.length : 0;
+    return Math.max(recent, passes);
+  }
+
+  function readPromptCandidateLength(researchReportLoop, virtualWorkspace) {
+    const packetCandidate = researchReportLoop &&
+      researchReportLoop.acceptancePacket &&
+      researchReportLoop.acceptancePacket.candidate &&
+      typeof researchReportLoop.acceptancePacket.candidate === "object"
+      ? researchReportLoop.acceptancePacket.candidate
+      : {};
+    const packetStats = packetCandidate.textStats || {};
+    const packetWords = readNumber$3(packetStats.words);
+    if (packetWords > 0) {
+      return {
+        observed: packetWords,
+        path: readString$x(packetCandidate.path) || "final_candidate.md",
+        unit: "words"
+      };
+    }
+    const files = virtualWorkspace && Array.isArray(virtualWorkspace.files)
+      ? virtualWorkspace.files
+      : [];
+    const finalFile = files.find((file) => readString$x(file && file.path) === "final_candidate.md") || files[0] || {};
+    const stats = finalFile.textStats && typeof finalFile.textStats === "object" ? finalFile.textStats : {};
+    return {
+      observed: readNumber$3(stats.words),
+      path: readString$x(finalFile.path) || null,
+      unit: "words"
+    };
+  }
+
+  function readPromptRequestedLength(researchReportLoop) {
+    const requested = researchReportLoop &&
+      researchReportLoop.acceptancePacket &&
+      researchReportLoop.acceptancePacket.requestedLength &&
+      typeof researchReportLoop.acceptancePacket.requestedLength === "object"
+      ? researchReportLoop.acceptancePacket.requestedLength
+      : {};
+    return {
+      unit: readString$x(requested.unit) || "words",
+      value: readNumber$3(requested.value)
+    };
+  }
+
+  function selectResearchPhase(facts) {
+    if (facts.candidateUrlCount > 0 && facts.readSourceCount === 0 && facts.searchPassCount >= 1) {
+      return "read_candidate_sources";
+    }
+    if (facts.candidateUrlCount > facts.readSourceCount && facts.sourceMinimumUnmet === true) {
+      return "read_candidate_sources";
+    }
+    if (facts.readSourceCount > 0 && !facts.hasDraft) {
+      return "draft_from_evidence";
+    }
+    if (facts.hasDraft && facts.requestedLength > 0 && facts.observedLength < facts.requestedLength) {
+      return "grow_workspace_candidate";
+    }
+    if (facts.hasDraft) return "finalize_or_publish";
+    return "discover_sources";
+  }
+
+  function buildResearchPhaseAllowedMoveHints(facts) {
+    const moves = [];
+    if (
+      facts.candidateUrlCount > 0 &&
+      facts.candidateUrlCount > facts.successfulReadUrlCount &&
+      (facts.successfulReadUrlCount === 0 || facts.sourceMinimumUnmet === true)
+    ) {
+      moves.push("read_url");
+    }
+    if (facts.observedLength > 0 && facts.requestedLength > 0 && facts.observedLength < facts.requestedLength) {
+      moves.push("workspace_append", "workspace_insert_after_section");
+    } else {
+      moves.push("workspace_write", "workspace_append");
+    }
+    moves.push("workspace_publish_candidate_limited_with_remainingGaps");
+    return Array.from(new Set(moves));
+  }
+
+  function readPromptSourceMinimum(researchReportLoop) {
+    const direct = researchReportLoop && researchReportLoop.sourceMinimum && typeof researchReportLoop.sourceMinimum === "object"
+      ? researchReportLoop.sourceMinimum
+      : null;
+    const packet = researchReportLoop &&
+      researchReportLoop.acceptancePacket &&
+      researchReportLoop.acceptancePacket.evidence &&
+      researchReportLoop.acceptancePacket.evidence.sourceMinimum &&
+      typeof researchReportLoop.acceptancePacket.evidence.sourceMinimum === "object"
+      ? researchReportLoop.acceptancePacket.evidence.sourceMinimum
+      : null;
+    const source = direct || packet;
+    if (!source) return null;
+    return {
+      minReadSources: readNumber$3(source.minReadSources) || readNumber$3(source.minReads),
+      minRelevantSources: readNumber$3(source.minRelevantSources) || readNumber$3(source.minRelevant),
+      passed: source.passed === true,
+      readSources: readNumber$3(source.readSources) || readNumber$3(source.reads),
+      relevantSources: readNumber$3(source.relevantSources) || readNumber$3(source.relevant)
+    };
+  }
+
+  function isPromptSourceMinimumUnmet(sourceMinimum) {
+    if (!sourceMinimum || sourceMinimum.passed === true) return false;
+    return Boolean(
+      (sourceMinimum.minReadSources > 0 && sourceMinimum.readSources < sourceMinimum.minReadSources) ||
+      (sourceMinimum.minRelevantSources > 0 && sourceMinimum.relevantSources < sourceMinimum.minRelevantSources)
+    );
+  }
+
+  function isHardVetoTerminalRepairPromptState(value) {
+    return Boolean(
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      value.active === true &&
+      readString$x(value.escalation) === "hard_veto"
+    );
+  }
+
   function hasPromptTodoState(todoState) {
     return Boolean(
       todoState
@@ -62616,11 +66722,11 @@ ${user}:`]
     const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
       ? workspace.files
       : {};
-    return Object.values(files).some((file) => readString$w(file && file.content));
+    return Object.values(files).some((file) => readString$x(file && file.content));
   }
 
   function hasPromptSkillState(value) {
-    return Boolean(value && typeof value === "object" && readString$w(value.name));
+    return Boolean(value && typeof value === "object" && readString$x(value.name));
   }
 
   function summarizeResearchReportLoop(loopValue, graphValue, contextValue) {
@@ -62650,19 +66756,19 @@ ${user}:`]
     // coverage-target table.
     const coverageTargets = [];
     const evidenceGaps = Array.isArray(graph && graph.evidenceGaps)
-      ? graph.evidenceGaps.map(readString$w).filter(Boolean).slice(0, 8)
+      ? graph.evidenceGaps.map(readString$x).filter(Boolean).slice(0, 8)
       : [];
     const searchPasses = Array.isArray(context.searchPasses) ? context.searchPasses : [];
     const recentSearches = searchPasses.slice(-8).map((pass) => ({
       count: typeof pass.count === "number" ? pass.count : null,
-      kind: readString$w(pass.kind) || null,
-      query: readString$w(pass.query),
+      kind: readString$x(pass.kind) || null,
+      query: readString$x(pass.query),
       status: pass.status == null ? null : String(pass.status)
     })).filter((pass) => pass.query);
     const zeroResultQueries = Array.from(new Set(
       searchPasses
         .filter((pass) => readNumber$3(pass && pass.count) === 0)
-        .map((pass) => readString$w(pass && pass.query))
+        .map((pass) => readString$x(pass && pass.query))
         .filter(Boolean)
     )).slice(-6);
     const gateSignal = loop && loop.gateSignal && typeof loop.gateSignal === "object"
@@ -62673,8 +66779,8 @@ ${user}:`]
     );
 
     return {
-      status: readString$w(loop && loop.status) || null,
-      finalMode: readString$w(loop && loop.finalMode) || null,
+      status: readString$x(loop && loop.status) || null,
+      finalMode: readString$x(loop && loop.finalMode) || null,
       sourceMinimum: sourceMinimum ? {
         passed: sourceMinimum.passed === true,
         reads: readNumber$3(sourceMinimum.readSources),
@@ -62691,8 +66797,8 @@ ${user}:`]
       evidenceGaps,
       acceptancePacket,
       gateSignal: gateSignal ? {
-        finalMode: readString$w(gateSignal.finalMode) || null,
-        status: readString$w(gateSignal.status) || null
+        finalMode: readString$x(gateSignal.finalMode) || null,
+        status: readString$x(gateSignal.status) || null
       } : null,
       recentSearches,
       zeroResultQueries,
@@ -62717,10 +66823,10 @@ ${user}:`]
     return {
       candidate: {
         lastRead: candidate.lastRead && typeof candidate.lastRead === "object" ? {
-          path: readString$w(candidate.lastRead.path) || null,
+          path: readString$x(candidate.lastRead.path) || null,
           textStats: summarizePromptTextStats(candidate.lastRead.textStats)
         } : null,
-        path: readString$w(candidate.path) || null,
+        path: readString$x(candidate.path) || null,
         ready: candidate.ready === true,
         textStats: summarizePromptTextStats(candidate.textStats)
       },
@@ -62731,9 +66837,9 @@ ${user}:`]
       } : null,
       evidence: {
         researchFinalAllowed: evidence.researchFinalAllowed === true,
-        researchFinalReason: readString$w(evidence.researchFinalReason) || null,
+        researchFinalReason: readString$x(evidence.researchFinalReason) || null,
         researchGaps: Array.isArray(evidence.researchGaps)
-          ? evidence.researchGaps.map(readString$w).filter(Boolean).slice(0, 8)
+          ? evidence.researchGaps.map(readString$x).filter(Boolean).slice(0, 8)
           : [],
         sourceMinimum: sourceMinimum ? {
           minReadSources: readNumber$3(sourceMinimum.minReadSources),
@@ -62748,21 +66854,21 @@ ${user}:`]
       publish: publish ? {
         count: readNumber$3(publish.count),
         cyclesRemaining: readNullableNumber(publish.cyclesRemaining),
-        lastStatus: readString$w(publish.lastStatus) || null
+        lastStatus: readString$x(publish.lastStatus) || null
       } : null,
       recentSearch: packet.recentSearch && typeof packet.recentSearch === "object" ? {
         lastSearchAttempt: packet.recentSearch.lastSearchAttempt || null,
         recentQueries: Array.isArray(packet.recentSearch.recentQueries)
-          ? packet.recentSearch.recentQueries.map(readString$w).filter(Boolean).slice(-5)
+          ? packet.recentSearch.recentQueries.map(readString$x).filter(Boolean).slice(-5)
           : []
       } : null,
       requestedLength: packet.requestedLength && typeof packet.requestedLength === "object" ? {
-        statsKey: readString$w(packet.requestedLength.statsKey) || null,
-        unit: readString$w(packet.requestedLength.unit) || null,
+        statsKey: readString$x(packet.requestedLength.statsKey) || null,
+        unit: readString$x(packet.requestedLength.unit) || null,
         value: readNumber$3(packet.requestedLength.value)
       } : null,
-      status: readString$w(packet.status) || null,
-      updatedBy: readString$w(packet.updatedBy) || null
+      status: readString$x(packet.status) || null,
+      updatedBy: readString$x(packet.updatedBy) || null
     };
   }
 
@@ -62774,34 +66880,36 @@ ${user}:`]
       ? value.files
       : {};
     const quality = value.quality && typeof value.quality === "object" ? value.quality : {};
+    const pendingPatch = value.pendingPatch && typeof value.pendingPatch === "object" ? value.pendingPatch : null;
     const checks = Array.isArray(quality.checks)
       ? quality.checks.map((check) => ({
-        code: readString$w(check && check.code),
-        reason: readString$w(check && check.reason),
-        status: readString$w(check && check.status)
+        code: readString$x(check && check.code),
+        reason: readString$x(check && check.reason),
+        status: readString$x(check && check.status)
       })).filter((check) => check.code || check.status || check.reason).slice(0, 12)
       : [];
     return {
       enabled: true,
       files: Object.entries(files).map(([path, file]) => ({
-        hasContent: readString$w(file && file.content).length > 0,
+        hasContent: readString$x(file && file.content).length > 0,
         path,
-        size: readString$w(file && file.content).length,
+        size: readString$x(file && file.content).length,
         textStats: summarizePromptTextStats(file && file.textStats, file && file.content),
         version: typeof (file && file.version) === "number" ? file.version : 0
       })),
       finalCandidateReady: quality.finalCandidateReady === true,
-      mode: readString$w(value.mode) || "complex_response",
-      nextActionOptions: [
-        "workspace_list or workspace_read to review existing artifacts and exact textStats",
-        "workspace_write, workspace_append, workspace_insert_after_section, or workspace_replace to improve an artifact",
-        "workspace_finalize_candidate after the selected file contains the user-facing candidate",
-        "workspace_publish_candidate when the selected candidate should be sent directly to the user",
-        "finalize/final only when you judge the active workflow contract is satisfied"
-      ],
+      mode: readString$x(value.mode) || "complex_response",
       operationCount: Array.isArray(value.operations) ? value.operations.length : 0,
+      pendingPatch: pendingPatch ? {
+        deltaWords: readNumber$3(pendingPatch.deltaWords),
+        patchId: readString$x(pendingPatch.patchId) || null,
+        path: readString$x(pendingPatch.path) || null,
+        riskFlags: Array.isArray(pendingPatch.riskFlags) ? pendingPatch.riskFlags.map(readString$x).filter(Boolean).slice(0, 8) : [],
+        status: readString$x(pendingPatch.status) || null,
+        valid: pendingPatch.valid === true
+      } : null,
       qualityChecks: checks,
-      qualityStatus: readString$w(quality.status) || "needs_draft"
+      qualityStatus: readString$x(quality.status) || "needs_draft"
     };
   }
 
@@ -62827,7 +66935,7 @@ ${user}:`]
         words: readNumber$3(source.words)
       };
     }
-    const text = readString$w(fallbackContent);
+    const text = readString$x(fallbackContent);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -62890,7 +66998,7 @@ ${user}:`]
         ? "If the answer should stop without tools, use final or finalize."
         : "If the answer should stop without tools, use final. Do not return finalize in this context."
     ].join("\n");
-    const hostSystemPrompt = readString$1H(options && options.systemPrompt);
+    const hostSystemPrompt = readString$1I(options && options.systemPrompt);
     const systemPrompt = hostSystemPrompt
       ? [hostSystemPrompt, "", repairSystemPrompt].join("\n")
       : repairSystemPrompt;
@@ -62908,10 +67016,10 @@ ${user}:`]
       ...envelopeExamples,
       "",
       "Planner prompt:",
-      readString$1H(options && options.plannerPrompt) || "None",
+      readString$1I(options && options.plannerPrompt) || "None",
       "",
       "Invalid planner output to repair:",
-      readString$1H(options && options.responseText) || "None"
+      readString$1I(options && options.responseText) || "None"
     ].join("\n");
     const { response, text, value } = await requestSemanticJudge(options.request, {
       prompt,
@@ -62938,24 +67046,24 @@ ${user}:`]
     }
 
     if (type === "final") {
-      const answer = readString$1H(record.answer) || readString$1H(record.text);
+      const answer = readString$1I(record.answer) || readString$1I(record.text);
       return answer
         ? {
             answer,
             citations: Array.isArray(record.citations) ? record.citations : [],
             finalReadiness: normalizeFinalReadiness(record.finalReadiness),
-            reasoning: readString$1H(record.reasoning),
+            reasoning: readString$1I(record.reasoning),
             type
           }
         : null;
     }
 
     if (type === "clarify") {
-      const question = readString$1H(record.question) || readString$1H(record.text);
+      const question = readString$1I(record.question) || readString$1I(record.text);
       return question
         ? {
             question,
-            reasoning: readString$1H(record.reasoning),
+            reasoning: readString$1I(record.reasoning),
             type
           }
         : null;
@@ -62964,8 +67072,8 @@ ${user}:`]
     if (type === "finalize") {
       return {
         finalReadiness: normalizeFinalReadiness(record.finalReadiness),
-        instruction: readString$1H(record.instruction) || readString$1H(record.answer) || readString$1H(record.text),
-        reasoning: readString$1H(record.reasoning),
+        instruction: readString$1I(record.instruction) || readString$1I(record.answer) || readString$1I(record.text),
+        reasoning: readString$1I(record.reasoning),
         type
       };
     }
@@ -62977,10 +67085,10 @@ ${user}:`]
             actions,
             finalReadiness: normalizeFinalReadiness(record.finalReadiness),
             partial_ok: record.partial_ok === true,
-            reasoning: readString$1H(record.reasoning),
+            reasoning: readString$1I(record.reasoning),
             stitch: normalizeStitch$1(record.stitch),
             synthesize_per_action: record.synthesize_per_action === true,
-            synthesize_instruction: readString$1H(record.synthesize_instruction) || readString$1H(record.instruction),
+            synthesize_instruction: readString$1I(record.synthesize_instruction) || readString$1I(record.instruction),
             type
           }
         : null;
@@ -62994,13 +67102,13 @@ ${user}:`]
     return {
       args: readPlannerArgs(record),
       name,
-      reasoning: readString$1H(record.reasoning),
+      reasoning: readString$1I(record.reasoning),
       type
     };
   }
 
   function normalizeType(record) {
-    const explicitType = readString$1H(record.type || record.kind || record.decisionType);
+    const explicitType = readString$1I(record.type || record.kind || record.decisionType);
 
     if (
       explicitType === "action" ||
@@ -63016,19 +67124,19 @@ ${user}:`]
       return "plan";
     }
 
-    if (readString$1H(record.answer)) {
+    if (readString$1I(record.answer)) {
       return "final";
     }
 
-    if (readString$1H(record.question)) {
+    if (readString$1I(record.question)) {
       return "clarify";
     }
 
-    if (readString$1H(record.instruction)) {
+    if (readString$1I(record.instruction)) {
       return "finalize";
     }
 
-    if (readString$1H(record.name || record.action || record.tool || record.toolName)) {
+    if (readString$1I(record.name || record.action || record.tool || record.toolName)) {
       return "action";
     }
 
@@ -63036,7 +67144,7 @@ ${user}:`]
   }
 
   function normalizeActionName(record, options) {
-    const candidate = readString$1H(record.name || record.action || record.tool || record.toolName).toLowerCase();
+    const candidate = readString$1I(record.name || record.action || record.tool || record.toolName).toLowerCase();
     if (!candidate) {
       return "";
     }
@@ -63091,7 +67199,7 @@ ${user}:`]
       normalized.push({
         args: readPlannerArgs(record),
         name,
-        reasoning: readString$1H(record.reasoning),
+        reasoning: readString$1I(record.reasoning),
         section: normalizeSection$1(record.section),
         type: "action"
       });
@@ -63105,8 +67213,8 @@ ${user}:`]
       return null;
     }
     return {
-      prompt: readString$1H(record.prompt),
-      title: readString$1H(record.title)
+      prompt: readString$1I(record.prompt),
+      title: readString$1I(record.title)
     };
   }
 
@@ -63120,9 +67228,9 @@ ${user}:`]
       followups: Array.isArray(record.followups)
         ? record.followups.filter((item) => typeof item === "string")
         : [],
-      intro_prompt: readString$1H(record.intro_prompt),
-      outro_prompt: readString$1H(record.outro_prompt),
-      provenance: readString$1H(record.provenance)
+      intro_prompt: readString$1I(record.intro_prompt),
+      outro_prompt: readString$1I(record.outro_prompt),
+      provenance: readString$1I(record.provenance)
     };
   }
 
@@ -63132,11 +67240,11 @@ ${user}:`]
     }
 
     if (value.type === "final") {
-      return readString$1H(value.answer).length > 0;
+      return readString$1I(value.answer).length > 0;
     }
 
     if (value.type === "clarify") {
-      return readString$1H(value.question).length > 0;
+      return readString$1I(value.question).length > 0;
     }
 
     if (value.type === "finalize") {
@@ -63147,7 +67255,7 @@ ${user}:`]
       return Array.isArray(value.actions) && value.actions.length > 0;
     }
 
-    return value.type === "action" && readString$1H(value.name).length > 0;
+    return value.type === "action" && readString$1I(value.name).length > 0;
   }
 
   function shouldRejectTerminalEnvelope(envelope, options) {
@@ -63175,7 +67283,7 @@ ${user}:`]
     ) {
       return {
         instruction: "The requested skill is already active. Use the current active skill context to answer directly.",
-        reasoning: readString$1H(envelope.reasoning) || "Requested bundled agent skill is already active.",
+        reasoning: readString$1I(envelope.reasoning) || "Requested bundled agent skill is already active.",
         type: "finalize"
       };
     }
@@ -63195,7 +67303,7 @@ ${user}:`]
     ) {
       return {
         instruction: "The requested bundled tool result is already available. Use the existing tool evidence to answer directly.",
-        reasoning: readString$1H(envelope.reasoning) || "Requested bundled skill tool result is already available.",
+        reasoning: readString$1I(envelope.reasoning) || "Requested bundled skill tool result is already available.",
         type: "finalize"
       };
     }
@@ -63206,7 +67314,7 @@ ${user}:`]
     ) {
       return {
         instruction: "Read URL evidence is already available. Use the current source content to answer directly.",
-        reasoning: readString$1H(envelope.reasoning) || "Requested URL content is already available.",
+        reasoning: readString$1I(envelope.reasoning) || "Requested URL content is already available.",
         type: "finalize"
       };
     }
@@ -63216,20 +67324,20 @@ ${user}:`]
 
   function isMissingRequiredSkillToolFields(args, activeAgentSkill) {
     // If an active skill exists, the action handler can resolve from it — allow.
-    if (activeAgentSkill && typeof activeAgentSkill === "object" && readString$1H(activeAgentSkill.name)) {
+    if (activeAgentSkill && typeof activeAgentSkill === "object" && readString$1I(activeAgentSkill.name)) {
       return false;
     }
 
-    const skillName = readString$1H(args && args.skillName);
-    const toolName = readString$1H(args && args.toolName);
+    const skillName = readString$1I(args && args.skillName);
+    const toolName = readString$1I(args && args.toolName);
 
     // Both missing — inference fallback cannot reliably distinguish tools.
     return !skillName && !toolName;
   }
 
   function isAlreadyActiveSkill(requestedSkillName, activeAgentSkill) {
-    const requested = readString$1H(requestedSkillName).toLowerCase();
-    const active = readString$1H(activeAgentSkill && activeAgentSkill.name).toLowerCase();
+    const requested = readString$1I(requestedSkillName).toLowerCase();
+    const active = readString$1I(activeAgentSkill && activeAgentSkill.name).toLowerCase();
     return Boolean(requested && active && requested === active);
   }
 
@@ -63246,12 +67354,12 @@ ${user}:`]
       return false;
     }
 
-    const lastTool = readString$1H(lastResult.tool).toLowerCase();
+    const lastTool = readString$1I(lastResult.tool).toLowerCase();
     if (!lastTool) {
       return false;
     }
 
-    const requestedTool = readString$1H(args && args.toolName).toLowerCase();
+    const requestedTool = readString$1I(args && args.toolName).toLowerCase();
 
     // Exact match: planner explicitly requests the same tool that already ran.
     if (requestedTool && requestedTool === lastTool) {
@@ -63269,13 +67377,13 @@ ${user}:`]
   }
 
   function hasReadableSourceForUrl(url, readSources) {
-    const normalizedUrl = readString$1H(url).toLowerCase();
+    const normalizedUrl = readString$1I(url).toLowerCase();
     if (!normalizedUrl) {
       return false;
     }
 
     return (Array.isArray(readSources) ? readSources : []).some((item) => {
-      const sourceUrl = readString$1H(item && item.url).toLowerCase();
+      const sourceUrl = readString$1I(item && item.url).toLowerCase();
       return sourceUrl === normalizedUrl;
     });
   }
@@ -63339,9 +67447,9 @@ ${user}:`]
   }
 
   function createWebSearchFallbackDecision(options = {}) {
-    const query = readString$u(options.activeQuery)
-      || readString$u(options.activeGoal)
-      || readString$u(options.prompt);
+    const query = readString$v(options.activeQuery)
+      || readString$v(options.activeGoal)
+      || readString$v(options.prompt);
 
     if (!query) {
       return null;
@@ -63385,16 +67493,16 @@ ${user}:`]
 
   function hasAllowedAction(actions, name) {
     return (Array.isArray(actions) ? actions : []).some((action) => (
-      readString$u(action && action.name) === name ||
-      readString$u(action) === name
+      readString$v(action && action.name) === name ||
+      readString$v(action) === name
     ));
   }
 
   function isPendingClarification(value) {
-    return Boolean(value && typeof value === "object" && !Array.isArray(value) && readString$u(value.question));
+    return Boolean(value && typeof value === "object" && !Array.isArray(value) && readString$v(value.question));
   }
 
-  function readString$u(value) {
+  function readString$v(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -63529,15 +67637,15 @@ ${user}:`]
       return null;
     }
 
-    const name = readString$t(call.name);
+    const name = readString$u(call.name);
     const args = parseArgs(call.arguments);
 
     if (name === "final_answer") {
       return {
-        answer: readString$t(args.answer),
+        answer: readString$u(args.answer),
         citations: Array.isArray(args.citations) ? args.citations : [],
         finalReadiness: normalizeFinalReadiness(args.finalReadiness),
-        reasoning: readString$t(args.reasoning),
+        reasoning: readString$u(args.reasoning),
         type: "final"
       };
     }
@@ -63545,16 +67653,16 @@ ${user}:`]
     if (name === "finalize") {
       return {
         finalReadiness: normalizeFinalReadiness(args.finalReadiness),
-        instruction: readString$t(args.instruction),
-        reasoning: readString$t(args.reasoning),
+        instruction: readString$u(args.instruction),
+        reasoning: readString$u(args.reasoning),
         type: "finalize"
       };
     }
 
     if (name === "ask_clarification") {
       return {
-        question: readString$t(args.question),
-        reasoning: readString$t(args.reasoning),
+        question: readString$u(args.question),
+        reasoning: readString$u(args.reasoning),
         type: "clarify"
       };
     }
@@ -63570,7 +67678,7 @@ ${user}:`]
     return {
       args,
       name,
-      reasoning: readString$t(args.reasoning),
+      reasoning: readString$u(args.reasoning),
       type: "action"
     };
   }
@@ -63578,7 +67686,7 @@ ${user}:`]
   function buildPlanTool(actions, capabilities) {
     const nativePlan = capabilities && capabilities.nativePlan ? capabilities.nativePlan : {};
     const toolArgsJsonRequired = nativePlan.toolArgsJsonRequired === true;
-    const preferredShape = readString$t(nativePlan.executeSkillToolArgsShape) || "object";
+    const preferredShape = readString$u(nativePlan.executeSkillToolArgsShape) || "object";
     const standaloneActionNames = formatStandalonePlanActionNames(actions);
     const toolArgsJsonDescription = toolArgsJsonRequired
       ? "Compatibility field for execute_skill_tool. REQUIRED for this provider's plan actions that need tool arguments because nested objects can be emitted as empty objects. JSON string containing tool arguments, for example '{\"label\":\"alpha\"}'. Prefer this over nested toolArgs."
@@ -63804,10 +67912,10 @@ ${user}:`]
       actions: normalizePlanToolActions(args.actions),
       partial_ok: args.partial_ok === true,
       finalReadiness: normalizeFinalReadiness(args.finalReadiness),
-      reasoning: readString$t(args.reasoning),
+      reasoning: readString$u(args.reasoning),
       result_budget: readObject(args.result_budget),
       stitch: normalizePlanStitch(args.stitch),
-      synthesize_instruction: readString$t(args.synthesize_instruction) || readString$t(args.instruction),
+      synthesize_instruction: readString$u(args.synthesize_instruction) || readString$u(args.instruction),
       synthesize_per_action: args.synthesize_per_action === true,
       type: "plan"
     };
@@ -63819,12 +67927,12 @@ ${user}:`]
     for (const item of actions) {
       const record = readObject(item);
       if (!record) continue;
-      const name = readString$t(record.name || record.action || record.tool || record.toolName).toLowerCase();
+      const name = readString$u(record.name || record.action || record.tool || record.toolName).toLowerCase();
       if (!name) continue;
       normalized.push({
         args: normalizePlanActionArgs(name, record),
         name,
-        reasoning: readString$t(record.reasoning),
+        reasoning: readString$u(record.reasoning),
         section: normalizePlanSection(record.section),
         type: "action"
       });
@@ -63840,8 +67948,8 @@ ${user}:`]
       return mergeMissingArgs(args, genericArgs);
     }
 
-    const flatSkillName = readString$t(record.skillName || record.skill_name);
-    const flatToolName = readString$t(record.toolName || record.tool_name);
+    const flatSkillName = readString$u(record.skillName || record.skill_name);
+    const flatToolName = readString$u(record.toolName || record.tool_name);
     const flatToolArgs = genericArgs;
     const hasFlatFields = Boolean(flatSkillName || flatToolName || flatToolArgs);
 
@@ -63850,8 +67958,8 @@ ${user}:`]
     }
 
     const normalized = { ...args };
-    if (flatSkillName && !readString$t(normalized.skillName)) normalized.skillName = flatSkillName;
-    if (flatToolName && !readString$t(normalized.toolName)) normalized.toolName = flatToolName;
+    if (flatSkillName && !readString$u(normalized.skillName)) normalized.skillName = flatSkillName;
+    if (flatToolName && !readString$u(normalized.toolName)) normalized.toolName = flatToolName;
     if (flatToolArgs && !readObject(normalized.args)) normalized.args = flatToolArgs;
     return normalized;
   }
@@ -63860,8 +67968,8 @@ ${user}:`]
     const record = readObject(section);
     if (!record) return null;
     return {
-      prompt: readString$t(record.prompt),
-      title: readString$t(record.title)
+      prompt: readString$u(record.prompt),
+      title: readString$u(record.title)
     };
   }
 
@@ -63873,9 +67981,9 @@ ${user}:`]
       followups: Array.isArray(record.followups)
         ? record.followups.filter((item) => typeof item === "string")
         : [],
-      intro_prompt: readString$t(record.intro_prompt),
-      outro_prompt: readString$t(record.outro_prompt),
-      provenance: readString$t(record.provenance),
+      intro_prompt: readString$u(record.intro_prompt),
+      outro_prompt: readString$u(record.outro_prompt),
+      provenance: readString$u(record.provenance),
       result_budget: readObject(record.result_budget)
     };
   }
@@ -63889,7 +67997,7 @@ ${user}:`]
       .filter((call) => call && typeof call === "object")
       .map((call) => ({
         argsShape: summarizeDebugValue(parseArgs(call.arguments), 0),
-        name: readString$t(call.name) || null
+        name: readString$u(call.name) || null
       }));
   }
 
@@ -64203,7 +68311,7 @@ ${user}:`]
     return {};
   }
 
-  function readString$t(value) {
+  function readString$u(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -64220,7 +68328,7 @@ ${user}:`]
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     const hasAction = (name) => actionDefinitions.some((action) => action && action.name === name);
     const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
-    const nativePlanGuidance = readString$s(
+    const nativePlanGuidance = readString$t(
       capabilities &&
       capabilities.nativePlan &&
       capabilities.nativePlan.guidance
@@ -64244,7 +68352,9 @@ ${user}:`]
       "If loopState.actionPatternConvergence.convergenceSignal forbids repeat_same_terminal_intent, do not repeat workspace_publish_candidate/finalize with the same terminal intent; change observable facts through evidence/workspace recovery or publish a valid limited result with concrete remainingGaps.",
       "If loopState.actionPatternConvergence.terminalCorrectionState.active=true, the publish/finalize no-progress correction is sticky; do evidence/workspace/TodoState recovery from allowedNextMoves before another terminal attempt, or publish a valid limited result with concrete remainingGaps matching observed deficits.",
       "If loopState.actionPatternConvergence.terminalRetryCooldown.active=true, clean ready, direct finalize, and plain workspace_publish_candidate are cooling down; do recovery/TodoState sync first, or publish only valid limited with concrete remainingGaps and false failed-dimension flags.",
-      "If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, do not choose more web_search, todo_plan, todo_inspect, workspace_list, workspace_read, or skill-setup planning loops. Choose productive evidence/workspace recovery or valid limited with concrete remainingGaps.",
+      "If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, do not choose more web_search, todo_plan, todo_inspect, workspace_list, workspace_read, execute_skill_tool, or skill-setup planning loops. Choose productive evidence/workspace recovery or valid limited with concrete remainingGaps.",
+      "If loopState.actionPatternConvergence.structureRepairConvergence.active=true, the structure audit is not improving. Do not repeat workspace_read/workspace_list/append/insert around the same broken outline; use targeted workspace_write/workspace_replace to remove duplicate heading/section-number samples, then finalize/publish, or publish valid limited with concrete structure gaps.",
+      "If source and length are satisfied but terminal repair still shows structure plus todo deficits, use the listed patch action for heading/section-number repair and sync TodoState with todo_advance/todo_run_next/todo_cancel; do not append/insert/write/replace/search/read unless current allowedActions explicitly require it.",
       "If loopState.actionPatternConvergence.latestCorrectionSignal.status=escalated or terminalCorrectionState.ignoredTerminalCorrectionCount>=2, do not clean ready and do not retry plain publish/finalize; do recovery first or publish valid limited only.",
       "If loopState.terminalRepairState.active=true, terminal repair mode is active: direct finalize/final_answer and plain workspace_publish_candidate are unavailable. Choose a listed allowed recovery action, or call workspace_publish_candidate only with decision=limited, non-empty remainingGaps, and false flags for failed dimensions.",
       `Current standalone-only actions for plan validation: ${standaloneActionNames}. These must be standalone tool calls, not plan.actions entries.`,
@@ -64275,10 +68385,10 @@ ${user}:`]
 
   function buildRoleSystemPromptBlock(role) {
     if (!role || typeof role !== "object" || Array.isArray(role)) return "";
-    return readString$s(role.instructions);
+    return readString$t(role.instructions);
   }
 
-  function readString$s(value) {
+  function readString$t(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -64292,18 +68402,18 @@ ${user}:`]
       : {};
     const actions = Array.isArray(options.availableActions) ? options.availableActions : [];
     const tools = Array.isArray(options.tools) ? options.tools : [];
-    const prompt = readString$r(options.prompt);
-    const systemPrompt = readString$r(options.systemPrompt);
+    const prompt = readString$s(options.prompt);
+    const systemPrompt = readString$s(options.systemPrompt);
     return {
-      availableActions: actions.map((action) => readString$r(action && action.name)).filter(Boolean).slice(0, MAX_NAMES),
+      availableActions: actions.map((action) => readString$s(action && action.name)).filter(Boolean).slice(0, MAX_NAMES),
       availableActionCount: actions.length,
       activeSkill: readSkillName(options.activeAgentSkill || (runState.agentSkillContext && runState.agentSkillContext.activeSkill)),
       callKind: "planner_request",
       packetId: createPacketId(runState, options.mode || "planner"),
-      plannerMode: readString$r(options.mode) || readString$r(modeSelection.effectiveMode) || "n/a",
-      plannerModeReason: readString$r(modeSelection.reason) || "n/a",
-      provider: readString$r(request.provider) || "n/a",
-      model: readString$r(request.model) || "n/a",
+      plannerMode: readString$s(options.mode) || readString$s(modeSelection.effectiveMode) || "n/a",
+      plannerModeReason: readString$s(modeSelection.reason) || "n/a",
+      provider: readString$s(request.provider) || "n/a",
+      model: readString$s(request.model) || "n/a",
       prompt: summarizeTextPayload(prompt),
       requestPayload: createProviderRequestTrace({
         apiVariant: request.apiVariant,
@@ -64322,7 +68432,7 @@ ${user}:`]
       }),
       readSources: summarizeReadSources(runState.researchContext && runState.researchContext.readSources),
       systemPrompt: summarizeTextPayload(systemPrompt),
-      toolChoice: readString$r(options.toolChoice) || null,
+      toolChoice: readString$s(options.toolChoice) || null,
       tools: summarizeTools(tools),
       virtualWorkspace: summarizeVirtualWorkspace(runState.virtualWorkspace)
     };
@@ -64335,20 +68445,20 @@ ${user}:`]
     return {
       callKind: "planner_response",
       decision: summarizeDecision(decision),
-      finishReason: readString$r(response.finishReason) || null,
+      finishReason: readString$s(response.finishReason) || null,
       packetId: createPacketId(runState, options.mode || "planner"),
       parse: {
-        parseError: readString$r(options.parseError) || null,
-        repairPath: readString$r(options.repairPath) || "none",
-        responseType: readString$r(options.responseType) || inferResponseType(response, decision)
+        parseError: readString$s(options.parseError) || null,
+        repairPath: readString$s(options.repairPath) || "none",
+        responseType: readString$s(options.responseType) || inferResponseType(response, decision)
       },
-      provider: readString$r(options.provider) || readString$r(options.request && options.request.provider) || "n/a",
-      model: readString$r(options.model) || readString$r(options.request && options.request.model) || "n/a",
+      provider: readString$s(options.provider) || readString$s(options.request && options.request.provider) || "n/a",
+      model: readString$s(options.model) || readString$s(options.request && options.request.model) || "n/a",
       responsePayload: createProviderResponseTrace({
         durationMs: options.durationMs || response.durationMs,
         finishReason: response.finishReason,
-        model: readString$r(options.model) || readString$r(options.request && options.request.model) || "n/a",
-        provider: readString$r(options.provider) || readString$r(options.request && options.request.provider) || "n/a",
+        model: readString$s(options.model) || readString$s(options.request && options.request.model) || "n/a",
+        provider: readString$s(options.provider) || readString$s(options.request && options.request.provider) || "n/a",
         response: response.raw,
         status: response.status,
         text: response.text,
@@ -64361,9 +68471,9 @@ ${user}:`]
   }
 
   function createPacketId(runState, mode) {
-    const runId = readString$r(runState && runState.runId) || "run";
+    const runId = readString$s(runState && runState.runId) || "run";
     const cycle = Number.isInteger(runState && runState.cycleCount) ? runState.cycleCount : 0;
-    return `${runId}:${cycle}:${readString$r(mode) || "planner"}`;
+    return `${runId}:${cycle}:${readString$s(mode) || "planner"}`;
   }
 
   function summarizeTools(tools) {
@@ -64371,12 +68481,12 @@ ${user}:`]
     for (const group of tools) {
       if (group && Array.isArray(group.functionDeclarations)) {
         for (const declaration of group.functionDeclarations) {
-          const name = readString$r(declaration && declaration.name);
+          const name = readString$s(declaration && declaration.name);
           if (name) names.push(name);
         }
         continue;
       }
-      const name = readString$r(group && group.name);
+      const name = readString$s(group && group.name);
       if (name) names.push(name);
     }
     return {
@@ -64399,8 +68509,8 @@ ${user}:`]
       latest: latest ? {
         ok: latest.ok !== false,
         status: typeof latest.status === "number" ? latest.status : null,
-        tier: readString$r(latest.tier) || null,
-        url: readString$r(latest.url) || null
+        tier: readString$s(latest.tier) || null,
+        url: readString$s(latest.url) || null
       } : null,
       successful: sources.filter((source) => source && typeof source === "object" && source.ok !== false).length
     };
@@ -64431,8 +68541,8 @@ ${user}:`]
     if (!decision) return null;
     const finalReadiness = decision.finalReadiness && typeof decision.finalReadiness === "object"
       ? {
-        decision: readString$r(decision.finalReadiness.decision) || null,
-        evidenceMode: readString$r(decision.finalReadiness.evidenceMode) || null,
+        decision: readString$s(decision.finalReadiness.decision) || null,
+        evidenceMode: readString$s(decision.finalReadiness.evidenceMode) || null,
         limitations: summarizeTextPayload(decision.finalReadiness.limitations),
         requirementsAssessment: summarizeRequirementsAssessment(
           decision.finalReadiness.requirementsAssessment || decision.finalReadiness.selfAudit
@@ -64440,11 +68550,11 @@ ${user}:`]
       }
       : null;
     return {
-      actionName: readString$r(decision.name || decision.actionName) || null,
+      actionName: readString$s(decision.name || decision.actionName) || null,
       finalReadiness,
       instruction: summarizeTextPayload(decision.instruction || decision.synthesize_instruction),
       reasoning: summarizeTextPayload(decision.reasoning),
-      type: readString$r(decision.type) || null
+      type: readString$s(decision.type) || null
     };
   }
 
@@ -64456,18 +68566,18 @@ ${user}:`]
       evidenceSatisfied: typeof value.evidenceSatisfied === "boolean" ? value.evidenceSatisfied : null,
       lengthSatisfied: typeof value.lengthSatisfied === "boolean" ? value.lengthSatisfied : null,
       observedLength: readNumberOrNull(value.observedLength) ?? readNumberOrNull(value.actualLength),
-      observedLengthUnit: readString$r(value.observedLengthUnit || value.lengthUnit) || null,
+      observedLengthUnit: readString$s(value.observedLengthUnit || value.lengthUnit) || null,
       requestedLength: readNumberOrNull(value.requestedLength),
       requirementSatisfied: typeof value.requirementSatisfied === "boolean" ? value.requirementSatisfied : null,
-      summary: readString$r(value.summary) || null,
+      summary: readString$s(value.summary) || null,
       successfulReadUrlCount: readNumberOrNull(value.successfulReadUrlCount)
     };
   }
 
   function inferResponseType(response, decision) {
     if (Array.isArray(response.toolCalls) && response.toolCalls.length > 0) return "tool_call";
-    if (decision) return readString$r(decision.type) || "parsed";
-    if (readString$r(response.text)) return "text";
+    if (decision) return readString$s(decision.type) || "parsed";
+    if (readString$s(response.text)) return "text";
     return "empty";
   }
 
@@ -64485,7 +68595,7 @@ ${user}:`]
 
   function readSkillName(skill) {
     if (!skill || typeof skill !== "object") return null;
-    return readString$r(skill.name || skill.id || skill.skillId) || null;
+    return readString$s(skill.name || skill.id || skill.skillId) || null;
   }
 
   function readNumber$2(value) {
@@ -64496,7 +68606,7 @@ ${user}:`]
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
-  function readString$r(value) {
+  function readString$s(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -64696,11 +68806,11 @@ ${user}:`]
     if (runState.agentSkillContext && typeof runState.agentSkillContext === "object") {
       const activeSkill = runState.agentSkillContext.activeSkill;
       const lastReadSkill = runState.agentSkillContext.lastReadSkill;
-      if (readString$q(activeSkill && activeSkill.name) || readString$q(lastReadSkill && lastReadSkill.name)) {
+      if (readString$r(activeSkill && activeSkill.name) || readString$r(lastReadSkill && lastReadSkill.name)) {
         return true;
       }
     }
-    if (readString$q(options && options.activeAgentSkill && options.activeAgentSkill.name)) {
+    if (readString$r(options && options.activeAgentSkill && options.activeAgentSkill.name)) {
       return true;
     }
     const readSources = runState.researchContext && Array.isArray(runState.researchContext.readSources)
@@ -64756,7 +68866,7 @@ ${user}:`]
     return "fallback_to_envelope";
   }
 
-  function readString$q(value) {
+  function readString$r(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -64786,7 +68896,7 @@ ${user}:`]
 
     try {
       const replacement = await options.onInvalidPlannerOutput(
-        readString$q(rawText),
+        readString$r(rawText),
         parseError || null,
         options.runState || null
       );
@@ -64836,8 +68946,7 @@ ${user}:`]
       runState: options.runState,
       todoState: options.runState && options.runState.todoState,
       preferFinalizeOnLastResult: options.preferFinalizeOnLastResult,
-      goalAnchorBlock: options.goalAnchorBlock,
-      todoStateBlock: options.todoStateBlock
+      goalAnchorBlock: options.goalAnchorBlock
     });
     emitStep(options, "planner-system-prompt-profile", systemPromptProfile);
     emitStep(options, "agent-workflow-packet", createPlannerRequestPacket({
@@ -64908,7 +69017,11 @@ ${user}:`]
     // The deleted strict retry was push-mode: runtime authored a hardcoded
     // "stricter" prompt asking the LLM to retry with extra constraints.
 
-    if (!decision && shouldFallbackToWebSearch({
+    const longResearchGateRequired = isResearchQualityGateRequired(options.runState, {
+      prompt: options && options.request && options.request.prompt
+    });
+
+    if (!decision && !longResearchGateRequired && shouldFallbackToWebSearch({
       activeGoal: options.plannerState && options.plannerState.currentGoal,
       activeQuery: options.plannerState && options.plannerState.activeQuery,
       availableActions: options.availableActions,
@@ -65004,6 +69117,13 @@ ${user}:`]
     if (request.compactPlannerSystemPrompt === false) {
       return { compact: false, reason: "request_disabled" };
     }
+    // ADR-0033 Tier A — lite-tier models always run compact, even with rich
+    // state (active skill / todo / workspace). Capable models keep the
+    // state-based decision below. Host can pass `request.modelTier: "lite"`
+    // or `"capable"` to override the name-string heuristic.
+    if (isLiteTierModel(request.model, { modelTier: request.modelTier })) {
+      return { compact: true, reason: "lite_tier_model_compact" };
+    }
     if (hasSkillContext(options && options.activeAgentSkill)) {
       return { compact: false, reason: "active_agent_skill" };
     }
@@ -65085,7 +69205,8 @@ ${user}:`]
    *     cycles need a different budget than finalize (which carries the
    *     full evidence stack and emits the user-visible answer).
    *   - The signal that "this turn is long-running" is structural, not
-   *     a knob: a non-empty TodoState plan IS the signal.
+   *     a knob: a non-empty TodoState plan or long-research report contract
+   *     is the signal.
    *   - Hosts can still pin an explicit `request.timeoutMs`; this helper
    *     never overrides an explicit value.
    *
@@ -65100,6 +69221,7 @@ ${user}:`]
 
   const PLANNER_AUTOPILOT_TIMEOUT_MS = 120_000;
   const FINALIZE_AUTOPILOT_TIMEOUT_MS = 180_000;
+  const LONG_RESEARCH_MIN_LENGTH = 1000;
 
   /**
    * @param {object} options
@@ -65113,10 +69235,14 @@ ${user}:`]
     const opts = options && typeof options === "object" ? options : {};
     const explicit = readPositiveInteger$8(opts.baseTimeoutMs);
     if (explicit) return explicit;
-    if (!isAutopilotPlanInPlay(opts.runState)) return null;
+    if (!isLongRunningTurnInPlay(opts.runState)) return null;
     return opts.kind === "finalize"
       ? FINALIZE_AUTOPILOT_TIMEOUT_MS
       : PLANNER_AUTOPILOT_TIMEOUT_MS;
+  }
+
+  function isLongRunningTurnInPlay(runState) {
+    return isAutopilotPlanInPlay(runState) || isLongResearchInPlay(runState);
   }
 
   function isAutopilotPlanInPlay(runState) {
@@ -65130,10 +69256,35 @@ ${user}:`]
     return todoState.status === "active" || todoState.status === "completed";
   }
 
+  function isLongResearchInPlay(runState) {
+    if (!runState || typeof runState !== "object") return false;
+    if (readString$q(runState.researchActivation).toLowerCase() === "long_research") {
+      return true;
+    }
+    const loop = runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : null;
+    const gateSignal = loop && loop.gateSignal && typeof loop.gateSignal === "object"
+      ? loop.gateSignal
+      : null;
+    const packet = gateSignal && gateSignal.acceptancePacket && typeof gateSignal.acceptancePacket === "object"
+      ? gateSignal.acceptancePacket
+      : null;
+    const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
+      ? packet.requestedLength
+      : null;
+    const requestedValue = readPositiveInteger$8(requested && requested.value);
+    return Boolean(requestedValue && requestedValue >= LONG_RESEARCH_MIN_LENGTH);
+  }
+
   function readPositiveInteger$8(value) {
     if (typeof value !== "number" || !Number.isFinite(value)) return null;
     if (value <= 0) return null;
     return Math.floor(value);
+  }
+
+  function readString$q(value) {
+    return typeof value === "string" ? value.trim() : "";
   }
 
   /**
@@ -65304,7 +69455,7 @@ ${user}:`]
   function buildRecallPrompt(request) {
     return [
       "Latest user prompt:",
-      readString$1H(request && request.prompt) || "None",
+      readString$1I(request && request.prompt) || "None",
       "",
       "Session context:",
       JSON.stringify(request && request.sessionContext ? request.sessionContext : null, null, 2)
@@ -65313,7 +69464,7 @@ ${user}:`]
 
   function normalizeRecallValue(value) {
     const record = readObject$2(value) || {};
-    const answer = readString$1H(record.answer);
+    const answer = readString$1I(record.answer);
 
     return {
       answer,
@@ -65332,15 +69483,15 @@ ${user}:`]
       return null;
     }
 
-    const kind = readString$1H(record.kind);
-    const text = readString$1H(record.text);
+    const kind = readString$1I(record.kind);
+    const text = readString$1I(record.text);
     if (!kind || !text) {
       return null;
     }
 
     return {
       kind,
-      slot: readString$1H(record.slot) || null,
+      slot: readString$1I(record.slot) || null,
       text
     };
   }
@@ -65469,13 +69620,14 @@ ${user}:`]
       });
       const plannerAgentSkills = skillCatalogSelection.skills;
       runState.availableAgentSkills = cloneValue(plannerAgentSkills);
+      const plannerTerminalRepairState = refreshTerminalRepairBeforePlanner(runState, pushStep);
       const plannerActions = selectPlannerActions(availableActions, {
         activeAgentSkill,
         availableAgentSkills: plannerAgentSkills,
         lastReadAgentSkill: runState.agentSkillContext.lastReadSkill,
         prompt: request.prompt,
         runState,
-        terminalRepairState: runState.terminalRepairState
+        terminalRepairState: plannerTerminalRepairState || runState.terminalRepairState
       });
       const plannerPrompt = buildPlannerPrompt({
         activeAgentSkill,
@@ -65506,7 +69658,7 @@ ${user}:`]
         researchAcceptanceEvaluator: runState.researchAcceptanceEvaluator,
         requirementRecoveryEvaluator: runState.requirementRecoveryEvaluator,
         readUrlRecoverySignal: runState.readUrlRecoverySignal,
-        terminalRepairState: runState.terminalRepairState,
+        terminalRepairState: plannerTerminalRepairState || runState.terminalRepairState,
         searchResults: runState.researchContext.searchResults,
         toolContext: runState.toolContext,
         turnCount: runState.turnCount,
@@ -65559,6 +69711,7 @@ ${user}:`]
         pendingClarification: cloneValue(plannerEvidence.pendingClarification),
         hasSessionEvidenceBlock: plannerEvidence.hasSessionEvidenceBlock,
         plannerPromptPreview: plannerEvidence.promptPreview,
+        prompt: plannerEvidence.promptStats,
         promptSignal: plannerEvidence.promptSignal,
         provider: request.provider,
         ...createControlEnvelopeDetail(runState),
@@ -65825,6 +69978,24 @@ ${user}:`]
     return /did not include (assistant )?(text|text output)|empty response|response was empty|no text|no function calls?/.test(message);
   }
 
+  function refreshTerminalRepairBeforePlanner(runState, pushStep) {
+    const repair = refreshTerminalRepairState(runState, {
+      status: "before_planner"
+    });
+    if (repair && repair.active === true && typeof pushStep === "function") {
+      pushStep("terminal-repair-state-refreshed", {
+        active: true,
+        activeDeficits: Array.isArray(repair.activeDeficits) ? repair.activeDeficits.slice(0, 8) : [],
+        allowedActions: Array.isArray(repair.allowedActions) ? repair.allowedActions.slice(0, 12) : [],
+        budgetState: repair.budgetState || null,
+        ignoredCount: repair.ignoredCount || 0,
+        reason: repair.reason || null,
+        status: "before_planner"
+      });
+    }
+    return repair;
+  }
+
   function createPlannerEvidence(request, prompt, plannerState) {
     const promptText = typeof prompt === "string" ? prompt : "";
     const requestSessionContext = projectSessionContextFromSnapshot(
@@ -65852,6 +70023,7 @@ ${user}:`]
       openAmbiguity: plannerState.openAmbiguity,
       pendingClarification: plannerState.pendingClarification,
       promptPreview: truncateText(promptText, 1200),
+      promptStats: measurePlannerPromptSections(promptText),
       promptSignal: plannerState.promptSignal,
       shouldUseRecall: plannerState.shouldUseRecall === true,
       sessionContextMeta: summarizeSessionContextMeta(projectSessionContextFromPlannerState(
@@ -65978,6 +70150,52 @@ ${user}:`]
       return truncateText(JSON.stringify(response.toolCalls), 1600);
     }
     return "";
+  }
+
+  // Measures the char contribution of each known section in the planner user prompt.
+  // Sections are identified by their fixed header markers. Used for payload pressure analysis.
+  function measurePlannerPromptSections(promptText) {
+    if (!promptText) return { chars: 0 };
+    const total = promptText.length;
+    const marker = (label) => {
+      const idx = promptText.indexOf(label);
+      return idx >= 0 ? idx : -1;
+    };
+    const slice = (start, end) => (start >= 0 ? (end >= 0 ? end - start : total - start) : 0);
+    const loopStart = marker("Loop state:\n");
+    const historyStart = marker("Action history:\n");
+    const workspaceStart = marker("Virtual workspace draft artifacts:");
+    const actionsStart = marker("Available actions:\n");
+    const planStart = marker("Plan state:\n");
+    const loopStateChars = slice(loopStart, historyStart >= 0 ? historyStart : -1);
+    const loopFieldBreakdown = measureLoopStateFields(promptText, loopStart);
+    return {
+      chars: total,
+      actionsChars: slice(actionsStart, loopStart >= 0 ? loopStart : historyStart),
+      historyChars: slice(historyStart, workspaceStart >= 0 ? workspaceStart : -1),
+      loopStateChars,
+      planChars: slice(planStart, historyStart >= 0 ? historyStart : -1),
+      workspaceChars: slice(workspaceStart, -1),
+      loopFields: loopFieldBreakdown
+    };
+  }
+
+  function measureLoopStateFields(promptText, loopStart) {
+    if (loopStart < 0) return null;
+    const jsonStart = loopStart + "Loop state:\n".length;
+    // Compact JSON is a single line — stop at the first newline after jsonStart
+    const lineEnd = promptText.indexOf("\n", jsonStart);
+    const jsonText = (lineEnd >= 0 ? promptText.slice(jsonStart, lineEnd) : promptText.slice(jsonStart)).trim();
+    try {
+      const obj = JSON.parse(jsonText);
+      const breakdown = {};
+      for (const key of Object.keys(obj)) {
+        breakdown[key] = JSON.stringify(obj[key]).length;
+      }
+      return breakdown;
+    } catch {
+      return null;
+    }
   }
 
   function normalizeActionPolicy(value) {
@@ -66151,6 +70369,10 @@ ${user}:`]
       if (!isActionAvailable(actionName, session.availableActions)) {
         return { ok: false, error: `Plan action ${index} references disabled action "${actionName}".` };
       }
+      const actionSurfaceValidation = validateRuntimeActionSurface(session, actionName, index);
+      if (!actionSurfaceValidation.ok) {
+        return actionSurfaceValidation;
+      }
       const planContract = readPlanActionContract(action);
       if (planContract.allowedInPlan === false) {
         return createPlanValidationError(
@@ -66289,6 +70511,96 @@ ${user}:`]
     };
   }
 
+  function validateRuntimeActionSurface(session, actionName, index) {
+    const selectedActions = selectPlannerActions(session.availableActions, {
+      activeAgentSkill: session.runState && session.runState.agentSkillContext
+        ? session.runState.agentSkillContext.activeSkill
+        : null,
+      availableAgentSkills: session.runState && Array.isArray(session.runState.availableAgentSkills)
+        ? session.runState.availableAgentSkills
+        : session.runtimeConfig && Array.isArray(session.runtimeConfig.agentSkills)
+          ? session.runtimeConfig.agentSkills
+          : [],
+      lastReadAgentSkill: session.runState && session.runState.agentSkillContext
+        ? session.runState.agentSkillContext.lastReadSkill
+        : null,
+      prompt: session.request && session.request.prompt,
+      runState: session.runState,
+      terminalRepairState: session.runState && session.runState.terminalRepairState
+    });
+    if (isActionAvailable(actionName, selectedActions)) {
+      return { ok: true };
+    }
+    const selectedActionNames = selectedActions.map((action) => readString$o(action && action.name)).filter(Boolean);
+    const detail = buildRuntimeActionSurfaceDetail(session, selectedActionNames);
+    return createPlanValidationError(
+      `Plan action ${index} "${actionName}" is currently hidden by the runtime action surface.`,
+      {
+        code: "action_surface_blocked_in_plan",
+        detail
+      }
+    );
+  }
+
+  function buildRuntimeActionSurfaceDetail(session, allowedActionNames) {
+    const runState = session && session.runState && typeof session.runState === "object"
+      ? session.runState
+      : {};
+    const terminalRepairState = runState.terminalRepairState && typeof runState.terminalRepairState === "object"
+      ? runState.terminalRepairState
+      : null;
+    if (terminalRepairState && terminalRepairState.active === true) {
+      const repairAllowed = readStringArray(terminalRepairState.allowedActions);
+      return [
+        "The active terminalRepairState is constraining the next action surface.",
+        repairAllowed.length > 0
+          ? `Choose one of these allowed repair actions: ${repairAllowed.join(", ")}.`
+          : "Choose a repair action currently exposed by the planner action surface.",
+        readString$o(terminalRepairState.reason)
+          ? `Repair reason: ${readString$o(terminalRepairState.reason)}.`
+          : "",
+        readString$o(terminalRepairState.requiredRepair)
+          ? `Required repair: ${readString$o(terminalRepairState.requiredRepair)}.`
+          : ""
+      ].filter(Boolean).join(" ");
+    }
+
+    const convergence = runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
+      ? runState.actionPatternConvergence
+      : null;
+    const readOnlyState = convergence &&
+      convergence.readOnlyPlanningState &&
+      typeof convergence.readOnlyPlanningState === "object"
+      ? convergence.readOnlyPlanningState
+      : null;
+    if (readOnlyState && readOnlyState.active === true) {
+      return [
+        "The active readOnlyPlanningState is constraining the next action surface because recent actions did not create productive progress.",
+        allowedActionNames.length > 0
+          ? `Choose an exposed productive action instead: ${allowedActionNames.join(", ")}.`
+          : "Choose an action that creates productive progress before retrying read-only planning."
+      ].join(" ");
+    }
+
+    const structureState = convergence &&
+      convergence.structureRepairConvergence &&
+      typeof convergence.structureRepairConvergence === "object"
+      ? convergence.structureRepairConvergence
+      : null;
+    if (structureState && structureState.active === true) {
+      return [
+        "The active structureRepairConvergence is constraining the next action surface.",
+        allowedActionNames.length > 0
+          ? `Choose an exposed structure repair action instead: ${allowedActionNames.join(", ")}.`
+          : "Choose a structure repair action currently exposed by the planner action surface."
+      ].join(" ");
+    }
+
+    return allowedActionNames.length > 0
+      ? `Choose one of the currently exposed actions: ${allowedActionNames.join(", ")}.`
+      : "No runtime-exposed plan action is currently available for that action name.";
+  }
+
   function validateStitch(stitch) {
     if (stitch == null) {
       return { ok: true };
@@ -66360,6 +70672,10 @@ ${user}:`]
 
   function readString$o(value) {
     return typeof value === "string" ? value.trim() : "";
+  }
+
+  function readStringArray(value) {
+    return Array.isArray(value) ? value.map(readString$o).filter(Boolean) : [];
   }
 
   function isDrillHint$1(value) {
@@ -66489,7 +70805,7 @@ ${user}:`]
     );
     if (!decision || decision.name !== "todo_run_next") return;
 
-    const result = applyTodoRunNextToRunState(session.runState, decision.args);
+    const result = applyTodoRunNextToRunState(session.runState, decision.args, createActionContext(session));
     session.pushStep("todo-autopilot-action-progress", {
       actionName,
       summary: result.summary,
@@ -67469,7 +71785,7 @@ ${user}:`]
     const message = "Research finalize contract missing AI readiness: choose read_url/web_search/workspace work, or finalize again with finalReadiness.decision='limited'/'ready' plus optional finalReadiness.requirementsAssessment and honest limitations. Runtime is not judging source, length, or content sufficiency.";
     contract.status = "missing_ai_readiness";
     session.runState.researchFinalizeContract = contract;
-    const actionName = readString$1H(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1I(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const output = {
       contract: cloneValue(contract),
       kind: "research_finalize_contract",
@@ -67503,7 +71819,7 @@ ${user}:`]
     const declaredUnsatisfied = readDeclaredUnsatisfied(contract);
     if (declaredUnsatisfied.length === 0) return null;
 
-    const actionName = readString$1H(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1I(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const observed = contract.finalReadinessAssessment && typeof contract.finalReadinessAssessment === "object"
       ? contract.finalReadinessAssessment.observed
       : null;
@@ -67569,7 +71885,7 @@ ${user}:`]
       return null;
     }
 
-    const actionName = readString$1H(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1I(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const evaluator = refreshResearchAcceptanceEvaluator(session.runState, {
       actionName,
       conflictIssues: audit.issues,
@@ -67678,7 +71994,7 @@ ${user}:`]
       : null;
     if (!candidate && !draft && !longFormContract) return null;
 
-    const actionName = readString$1H(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1I(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const signal = {
       actionName,
       cycle: runState.cycleCount,
@@ -67755,7 +72071,7 @@ ${user}:`]
     if (!contract || typeof contract !== "object") return false;
     const value = readNumber$1(contract.value);
     if (value <= 0) return false;
-    const unit = readString$1H(contract.unit).toLowerCase();
+    const unit = readString$1I(contract.unit).toLowerCase();
     if (unit === "words") return value >= 1000;
     if (unit === "chars" || unit === "characters") return value >= 3000;
     return false;
@@ -68099,7 +72415,7 @@ ${user}:`]
       if (session.actionRegistry.get("workspace_publish_candidate")) return true;
     }
     return (Array.isArray(session && session.availableActions) ? session.availableActions : [])
-      .some((action) => action && readString$1H(action.name) === "workspace_publish_candidate");
+      .some((action) => action && readString$1I(action.name) === "workspace_publish_candidate");
   }
 
   function readWorkspaceCandidate(workspace) {
@@ -68108,10 +72424,10 @@ ${user}:`]
       ? workspace.files
       : {};
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const path = readString$1H(quality.finalCandidatePath) || "final_candidate.md";
+    const path = readString$1I(quality.finalCandidatePath) || "final_candidate.md";
     if (path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
     const file = files[path];
-    const content = readString$1H(file && file.content);
+    const content = readString$1I(file && file.content);
     if (!content) return null;
     const stats = quality.finalCandidateStats && typeof quality.finalCandidateStats === "object"
       ? quality.finalCandidateStats
@@ -68134,7 +72450,7 @@ ${user}:`]
       ? workspace.files
       : {};
     const file = files["draft.md"];
-    const content = readString$1H(file && file.content);
+    const content = readString$1I(file && file.content);
     if (content) {
       return {
         path: "draft.md",
@@ -68147,7 +72463,7 @@ ${user}:`]
 
   function readWorkspaceCustomDraft(workspace, files) {
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const finalCandidatePath = readString$1H(quality.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1I(quality.finalCandidatePath) || "final_candidate.md";
     const reserved = new Set([
       finalCandidatePath,
       "final_candidate.md",
@@ -68159,10 +72475,10 @@ ${user}:`]
     const contentActions = new Set(["write", "replace", "append", "insert_after_section"]);
     for (let i = operations.length - 1; i >= 0; i -= 1) {
       const operation = operations[i];
-      if (!operation || !contentActions.has(readString$1H(operation.action))) continue;
-      const path = readString$1H(operation.path);
+      if (!operation || !contentActions.has(readString$1I(operation.action))) continue;
+      const path = readString$1I(operation.path);
       if (!path || reserved.has(path) || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) continue;
-      const content = readString$1H(files[path] && files[path].content);
+      const content = readString$1I(files[path] && files[path].content);
       if (!content) continue;
       return {
         path,
@@ -68173,9 +72489,9 @@ ${user}:`]
 
     let best = null;
     for (const [path, file] of Object.entries(files)) {
-      const safePath = readString$1H(path);
+      const safePath = readString$1I(path);
       if (!safePath || reserved.has(safePath) || safePath.startsWith("/") || safePath.includes("..") || /[\\]/.test(safePath)) continue;
-      const content = readString$1H(file && file.content);
+      const content = readString$1I(file && file.content);
       if (!content) continue;
       if (!best || content.length > best.content.length) {
         best = { content, path: safePath };
@@ -68190,7 +72506,7 @@ ${user}:`]
   }
 
   function summarizeTextForSignal(content) {
-    const text = readString$1H(content);
+    const text = readString$1I(content);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -68206,7 +72522,7 @@ ${user}:`]
   }
 
   function readActionNameForTerminalSource(sourceLabel) {
-    const source = readString$1H(sourceLabel);
+    const source = readString$1I(sourceLabel);
     if (source === "planner_final") return "final";
     if (source === "planner_finalize") return "finalize";
     return source || "finalize";
@@ -69248,7 +73564,7 @@ ${user}:`]
       ...createOrientRecord(observeRecord, session.runtimeConfig),
       ambiguityState: inputResolution.ambiguityState,
       availableActions: cloneValue(session.availableActions.map((action) => action.name)),
-      clarificationStatus: readString$1H(inputResolution && inputResolution.clarificationStatus) || "none",
+      clarificationStatus: readString$1I(inputResolution && inputResolution.clarificationStatus) || "none",
       executionClass: session.runState.executionClass,
       evidenceState: inputResolution.evidenceState,
       intentState: cloneValue(inputResolution.intentState || null),
@@ -69321,7 +73637,7 @@ ${user}:`]
     const intentState = inputResolution && typeof inputResolution.intentState === "object"
       ? inputResolution.intentState
       : null;
-    const activeQuery = readString$1H(inputResolution && inputResolution.activeQuery);
+    const activeQuery = readString$1I(inputResolution && inputResolution.activeQuery);
 
     if (!inquiryContext && !intentState) {
       return createContextSnapshot(snapshot);
@@ -69329,12 +73645,12 @@ ${user}:`]
 
     const nextInquiryContext = normalizeInquiryContext({
       ...snapshot.inquiryContext,
-      activeGoal: readString$1H(inquiryContext && inquiryContext.activeGoal)
-        || readString$1H(intentState && intentState.goal)
+      activeGoal: readString$1I(inquiryContext && inquiryContext.activeGoal)
+        || readString$1I(intentState && intentState.goal)
         || snapshot.inquiryContext.activeGoal,
       activeQuery: activeQuery || snapshot.inquiryContext.activeQuery,
-      activeTopic: readString$1H(inquiryContext && inquiryContext.activeTopic)
-        || readString$1H(intentState && intentState.topic)
+      activeTopic: readString$1I(inquiryContext && inquiryContext.activeTopic)
+        || readString$1I(intentState && intentState.topic)
         || snapshot.inquiryContext.activeTopic,
       lastClarificationResolution: hasOwnValue(inquiryContext, "lastClarificationResolution")
         ? inquiryContext.lastClarificationResolution
@@ -69401,7 +73717,7 @@ ${user}:`]
   function evaluateCycleDrift(session, turnState) {
     const config = session.runtimeConfig && session.runtimeConfig.driftDetection;
     if (!config || config.enabled !== true) return null;
-    const goalAnchorText = readString$1H(turnState && turnState.goalAnchorText);
+    const goalAnchorText = readString$1I(turnState && turnState.goalAnchorText);
     if (!goalAnchorText) return null;
     const trajectoryText = computeTrajectorySignal(session.runState, {
       maxEntries: config.maxTrajectoryEntries
@@ -69447,13 +73763,13 @@ ${user}:`]
       return false;
     }
 
-    const actionName = readString$1H(decision.name);
+    const actionName = readString$1I(decision.name);
     if (!actionName) {
       return false;
     }
 
     return (Array.isArray(availableActions) ? availableActions : []).some(
-      (action) => action && typeof action === "object" && readString$1H(action.name) === actionName
+      (action) => action && typeof action === "object" && readString$1I(action.name) === actionName
     );
   }
 
@@ -69499,7 +73815,7 @@ ${user}:`]
         break;
       }
       if (entry.kind === "action_error") {
-        candidateName = readString$1H(entry.actionName) || null;
+        candidateName = readString$1I(entry.actionName) || null;
         break;
       }
       if (entry.kind === "planner_invalid_action") {
@@ -71333,41 +75649,63 @@ ${user}:`]
   function maybeBlockDirectTerminalDuringRepair(session, actionName, decision) {
     const type = readString$f(decision && decision.type);
     if (type !== "final" && type !== "finalize") return false;
-    const output = {
-      ok: false,
-      control: "continue",
-      kind: "terminal_repair_required",
-      status: "blocked",
-      reason: "direct_terminal_suppressed_by_terminal_repair",
-      actionName,
-      message: "Terminal repair mode is active. Direct final/finalize cannot bypass workspace publish or valid limited contract."
-    };
     const repair = refreshTerminalRepairState(session.runState, {
       actionName,
       decision,
-      output,
+      output: { ok: false, control: "continue", kind: "terminal_repair_required", status: "blocked",
+        reason: "direct_terminal_suppressed_by_terminal_repair", actionName,
+        message: DEFAULT_TERMINAL_REPAIR_STRINGS.directTerminalBlock.message },
       status: "terminal_repair_direct_terminal_block"
     });
     if (!repair || repair.active !== true) return false;
-    session.pushStep("terminal-repair-direct-terminal-blocked", {
-      actionName,
-      activeDeficits: Array.isArray(repair.activeDeficits) ? repair.activeDeficits.slice(0, 8) : [],
-      ignoredCount: repair.ignoredCount || 0,
-      reason: repair.reason || output.reason
-    });
+
+    const isHardVeto = readString$f(repair.escalation) === "hard_veto";
+    const ignoredCount = repair.ignoredCount || 0;
+    const message = isHardVeto
+      ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
+          actionName,
+          ignoredCount,
+          budgetState: repair.budgetState,
+          activeDeficits: repair.activeDeficits,
+          allowedActions: repair.allowedActions,
+          observableDeficits: repair.observableDeficits
+        })
+      : DEFAULT_TERMINAL_REPAIR_STRINGS.directTerminalBlock.message;
+    const kind = isHardVeto ? "terminal_repair_hard_veto_block" : "terminal_repair_required";
+
+    session.pushStep(
+      isHardVeto ? "terminal-repair-hard-veto-blocked" : "terminal-repair-direct-terminal-blocked",
+      {
+        actionName,
+        activeDeficits: Array.isArray(repair.activeDeficits) ? repair.activeDeficits.slice(0, 8) : [],
+        escalation: repair.escalation || "advisory",
+        ignoredCount,
+        reason: repair.reason || "direct_terminal_suppressed_by_terminal_repair"
+      }
+    );
     session.actionHistory.push({
       actionName,
-      kind: "terminal_repair_required",
-      summary: "terminal repair mode blocked direct final/finalize; use recovery action or valid limited workspace_publish_candidate"
+      kind,
+      summary: isHardVeto
+        ? "terminal repair HARD VETO — direct final/finalize blocked; must use workspace_publish_candidate with decision=limited"
+        : "terminal repair mode blocked direct final/finalize; use recovery action or valid limited workspace_publish_candidate"
     });
     session.runState.lastAction = actionName;
     session.runState.observation = {
       actionName,
-      kind: "terminal_repair_required",
-      message: output.message,
+      kind,
+      message,
       output: {
-        ...output,
-        terminalRepairState: summarizeTerminalRepairState(repair)
+        ok: false,
+        control: "continue",
+        kind,
+        status: "blocked",
+        reason: "direct_terminal_suppressed_by_terminal_repair",
+        actionName,
+        escalation: repair.escalation || "advisory",
+        ignoredCount,
+        terminalRepairState: summarizeTerminalRepairState(repair),
+        message
       }
     };
     return true;
@@ -74755,6 +79093,7 @@ ${user}:`]
     });
     let sessionContextMeta = createSessionContextMeta(contextSnapshot, plan);
     let summaryUpdatedAt = null;
+    let compactionUsage = null;
 
     if (evaluatedBudget.needsCompaction) {
       const compactionMessages = selectCompactionMessages(
@@ -74771,7 +79110,7 @@ ${user}:`]
             ? summaryRecord.updatedAt
             : null;
 
-          const nextSummary = await summarizeSessionContext({
+          const compactionResult = await summarizeSessionContext({
             input,
             callerAbortSignal: options.callerAbortSignal || null,
             contextSnapshot,
@@ -74783,6 +79122,13 @@ ${user}:`]
             threadId: scopeThreadId,
             previousSummary: summaryRecord && summaryRecord.text ? summaryRecord.text : ""
           });
+          const nextSummaryText = compactionResult.text;
+          compactionUsage = {
+            usage: compactionResult.usage,
+            model: compactionResult.model,
+            provider: compactionResult.provider,
+            latencyMs: compactionResult.latencyMs
+          };
 
           // AGRUN-145 Slice D — Pre-compute the compaction window floor so
           // the summary record carries `oldestPreservedTurnId` (turnId of
@@ -74810,12 +79156,12 @@ ${user}:`]
             buildProposed: () => ({
               format: sessionPolicy.compaction.summaryFormat,
               meta: {
-                estimatedTokens: estimateStructuredSummaryTokens(nextSummary, sessionPolicy.charsPerToken),
+                estimatedTokens: estimateStructuredSummaryTokens(nextSummaryText, sessionPolicy.charsPerToken),
                 sourceMessageCount: compactionMessages.length
               },
               sessionId,
               threadId: compactionThreadId,
-              text: nextSummary,
+              text: nextSummaryText,
               uptoMessageId: compactionMessages[compactionMessages.length - 1].id,
               oldestPreservedTurnId,
               updatedAt: Date.now()
@@ -74876,11 +79222,13 @@ ${user}:`]
         plan,
         sessionContextMeta,
         summaryUpdatedAt,
-        compactionWindow
+        compactionWindow,
+        compactionUsage
       );
     }
 
     return {
+      compactionUsage,
       compactionWindow,
       contextSnapshot,
       error: createPromptBudgetError(input, plan.budget, sessionContextMeta && sessionContextMeta.contextWindow),
@@ -74948,6 +79296,7 @@ ${user}:`]
   }
 
   async function summarizeSessionContext(options) {
+    const startMs = Date.now();
     const response = await requestProviderCompletion(
       {
         ...options.input,
@@ -74968,7 +79317,13 @@ ${user}:`]
       }
     );
 
-    return formatStructuredSummary(response.text.trim(), options.contextSnapshot, options.messages);
+    return {
+      text: formatStructuredSummary(response.text.trim(), options.contextSnapshot, options.messages),
+      usage: response.usage || null,
+      model: typeof response.model === "string" ? response.model : null,
+      provider: typeof response.provider === "string" ? response.provider : null,
+      latencyMs: Date.now() - startMs
+    };
   }
 
   function createPreparedSnapshot(input, sessionRecord, sessionMemory) {
@@ -75029,9 +79384,11 @@ ${user}:`]
     plan,
     sessionContextMeta,
     summaryUpdatedAt,
-    compactionWindow
+    compactionWindow,
+    compactionUsage
   ) {
     return {
+      compactionUsage: compactionUsage || null,
       compactionWindow: compactionWindow || null,
       contextSnapshot,
       input: buildPreparedProviderInput(input, messages, sessionPolicy, contextSnapshot, plan),
@@ -75630,6 +79987,9 @@ ${user}:`]
       // turn id (which would collide with stamped provenance entries).
       lastRunSequence: 0,
       lastTokenUsage: null,
+      // AGRUN-240 — Session lineage. Null until caller passes parentSessionId
+      // in session.run() input, enabling orchestrator-worker task tree debugging.
+      parentSessionId: null,
       updatedAt: now,
       // AGRUN-206 — Optimistic concurrency token. `saveSession` rejects
       // writes whose `version` does not match the stored one, so two
@@ -75859,16 +80219,16 @@ ${user}:`]
       return null;
     }
 
-    const kind = readString$1H(record.kind);
-    const slot = readString$1H(record.slot);
-    const text = readString$1H(record.text);
+    const kind = readString$1I(record.kind);
+    const slot = readString$1I(record.slot);
+    const text = readString$1I(record.text);
 
     if (!MEMORY_KINDS$1.has(kind) || !slot || !text) {
       return null;
     }
 
     return {
-      confidence: clampConfidence$1(readNumber$k(record.confidence, 0.8)),
+      confidence: clampConfidence$1(readNumber$l(record.confidence, 0.8)),
       kind,
       slot,
       text
@@ -76179,6 +80539,12 @@ ${user}:`]
         throw createAbortError$1("Run aborted by caller before session turn started.");
       }
 
+      // AGRUN-240 — Read parentSessionId from input object (first arg to session.run).
+      const incomingParentSessionId = input && typeof input === "object" && !Array.isArray(input)
+        && typeof input.parentSessionId === "string" && input.parentSessionId.trim()
+        ? input.parentSessionId.trim()
+        : null;
+
       const userMessage = persistUserMessage
         ? createPendingUserMessage(sessionRecord.id, input)
         : null;
@@ -76202,6 +80568,23 @@ ${user}:`]
       const threadScope = readThreadScope(options.runtimeConfig, threadRouting);
 
       const prepared = await prepareSessionInput(input, userMessage, threadScope, callerAbortSignal);
+
+      const compactionSnapshot = prepared.compactionUsage
+        ? createUsageSnapshot(prepared.compactionUsage)
+        : null;
+      if (compactionSnapshot) {
+        sessionRecord.cumulativeUsage = accumulateUsage(sessionRecord.cumulativeUsage, compactionSnapshot);
+        if (typeof onStep === "function") {
+          onStep({
+            type: "compaction-completed",
+            inputTokens: compactionSnapshot.inputTokens,
+            outputTokens: compactionSnapshot.outputTokens,
+            totalTokens: compactionSnapshot.totalTokens,
+            model: compactionSnapshot.model,
+            provider: compactionSnapshot.provider
+          });
+        }
+      }
 
       if (prepared.error) {
         return handlePreparedSessionError(prepared, userMessage, onStep);
@@ -76310,6 +80693,8 @@ ${user}:`]
       }
       result.runState.sessionContextSource = prepared.sessionContextSource || result.runState.sessionContextSource || null;
       result.runState.approvalResumeFallbackUsed = prepared.approvalResumeFallbackUsed === true;
+      // AGRUN-240 — Project parentSessionId onto runState snapshot.
+      result.runState.parentSessionId = incomingParentSessionId || sessionRecord.parentSessionId || null;
 
       if (userMessage) {
         userMessage.runId = result.runState.runId;
@@ -76390,7 +80775,25 @@ ${user}:`]
         sessionRecord.cumulativeUsage = accumulateUsage(sessionRecord.cumulativeUsage, usageSnapshot);
       }
 
+      if (compactionSnapshot && result.runState && result.runState.costLedger) {
+        recordCostEntry(result.runState.costLedger, {
+          phase: "planner",
+          callKind: "compaction",
+          provider: compactionSnapshot.provider,
+          model: compactionSnapshot.model,
+          inputTokens: compactionSnapshot.inputTokens,
+          outputTokens: compactionSnapshot.outputTokens,
+          totalTokens: compactionSnapshot.totalTokens,
+          latencyMs: prepared.compactionUsage && prepared.compactionUsage.latencyMs
+        });
+      }
+
       sessionRecord.lastRun = cloneValue(runtimeState.lastRun);
+      // AGRUN-240 — Persist parentSessionId latch: set once on first non-null, callers may
+      // override by passing a new value on any subsequent run() call.
+      if (incomingParentSessionId) {
+        sessionRecord.parentSessionId = incomingParentSessionId;
+      }
       sessionRecord.contextSnapshot = cloneValue(
         result.runState && result.runState.contextSnapshot
           ? result.runState.contextSnapshot

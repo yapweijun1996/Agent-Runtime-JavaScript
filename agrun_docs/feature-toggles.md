@@ -239,7 +239,7 @@ Bridge note: this toggle exists because small models (e.g. Gemini Flash-Lite) of
 
 ## Session Budget (Loop Convergence)
 
-A composite budget that guarantees long-running tasks converge. Enabled by default. Complements `maxSteps` (which is a hard ceiling) with four finer-grained caps that trigger an **honest forced finalize** (not a thrown error) when the agent is clearly stuck.
+A composite budget that guarantees long-running tasks converge. Enabled by default. Complements `maxSteps` (which is a hard ceiling) with four finer-grained caps that emit a **convergence signal** on `runState.sessionBudget`. The signal is surfaced to the planner via `loopState.sessionBudget`; the AI sees it and decides how to react (switch tactics, finalize, or accept the budget). The runtime does not force-finalize on breach — that push-mode site was removed per ADR-0026. See [action-loop-session-loop.js:121-122](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/action-loop-session-loop.js) for the in-source tombstone.
 
 Shipped in AGRUN-141 (P0). Design: [agrun_docs/long-running-multi-topic-tasks.md](./long-running-multi-topic-tasks.md).
 

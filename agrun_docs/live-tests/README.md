@@ -2,9 +2,9 @@
 
 Browser / real-LLM live test evidence. Each file is a verification record for a specific runtime contract, ADR, or fix. Tests are historical evidence (frozen at the run date), not architecture authority — see [`../architecture-ssot.md`](../architecture-ssot.md) for the authority order.
 
-**Total: 61 records (2026-04-26 to 2026-05-14).**
+**Total: 76 records (2026-04-26 to 2026-05-16).**
 
-> Last reviewed: 2026-05-14.
+> Last reviewed: 2026-05-16.
 
 ---
 
@@ -89,6 +89,7 @@ Browser / real-LLM live test evidence. Each file is a verification record for a 
 - [agrun-214o-audit-2026-05-09](./agrun-214o-audit-2026-05-09.md)
 - [ai-workflow-finalize-audit-2026-05-09](./ai-workflow-finalize-audit-2026-05-09.md)
 - [harness-engineering-2026-report](./harness-engineering-2026-report.md)
+- [codeloom-index-scope-2026-05-16](./codeloom-index-scope-2026-05-16.md)
 
 ---
 
@@ -108,6 +109,7 @@ Browser / real-LLM live test evidence. Each file is a verification record for a 
 
 | Date | Records |
 |---|---|
+| 2026-05-16 | 6 |
 | 2026-05-14 | 2 |
 | 2026-05-13 | 5 |
 | 2026-05-12 | 1 |

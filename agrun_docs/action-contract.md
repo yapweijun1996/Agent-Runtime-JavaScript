@@ -200,6 +200,53 @@ Rules:
 - `actionRegistry.listForPlanner()` is the source of truth for planner-visible actions
 - `actionRegistry.list()` is for public runtime state only
 
+### Virtual Workspace Patch Contract
+
+`workspace_propose_patch` and `workspace_apply_patch` are a two-step
+mutation contract for risky long-report repair.
+
+Rules:
+
+- `workspace_propose_patch` is preview-only. It writes `runState.virtualWorkspace.pendingPatch` but does not change file content, file version, workspace version, or publish protocol.
+- Patch v1 uses structured operations, not unified diff text:
+  `replace`, `append`, `insert_after_section`, and `normalize_headings`.
+- Valid operation shapes are:
+  `append { content, separator? }`,
+  `insert_after_section { heading, content, separator? }`,
+  `replace { find, replace, replace_all? }`, and
+  `normalize_headings { headings:[{ lineNumber, text }] }`.
+- `replace` is an exact-current-text operation. It must not be used as
+  `{ type: "replace", content: "full document" }`; that shape is
+  preview-blocked and the AI should either provide `find` + `replace` or
+  switch to `append` / `insert_after_section`.
+- `normalize_headings` is for structure-only duplicate heading/section-number
+  repair. The AI supplies `lineNumber` and replacement heading text; runtime
+  only verifies that the line exists, is currently a Markdown heading, and that
+  the preview does not worsen structure. Runtime must not choose the new
+  heading text.
+- The propose result exposes `patchId`, `baseVersion`, `beforeWords`,
+  `afterWords`, `deltaWords`, `changed`, `status`, `riskFlags`, and
+  `previewSummary`. Action output may include compact `structureBefore` /
+  `structureAfter` summaries and a short `suggestion` for blocked previews. It
+  must not expose the full preview text.
+- Blocking `riskFlags` are `not_found`, `ambiguous`, `no_growth`, and
+  `structure_maybe_worse`. AI must revise the patch or choose
+  `workspace_append` / `workspace_insert_after_section` instead of
+  finalizing when these appear.
+- `workspace_apply_patch` applies only the latest valid pending patch. It
+  refuses stale `baseVersion`, `patchId` mismatch, invalid previews, and
+  previews whose stored hash no longer matches.
+- Apply success records one workspace operation with
+  `action: "apply_patch"`, increments the target file version, refreshes
+  workspace quality/text stats, and clears `pendingPatch`.
+- Runtime validates and applies AI-authored patch operations; runtime must
+  not invent the patch content.
+- During WMG hard-veto terminal repair, a blocked pending patch can
+  temporarily remove `workspace_propose_patch` / `workspace_apply_patch`
+  from the next action surface so the AI must use observable growth
+  actions (`workspace_append` / `workspace_insert_after_section`) or an
+  honest limited publish instead of repeating the same invalid preview.
+
 ### Native Tool Schema Contract
 
 When `plannerMode: "native_tools"` is active, provider tool/function schemas are generated from the same planner action contract:

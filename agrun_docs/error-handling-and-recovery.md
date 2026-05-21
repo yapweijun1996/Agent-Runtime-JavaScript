@@ -281,6 +281,38 @@ The runtime tracks `plannerInvalidCount` across cycles. This prevents infinite l
 
 When `plannerInvalidCount` exceeds a threshold, `handleInvalidPlannerDecision()` may terminate the run with a failure result rather than continuing to retry.
 
+## Convergence and Action Loop Stability
+
+`src/runtime/action-pattern-convergence.js` detects oscillation and no-progress loops and escalates from advisory (prompt-level pressure) to hard_veto (action surface removal + preflight block).
+
+### Convergence States
+
+| State | Detects | Advisory threshold | Hard_veto threshold |
+|-------|---------|-------------------|---------------------|
+| `exactAction` | Repeated same action with same args | n/a | Immediate on detection |
+| `readOnlyPlanningState` | Agent plans/reads without writing | `ignoredCount ≥ 1` | `ignoredCount ≥ 3` |
+| `workspaceMutationGrowthConvergence` | workspace_write produces no growth (stall) | `stallCount ≥ 2` or `deltaWords < 0` | `stallCount ≥ 3` |
+| `structureRepairConvergence` | No-progress during structure repair | Immediate on activation | n/a (surface filter only) |
+
+### hard_veto Priority
+
+When a convergence state reaches `escalation: "hard_veto"`:
+
+1. `selectPlannerActions()` removes the forbidden actions from the action surface **before** any repair-mode allowlist is applied.
+2. `maybeBlockReadOnlyPlanningLoop()` / `maybeBlockWorkspaceMutationGrowthLoop()` blocks the preflight check even when the action appears in `terminalRepairState.allowedActions`.
+
+**Priority order: hard_veto > terminalRepairState.allowedActions > advisory**
+
+Advisory-escalation signals do NOT remove actions from the surface — they inject guidance into the planner prompt only.
+
+### AGRUN-237-GAP-04 Lessons
+
+Three bugs were found where hard_veto was bypassed by `terminalRepairState.allowedActions`:
+
+1. **`maybeBlockReadOnlyPlanningLoop` early return** — `repairAllowedActions.includes(actionName)` returned null unconditionally, skipping the hard_veto check. Fix: check if action is in hard_veto forbiddenActions before returning null.
+2. **`selectPlannerActions` allowedRepairActions early return** — forbidden actions appeared on the LLM surface because the `allowedRepairActions` branch ran before the hard_veto filter. Fix: hard_veto filters always run first.
+3. **`updateWorkspaceMutationGrowthConvergence` stallCount reset by append** — a workspace_append with positive delta cleared the stallCount, hiding write→append→write oscillation. Fix: function only tracks `workspace_write`; other mutations passthrough without resetting the counter.
+
 ## Concurrent-Turn Safety
 
 ### Compaction Summary Compare-And-Swap

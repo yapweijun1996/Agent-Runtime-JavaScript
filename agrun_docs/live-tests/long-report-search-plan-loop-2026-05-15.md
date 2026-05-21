@@ -197,18 +197,49 @@ The run still ended on `max_steps_continuation` because the structure audit dete
 - read/inspect micro-loop (v2): partially addressed by `readOnlyPlanningState` advisory signal (v3 emitted it but AI sometimes ignored).
 - structure-repair churn (v3 residual): AI knows the structure is broken (`finalCandidateStructureOk: false`, `duplicate_section_numbers`) but can't converge on the textual fix; spends step budget reading + partial replacing without removing the duplicate.
 
-### Acceptance state — final
+### Acceptance state — running summary (pre-v6)
 
 | Goal | Achieved |
 |---|---|
 | Eliminate search/plan death loop in long-form reports | ✅ |
 | AI engages `long-web-research` skill when prompted | ✅ |
 | Convergence signal classifies transitional vs productive progress | ✅ |
-| Long-form runs reach `decision: ready` with all four readiness dimensions satisfied | ✅ (v3) |
-| Run terminates cleanly (no `max_steps` / `max_steps_continuation`) | ❌ — structure-repair micro-loop remains |
+| Long-form runs reach `decision: ready` with all four readiness dimensions satisfied | ✅ (v3 once) |
+| Run terminates cleanly (no fatal failure) | ❌ pre-v6 — v4/v5 hit ACTION_EXECUTE_ERROR |
 | `finalCandidateStructureOk` reaches true after `decision: ready` | ❌ — duplicate_section_numbers persists |
 
 The original AGRUN-236 scope is closed. The residual structure-repair issue is a new follow-up; track separately rather than re-opening this finding.
+
+### E2E v4 and v5 (AGRUN-237 PR 1 stickiness fix)
+
+After shipping `readOnlyPlanningState.escalation` field + workspace-progress stickiness (require 2 consecutive workspace-productive steps to clear an active state; source-progress still clears in one step):
+
+| Metric | v3 | v4 | v5 |
+|---|---|---|---|
+| `runStatus` | `completed` | **`failed`** | **`failed`** |
+| Total steps | 90 | 24 | 51 |
+| `candidateWords` | 3347 | 0 | 1570 |
+| `candidateChars` | 23561 | 0 | 10873 |
+| `decision` | `ready` | `""` | `""` |
+| `successfulReadUrlCount` | 4 | 0 | 0 |
+| `sourceMinimumPassed` | true | false | **true** (3/3, 3/2) |
+| `finalCandidateStructureOk` | false (`duplicate_section_numbers`) | false (`candidate_empty`) | false (`duplicate_section_numbers`) |
+| `readOnlyPlanningActive` (final) | n/a (kept clearing) | **true** | **true** |
+| `readOnlyPlanningIgnoredCount` | 0 | **5** | 0 |
+| `terminalRepairState.active` | false | false | **true** (`length`,`structure`,`todo`) |
+| `terminalizedBy` | `max_steps_continuation` | `""` | `""` |
+| `runError.code` | n/a | (not captured) | **`ACTION_EXECUTE_ERROR`** |
+| `runError.message` | n/a | n/a | `Action "workspace_replace" failed during execution.` |
+
+### AGRUN-237 PR 1 stickiness — verified
+
+`readOnlyPlanningIgnoredCount: 5` in v4 is direct evidence the stickiness fix works: once active, the state stayed active across multiple subsequent forbidden actions (search/plan/read) and the preflight block tallied 5 ignored attempts. Pre-fix (v3) the same pattern would have cleared the state on every productive insert and produced `ignoredCount: 0`.
+
+### New issue surfaced — AGRUN-238
+
+Both v4 and v5 ended on `runStatus: "failed"` not because of stickiness or convergence problems but because of a runtime ergonomics bug: `workspace_replace` throws when its `search` string is no longer in the file (a normal consequence of earlier replaces mutating the content), and the action loop treats the throw as fatal — discarding the entire run state. v5's `runError` field captured the exact message; v4 was the same bug masked by a faster failure (24 steps instead of 51).
+
+This is tracked as a new finding (AGRUN-238) rather than re-opening AGRUN-237. Once `workspace_replace` returns `ok: false` with a structured observation instead of throwing, the AI will be able to react (e.g., switch to `workspace_read` first to refresh its mental model of the current content) and the v3-style ~3300-word ready terminal state should be repeatedly reachable.
 
 ## Reference inputs
 
@@ -233,3 +264,46 @@ The original AGRUN-236 scope is closed. The residual structure-repair issue is a
   pipeline.
 - This change does not address weak-model behavior under `gemini-3.1-flash-lite-preview`.
   A separate ADR-0023/0026 lite rerun is required after this lands.
+
+### E2E v6 (AGRUN-238 / ADR-0013 — recoverable tool errors are observations)
+
+Same prompt + `gemini-3-flash-preview` + dist rebuild after AGRUN-238 PR landed.
+Runtime: 21.5 min, 90 steps.
+
+| Metric | v5 (pre-ADR-0013) | v6 (post) |
+|---|---|---|
+| `runStatus` | `failed` ❌ | **`completed`** ✅ |
+| `runError` | `ACTION_EXECUTE_ERROR` | **`null`** ✅ |
+| `terminalizedBy` | `""` (throw fatal) | **`max_steps_continuation`** (natural) ✅ |
+| `candidateChars` | 10873 | **13754** |
+| `candidateWords` | 1570 | **1973** |
+| `hasMeaningfulWorkspaceExpansion` | true | true |
+| `decision` | `""` | `""` (AI did not self-declare ready/limited) |
+| `successfulReadUrlCount` | 0 | 0 (readurl service 502 — external) |
+| `sourceMinimumPassed` | true | false (only 1/3 reads, readurl down) |
+| `finalCandidateStructureOk` | false | false (`duplicate_section_numbers`) |
+| `terminalRepairState.activeDeficits` | `["length","structure","todo"]` | `["source","length","structure","todo"]` |
+
+**AGRUN-238 / ADR-0013 acceptance — ALL PASS**:
+- ✅ `runStatus === "failed"` no longer fires from action errors (v5 root symptom gone).
+- ✅ `runError === null` (no `ACTION_EXECUTE_ERROR` recorded).
+- ✅ Run reaches natural maxSteps termination instead of throw fatal.
+- ✅ AI produced 1973 words across 90 mutating steps without the harness crashing — direct proof that workspace mutator throws are now observations.
+- ✅ `runState.failedTools`, planner prompt, and convergence signal continue functioning (verified via 5 new unit tests + smoke regression).
+
+Residuals (out of AGRUN-238 scope, tracked separately):
+- `decision === ""` — AI did not voluntarily emit `workspace_publish_candidate` with `limited` despite `terminalRepairState.active=true`. This is the structureRepair / readiness-decision convergence (AGRUN-237 PR2) follow-up.
+- `successfulReadUrlCount: 0` — readurl service returned 502 during this run; external infra blip, not in repo scope.
+- `duplicate_section_numbers` structure deficit — AGRUN-237 PR2 structure-repair signal target.
+
+### Final acceptance state — across v1 → v6
+
+| Goal | Achieved |
+|---|---|
+| Eliminate search/plan death loop in long-form reports | ✅ |
+| AI engages `long-web-research` skill when prompted | ✅ |
+| Convergence signals classify productive vs transitional vs read-only-planning vs structure-repair | ✅ |
+| Long-form runs reach `decision: ready` (v3 baseline) | ✅ once, ⚠️ not yet repeatable on every run |
+| Run never fails fatally on workspace mutator errors (AGRUN-238 / ADR-0013) | ✅ proven by v6 |
+| Run terminates cleanly without throw fatal | ✅ (maxSteps is acceptable termination) |
+| `finalCandidateStructureOk: true` post-publish | ❌ — AGRUN-237 PR2 + model-quality follow-up |

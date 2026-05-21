@@ -22,6 +22,9 @@ Ask "how do I X?"; scan the list.
 - [Development Secrets](development-secrets.md) — local `.env.local` conventions.
 - [Release Process](release-process.md) — cut and publish a release.
 - [Distribution Bundle](distribution-bundle.md) — what npm run build produces and how engineers consume dist/.
+- [Long Task Lab Demo Design](long-task-lab-demo.md) — PRD and implementation plan for a long-running task demo websystem.
+- [Long Task Lab Record JSONL Plan](long-task-lab-record-jsonl-plan.md) — IndexedDB record ledger and JSONL export/import plan for Long Task Lab.
+- [Long Task Lab Demo Checklist](long-task-lab-demo-checklist.md) — one-command Records demo and manual PWA/E2E checklist for Long Task Lab.
 
 ### Reference — exact contracts
 
@@ -41,6 +44,7 @@ Read these before changing a subsystem.
 
 - [Architecture SSOT](architecture-ssot.md) — authority order for task.md, ADRs, contracts, explanation docs, live evidence, and generated dist artifacts.
 - [Spec](spec.md) — top-level architecture and design principles.
+- [Workspace Edit Harness Design](workspace-edit-harness-design.md) — research-backed boundary for workspace propose/apply patch tools and normalize_headings.
 - [MVP](mvp.md) — MVP scope and intentional cuts.
 - [Agentic Execution Flow](agentic-execution-flow.md) — end-to-end OODAE loop walkthrough.
 - [Planner Architecture](planner-architecture.md) — planner, repair cascade, guardrails.
@@ -54,10 +58,13 @@ Read these before changing a subsystem.
 - [Agent Harness Runtime Patterns](agent-harness-runtime-patterns.md) — runtime harness patterns mapped to AGRUN-213/214 roadmap slices.
 - [Error Handling and Recovery](error-handling-and-recovery.md) — structured errors, failure modes, recovery.
 - [Long-Running Multi-Topic Tasks](long-running-multi-topic-tasks.md) — thread isolation and topic routing design.
+- [Anthropic Long-Running Agent Research](anthropic-long-run-agent-research.md) — Anthropic long-running agent patterns (Initializer/Coding split, Ralph Loop, ACI, multi-agent) and agrun gap analysis.
+- [Hermes Long-Running Agent Research](hermes-long-running-agent-research.md) — Hermes agent long-running mechanisms (SQLite WAL, session lineage, auxiliary LLM compaction, stateful SSE scrubbers, self-registering tools) and agrun gap analysis.
 - [Learnings from Sample Projects](learnings-from-sample-projects.md) — patterns distilled from reference projects.
 - [Sample Reference Guide](sample-reference-guide.md) — index of sample projects under study.
 - [OpenClaw agrun Mapping](openclaw-agrun-mapping.md) — conceptual mapping to OpenClaw.
 - [Docs Bundle Design](docs-bundle-design.md) — design for making generated dist documentation easier to scan by task and feature.
+- [Observability, Node Live Timing, and Gemini Thinking Research](observability-otel-gemini-thinking-research.md) — OTel adapter direction, Node live timing facts, and Gemini thinking controls for workspace-tool debugging.
 
 ### Decisions — architecture decision records
 
@@ -67,7 +74,8 @@ One decision per file. Start with the guide.
 - [ADR Template](adr/_template.md) — ADR skeleton.
 - [ADR 0001 Runtime Hardening Batch](adr/0001-runtime-hardening-batch.md) — JSON parsing, IndexedDB resilience, approval signing, sensitive content filtering.
 - [ADR 0002 Long-Running Multi-Topic Architecture](adr/0002-long-running-multi-topic-architecture.md) — threadId scoping, topic router, evidence filtering.
-- [ADR 0003 Native Tools Default Readiness](adr/0003-native-tools-default-readiness.md) — native_tools default decision, envelope opt-out, and provider caveats.
+- [ADR 0003 Native Tools Default Readiness](adr/0003-native-tools-default-readiness.md) — native_tools default decision, envelope opt-out, and provider caveats. **Superseded by ADR-0031 (2026-05-16)**.
+- [ADR 0031 Envelope Is Default Planner Mode](adr/0031-envelope-is-default-planner-mode.md) — envelope is the default planner mode; native_tools is an explicit advanced/debug opt-in after Gemini-side native instability on 2026-05-16.
 
 ### Release notes
 
@@ -81,6 +89,7 @@ Per-version change summaries. See [../CHANGELOG.md](../CHANGELOG.md) for the agg
 
 MCP Chrome / browser-runtime verification runs. Each file is a single-scoped run with scope-statement.
 
+- [Node 3000 Gemini Flash-Lite Workspace Patch 2026-05-20](live-tests/node-agrun-3000-gemini-flash-lite-workspace-patch-2026-05-20.md) — Node 3000-word live evidence for workspace patch redirect, normalize_headings, Flash-Lite limited publish, and Gemini 3.5 ready control.
 - [Browser Read URL Live Smoke 2026-05-01](live-tests/browser-read-url-live-smoke-2026-05-01.md) — Browser read_url service live smoke verifies Network POST /read-url 200 and Healthy Run Inspector classification.
 - [Native Tools Readiness 2026-04-29](live-tests/native-tools-readiness-2026-04-29.md) — AGRUN-213e native tools default-readiness live provider checklist.
 - [AGRUN-145 Slice D Browser Smoke](live-tests/agrun-145-slice-d-browser-smoke.md) — AGRUN-145 thread-aware compaction harness executes identically in Chromium via Vite ESM.

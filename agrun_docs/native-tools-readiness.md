@@ -1,8 +1,12 @@
 # Native Tools Default-Readiness Matrix
 
-Status: Supported with caveats, 2026-04-29.
+Status: **Native mode is no longer the default.** Updated 2026-05-16.
 
-Decision: `plannerMode` now defaults to `"auto"`. Envelope mode remains available as `createRuntime({ plannerMode: "envelope" })`, and native mode remains available as the advanced/debug override `createRuntime({ plannerMode: "native_tools" })`. The formal `native-readiness` live suite passes 12/12 with `.env.local`, including OpenAI/Gemini native action, clarify, finalize, approval, search, and TodoState. Gemini native plan remains `toolArgsJson`-required. Real host server-auth proxy coverage is N/A for the current project because no host proxy exists; local proxy coverage remains the sanitation check. Native planner failures default to `nativeToolsFailurePolicy: "fallback_to_envelope"` for compatibility; hosts can opt into `"hard_fail"` when they want native-mode debugging to fail fast instead of retrying envelope mode.
+Decision (2026-05-16): `plannerMode: "auto"` now resolves to `effectiveMode: "envelope"` for every provider/model/action surface. `envelope` is the canonical PASS path; `native_tools` remains available as an explicit advanced/debug opt-in via `createRuntime({ plannerMode: "native_tools" })`. The change was driven by repeated `gemini-3-pro-preview` provider-side instability during long-running real-API live tests on 2026-05-16 (PLANNER_ERROR timeouts and exit-144 signal kills under sustained native-tools requests), while the same prompts under envelope mode passed cleanly twice in a row on OpenAI `gpt-5-mini`. See `agrun_docs/live-tests/node-agrun-3000-double-baseline-2026-05-16.md` and ADR-0031 for the full evidence trail. The formal `native-readiness` live suite (when run) still exercises native paths via `plannerMode: "native_tools"`; the harness contract has not changed, only the auto default.
+
+Earlier decision (2026-04-29): `plannerMode` defaulted to `"auto"` with `native_tools` as the resolver fallback. That decision is superseded by ADR-0031.
+
+Native planner failures still default to `nativeToolsFailurePolicy: "fallback_to_envelope"` for compatibility when a host explicitly opts into native mode; hosts can opt into `"hard_fail"` when they want native-mode debugging to fail fast instead of retrying envelope mode.
 
 ## Current Capability
 
@@ -82,18 +86,19 @@ When debug logging is enabled, native tool calls also emit a safe raw-args shape
 
 `plannerMode: "auto"` is the default host contract. The host declares provider/model/tools; agrun chooses the effective planner encoding.
 
-Current static rules:
+Current static rules (ADR-0031, 2026-05-16):
 
-| Provider / model / surface | Effective mode | Reason |
+| Configured mode | Effective mode | Reason |
 | --- | --- | --- |
-| Gemini lite model + complex native plan surface, including `execute_skill_tool` | `envelope` | `gemini_lite_complex_native_plan_surface` |
+| Omitted / `undefined` / unknown value / `"auto"` | `envelope` | `default_envelope` |
 | Explicit `plannerMode: "envelope"` | `envelope` | `explicit` |
 | Explicit `plannerMode: "native_tools"` | `native_tools` | `explicit` |
-| Other supported provider/model surfaces | `native_tools` | `provider_default_native_tools` |
 
-Debug snapshots, Inspector Summary, Debug Report, and Support Bundle should show both configured mode (`auto` unless overridden) and effective mode (`native_tools` or `envelope`) so hosts can observe the runtime decision without owning the compatibility matrix.
+The previous provider/model/tool-surface heuristics (`gemini_lite_complex_native_plan_surface`, `provider_default_native_tools`) were removed because (i) repeated Gemini-side native instability on 2026-05-16 made native an unsafe default for any provider, and (ii) the harness signal stack works correctly under envelope mode for every provider/model that satisfied Success Criteria during live verification.
 
-When auto mode resolves to `envelope` for a Gemini lite model and TodoState still has unfinished active/pending items, planner prompt construction applies a terminal-envelope guard: valid envelope examples include direct `type:"final"` but omit `type:"finalize"`. The same guard is reused by envelope repair and strict retry prompts, and validation rejects a stray `finalize` envelope before execution in that high-risk context. This keeps small-model TodoState loops from repeatedly selecting the synthesis-triggering `finalize` envelope while retaining runtime-finalize support in normal evidence-synthesis contexts.
+Debug snapshots, Inspector Summary, Debug Report, and Support Bundle should still show both configured mode (`auto` unless overridden) and effective mode (`envelope` by default, `native_tools` when explicitly opted in) so hosts can observe the runtime decision.
+
+The terminal-envelope guard that previously kicked in for Gemini lite + envelope auto-resolution remains available; it now applies whenever the effective mode is `envelope` (which is the new default), so planner prompt examples omit `type:"finalize"` while TodoState has unfinished active/pending items, validation rejects stray `finalize` envelopes in that context, and envelope repair / strict retry reuses the same guard.
 
 ## Readiness Matrix
 

@@ -74,6 +74,14 @@ npm run check
 
 That command builds the full `dist/` tree (lib + example) and runs the smoke test suite.
 
+To generate a demo-ready distribution artifact without the full smoke suite:
+
+```bash
+npm run dist
+```
+
+That command runs the full build and `dist:check`, producing `dist/agrun.js` plus the static browser demo at `dist/example/`.
+
 `npm run build` is a three-stage pipeline (see [agrun_docs/distribution-bundle.md](./agrun_docs/distribution-bundle.md)):
 
 1. `npm run build:lib` — rollup builds `dist/agrun.js`, `dist/README.md`, `dist/FLOWCHART.md`, `dist/agrun.md`, `dist/agrun_docs/`, `dist/CHANGELOG.md`.

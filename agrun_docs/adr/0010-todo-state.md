@@ -948,7 +948,7 @@ Existing required-completion redirects, such as final synthesis item completion 
 - `decision`
 - `recommendedEscapeAction`
 
-The step detail is built by `buildBeforeFinalizeVetoStepDetail` so event-shape tests can verify it without importing the full action-loop dependency graph.
+The step detail is built by `buildBeforeFinalizeVetoStepDetail` (in `test/helpers/before-finalize-veto-detail.mjs`) so event-shape tests can verify it without importing the full action-loop dependency graph.
 
 ### Verification
 

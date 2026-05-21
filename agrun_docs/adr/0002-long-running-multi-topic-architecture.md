@@ -35,7 +35,8 @@ Affected modules:
 [src/runtime/evidence-state.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/evidence-state.js),
 [src/session/evidence.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/evidence.js),
 [src/session/compaction.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/compaction.js),
-[src/session/prompt-anchors.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/prompt-anchors.js),
+[src/runtime/goal-anchor.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/goal-anchor.js),
+[src/runtime/goal-anchor-config.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/goal-anchor-config.js),
 [src/session/store-memory.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/store-memory.js),
 [src/session/store-indexeddb.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/store-indexeddb.js).
 
@@ -132,7 +133,7 @@ silently revise any of them.
   - Multi-topic chats become first-class rather than a known bad case.
   - Existing sessions continue to work (`threadId = "default"`).
   - Most scaffolding (`topic-like-task.js`, `evidence.js`,
-    `clarification-state.js`, `prompt-anchors.js`) already exists — the
+    `clarification-state.js`, `goal-anchor.js`) already exists — the
     change is largely wiring and extension.
 
 - **Cons:**

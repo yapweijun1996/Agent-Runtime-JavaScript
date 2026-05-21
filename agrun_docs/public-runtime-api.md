@@ -74,7 +74,7 @@ const runtime = createRuntime({
 | `virtualWorkspace` | no | stable advanced | Browser-safe virtual draft workspace for complex final responses. `false` disables it; `{ enabled: true }` forces it; default `{ enabled: "auto" }` enables workspace state for complex/long-run prompts without exposing chain-of-thought or touching real files. |
 | `longResearchQualityGate` | no | stable advanced | Long-run research quality and report-loop gate. Supports existing bounded search vetoes plus report-loop values such as `minReadSources`, `minRelevantSources`, `maxResearchLoopVetoes`, and `allowFinalWithLimitationsOnBudgetExhausted`. |
 | `repoFileTools` | no | stable advanced | Optional host-provided read-only repo/file adapter. Disabled by default; when `{ enabled: true, readFile, search }` is provided the planner can use tier-1 `repo_read_file` and `repo_rg`, which still pass through `actionPolicy`. |
-| `plannerMode` | no | stable advanced | Planner decision encoding: `"auto"` (default), `"native_tools"`, or `"envelope"`. `auto` lets agrun select the effective mode from provider/model/tool-surface capabilities. Explicit values are advanced/debug overrides. |
+| `plannerMode` | no | stable advanced | Planner decision encoding: `"auto"` (default), `"envelope"`, or `"native_tools"`. Since ADR-0031 (2026-05-16), `"auto"` and any omitted/unknown value resolve to `effectiveMode: "envelope"` with `reason: "default_envelope"`. `"envelope"` is the canonical PASS path; `"native_tools"` is an explicit advanced/debug opt-in only and was demoted from default after sustained Gemini-side native instability during long-running real-API live tests. |
 | `nativeToolsFailurePolicy` | no | stable advanced | Native planner failure behavior when the effective planner mode is `"native_tools"`. Default `"fallback_to_envelope"` emits `planner-native-tools-fallback` and retries the same cycle through envelope mode. `"hard_fail"` emits `planner-native-tools-failed` and returns the provider/planner failure without envelope fallback. |
 | `selfCorrection` | no | stable advanced | LLM self-correction on action errors. `true` (default), `false`, or `{ enabled, maxRetries }`. |
 | `circuitBreaker` | no | stable advanced | Per-provider circuit breaker. `true` (defaults: 5 failures, 60s cooldown), `false` (default, disabled), or `{ threshold, cooldownMs }`. Fast-fails provider calls when a provider is consistently down. |
@@ -490,6 +490,71 @@ The second argument is an optional options object for callbacks and per-run over
 
 Hook errors are swallowed (logged in debug mode) — a throwing hook will never crash the run.
 
+### Node.js Test Runner Observability
+
+`test/node-agrun-3000-live.mjs` is the canonical Node.js integration test. It wires all three hooks and emits structured JSON lines to stdout, making it easy to inspect payload sizes, tool results, and convergence signals without a browser.
+
+#### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AGRUN_DEBUG=1` | off | Write `.jsonl` + `.md` debug artifacts to `agrun_debug_runs/` |
+| `NODE_AGRUN_LIVE_DEBUG=1` | off | Same as `AGRUN_DEBUG=1` |
+| `NODE_AGRUN_LIVE_MODEL` | provider default | Override model (e.g. `gemini-3.1-flash-lite`) |
+| `NODE_AGRUN_LIVE_WORDS` | `3000` | Word target for the research prompt |
+| `NODE_AGRUN_LIVE_PROMPT` | built-in | Override the full prompt text |
+| `NODE_AGRUN_LIVE_MAX_STEPS` | `90` | Max cycles before forced stop |
+| `NODE_AGRUN_LIVE_PLANNER_MODE` | `envelope` | Planner mode (`envelope` / `native_tools`) |
+| `NODE_AGRUN_LIVE_PROVIDER` | auto-detect | `gemini` or `openai` |
+
+#### Console events (real-time, one JSON line each)
+
+| Event | Key fields |
+|---|---|
+| `node_agrun_live_start` | run config snapshot |
+| `planner_decision` | `actionName`, `cycleCount`, `candidateWords`, `budgetState`, `readOnlyPlanningIgnoredCount`, `terminalRepairActive`, `terminalRepairIgnoredCount`, `wmgActive`, `wmgStallCount` |
+| `prompt_payload` | `promptChars`, `actionsChars`, `historyChars`, `loopStateChars`, `planChars`, `workspaceChars`, `loopFields` (fires on every `planner-requested` step) |
+| `hard_veto_fired` | `actionName`, `escalation`, `ignoredCount`, `candidateWords`, `cycleCount`, `stepType` |
+| `convergence_block` | `actionName`, `reason`, `ignoredCount`, `stepType` |
+| `node_agrun_live_summary` | full run summary including `candidateWords`, `structureOk`, `sourceMinimumPassed`, `terminalRepairState`, `actionPatternConvergence`, `workspaceDiagnostics`, `issueHints` |
+| `tool_result` | `actionName`, `status` (`"success"` / `"error"`), `message` (full when error, ≤200 chars when success), `summary` (≤200 chars) — emitted after every tool execution |
+| `node_agrun_live_debug_artifact` | paths to `.jsonl` and `.md` files (only when debug enabled) |
+
+#### `onToolResult` payload
+
+Real-time console line per tool call (since 2026-05-20):
+
+```json
+{ "event": "tool_result", "actionName": "workspace_append", "status": "success", "message": "Appended 312 chars...", "summary": "..." }
+{ "event": "tool_result", "actionName": "workspace_publish_candidate", "status": "error", "message": "<full error, not truncated>", "summary": "..." }
+```
+
+`message` is **not truncated on error** (full diagnostic text). On success it is capped at 200 chars. The debug recorder also stores a compact snapshot with: `actionName`, `status`, `message` (≤500 chars), `summary` (≤500 chars), `outputKind`, `outputStatus`, `publishBlock` (reason + required args example when publish is blocked).
+
+**Signature note:** the runtime calls `onToolResult(output, { actionName, decision, runState })`. The first argument is the action output object directly (not a wrapper). `actionName` is in the second argument's destructured context, not on `output` itself.
+
+#### Debug artifacts (`AGRUN_DEBUG=1`)
+
+When enabled, two files are written to `agrun_debug_runs/<timestamp>/`:
+
+- **`.jsonl`** — every recorded event in chronological order
+- **`.md`** — human-readable report with sections: Verdict, Issue Hints, Run Config, Action Timeline, Action Counts, Source Ledger, Workspace Ledger, Terminal Repair, TodoState, Action Pattern Convergence, Requirement Recovery, Agent Workflow Trace Packet (planner request/response metadata + responseText preview + tool call args), Step Diagnostics, Event Ledger, Raw Summary
+
+#### Quick start
+
+```bash
+# Basic run
+node test/node-agrun-3000-live.mjs
+
+# With debug artifacts + lite model
+AGRUN_DEBUG=1 NODE_AGRUN_LIVE_MODEL=gemini-3.1-flash-lite node test/node-agrun-3000-live.mjs
+
+# Fast smoke (500 words, short prompt)
+NODE_AGRUN_LIVE_WORDS=500 NODE_AGRUN_LIVE_PROMPT="Write 500 words about AI agents." AGRUN_DEBUG=1 node test/node-agrun-3000-live.mjs
+```
+
+The `.md` artifact is the best starting point for debugging — it summarises all convergence signals, workspace operations, and source read results without requiring manual JSONL parsing.
+
 ### `runtime.getRuntimeConfig()`
 
 Returns a cloned snapshot of the normalized runtime configuration. Use this at host boot or in an Inspector/debug panel to confirm which config fields are active after `createRuntime(options)` normalization.
@@ -707,6 +772,7 @@ Host notes:
 - `temperature`, `max_output_tokens`, `maxOutputTokens`, and `maxTokens` are not supported.
 - Provider-style input is still submitted through `runtime.run(input)`, not through a separate runtime API.
 - `systemPrompt` applies globally to both the planner and finalizer. This means per-run instructions such as response language or persona overrides take effect on all response paths, including `type: "final"` direct answers. When omitted, no dynamic system prompt is injected.
+- `modelTier` (optional, `"lite"|"capable"`): overrides the planner's name-string heuristic for lite-tier classification (ADR-0033 Tier A). When set to `"lite"`, the planner runs in compact-prompt mode even for a capable-looking model name; when set to `"capable"`, name-matching is bypassed and the full prompt is used. Default: heuristic on `model` matches `flash-lite | flash | mini | haiku | nano` as lite. Use this override when the host knows the model better than the heuristic — e.g. a future `*-mini` SKU that is actually capable, or a custom-named deployment that should still get the compact prompt. The explicit opt-out `compactPlannerSystemPrompt: false` still wins over both heuristic and `modelTier: "lite"`.
 
 Research-turn note:
 
@@ -940,7 +1006,7 @@ Skills declare each tool's arg contract in `tools[].parameters` — a JSON-schem
 
 `aliases` is an optional per-property array that absorbs LLM planner hallucination where the model emits a near-miss key (e.g. camelCase for a snake_case param). If the planner sends an alias, the validator rewrites it to the canonical name *before* required/type checks and *before* the tool body is called, so hosts never have to defend against key drift inside their tool bodies. Works end-to-end: both bundled-tool calls (via `execute_skill_tool`) and action-level args.
 
-For effective `plannerMode: "native_tools"`, provider tool declarations are projected from the same `argsSchema`. Gemini declarations also include recursive `propertyOrdering` to keep required/control fields before nested payload fields. Native `plan` normalizes Gemini compatibility shapes (`toolArgsJson`, `arg_*`, direct flat fields) back to canonical action args before validation. For Gemini, `toolArgsJson` is the required native-plan payload shape for bundled-tool args because nested `toolArgs` can be emitted as `{}`; this provider capability is centralized in `src/runtime/provider-capabilities.js`. `plannerMode: "auto"` uses the same provider capability SSOT to choose `native_tools` or `envelope`; debug snapshots expose configured/effective mode plus the resolver reason. Native `todo_plan` also preflights empty item lists in native mode so a bad provider output emits `action-args-invalid` before TodoState mutation. If `debug` is enabled, native planner calls log a scrubbed raw args shape only; raw values, headers, API keys, bearer tokens, cookies, passwords, and secrets are omitted.
+For effective `plannerMode: "native_tools"` (which is now an explicit advanced/debug opt-in only — see ADR-0031), provider tool declarations are projected from the same `argsSchema`. Gemini declarations also include recursive `propertyOrdering` to keep required/control fields before nested payload fields. Native `plan` normalizes Gemini compatibility shapes (`toolArgsJson`, `arg_*`, direct flat fields) back to canonical action args before validation. For Gemini, `toolArgsJson` is the required native-plan payload shape for bundled-tool args because nested `toolArgs` can be emitted as `{}`; this provider capability is centralized in `src/runtime/provider-capabilities.js`. `plannerMode: "auto"` now resolves to `effectiveMode: "envelope"` with `reason: "default_envelope"` regardless of provider/model, so the resolver no longer inspects provider capabilities for the auto path; native opt-in is `plannerMode: "native_tools"` explicit. Debug snapshots still expose configured/effective mode plus the resolver reason. Native `todo_plan` still preflights empty item lists in native mode so a bad provider output emits `action-args-invalid` before TodoState mutation. If `debug` is enabled, native planner calls log a scrubbed raw args shape only; raw values, headers, API keys, bearer tokens, cookies, passwords, and secrets are omitted.
 
 ```js
 // Skill tool (bundled-tool path via execute_skill_tool)

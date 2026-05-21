@@ -1,6 +1,6 @@
 # Planner Architecture
 
-> **Last reviewed:** 2026-05-14 against ADR-0023..0029.
+> **Last reviewed:** 2026-05-19 against ADR-0023..0033.
 >
 > Sections marked **HISTORICAL** describe push-mode behavior deleted by [ADR-0023](./adr/0023-harness-as-tool-provider-only.md) (5/8) and [ADR-0026](./adr/0026-zero-residual-push-mode.md) (5/9). The runtime no longer:
 > - runs a strict-retry 3rd API call (Stage 3 below)
@@ -33,6 +33,22 @@ Context + Available Actions
         ↓
    Decision Envelope
 ```
+
+## OODAE Phase Mapping in Envelope Mode
+
+Each envelope call completes a full OODAE cycle in a **single LLM emission**. Runtime does not split cognition across multiple API calls by phase. See [ADR-0033](./adr/0033-oodae-as-single-call-structured-emission.md) for the full rationale.
+
+| OODAE Phase | How it appears in envelope mode | Owner |
+|---|---|---|
+| **Observe** | Runtime projects `toolContext.lastResult`, `readSources`, `virtualWorkspace`, `observation`, `loopState.*` into planner prompt | Runtime (mechanism) |
+| **Orient** | `reasoning` field — AI writes its rationale before choosing action | AI (policy) |
+| **Decide** | `type` + `name` + `args` — the chosen next step | AI (policy) |
+| **Act** | Runtime executes chosen tool or terminal handler; no LLM call | Runtime (mechanism) |
+| **Evaluate** | `finalReadiness.requirementsAssessment` on `finalize`; implicit in `reasoning` on non-terminal actions | AI (policy) |
+
+This is structurally equivalent to ReAct (reasoning + acting + observation interleaved in one call). Envelope mode is richer than native_tools here — `reasoning` and `requirementsAssessment` are enforced by schema, while native tool_use has no equivalent fields.
+
+**The OODAE loop is NOT 5 LLM calls per cycle.** Splitting by phase would require runtime to slice AI's cognitive context, which is push-mode and multiplies cost/latency without benefit. See ADR-0033 for the rejected alternative.
 
 ## Decision Envelope Contract
 
@@ -265,13 +281,50 @@ agrun.js supports two planner decision encodings. The default host-facing value 
 createRuntime({ plannerMode: "auto", ... })
 ```
 
-Auto mode uses `src/runtime/provider-capabilities.js` as the SSOT for provider compatibility:
+Auto mode uses `src/runtime/provider-capabilities.js` as the SSOT for planner-mode resolution:
 
 ```text
-provider + model + planner-visible actions → resolvePlannerMode() → effectivePlannerMode
+configuredMode → resolvePlannerMode() → effectivePlannerMode
 ```
 
-The current matrix sends Gemini lite models with complex native plan surfaces such as `execute_skill_tool` to envelope mode. Other supported provider/model surfaces default to native tools unless explicitly overridden.
+Since ADR-0031 (2026-05-16), the resolver no longer inspects provider/model/action surfaces. `plannerMode: "auto"` (and any omitted / unknown value) resolves to `effectiveMode: "envelope"` with `reason: "default_envelope"`. Explicit `plannerMode: "native_tools"` and `plannerMode: "envelope"` are still honored with `reason: "explicit"`. Native mode is an advanced/debug opt-in only; envelope is the canonical PASS path.
+
+### Lite Model Compact Envelope
+
+Lite-tier models (e.g. gemini-3.1-flash-lite) can struggle on long-form tasks. Understanding the real root cause requires auditing raw per-step output, not aggregate metrics.
+
+**Tier A — Compact envelope auto-detection (IMPLEMENTED 2026-05-20, validation FAILED)**
+
+`isLiteTierModel()` in `provider-capabilities.js` word-boundary-matches lite-tier markers (`flash-lite`, `flash`, `mini`, `haiku`, `nano`). `selectPlannerSystemPromptProfile()` in `planner.js:537` forces `compactSystemPrompt: true` with reason `lite_tier_model_compact`. Hosts can override with `request.modelTier: "lite"|"capable"`. Explicit opt-out `request.compactPlannerSystemPrompt: false` wins.
+
+Live validation (2026-05-20, 3× gemini-3.1-flash-lite): median 566/3000 words, ignoredCount median 66 (baseline 21). **FAILED.** Root-cause re-investigation (Part 4 of ADR-0033) found three concrete bugs, not a cognitive-load ceiling:
+
+| Bug | Location | Effect |
+|---|---|---|
+| **B1** — `buildGuidanceLines()` returns `[]` in compact mode | `planner-prompt.js:138,173–184` | Workspace append-preference guidance stripped → AI picks `workspace_write` (overwrite) every call via position bias |
+| **B2** — `terminalRepairState.allowedActions` not surfaced as ONE concrete next step | `action-loop-session-loop.js:820–867` | AI retries `finalize` → hard_veto → ignoredCount++ → permanent lock; 50%+ of cycles wasted |
+| **B3** — `serializePromptValue(value, 500)` in loopState fields | `planner-prompt.js:283,286` | flash-lite pattern-matches the 500-char truncation marker and writes 500-char workspace content per call |
+
+Flash-lite's actual per-step capacity is **67–73 words per successful `workspace_write/append`** (measured from raw JSONL). The aggregate 6-15 words/step figure was misleading: it mixed productive cycles with 56–71 veto-wasted finalize attempts.
+
+**Tier A.5 / A.6 / A.7 — DONE (2026-05-20 evening):**
+
+- **A.5 (B1 fix)** — `planner-prompt.js:173-194`: workspace_write/append rule + canonical publish path rule now gated on `hasAction("workspace_write")` only — applies to **all** modes including compact. Flash-lite no longer overwrites the draft on the second call.
+- **A.6 (B2 fix)** — `terminal-repair-strings.js:54-83`: `hardVetoActionNotAllowed` is now budget-aware. When `budgetState ≠ "exhausted"`, it surfaces the first deficit-clearing action (e.g. `workspace_append`) via `buildTerminalRepairDeficitHint()` instead of only forbidding the current action. Flash-lite gets a concrete next step instead of a dead-end message.
+- **A.7 (B3 fix)** — `planner-prompt.js:184`: added "typical 200-2000+ characters per call when remainingLength is large" to the workspace write rule, breaking flash-lite's 500-char mimicry pattern.
+- **B4 (bonus)** — `planner-prompt.js:191`: canonical publish path rule ("If you drafted in a different path, pass that path to `workspace_publish_candidate`") now applies to compact mode too, fixing split-file score collapse seen in v16 run2.
+
+Validation: `npm test` 880+ PASS, 0 FAIL. Single live flash-lite run post-fix: **1048 candidateWords** (baseline 566) — first time clearing 1000-word target. Three new bottlenecks (X1 structure-repair convergence lock, X2 500-char mimicry still partially active, X3 terminal repair high-water-mark too aggressive) are tracked separately; see ADR-0033 Part 4.
+
+**Tier B — Two-step Reflect→Act mode (ABANDONED 2026-05-20)**
+
+Was planned as `plannerMode: "split_envelope"`. Abandoned after Part 4 raw-emission audit: the failure was not intent-coherence drift but harness bugs B1/B2/B3. Reflect→Act does not fix any of them. Implementation plan archived at `adr/0033-tier-b-reflect-act-implementation-plan.md`. May be revisited if post-A.5/A.6/A.7 data shows genuine intent-drift (ignoredCount > 20, strategy oscillation in JSONL).
+
+**Tier C — AI-driven `think` envelope (long-term)**
+
+AI emits `{type:"think", need_more_thought:true}` to request an extra reasoning step. Runtime loops up to a per-cycle ceiling. Most AI-first option; requires empirical data first.
+
+See [ADR-0033](./adr/0033-oodae-as-single-call-structured-emission.md) for full data, root-cause chain, and rollback specs.
 
 ### Envelope Mode
 
@@ -312,15 +365,13 @@ Advantages:
 
 ### Native Tools Auto Readiness
 
-AGRUN-213q makes `plannerMode: "auto"` the default. Native tools remains the preferred effective mode where the provider matrix marks it ready, and envelope remains the compatibility mode / explicit override:
+ADR-0031 (2026-05-16) supersedes AGRUN-213q. `plannerMode: "auto"` now resolves to `envelope` for every provider/model/action surface; native tools is an explicit opt-in advanced/debug mode only:
 
-- native tools support single action, `ask_clarification`, `finalize`, `final_answer`, and `plan`
-- native `plan` parses into the same `type:"plan"` decision shape and reuses `validatePlan()` / `executePlan()`
-- OpenAI native two-action plan live-verified; Gemini native plan still has nested action-args risk for schema-rich actions such as `execute_skill_tool`
-- broad native-readiness live coverage passes OpenAI/Gemini native action, clarify, finalize, approval, search, and TodoState; Gemini native finalize is hardened by a one-shot runtime-finalizer empty-response retry
-- server-auth proxy native tools passed local forwarding-proxy sanitation; real host proxy coverage is N/A until a host proxy exists
-- native planner failures still default to `nativeToolsFailurePolicy: "fallback_to_envelope"` for compatibility when the effective mode is `native_tools`; `"hard_fail"` is available when hosts want native-mode failure to stop immediately
-- debug surfaces expose configured mode, effective mode, and resolver reason so hosts can observe agrun's choice without owning the matrix
+- envelope is now the canonical PASS path; live-verified twice in a row on OpenAI `gpt-5-mini` for the canonical 3000-word long-research scenario (see `agrun_docs/live-tests/node-agrun-3000-double-baseline-2026-05-16.md`)
+- native tools still support single action, `ask_clarification`, `finalize`, `final_answer`, and `plan`, and native `plan` still parses into the same `type:"plan"` decision shape that reuses `validatePlan()` / `executePlan()`
+- broad native-readiness live coverage previously passed OpenAI/Gemini native action, clarify, finalize, approval, search, and TodoState, but Gemini native preview endpoints were observed to be unstable under sustained long-running native requests on 2026-05-16, which is the primary driver for the envelope default
+- native planner failures still default to `nativeToolsFailurePolicy: "fallback_to_envelope"` when a host explicitly opts into native; `"hard_fail"` is available when hosts want native-mode failure to stop immediately
+- debug surfaces still expose configured mode (`auto`/`envelope`/`native_tools`), effective mode, and resolver reason (`default_envelope` / `explicit`) so hosts can observe agrun's choice
 
 The readiness matrix and blocker list live in [native-tools-readiness.md](./native-tools-readiness.md). The default-mode decision is recorded in [ADR-0003](./adr/0003-native-tools-default-readiness.md).
 
@@ -384,6 +435,55 @@ Key points:
 Parameter schemas prefer the action registry's planner `argsSchema`; `argsExample` is only a fallback for legacy action definitions. Gemini tool schemas add recursive `propertyOrdering` so required/control keys are emitted before nested payload fields. The native `plan` tool uses the same plan validation/execution harness as envelope `type:"plan"` decisions. For `execute_skill_tool` inside native `plan`, providers may use flatter compatibility shapes: `skillName` / `toolName` / `toolArgs`, `toolArgsJson`, `arg_*`, or direct flat tool-specific fields. The parser normalizes each shape back to canonical `args.skillName` / `args.toolName` / `args.args` before validation. For Gemini live readiness, `toolArgsJson` is the required compatibility shape today; nested `toolArgs` and direct flat fields remain provider-risk paths. Provider-specific native-plan guidance comes from `provider-capabilities.js`, keeping prompt text and schema descriptions aligned.
 
 When runtime debug logging is enabled, native planner calls log only a scrubbed raw argument shape: tool name, keys, primitive types, string lengths, array lengths, and sensitive-key counts. Raw argument values and sensitive fields are not logged.
+
+## Action Surface Filtering
+
+Before the planner prompt is built, `selectPlannerActions()` (`src/runtime/planner-action-surface.js`) filters the list of available actions shown to the LLM. The filtering has a strict priority order:
+
+```text
+All registered actions
+    ↓
+1. hard_veto convergence filters (always applied first — override everything)
+    ├─ readOnlyPlanningState hard_veto
+    └─ workspaceMutationGrowthConvergence hard_veto
+    ↓
+2. terminalRepairState.allowedActions (if terminal repair is active)
+    → show ONLY the allowedActions; all others hidden
+    ↓
+3. exactAction / structureRepair convergence filters (advisory-equivalent surface filters)
+    ↓
+Available action surface shown to LLM
+```
+
+### Priority Rule: hard_veto > terminalRepairState.allowedActions
+
+`terminalRepairState.allowedActions` narrows the action surface to a recovery-focused subset (e.g. `["workspace_write", "workspace_replace", "workspace_publish_candidate"]`). However, **hard_veto convergence signals override this allowlist**. When a convergence detector (e.g. `readOnlyPlanningState`, `workspaceMutationGrowthConvergence`) reaches `escalation: "hard_veto"`, its `forbiddenActions` are removed from the surface **before** the allowlist early-return is applied.
+
+Advisory-escalation convergence signals (`escalation: "advisory"`) do NOT override the allowlist — they communicate pressure via the planner prompt context only.
+
+This is enforced in two places:
+
+| Location | Role |
+|----------|------|
+| `selectPlannerActions` (planner-action-surface.js) | Hard_veto forbidden actions filtered from LLM surface first |
+| `maybeBlockReadOnlyPlanningLoop` (action-loop-action.js) | Hard_veto preflight: even if action is in repairAllowedActions, still blocked if in hard_veto forbiddenActions |
+
+### Convergence Surface Filters
+
+| Convergence State | Activation | Surface Effect |
+|-------------------|------------|----------------|
+| `exactAction` convergence | `forbiddenMove: "repeat_same_action_args"` for a specific `actionName` | Hides that specific action |
+| `readOnlyPlanningState` advisory | `ignoredCount ≥ 1`, `escalation: "advisory"` | No surface change (prompt-level pressure only) |
+| `readOnlyPlanningState` hard_veto | `ignoredCount ≥ 3`, `escalation: "hard_veto"` | Hides all `forbiddenActions` — overrides terminalRepair allowlist |
+| `structureRepairConvergence` | `active: true` | Hides `forbiddenActions` (read/list actions during structure repair) |
+| `workspaceMutationGrowthConvergence` advisory | `stallCount ≥ 2`, `escalation: "advisory"` | No surface change |
+| `workspaceMutationGrowthConvergence` hard_veto | `stallCount ≥ 3`, `escalation: "hard_veto"` | Hides all `forbiddenActions` — overrides terminalRepair allowlist |
+
+### workspaceMutationGrowthConvergence: write-only tracking
+
+`updateWorkspaceMutationGrowthConvergence` tracks workspace mutation stalls to catch write→overwrite oscillation. The stall counter only advances on `workspace_write` actions; other mutations (`workspace_append`, `workspace_replace`, `workspace_insert`) pass through without resetting the counter. A destructive overwrite (`deltaWords < 0`) activates advisory immediately without waiting for the 2-stall threshold.
+
+**Why write-only**: if append/replace positive-delta resets the stall counter, a write→append→write oscillation is masked indefinitely. Tracking only write stalls keeps the signal clean.
 
 ## Session Context Projection
 

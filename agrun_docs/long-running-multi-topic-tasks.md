@@ -175,7 +175,7 @@ Much of the machinery is already present; the refactor is largely extension + wi
 | Concept | Existing | Gap |
 |---|---|---|
 | Topic detection | [topic-like-task.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/topic-like-task.js), `inquiryContext.activeTopic` | No `threadId`, no routing |
-| Goal anchor | [prompt-anchors.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/prompt-anchors.js) `derivePromptAnchors()` | Not re-injected every cycle |
+| Goal anchor | [goal-anchor.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/goal-anchor.js), [goal-anchor-config.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/goal-anchor-config.js), and `thread.goalAnchor` hydration | Shipped by AGRUN-142; planner/finalizer receive the anchor every cycle |
 | Structured facts | [evidence.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/evidence.js) `EVIDENCE_KINDS` | No `turnId` / `threadId` / `confidence` |
 | Clarification | [clarification-state.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/clarification-state.js) | Works — reuse for topic ambiguity |
 | Budget counters | [state.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/state.js) `cycleCount`, `plannerInvalidCount` | No composite budget, no breach action |
