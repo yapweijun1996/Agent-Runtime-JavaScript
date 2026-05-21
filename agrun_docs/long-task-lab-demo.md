@@ -537,8 +537,11 @@ Known gaps / HBR:
 - The first verified real run had `usable=0` and `strong=0` because the direct
   source read hit a challenge page. This validates honest weak-evidence
   surfacing, not strong report quality.
-- The app is source-only for now. `examples/long-task-lab/dist/` is ignored
-  because local production builds must not be committed accidentally.
+- Long Task Lab is now included in the root release distribution through
+  `npm run build`, which builds the app and copies it into
+  `dist/long-task-lab/` with the same secret-leakage guard used for the browser
+  example. `examples/long-task-lab/dist/` remains a local build output, while
+  `dist/long-task-lab/` is the committed handoff artifact.
 - Browser QA used Chrome DevTools because the in-app Browser Node control tool
   was unavailable in this session; mobile layout was covered by responsive CSS
   rules and build checks but not by a rendered mobile screenshot.
