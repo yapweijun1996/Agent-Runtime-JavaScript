@@ -30,6 +30,21 @@ jobs:
       - name: Check and build Pages artifact
         run: npm run check
 
+      - name: Add demo hub and Long Task Lab
+        run: |
+          cp index.html _site/index.html
+          cp -R long-task-lab _site/long-task-lab
+
+          perl -0pi -e 's#href="/manifest.webmanifest"#href="./manifest.webmanifest"#g; s#href="/icons/#href="./icons/#g; s#src="/assets/#src="./assets/#g; s#href="/assets/#href="./assets/#g' _site/long-task-lab/index.html
+          perl -0pi -e 's#"id": "/"#"id": "./"#g; s#"start_url": "/"#"start_url": "./"#g; s#"scope": "/"#"scope": "./"#g; s#"src": "/icons/#"src": "./icons/#g; s#"url": "/\?panel=records"#"url": "./?panel=records"#g' _site/long-task-lab/manifest.webmanifest
+          perl -0pi -e 's#"/assets/#"./assets/#g; s#'\''/offline.html'\''#'\''./offline.html'\''#g; s#'\''/robots.txt'\''#'\''./robots.txt'\''#g; s#'\''/llms.txt'\''#'\''./llms.txt'\''#g; s#'\''/manifest.webmanifest'\''#'\''./manifest.webmanifest'\''#g; s#'\''/icons/#'\''./icons/#g; s#cache.put\('\''/'\''#cache.put('\''./'\''#g; s#caches.match\('\''/'\''#caches.match('\''./'\''#g' _site/long-task-lab/sw.js
+          perl -0pi -e 's#navigator\.serviceWorker\.register\("/sw\.js"\)#navigator.serviceWorker.register("./sw.js")#g' _site/long-task-lab/assets/*.js
+
+          test -f _site/index.html
+          test -f _site/example/index.html
+          test -f _site/long-task-lab/index.html
+          ! grep -R 'src="/assets\|href="/assets\|href="/manifest.webmanifest\|href="/icons/' _site/long-task-lab/index.html
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:

@@ -1,0 +1,7 @@
+# agrun Long Task Lab
+
+agrun Long Task Lab is a browser-first demo for observing, debugging, and replaying long-running agrun.js AI tasks.
+
+- [App](http://localhost:4176/)
+- [Manifest](http://localhost:4176/manifest.webmanifest)
+- [Offline shell](http://localhost:4176/offline.html)

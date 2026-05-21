@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agrun.js demos</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f8fb;
+        --panel: #ffffff;
+        --text: #111827;
+        --muted: #5b6472;
+        --line: #d9dee7;
+        --teal: #0f766e;
+        --amber: #b45309;
+        --ink: #172033;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101318;
+          --panel: #171b22;
+          --text: #f3f6fb;
+          --muted: #a8b1bf;
+          --line: #2a313d;
+          --teal: #5eead4;
+          --amber: #fbbf24;
+          --ink: #d9e2f2;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 44px 0 56px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+        gap: 32px;
+        align-items: center;
+        min-height: min(520px, calc(100vh - 32px));
+      }
+
+      h1 {
+        margin: 0 0 14px;
+        font-size: clamp(2.3rem, 7vw, 5.6rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 1.04rem;
+        line-height: 1.65;
+      }
+
+      .lede {
+        max-width: 64ch;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 15px;
+        font-weight: 650;
+        text-decoration: none;
+        background: var(--panel);
+      }
+
+      .button.primary {
+        border-color: color-mix(in srgb, var(--teal) 64%, var(--line));
+        color: #ffffff;
+        background: #0f766e;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .button.primary {
+          color: #06201d;
+          background: var(--teal);
+        }
+      }
+
+      .preview {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 18px 55px color-mix(in srgb, #000 14%, transparent);
+        overflow: hidden;
+      }
+
+      .preview-top {
+        display: flex;
+        gap: 7px;
+        border-bottom: 1px solid var(--line);
+        padding: 12px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--line);
+      }
+
+      .preview-body {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+        gap: 14px;
+        min-height: 300px;
+        padding: 18px;
+      }
+
+      .rail,
+      .canvas {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .line {
+        height: 10px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--ink) 14%, transparent);
+        margin-bottom: 11px;
+      }
+
+      .line.short {
+        width: 64%;
+      }
+
+      .pulse {
+        height: 72px;
+        border-radius: 8px;
+        margin-top: 18px;
+        background:
+          linear-gradient(90deg, color-mix(in srgb, var(--teal) 58%, transparent), transparent),
+          linear-gradient(135deg, color-mix(in srgb, var(--amber) 42%, transparent), transparent);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 8px;
+      }
+
+      .card {
+        display: grid;
+        gap: 14px;
+        min-height: 250px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 20px;
+        background: var(--panel);
+        text-decoration: none;
+      }
+
+      .card strong {
+        display: block;
+        font-size: 1.22rem;
+        letter-spacing: 0;
+      }
+
+      .card span {
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .card mark {
+        width: fit-content;
+        border-radius: 999px;
+        padding: 5px 9px;
+        color: var(--text);
+        background: color-mix(in srgb, var(--teal) 18%, transparent);
+      }
+
+      .card:nth-child(2) mark {
+        background: color-mix(in srgb, var(--amber) 22%, transparent);
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 24px;
+        color: var(--muted);
+      }
+
+      .links a {
+        color: inherit;
+      }
+
+      @media (max-width: 760px) {
+        header,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        header {
+          min-height: auto;
+        }
+
+        .preview-body {
+          grid-template-columns: 1fr;
+        }
+
+        main {
+          padding-top: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section>
+          <h1>agrun.js demos</h1>
+          <p class="lede">Open the browser demos for the JavaScript agent runtime. Start with the chat workspace for conversational flows, or use Long Task Lab to inspect long-running runs, traces, records, and final artifacts.</p>
+          <div class="actions" aria-label="Primary demos">
+            <a class="button primary" href="./example/">AI Chatbox</a>
+            <a class="button" href="./long-task-lab/">Long Task Lab</a>
+          </div>
+        </section>
+
+        <section class="preview" aria-label="Runtime demo preview">
+          <div class="preview-top">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <div class="preview-body">
+            <div class="rail" aria-hidden="true">
+              <div class="line"></div>
+              <div class="line short"></div>
+              <div class="line"></div>
+              <div class="line short"></div>
+              <div class="pulse"></div>
+            </div>
+            <div class="canvas" aria-hidden="true">
+              <div class="line short"></div>
+              <div class="line"></div>
+              <div class="line"></div>
+              <div class="pulse"></div>
+              <div class="line"></div>
+              <div class="line short"></div>
+            </div>
+          </div>
+        </section>
+      </header>
+
+      <section class="grid" aria-label="Demo choices">
+        <a class="card" href="./example/">
+          <mark>Chat workspace</mark>
+          <strong>AI Chatbox</strong>
+          <span>Try the conversational workspace, provider settings, skills, message flow, and runtime inspector in a browser-first demo.</span>
+        </a>
+        <a class="card" href="./long-task-lab/">
+          <mark>Long-running tasks</mark>
+          <strong>Long Task Lab</strong>
+          <span>Run and review longer agent tasks with mission setup, trace views, workspace output, record export, and replay-oriented diagnostics.</span>
+        </a>
+      </section>
+
+      <nav class="links" aria-label="Project links">
+        <a href="./agrun.md">Docs</a>
+        <a href="./agrun.js">Runtime bundle</a>
+        <a href="./CHANGELOG.md">Changelog</a>
+      </nav>
+    </main>
+  </body>
+</html>

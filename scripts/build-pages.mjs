@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -110,12 +110,20 @@ async function rewriteExampleForPages() {
     "utf8"
   );
 
-  const jsPath = join(outDir, "example/assets/index-J-Ep46YO.js");
-  const js = await readFile(jsPath, "utf8");
-  await writeFile(
-    jsPath,
-    js.replaceAll('"/skills/manifest.json"', '"./skills/manifest.json"'),
-    "utf8"
+  const assetsDir = join(outDir, "example/assets");
+  const assetNames = await readdir(assetsDir);
+  await Promise.all(
+    assetNames
+      .filter((assetName) => assetName.endsWith(".js"))
+      .map(async (assetName) => {
+        const jsPath = join(assetsDir, assetName);
+        const js = await readFile(jsPath, "utf8");
+        await writeFile(
+          jsPath,
+          js.replaceAll('"/skills/manifest.json"', '"./skills/manifest.json"'),
+          "utf8"
+        );
+      })
   );
 }
 

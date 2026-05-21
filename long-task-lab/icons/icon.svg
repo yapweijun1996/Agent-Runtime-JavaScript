@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="agrun Long Task Lab">
+  <rect width="512" height="512" rx="96" fill="#111318"/>
+  <rect x="80" y="98" width="352" height="316" rx="34" fill="#151922" stroke="rgba(255,255,255,0.14)" stroke-width="12"/>
+  <path d="M138 176h236M138 256h236M138 336h156" stroke="#5eead4" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="374" cy="336" r="26" fill="#86efac"/>
+</svg>
