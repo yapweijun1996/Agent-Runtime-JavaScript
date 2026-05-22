@@ -12,19 +12,27 @@ OPENAI_API_KEY=your-openai-key
 GEMINI_API_KEY=your-gemini-key
 OPENAI_MODEL=gpt-5-mini
 GEMINI_MODEL=gemini-2.5-flash
+OPENAI_GATEWAY_ENDPOINT=https://gpt.yapweijun1996.com/v1/responses
+OPENAI_GATEWAY_API_KEY=your-gateway-key
+OPENAI_GATEWAY_MODEL=gpt-5.4-mini
+OPENAI_GATEWAY_API_VARIANT=responses
 READ_URL_ENDPOINT=https://readurl.yapweijun1996.com/read-url
 READ_URL_API_KEY=your-read-url-key
 WEB_SEARCH_ENDPOINT=https://your-searxng-instance.example.com/search
 ```
 
-## Browser example auto-seeding
+## Browser and Long Task Lab auto-seeding
 
-If you want `examples/browser` to auto-fill local development API keys into browser settings during `npm run dev` or `npm run build`, explicitly opt in:
+If you want `examples/browser` or `examples/long-task-lab` to auto-fill local development API keys into browser settings during local dev, explicitly opt in:
 
 ```bash
 BROWSER_DEV_AUTOSEED_KEYS=true
 OPENAI_API_KEY=your-openai-key
 GEMINI_API_KEY=your-gemini-key
+OPENAI_GATEWAY_ENDPOINT=https://gpt.yapweijun1996.com/v1/responses
+OPENAI_GATEWAY_API_KEY=your-gateway-key
+OPENAI_GATEWAY_MODEL=gpt-5.4-mini
+OPENAI_GATEWAY_API_VARIANT=responses
 READ_URL_ENDPOINT=https://readurl.yapweijun1996.com/read-url
 READ_URL_API_KEY=your-read-url-key
 WEB_SEARCH_ENDPOINT=https://your-searxng-instance.example.com/search
@@ -32,10 +40,11 @@ WEB_SEARCH_ENDPOINT=https://your-searxng-instance.example.com/search
 
 Behavior:
 
-- The browser example reads the repo-root `.env.local`.
+- The browser examples read the repo-root `.env.local`.
 - Auto-seeding only happens when `BROWSER_DEV_AUTOSEED_KEYS=true`.
 - The browser settings use those values only as defaults when local storage is missing or empty.
 - `READ_URL_ENDPOINT` and `READ_URL_API_KEY` seed the optional browser-side adapter for the runtime `read_url` action.
+- Long Task Lab `Default` provider uses `OPENAI_GATEWAY_ENDPOINT`, `OPENAI_GATEWAY_API_KEY`, `OPENAI_GATEWAY_MODEL`, and `OPENAI_GATEWAY_API_VARIANT` as hidden local-dev defaults so demo users do not need to see model/key inputs.
 - Leaving `READ_URL_ENDPOINT` empty does not disable `read_url`; the browser example still allows direct page reads for URLs the browser can fetch and extract without the adapter.
 - This is for local development convenience only.
 
@@ -44,6 +53,8 @@ Important:
 - When enabled, the browser example bundle contains those keys.
 - Do not use production keys for this mode.
 - Do not deploy or share a build created with real secrets embedded.
+- Do not hardcode API keys in source files, even with reversible obfuscation such as XOR.
+- XOR is not acceptable for frontend default provider secrets because the key, ciphertext, and decrypt logic would all ship in the browser bundle.
 - The read-url browser adapter accepts either a service base URL or a full `/read-url` URL, sends direct page reads to `POST /read-url`, attaches `x-api-key`, and leaves provider and web-search requests unchanged.
 
 ## Live provider check
