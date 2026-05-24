@@ -30,7 +30,12 @@ result as a provider transport recovery case:
 - if the result has no assistant text and no tool calls, the single repair
   retry adds `metadata.agrun_empty_response_repair = "true"`;
 - for Responses API only, the repair retry lowers `reasoningEffort` to
-  `"minimal"` and removes `reasoningSummary`.
+  `"none"` and removes `reasoningSummary`.
+
+Correction: the first implementation used `reasoningEffort: "minimal"`, but
+`gpt-5.4-mini` rejected it with `Unsupported value: 'minimal' ... Supported
+values are: 'none', 'low', 'medium', 'high', and 'xhigh'`. The repair level is
+therefore `"none"` for the browser gateway path.
 
 This keeps content generation AI-owned. The runtime does not synthesize a user
 answer, does not hardcode prompt-specific text, and does not add runtime answer
@@ -41,7 +46,7 @@ quality gates.
 - `node test/unit/openai-transport.test.js`
   - Added a regression where the first Responses API result has empty
     `output_text` and `170/176` output tokens spent on reasoning.
-  - Asserted the repair retry sends `reasoning.effort = "minimal"`, omits
+  - Asserted the repair retry sends `reasoning.effort = "none"`, omits
     `reasoning.summary`, and tags `metadata.agrun_empty_response_repair`.
 - `npm --prefix examples/browser run build`
   - Verified the example browser production bundle still builds.
@@ -54,10 +59,17 @@ quality gates.
   - Verified generated distribution markdown links after adding this audit doc.
 - `git diff --check` and `task.jsonl` JSONL parse
   - Verified diff whitespace and task ledger syntax.
+- Chrome DevTools against `examples/browser` preview at
+  `http://127.0.0.1:4173/?qa_provider=default&qa_auto_approve_tier1=1`
+  - Prompt: `hi, reply one short sentence`.
+  - Result: UI returned visible assistant text `Hi!`.
+  - Network: three `POST https://gpt.yapweijun1996.com/v1/responses` requests,
+    all HTTP 200.
+  - Console: no messages.
 
 ## HBR
 
-No real browser gateway rerun was completed in this slice. The fix is pinned by
-mocked Responses API transport coverage and browser build verification, but a
-live Default-provider browser turn should still be run before calling the
-gateway behavior fully closed.
+The real browser rerun was intentionally short and verified that the built
+Default-provider route can return visible text through the gateway. The original
+long `Find the latest AI browser news...` style task was not rerun, so long
+multi-step gateway behavior remains a follow-up stress check.
