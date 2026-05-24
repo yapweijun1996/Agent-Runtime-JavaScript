@@ -37,6 +37,7 @@ Look up an option, flag, schema, or API signature.
 - [Action Contract](action-contract.md) — action schema and execution envelope.
 - [AGRUN-248-A Workspace Candidate Lifecycle](audits/agrun-248-a-workspace-candidate-lifecycle.md) — AGRUN-248-A workspace candidate lifecycle state machine and candidate-path mismatch signal evidence.
 - [Runtime Config + Permission Lifecycle Audit](audits/runtime-config-permission-lifecycle-2026-05-24.md) — audit and first implementation slice for runtime config lifecycle and action permission metadata.
+- [OpenAI Responses Empty Text Repair](audits/openai-empty-response-repair-2026-05-25.md) — OpenAI Responses empty output repair lowers reasoning effort on retry without runtime-authored content.
 - [Repo/File Write Tools Design](repo-file-write-tools-design.md) — future real file mutation tools boundary: preview, approval, patch digest.
 - [Agent Skills](agent-skills.md) — built-in skills and their contracts.
 

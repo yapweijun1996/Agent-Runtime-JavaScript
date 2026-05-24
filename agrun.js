@@ -4631,7 +4631,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "e386010cc-dirty"
+      "7c076260f-dirty"
         
     );
   }
@@ -66123,6 +66123,7 @@ ${user}:`]
     "content-type",
     "accept"
   ]);
+  const OPENAI_EMPTY_RESPONSE_REPAIR_REASONING_EFFORT = "minimal";
 
   async function requestOpenAIChatCompletion(request, fetchImpl) {
     const openai = createOpenAIProvider(request, fetchImpl);
@@ -66232,7 +66233,7 @@ ${user}:`]
       ...options,
       messages: repairMessages,
       maxRetries: 0,
-      providerOptions: addOpenAIRequestMetadata(providerOptions, { agrun_empty_response_repair: "true" })
+      providerOptions: buildEmptyResponseRepairProviderOptions(providerOptions, request)
     });
   }
 
@@ -66252,6 +66253,20 @@ ${user}:`]
           ...metadata
         }
       }
+    };
+  }
+
+  function buildEmptyResponseRepairProviderOptions(providerOptions, request) {
+    const next = addOpenAIRequestMetadata(providerOptions, { agrun_empty_response_repair: "true" });
+    if (!request || request.apiVariant !== "responses") return next;
+    const openaiOptions = {
+      ...((next && next.openai) || {}),
+      reasoningEffort: OPENAI_EMPTY_RESPONSE_REPAIR_REASONING_EFFORT
+    };
+    delete openaiOptions.reasoningSummary;
+    return {
+      ...next,
+      openai: openaiOptions
     };
   }
 
