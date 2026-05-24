@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agrun-long-task-lab-shell-mpk0zfu6';
+const CACHE_NAME = 'agrun-long-task-lab-shell-mpk10rtm';
 const SHELL_ASSETS = [
   '/',
   '/offline.html',

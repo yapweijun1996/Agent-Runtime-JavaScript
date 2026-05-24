@@ -45,6 +45,15 @@ quality gates.
     `reasoning.summary`, and tags `metadata.agrun_empty_response_repair`.
 - `npm --prefix examples/browser run build`
   - Verified the example browser production bundle still builds.
+- `npm test`
+  - Verified the repair regression inside the full smoke/concern suite.
+- `npm run build`
+  - Verified root library, example browser, long-task-lab, and copied dist
+    artifacts build successfully.
+- `npm run dist:check`
+  - Verified generated distribution markdown links after adding this audit doc.
+- `git diff --check` and `task.jsonl` JSONL parse
+  - Verified diff whitespace and task ledger syntax.
 
 ## HBR
 
