@@ -115,7 +115,7 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
-    const topic = readString$1W(value.topic);
+    const topic = readString$1X(value.topic);
     const evidenceGraph = trimEvidenceGraph(value.evidenceGraph);
     const reportLoop = trimReportLoop(value.reportLoop);
     const finalEnvelope = value.finalEnvelope && typeof value.finalEnvelope === "object"
@@ -129,10 +129,10 @@
       || researchActivation;
     if (!hasContent) return null;
     return {
-      entityKey: readString$1W(value.entityKey),
+      entityKey: readString$1X(value.entityKey),
       evidenceGraph,
       finalEnvelope,
-      lastTurnId: readString$1W(value.lastTurnId) || null,
+      lastTurnId: readString$1X(value.lastTurnId) || null,
       researchActivation,
       reportLoop,
       topic,
@@ -149,8 +149,8 @@
   function serializeResearchSlice(runState, options) {
     if (!runState || typeof runState !== "object") return null;
     const opts = options && typeof options === "object" ? options : {};
-    const topic = readString$1W(runState.researchState && runState.researchState.topic)
-      || readString$1W(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
+    const topic = readString$1X(runState.researchState && runState.researchState.topic)
+      || readString$1X(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
     const graph = runState.researchEvidenceGraph;
     const loop = runState.researchReportLoop;
     const envelope = runState.researchFinalEnvelope;
@@ -161,16 +161,16 @@
     const hasLoop = loop && typeof loop === "object"
       && (loop.enabled === true
         || (typeof loop.status === "string" && loop.status && loop.status !== "idle")
-        || readString$1W(loop.finalMode));
+        || readString$1X(loop.finalMode));
     const hasEnvelope = envelope && typeof envelope === "object";
     if (!topic && !hasGraph && !hasLoop && !hasEnvelope) {
       return null;
     }
     return normalizeResearchSlice({
-      entityKey: readString$1W(graph && graph.entity && graph.entity.key),
+      entityKey: readString$1X(graph && graph.entity && graph.entity.key),
       evidenceGraph: hasGraph ? graph : null,
       finalEnvelope: hasEnvelope ? envelope : null,
-      lastTurnId: readString$1W(opts.turnId) || readString$1W(runState.runId) || null,
+      lastTurnId: readString$1X(opts.turnId) || readString$1X(runState.runId) || null,
       researchActivation: readResearchActivation(runState),
       reportLoop: hasLoop ? loop : null,
       topic,
@@ -203,7 +203,7 @@
       if (!runState.researchState || typeof runState.researchState !== "object") {
         runState.researchState = {};
       }
-      if (!readString$1W(runState.researchState.topic)) {
+      if (!readString$1X(runState.researchState.topic)) {
         runState.researchState.topic = normalized.topic;
       }
     }
@@ -250,25 +250,25 @@
         ? cloneValue(value.authorityCoverage)
         : null,
       enabled: value.enabled === true,
-      finalMode: readString$1W(value.finalMode) || null,
+      finalMode: readString$1X(value.finalMode) || null,
       gateSignal: value.gateSignal && typeof value.gateSignal === "object"
         ? cloneValue(value.gateSignal)
         : null,
-      lastTopic: readString$1W(value.lastTopic) || null,
+      lastTopic: readString$1X(value.lastTopic) || null,
       recentQueries: Array.isArray(value.recentQueries)
         ? cloneValue(value.recentQueries).slice(-20)
         : [],
       sourceMinimum: value.sourceMinimum && typeof value.sourceMinimum === "object"
         ? cloneValue(value.sourceMinimum)
         : null,
-      status: readString$1W(value.status) || "idle",
+      status: readString$1X(value.status) || "idle",
       vetoCount: typeof value.vetoCount === "number" ? value.vetoCount : 0,
       version: typeof value.version === "number" ? value.version : 2
     };
   }
 
   function readResearchActivation(value) {
-    const explicit = readString$1W(value && value.researchActivation).toLowerCase();
+    const explicit = readString$1X(value && value.researchActivation).toLowerCase();
     if (explicit === "long_research" || explicit === "long-web-research" || explicit === "deep-research-writer") {
       return "long_research";
     }
@@ -280,7 +280,7 @@
     return "";
   }
 
-  function readString$1W(value) {
+  function readString$1X(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -771,7 +771,7 @@
   function createThread(options) {
     const source = options && typeof options === "object" ? options : {};
     const now = typeof source.now === "number" ? source.now : Date.now();
-    const id = readString$1V(source.id) || generateThreadId(now);
+    const id = readString$1W(source.id) || generateThreadId(now);
     return {
       budget: source.budget && typeof source.budget === "object" ? { ...source.budget } : null,
       createdAt: now,
@@ -789,7 +789,7 @@
       // 212a) hydrate cleanly without a migration step.
       todoState: normalizeTodoState(source.todoState),
       toolContext: normalizeToolContext$1(source.toolContext),
-      topic: readString$1V(source.topic)
+      topic: readString$1W(source.topic)
     };
   }
 
@@ -837,7 +837,7 @@
    */
   function findThreadById(threads, threadId) {
     const list = Array.isArray(threads) ? threads : [];
-    const target = readString$1V(threadId);
+    const target = readString$1W(threadId);
     if (!target) return null;
     return list.find((thread) => thread && thread.id === target) || null;
   }
@@ -848,7 +848,7 @@
    */
   function appendRecentUserText(thread, text) {
     const existing = Array.isArray(thread && thread.recentUserTexts) ? thread.recentUserTexts : [];
-    const trimmed = readString$1V(text);
+    const trimmed = readString$1W(text);
     if (!trimmed) return existing.slice();
     const updated = existing.concat([trimmed]);
     if (updated.length <= MAX_RECENT_USER_TEXTS) return updated;
@@ -868,7 +868,7 @@
     const record = sessionRecord && typeof sessionRecord === "object" ? sessionRecord : {};
     const normalizedList = normalizeThreadList(record.threads);
     const threads = normalizedList.length > 0 ? normalizedList : [createDefaultThread()];
-    const requestedActive = readString$1V(record.activeThreadId);
+    const requestedActive = readString$1W(record.activeThreadId);
     const activeThreadId = findThreadById(threads, requestedActive)
       ? requestedActive
       : threads[0].id;
@@ -893,8 +893,8 @@
     const source = options && typeof options === "object" ? options : {};
     const state = readThreadsState(source.sessionRecord);
     const verdict = source.verdict && typeof source.verdict === "object" ? source.verdict : null;
-    const userText = readString$1V(source.userText);
-    const turnId = readString$1V(source.turnId) || null;
+    const userText = readString$1W(source.userText);
+    const turnId = readString$1W(source.turnId) || null;
     const now = typeof source.now === "number" ? source.now : Date.now();
     const maxThreads = Number.isInteger(source.maxThreads) && source.maxThreads > 0
       ? source.maxThreads
@@ -914,7 +914,7 @@
       const newThread = createThread({
         lastActiveAt: now,
         recentUserTexts: userText ? [userText] : [],
-        topic: readString$1V(verdict.topic),
+        topic: readString$1W(verdict.topic),
         goalAnchor: userText
           ? { createdAt: now, text: userText, turnId }
           : undefined
@@ -922,13 +922,13 @@
       threads.push(newThread);
       activeThreadId = newThread.id;
     } else if (verdict.action === "pivot_back") {
-      const target = readString$1V(verdict.threadId);
+      const target = readString$1W(verdict.threadId);
       if (target && findThreadById(threads, target)) {
         activeThreadId = target;
       }
       threads = bumpThread(threads, activeThreadId, userText, now, turnId);
     } else if (verdict.action === "continue_thread") {
-      const target = readString$1V(verdict.threadId);
+      const target = readString$1W(verdict.threadId);
       if (target && findThreadById(threads, target)) {
         activeThreadId = target;
       }
@@ -994,7 +994,7 @@
       const existingAnchor = thread.goalAnchor && typeof thread.goalAnchor === "object"
         ? thread.goalAnchor
         : null;
-      const hasText = Boolean(existingAnchor && readString$1V(existingAnchor.text));
+      const hasText = Boolean(existingAnchor && readString$1W(existingAnchor.text));
       const nextGoalAnchor = !hasText && userText
         ? { createdAt: now, text: userText, turnId: turnId || null }
         : existingAnchor;
@@ -1025,7 +1025,7 @@
    * words and short noise. Exposed for topic-router scoring + tests.
    */
   function tokenizeTopicText(value) {
-    const text = readString$1V(value).toLowerCase();
+    const text = readString$1W(value).toLowerCase();
     if (!text) return [];
     const raw = text.split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean);
     const filtered = [];
@@ -1043,8 +1043,8 @@
     }
     return {
       createdAt: typeof value.createdAt === "number" ? value.createdAt : null,
-      text: readString$1V(value.text),
-      turnId: readString$1V(value.turnId) || null
+      text: readString$1W(value.text),
+      turnId: readString$1W(value.turnId) || null
     };
   }
 
@@ -1069,7 +1069,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       aggregatedSearchResults: Array.isArray(source.aggregatedSearchResults) ? source.aggregatedSearchResults.slice() : [],
-      lastQuery: readString$1V(source.lastQuery) || null,
+      lastQuery: readString$1W(source.lastQuery) || null,
       readSources: Array.isArray(source.readSources) ? source.readSources.slice() : [],
       searchPasses: Array.isArray(source.searchPasses) ? source.searchPasses.slice() : [],
       searchResults: Array.isArray(source.searchResults) ? source.searchResults.slice() : []
@@ -1078,13 +1078,13 @@
 
   function normalizeRecentUserTexts(value) {
     if (!Array.isArray(value)) return [];
-    const cleaned = value.map((item) => readString$1V(item)).filter(Boolean);
+    const cleaned = value.map((item) => readString$1W(item)).filter(Boolean);
     if (cleaned.length <= MAX_RECENT_USER_TEXTS) return cleaned;
     return cleaned.slice(-MAX_RECENT_USER_TEXTS);
   }
 
   function normalizeThreadStatus(value) {
-    const candidate = readString$1V(value).toLowerCase();
+    const candidate = readString$1W(value).toLowerCase();
     return THREAD_STATUSES.includes(candidate) ? candidate : "active";
   }
 
@@ -1094,7 +1094,7 @@
     return `t-${seedPart.slice(-4)}${randomPart.slice(-4)}`;
   }
 
-  function readString$1V(value) {
+  function readString$1W(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -1359,7 +1359,7 @@
   });
 
   function createIndexedDBSessionStore(options) {
-    const dbName = readString$1U(options && options.dbName) || DEFAULT_DB_NAME;
+    const dbName = readString$1V(options && options.dbName) || DEFAULT_DB_NAME;
     const openTimeoutMs = readPositiveNumber$4(options && options.openTimeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
     let dbPromise = null;
 
@@ -1428,7 +1428,7 @@
       async appendMemory(sessionId, entry) {
         const nextEntry = {
           ...cloneValue(entry),
-          key: `${sessionId}:${readString$1U(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
+          key: `${sessionId}:${readString$1V(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
           sessionId
         };
         await putRecord(await getDb(), "memoryEntries", nextEntry);
@@ -1700,14 +1700,14 @@
       return leftTime - rightTime;
     }
 
-    return readString$1U(left.id || left.key).localeCompare(readString$1U(right.id || right.key));
+    return readString$1V(left.id || left.key).localeCompare(readString$1V(right.id || right.key));
   }
 
   function cloneNullable$2(value) {
     return value == null ? null : cloneValue(value);
   }
 
-  function readString$1U(value) {
+  function readString$1V(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -1944,7 +1944,7 @@
   const RESOLVED_CLARIFICATION_KINDS = new Set(["confirm", "explicit_answer", "option_select"]);
 
   function isResolvedClarificationKind(value) {
-    return RESOLVED_CLARIFICATION_KINDS.has(readString$1T(value));
+    return RESOLVED_CLARIFICATION_KINDS.has(readString$1U(value));
   }
 
   function normalizeCandidateSource(value) {
@@ -1952,23 +1952,23 @@
       return null;
     }
 
-    const url = readString$1T(value.url);
+    const url = readString$1U(value.url);
 
     if (!url) {
       return null;
     }
 
     return {
-      domain: readString$1T(value.domain),
-      engine: readString$1T(value.engine),
+      domain: readString$1U(value.domain),
+      engine: readString$1U(value.engine),
       passIndex: typeof value.passIndex === "number" ? value.passIndex : null,
-      query: readString$1T(value.query),
+      query: readString$1U(value.query),
       rank: typeof value.rank === "number" ? value.rank : null,
-      source: readString$1T(value.source),
-      sourceCategory: readString$1T(value.sourceCategory),
+      source: readString$1U(value.source),
+      sourceCategory: readString$1U(value.sourceCategory),
       sourceScore: typeof value.sourceScore === "number" ? value.sourceScore : null,
-      snippet: readString$1T(value.snippet) || readString$1T(value.content),
-      title: readString$1T(value.title),
+      snippet: readString$1U(value.snippet) || readString$1U(value.content),
+      title: readString$1U(value.title),
       url
     };
   }
@@ -1978,7 +1978,7 @@
       return null;
     }
 
-    const url = readString$1T(value.url);
+    const url = readString$1U(value.url);
 
     if (!url) {
       return null;
@@ -1986,19 +1986,19 @@
 
     return {
       bytes: typeof value.bytes === "number" ? value.bytes : 0,
-      contentType: readString$1T(value.contentType),
-      error: readString$1T(value.error),
-      message: readString$1T(value.message),
-      mode: readString$1T(value.mode),
+      contentType: readString$1U(value.contentType),
+      error: readString$1U(value.error),
+      message: readString$1U(value.message),
+      mode: readString$1U(value.mode),
       ok: value.ok !== false,
       originStatus: typeof value.originStatus === "number" ? value.originStatus : null,
-      platform: readString$1T(value.platform),
-      reason: readString$1T(value.reason),
+      platform: readString$1U(value.platform),
+      reason: readString$1U(value.reason),
       status: typeof value.status === "number" ? value.status : null,
-      text: readString$1T(value.text),
+      text: readString$1U(value.text),
       textRange: normalizeTextRange$4(value.textRange),
-      tier: readString$1T(value.tier),
-      title: readString$1T(value.title),
+      tier: readString$1U(value.tier),
+      title: readString$1U(value.title),
       truncated: value.truncated === true,
       url
     };
@@ -2025,7 +2025,7 @@
 
   function normalizePendingClarification(value, fallbackQuestion) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      const fallback = readString$1T(fallbackQuestion);
+      const fallback = readString$1U(fallbackQuestion);
 
       if (!fallback) {
         return null;
@@ -2041,14 +2041,14 @@
       };
     }
 
-    const question = readString$1T(value.question);
+    const question = readString$1U(value.question);
 
     if (!question) {
       return null;
     }
 
     return {
-      id: readString$1T(value.id) || `clarify:${question.toLowerCase()}`,
+      id: readString$1U(value.id) || `clarify:${question.toLowerCase()}`,
       kind: readPendingKind(value.kind) || "clarification",
       options: Array.isArray(value.options)
         ? value.options
@@ -2056,8 +2056,8 @@
           .filter(Boolean)
         : [],
       question,
-      source: readString$1T(value.source) || "structured",
-      sourceTurn: readString$1T(value.sourceTurn) || "history"
+      source: readString$1U(value.source) || "structured",
+      sourceTurn: readString$1U(value.sourceTurn) || "history"
     };
   }
 
@@ -2066,7 +2066,7 @@
       return null;
     }
 
-    const kind = readString$1T(value.kind);
+    const kind = readString$1U(value.kind);
 
     if (!kind) {
       return null;
@@ -2074,7 +2074,7 @@
 
     return {
       kind,
-      sourceTurn: readString$1T(value.sourceTurn) || null,
+      sourceTurn: readString$1U(value.sourceTurn) || null,
       value: value.value == null ? null : cloneValue(value.value)
     };
   }
@@ -2084,8 +2084,8 @@
       return null;
     }
 
-    const key = readString$1T(value.key);
-    const text = readString$1T(value.text);
+    const key = readString$1U(value.key);
+    const text = readString$1U(value.text);
 
     if (!key || !text) {
       return null;
@@ -2146,7 +2146,7 @@
 
     let truncated = false;
     const capLong = (value) => {
-      const s = readString$1T(value);
+      const s = readString$1U(value);
       if (!s) return "";
       if (s.length <= snippetBudget) return s;
       truncated = true;
@@ -2155,22 +2155,22 @@
 
     const projected = {
       bytes: typeof readSource.bytes === "number" ? readSource.bytes : 0,
-      contentType: readString$1T(readSource.contentType),
+      contentType: readString$1U(readSource.contentType),
       error: capLong(readSource.error),
       message: capLong(readSource.message),
-      mode: readString$1T(readSource.mode),
+      mode: readString$1U(readSource.mode),
       ok: readSource.ok !== false,
       originStatus: typeof readSource.originStatus === "number" ? readSource.originStatus : null,
-      platform: readString$1T(readSource.platform),
-      reason: readString$1T(readSource.reason),
+      platform: readString$1U(readSource.platform),
+      reason: readString$1U(readSource.reason),
       snippet: capLong(readSource.snippet),
       status: typeof readSource.status === "number" ? readSource.status : null,
       text: capLong(readSource.text),
       textRange: normalizeTextRange$4(readSource.textRange),
-      tier: readString$1T(readSource.tier),
-      title: readString$1T(readSource.title),
+      tier: readString$1U(readSource.tier),
+      title: readString$1U(readSource.title),
       truncated: readSource.truncated === true || truncated,
-      url: readString$1T(readSource.url)
+      url: readString$1U(readSource.url)
     };
 
     if (truncated) {
@@ -2179,7 +2179,7 @@
     return projected;
   }
 
-  function readString$1T(value) {
+  function readString$1U(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -2246,10 +2246,10 @@
 
     return {
       ...context,
-      activeQuery: readString$1S(state.activeQuery) || context.activeQuery,
+      activeQuery: readString$1T(state.activeQuery) || context.activeQuery,
       clarificationStatus,
-      currentGoal: readString$1S(state.currentGoal) || context.currentGoal,
-      currentTopic: readString$1S(state.currentTopic) || context.currentTopic,
+      currentGoal: readString$1T(state.currentGoal) || context.currentGoal,
+      currentTopic: readString$1T(state.currentTopic) || context.currentTopic,
       lastResolution,
       openAmbiguity: pendingClarification && typeof pendingClarification.question === "string"
         ? pendingClarification.question
@@ -2297,12 +2297,12 @@
     return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
   }
 
-  function readString$1S(value) {
+  function readString$1T(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function capString(value, maxChars) {
-    const text = readString$1S(value);
+    const text = readString$1T(value);
     if (!text) return "";
     const budget = Number.isInteger(maxChars) && maxChars > 0 ? maxChars : 0;
     if (budget === 0 || text.length <= budget) return text;
@@ -2387,7 +2387,7 @@
 
     return {
       activeGoal: hasOwn$1(source, "activeGoal") ? readAnchorText(source.activeGoal) : legacy.activeGoal,
-      activeQuery: hasOwn$1(source, "activeQuery") ? readString$1R(source.activeQuery) : legacy.activeQuery,
+      activeQuery: hasOwn$1(source, "activeQuery") ? readString$1S(source.activeQuery) : legacy.activeQuery,
       activeTopic: hasOwn$1(source, "activeTopic") ? readAnchorText(source.activeTopic) : legacy.activeTopic,
       candidateSources,
       lastClarificationResolution: hasOwn$1(source, "lastClarificationResolution")
@@ -2410,7 +2410,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value)
       ? value
       : null;
-    const fallbackQuestion = readString$1R(source && source.openAmbiguity);
+    const fallbackQuestion = readString$1S(source && source.openAmbiguity);
 
     return {
       ...createEmptyInquiryContext(),
@@ -2477,16 +2477,16 @@
     }
 
     return {
-      compactedContext: readString$1R(source.compactedContext),
-      decisions: readString$1R(source.decisions),
+      compactedContext: readString$1S(source.compactedContext),
+      decisions: readString$1S(source.decisions),
       estimatedTokens: typeof source.estimatedTokens === "number" ? source.estimatedTokens : 0,
-      facts: readString$1R(source.facts),
-      history: readString$1R(source.history),
+      facts: readString$1S(source.facts),
+      history: readString$1S(source.history),
       items: Array.isArray(source.items) ? cloneValue(source.items) : [],
-      memory: readString$1R(source.memory),
-      preferences: readString$1R(source.preferences),
-      recentTurns: readString$1R(source.recentTurns),
-      summary: readString$1R(source.summary) || readString$1R(source.compactedContext)
+      memory: readString$1S(source.memory),
+      preferences: readString$1S(source.preferences),
+      recentTurns: readString$1S(source.recentTurns),
+      summary: readString$1S(source.summary) || readString$1S(source.compactedContext)
     };
   }
 
@@ -2495,7 +2495,7 @@
       return null;
     }
 
-    const kind = readString$1R(value.kind);
+    const kind = readString$1S(value.kind);
 
     if (!kind) {
       return null;
@@ -2504,10 +2504,10 @@
     return {
       clarificationReply: cloneStructuredValue$3(value.clarificationReply),
       followUpTarget: cloneStructuredValue$3(value.followUpTarget),
-      goal: readString$1R(value.goal),
+      goal: readString$1S(value.goal),
       kind,
       needsClarification: value.needsClarification === true,
-      topic: readString$1R(value.topic)
+      topic: readString$1S(value.topic)
     };
   }
 
@@ -2516,7 +2516,7 @@
       return null;
     }
 
-    const kind = readString$1R(value.kind);
+    const kind = readString$1S(value.kind);
 
     if (!kind) {
       return null;
@@ -2527,8 +2527,8 @@
       decision: cloneStructuredValue$3(value.decision),
       kind,
       pendingClarification: cloneStructuredValue$3(value.pendingClarification),
-      selectedUrl: readString$1R(value.selectedUrl) || null,
-      source: readString$1R(value.source) || null
+      selectedUrl: readString$1S(value.selectedUrl) || null,
+      source: readString$1S(value.source) || null
     };
   }
 
@@ -2542,12 +2542,12 @@
     return Object.prototype.hasOwnProperty.call(value, key);
   }
 
-  function readString$1R(value) {
+  function readString$1S(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readAnchorText(value) {
-    return readString$1R(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1S(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function projectSessionContextFromSnapshot(snapshot) {
@@ -2606,10 +2606,10 @@
       activeTopic: context.activeTopic || null,
       candidateSourceCount: context.candidateSources.length,
       hasPendingClarification: Boolean(context.pendingClarification),
-      lastClarificationResolutionKind: readString$1Q(
+      lastClarificationResolutionKind: readString$1R(
         context.lastClarificationResolution && context.lastClarificationResolution.kind
       ) || null,
-      lastReadSourceUrl: readString$1Q(context.lastReadSource && context.lastReadSource.url) || null,
+      lastReadSourceUrl: readString$1R(context.lastReadSource && context.lastReadSource.url) || null,
       selectedSource: context.selectedSource
         ? {
             title: context.selectedSource.title || null,
@@ -2625,7 +2625,7 @@
       : null;
   }
 
-  function readString$1Q(value) {
+  function readString$1R(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -2907,8 +2907,8 @@
         throw new Error(`Approval resumeToken rejected: ${verification.reason}.`);
       }
       if (enforceSessionBinding) {
-        const claimedSessionId = readString$1P(rawToken.sessionId);
-        const providedSessionId = readString$1P(rawInput.agrunSessionId);
+        const claimedSessionId = readString$1Q(rawToken.sessionId);
+        const providedSessionId = readString$1Q(rawInput.agrunSessionId);
         if (claimedSessionId && providedSessionId && claimedSessionId !== providedSessionId) {
           throw new Error("Approval resumeToken session binding mismatch.");
         }
@@ -2939,7 +2939,7 @@
     } = options;
     const reason = `Action "${actionName}" requires approval.`;
     const resumable = policy === "ask";
-    const sessionId = readString$1P(rawInput && rawInput.agrunSessionId) || readString$1P(request && request.agrunSessionId);
+    const sessionId = readString$1Q(rawInput && rawInput.agrunSessionId) || readString$1Q(request && request.agrunSessionId);
     const projectedContextSnapshot = runState && runState.contextSnapshot
       ? createContextSnapshot(runState.contextSnapshot)
       : request && request.contextSnapshot
@@ -2997,7 +2997,7 @@
       return null;
     }
 
-    const actionName = readString$1P(value.actionName);
+    const actionName = readString$1Q(value.actionName);
     const policy = readPolicy$1(value.policy);
     const resolution = readResolution(value.resolution) || "pending";
     const resumeToken = readResumeToken(value.resumeToken);
@@ -3009,7 +3009,7 @@
     return {
       actionName,
       policy,
-      reason: readString$1P(value.reason) || `Action "${actionName}" requires approval.`,
+      reason: readString$1Q(value.reason) || `Action "${actionName}" requires approval.`,
       resumable: value.resumable === true,
       resolution,
       resumeToken
@@ -3029,13 +3029,13 @@
 
     return {
       ...sourceRequest,
-      agrunSessionId: readString$1P(overrides.agrunSessionId) || readString$1P(source.sessionId) || null,
-      apiKey: isServerAuth ? null : readString$1P(overrides.apiKey) || readString$1P(sourceRequest.apiKey) || null,
+      agrunSessionId: readString$1Q(overrides.agrunSessionId) || readString$1Q(source.sessionId) || null,
+      apiKey: isServerAuth ? null : readString$1Q(overrides.apiKey) || readString$1Q(sourceRequest.apiKey) || null,
       authMode,
       cachedContentMode: readCachedContentMode$1(overrides.cachedContentMode) || readCachedContentMode$1(sourceRequest.cachedContentMode) || (isServerAuth ? "disabled" : "client"),
-      endpoint: readString$1P(overrides.endpoint) || readString$1P(sourceRequest.endpoint) || null,
+      endpoint: readString$1Q(overrides.endpoint) || readString$1Q(sourceRequest.endpoint) || null,
       fetch: typeof overrides.fetch === "function" ? overrides.fetch : null,
-      streamEndpoint: readString$1P(overrides.streamEndpoint) || readString$1P(sourceRequest.streamEndpoint) || null
+      streamEndpoint: readString$1Q(overrides.streamEndpoint) || readString$1Q(sourceRequest.streamEndpoint) || null
     };
   }
 
@@ -3046,7 +3046,7 @@
     const webSearchAuthMode = rawInput && typeof rawInput === "object" && typeof rawInput.webSearchAuthMode === "string"
       ? rawInput.webSearchAuthMode.trim()
       : null;
-    const agrunSessionId = readString$1P(rawInput && rawInput.agrunSessionId) || readString$1P(request && request.agrunSessionId);
+    const agrunSessionId = readString$1Q(rawInput && rawInput.agrunSessionId) || readString$1Q(request && request.agrunSessionId);
     const authMode = readAuthMode$3(request && request.authMode);
     const isServerAuth = authMode === "server";
 
@@ -3072,7 +3072,7 @@
 
   function normalizeResumeDecision(decision, actionName) {
     if (decision && typeof decision === "object" && !Array.isArray(decision)) {
-      if (decision.type === "clarify" && readString$1P(decision.question)) {
+      if (decision.type === "clarify" && readString$1Q(decision.question)) {
         return {
           question: decision.question.trim(),
           type: "clarify"
@@ -3084,7 +3084,7 @@
           args: decision.args && typeof decision.args === "object" && !Array.isArray(decision.args)
             ? cloneValue(decision.args)
             : {},
-          name: readString$1P(decision.name) || actionName,
+          name: readString$1Q(decision.name) || actionName,
           type: "action"
         };
       }
@@ -3102,7 +3102,7 @@
       return null;
     }
 
-    const actionName = readString$1P(value.actionName);
+    const actionName = readString$1Q(value.actionName);
     const policy = readPolicy$1(value.policy);
     const request = value.request && typeof value.request === "object" && !Array.isArray(value.request)
       ? cloneValue(value.request)
@@ -3124,7 +3124,7 @@
         : null,
       plannerInvalidCount: typeof value.plannerInvalidCount === "number" ? value.plannerInvalidCount : 0,
       policy,
-      reason: readString$1P(value.reason),
+      reason: readString$1Q(value.reason),
       request,
       actionPatternConvergence: cloneRecordOrNull(value.actionPatternConvergence),
       terminalRepairState: cloneRecordOrNull(value.terminalRepairState),
@@ -3139,7 +3139,7 @@
       candidatePathMismatchSignal: cloneRecordOrNull(value.candidatePathMismatchSignal),
       virtualWorkspace: cloneRecordOrNull(value.virtualWorkspace),
       sessionContextMode: readSessionContextMode(value.sessionContextMode),
-      sessionId: readString$1P(value.sessionId) || null,
+      sessionId: readString$1Q(value.sessionId) || null,
       todoState: value.todoState && typeof value.todoState === "object" && !Array.isArray(value.todoState)
         ? cloneValue(value.todoState)
         : null,
@@ -3186,7 +3186,7 @@
       : "";
   }
 
-  function readString$1P(value) {
+  function readString$1Q(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3290,7 +3290,7 @@
     return null;
   }
 
-  function readString$1O(value) {
+  function readString$1P(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3910,7 +3910,7 @@
   ];
 
   function resolveRequestedTimeZone(value) {
-    const explicit = readString$1N(value);
+    const explicit = readString$1O(value);
     if (!explicit) {
       return null;
     }
@@ -3935,7 +3935,7 @@
   }
 
   function normalizeQuery$1(query) {
-    return readString$1N(query)
+    return readString$1O(query)
       .toLowerCase()
       .replace(/[?.!,]/g, " ")
       .replace(/\s+/g, " ");
@@ -4027,7 +4027,7 @@
     }
   }
 
-  function readString$1N(value) {
+  function readString$1O(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -4176,9 +4176,9 @@
       return null;
     }
 
-    const skillId = readString$1M(skill.skillId) || readString$1M(skill.id) || readString$1M(skill.name);
-    const name = readString$1M(skill.name);
-    const instructions = readString$1M(skill.instructions);
+    const skillId = readString$1N(skill.skillId) || readString$1N(skill.id) || readString$1N(skill.name);
+    const name = readString$1N(skill.name);
+    const instructions = readString$1N(skill.instructions);
 
     if (!name || !instructions) {
       return null;
@@ -4186,25 +4186,25 @@
 
     return {
       availability: normalizeAvailability$1(skill.availability),
-      category: readString$1M(skill.category),
-      checksum: readString$1M(skill.checksum),
-      description: readString$1M(skill.description),
+      category: readString$1N(skill.category),
+      checksum: readString$1N(skill.checksum),
+      description: readString$1N(skill.description),
       instructions,
       inputTypes: normalizeStringArray$2(skill.inputTypes),
       name,
-      namespace: readString$1M(skill.namespace),
+      namespace: readString$1N(skill.namespace),
       requires: normalizeStringArray$2(skill.requires),
       riskTier: normalizeRiskTier(skill.riskTier),
       skillId,
-      sourcePath: readString$1M(skill.sourcePath),
+      sourcePath: readString$1N(skill.sourcePath),
       tags: normalizeStringArray$2(skill.tags),
       tools: normalizeAgentTools(skill.tools),
-      version: readString$1M(skill.version)
+      version: readString$1N(skill.version)
     };
   }
 
   function findAgentSkill(skills, name) {
-    const target = readString$1M(name).toLowerCase();
+    const target = readString$1N(name).toLowerCase();
 
     if (!target) {
       return null;
@@ -4220,8 +4220,8 @@
       return null;
     }
 
-    const name = readString$1M(skill.name);
-    const skillId = readString$1M(skill.skillId) || readString$1M(skill.id) || name;
+    const name = readString$1N(skill.name);
+    const skillId = readString$1N(skill.skillId) || readString$1N(skill.id) || name;
 
     if (!name || !skillId) {
       return null;
@@ -4229,19 +4229,19 @@
 
     return {
       availability: normalizeAvailability$1(skill.availability),
-      category: readString$1M(skill.category),
-      checksum: readString$1M(skill.checksum),
-      description: readString$1M(skill.description),
+      category: readString$1N(skill.category),
+      checksum: readString$1N(skill.checksum),
+      description: readString$1N(skill.description),
       inputTypes: normalizeStringArray$2(skill.inputTypes),
       name,
-      namespace: readString$1M(skill.namespace),
+      namespace: readString$1N(skill.namespace),
       requires: normalizeStringArray$2(skill.requires),
       riskTier: normalizeRiskTier(skill.riskTier),
       skillId,
-      sourcePath: readString$1M(skill.sourcePath),
+      sourcePath: readString$1N(skill.sourcePath),
       tags: normalizeStringArray$2(skill.tags),
       tools: normalizeAgentToolSummaries(skill.tools),
-      version: readString$1M(skill.version)
+      version: readString$1N(skill.version)
     };
   }
 
@@ -4307,7 +4307,7 @@
 
   function findAgentSkillTool(skill, toolName) {
     const resolvedSkill = normalizeAgentSkill(skill);
-    const target = readString$1M(toolName).toLowerCase();
+    const target = readString$1N(toolName).toLowerCase();
 
     if (!resolvedSkill || !target) {
       return null;
@@ -4323,7 +4323,7 @@
 
     return Object.freeze({
       getManifest(skillIdOrName) {
-        const target = readString$1M(skillIdOrName).toLowerCase();
+        const target = readString$1N(skillIdOrName).toLowerCase();
         if (!target) return null;
         const manifest = manifests.find((item) => matchesSkillKey(item, target));
         return manifest ? createAgentSkillSummary(manifest) : null;
@@ -4334,7 +4334,7 @@
       },
 
       loadSkill(skillIdOrName) {
-        const target = readString$1M(skillIdOrName).toLowerCase();
+        const target = readString$1N(skillIdOrName).toLowerCase();
         if (!target) return null;
         return normalizedSkills.find((skill) => matchesSkillKey(skill, target)) || null;
       }
@@ -4413,8 +4413,8 @@
       return null;
     }
 
-    const name = readString$1M(tool.name);
-    const description = readString$1M(tool.description);
+    const name = readString$1N(tool.name);
+    const description = readString$1N(tool.description);
     const func = typeof tool.func === "function" ? tool.func : null;
 
     if (!name || !description || !func) {
@@ -4445,8 +4445,8 @@
       return null;
     }
 
-    const name = readString$1M(tool.name);
-    const description = readString$1M(tool.description);
+    const name = readString$1N(tool.name);
+    const description = readString$1N(tool.description);
 
     if (!name || !description) {
       return null;
@@ -4458,8 +4458,8 @@
       parameters: normalizeToolParameters(tool.parameters)
     };
 
-    if (readString$1M(tool.resultKind)) {
-      summary.resultKind = readString$1M(tool.resultKind);
+    if (readString$1N(tool.resultKind)) {
+      summary.resultKind = readString$1N(tool.resultKind);
     }
     if (normalizeRiskTier(tool.riskTier) != null) {
       summary.riskTier = normalizeRiskTier(tool.riskTier);
@@ -4483,8 +4483,8 @@
       }
 
       const prop = {
-        description: readString$1M(value.description),
-        type: readString$1M(value.type)
+        description: readString$1N(value.description),
+        type: readString$1N(value.type)
       };
       copySchemaEnum(prop, value);
       copySchemaAliases(prop, value);
@@ -4496,8 +4496,8 @@
         for (const [nk, nv] of Object.entries(value.properties)) {
           if (nv && typeof nv === "object" && !Array.isArray(nv)) {
             const nestedProp = copySchemaEnum({
-              description: readString$1M(nv.description),
-              type: readString$1M(nv.type)
+              description: readString$1N(nv.description),
+              type: readString$1N(nv.type)
             }, nv);
             copySchemaAliases(nestedProp, nv);
             nested[nk] = nestedProp;
@@ -4516,7 +4516,7 @@
       required: Array.isArray(source.required)
         ? source.required.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
         : [],
-      type: readString$1M(source.type) || "object"
+      type: readString$1N(source.type) || "object"
     };
   }
 
@@ -4561,7 +4561,7 @@
     return target;
   }
 
-  function readString$1M(value) {
+  function readString$1N(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -4605,7 +4605,7 @@
     const seen = new Set();
 
     for (const skill of Array.isArray(skills) ? skills : []) {
-      const key = readString$1M(skill && (skill.skillId || skill.name)).toLowerCase();
+      const key = readString$1N(skill && (skill.skillId || skill.name)).toLowerCase();
       if (!key) continue;
       if (seen.has(key)) {
         throw new Error(`Duplicate agent skill id "${key}".`);
@@ -4616,8 +4616,8 @@
 
   function matchesSkillKey(skill, target) {
     if (!skill || !target) return false;
-    return readString$1M(skill.skillId).toLowerCase() === target ||
-      readString$1M(skill.name).toLowerCase() === target;
+    return readString$1N(skill.skillId).toLowerCase() === target ||
+      readString$1N(skill.name).toLowerCase() === target;
   }
 
   function normalizeMaybeAsync(value, normalize) {
@@ -4631,7 +4631,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "7bdcbe61a-dirty"
+      "43ef9f4f3-dirty"
         
     );
   }
@@ -5014,7 +5014,7 @@
   }
 
   function buildCurrentTurnParts(prompt, parts) {
-    const normalizedPrompt = readString$1L(prompt);
+    const normalizedPrompt = readString$1M(prompt);
     const normalizedParts = normalizeMultimodalParts(parts);
     const imageAndExtraParts = normalizedParts.filter((part) => (
       part.type === "image" ||
@@ -5081,7 +5081,7 @@
     }
 
     const label = readImageLabel(part);
-    const mimeType = readString$1L(part.mimeType) || "image/*";
+    const mimeType = readString$1M(part.mimeType) || "image/*";
     const bytes = readImageBytes(part);
     return bytes > 0
       ? `${label} (${mimeType}, ${bytes} bytes)`
@@ -5089,7 +5089,7 @@
   }
 
   function parseDataUrl(value) {
-    const source = readString$1L(value);
+    const source = readString$1M(value);
     const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/i.exec(source);
 
     if (!match) {
@@ -5098,7 +5098,7 @@
 
     return {
       data: match[2],
-      mimeType: readString$1L(match[1]) || "application/octet-stream"
+      mimeType: readString$1M(match[1]) || "application/octet-stream"
     };
   }
 
@@ -5108,13 +5108,13 @@
     }
 
     if (part.type === "text") {
-      const text = readString$1L(part.text);
+      const text = readString$1M(part.text);
       return text ? { type: "text", text } : null;
     }
 
     if (part.type === "image") {
-      const url = readString$1L(part.url);
-      const mimeType = readString$1L(part.mimeType);
+      const url = readString$1M(part.url);
+      const mimeType = readString$1M(part.mimeType);
 
       if (!url || !mimeType) {
         return null;
@@ -5133,11 +5133,11 @@
   }
 
   function readImageLabel(part) {
-    return readString$1L(part && part.filename) || "Image";
+    return readString$1M(part && part.filename) || "Image";
   }
 
   function estimateBase64Bytes(data) {
-    const text = readString$1L(data);
+    const text = readString$1M(data);
 
     if (!text) {
       return 0;
@@ -5156,7 +5156,7 @@
   }
 
   function readOptionalString$2(value) {
-    const text = readString$1L(value);
+    const text = readString$1M(value);
     return text || null;
   }
 
@@ -5166,7 +5166,7 @@
       : null;
   }
 
-  function readString$1L(value) {
+  function readString$1M(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5431,7 +5431,7 @@
    * / invalid URLs are dropped. Order is stable (first occurrence wins).
    */
   function buildThreadScopedEvidenceUrls(memoryEntries, activeThreadId) {
-    const threadId = readString$1K(activeThreadId);
+    const threadId = readString$1L(activeThreadId);
     if (!threadId) return null;
     const list = Array.isArray(memoryEntries) ? memoryEntries : [];
     if (list.length === 0) return null;
@@ -5439,7 +5439,7 @@
     for (const entry of list) {
       if (!entry || typeof entry !== "object") continue;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-      const entryThread = readString$1K(metadata.threadId) || DEFAULT_THREAD_ID;
+      const entryThread = readString$1L(metadata.threadId) || DEFAULT_THREAD_ID;
       if (entryThread !== threadId) continue;
       collectUrlsFromMetadata(metadata, urls);
     }
@@ -5460,23 +5460,23 @@
     const list = Array.isArray(entries) ? entries : [];
     if (!scope || typeof scope !== "object") return list.slice();
     if (scope.crossThread === true) return list.slice();
-    const threadId = readString$1K(scope.threadId);
+    const threadId = readString$1L(scope.threadId);
     if (!threadId) return list.slice();
     return list.filter((entry) => {
       if (!entry || typeof entry !== "object") return false;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-      const entryThread = readString$1K(metadata.threadId) || DEFAULT_THREAD_ID;
+      const entryThread = readString$1L(metadata.threadId) || DEFAULT_THREAD_ID;
       return entryThread === threadId;
     });
   }
 
   function collectUrlsFromMetadata(metadata, sink) {
-    const direct = readString$1K(metadata.url) || readString$1K(metadata.sourceUrl);
+    const direct = readString$1L(metadata.url) || readString$1L(metadata.sourceUrl);
     if (direct) sink.add(direct);
     if (Array.isArray(metadata.sources)) {
       for (const source of metadata.sources) {
         if (source && typeof source === "object") {
-          const url = readString$1K(source.url);
+          const url = readString$1L(source.url);
           if (url) sink.add(url);
         }
       }
@@ -5499,12 +5499,12 @@
 
     const context = projectSessionContextFromSnapshot(snapshot);
     return {
-      activeQuery: readString$1K(context && context.activeQuery),
-      clarificationStatus: readString$1K(context && context.clarificationStatus) || "none",
-      currentGoal: readString$1K(context && context.currentGoal),
-      currentTopic: readString$1K(context && context.currentTopic),
+      activeQuery: readString$1L(context && context.activeQuery),
+      clarificationStatus: readString$1L(context && context.clarificationStatus) || "none",
+      currentGoal: readString$1L(context && context.currentGoal),
+      currentTopic: readString$1L(context && context.currentTopic),
       lastResolution: context && context.lastResolution ? stableClone(context.lastResolution) : null,
-      openAmbiguity: readString$1K(context && context.openAmbiguity),
+      openAmbiguity: readString$1L(context && context.openAmbiguity),
       pendingClarification: context && context.pendingClarification ? stableClone(context.pendingClarification) : null
     };
   }
@@ -5516,7 +5516,7 @@
 
     const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
     const kind = readEvidenceKind(metadata.kind);
-    const status = readString$1K(metadata.status) || "confirmed";
+    const status = readString$1L(metadata.status) || "confirmed";
     const text = readEntryText$1(entry);
 
     if (!kind || status !== "confirmed" || !text) {
@@ -5524,14 +5524,14 @@
     }
 
     const slot = normalizeSlot$1(metadata.slot);
-    const threadId = readString$1K(metadata.threadId) || DEFAULT_THREAD_ID;
-    const turnId = readString$1K(metadata.turnId) || null;
-    const source = readString$1K(metadata.source) || null;
-    const supersededBy = readString$1K(metadata.supersededBy) || null;
+    const threadId = readString$1L(metadata.threadId) || DEFAULT_THREAD_ID;
+    const turnId = readString$1L(metadata.turnId) || null;
+    const source = readString$1L(metadata.source) || null;
+    const supersededBy = readString$1L(metadata.supersededBy) || null;
     const confidence = typeof metadata.confidence === "number"
       ? clampConfidence$2(metadata.confidence)
       : DEFAULT_CONFIDENCE;
-    const id = readString$1K(metadata.id)
+    const id = readString$1L(metadata.id)
       || `${threadId}|${kind}|${slot || normalizeText(text)}|${index}`;
 
     return {
@@ -5590,8 +5590,8 @@
   function anchorTurns(compacted, recentTurns, anchors) {
     const allTurns = Array.isArray(compacted) ? compacted : [];
     const recent = Array.isArray(recentTurns) ? recentTurns : [];
-    const currentGoal = readString$1K(anchors && anchors.currentGoal);
-    const currentTopic = readString$1K(anchors && anchors.currentTopic);
+    const currentGoal = readString$1L(anchors && anchors.currentGoal);
+    const currentTopic = readString$1L(anchors && anchors.currentTopic);
     const selected = new Set(recent.map((turn) => allTurns.indexOf(turn)).filter((index) => index >= 0));
     const goalIndex = findAnchorTurnIndex(allTurns, currentGoal);
     const topicIndex = findAnchorTurnIndex(allTurns, currentTopic);
@@ -5705,7 +5705,7 @@
     }
 
     for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const userText = readString$1K(turns[index] && turns[index].user);
+      const userText = readString$1L(turns[index] && turns[index].user);
       const normalizedUser = normalizeAnchorText$1(userText);
       if (!normalizedUser) {
         continue;
@@ -5728,7 +5728,7 @@
   }
 
   function readEvidenceKind(value) {
-    const normalized = readString$1K(value);
+    const normalized = readString$1L(value);
     return EVIDENCE_KINDS.includes(normalized) ? normalized : "";
   }
 
@@ -5748,17 +5748,17 @@
   }
 
   function normalizeText(value) {
-    return readString$1K(value)
+    return readString$1L(value)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
   }
 
   function normalizeAnchorText$1(value) {
-    return readString$1K(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
+    return readString$1L(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
   }
 
-  function readString$1K(value) {
+  function readString$1L(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5795,7 +5795,7 @@
     return {
       decisionsCount: countEvidenceItems(items, "decision"),
       ambiguityPresent: hasText(context && context.openAmbiguity),
-      clarificationStatus: readString$1J(context && context.clarificationStatus) || "none",
+      clarificationStatus: readString$1K(context && context.clarificationStatus) || "none",
       factsCount: countEvidenceItems(items, "fact"),
       goalPresent: hasText(context && context.currentGoal),
       historyCount: countHistoryMessages((context && (context.recentTurns || context.history)) || ""),
@@ -5820,7 +5820,7 @@
     }
 
     return [
-      readString$1J(heading) || "Session evidence:",
+      readString$1K(heading) || "Session evidence:",
       renderSection("Current goal", sessionContext.currentGoal),
       renderSection("Current topic", sessionContext.currentTopic),
       renderSection("Active query", sessionContext.activeQuery),
@@ -5964,7 +5964,7 @@
     return text ? `${title}:\n${text}` : "";
   }
 
-  function readString$1J(value) {
+  function readString$1K(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5977,12 +5977,12 @@
   }
 
   function readClarificationStatus$1(value) {
-    const text = readString$1J(value);
+    const text = readString$1K(value);
     return text && text !== "none" ? text : "";
   }
 
   function hasText(value) {
-    return readString$1J(value).length > 0;
+    return readString$1K(value).length > 0;
   }
 
   function countEvidenceItems(items, kind) {
@@ -5996,7 +5996,7 @@
   }
 
   function countHistoryMessages(value) {
-    const text = readString$1J(value);
+    const text = readString$1K(value);
 
     if (!text) {
       return 0;
@@ -6010,7 +6010,7 @@
   }
 
   function countNumberedLines(value) {
-    const text = readString$1J(value);
+    const text = readString$1K(value);
 
     if (!text) {
       return 0;
@@ -6068,13 +6068,13 @@
         usage.input_tokens,
         usage.promptTokenCount
       ),
-      model: readString$1I(output.model) || null,
+      model: readString$1J(output.model) || null,
       outputTokens: readUsageNumber(
         usage.completion_tokens,
         usage.output_tokens,
         usage.candidatesTokenCount
       ),
-      provider: readString$1I(output.provider) || null,
+      provider: readString$1J(output.provider) || null,
       totalTokens: readUsageNumber(
         usage.total_tokens,
         usage.totalTokenCount,
@@ -6103,7 +6103,7 @@
   }
 
   function estimateProviderPromptTokens(request, sessionPolicy) {
-    const provider = readString$1I(request && request.provider) || "openai";
+    const provider = readString$1J(request && request.provider) || "openai";
     const sessionPrompt = buildSessionContextSystemPrompt(request && request.sessionContext);
     const bytesPerToken = readPositiveInteger$i(
       sessionPolicy && sessionPolicy.charsPerToken,
@@ -6120,7 +6120,7 @@
   function estimateOpenAIPromptTokens(request, sessionPrompt, bytesPerToken) {
     let total = OPENAI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
 
-    if (readString$1I(request && request.systemPrompt)) {
+    if (readString$1J(request && request.systemPrompt)) {
       total += estimateMessageTokens("system", request.systemPrompt, bytesPerToken);
     }
 
@@ -6135,7 +6135,7 @@
 
   function estimateGeminiPromptTokens(request, sessionPrompt, bytesPerToken) {
     let total = GEMINI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
-    const systemPrompt = [readString$1I(request && request.systemPrompt), sessionPrompt]
+    const systemPrompt = [readString$1J(request && request.systemPrompt), sessionPrompt]
       .filter(Boolean)
       .join("\n\n");
 
@@ -6162,7 +6162,7 @@
         return total;
       }
 
-      const role = readString$1I(message.role) || "user";
+      const role = readString$1J(message.role) || "user";
       return total + estimatePartsTokens(message.parts, bytesPerToken, overhead, role);
     }, 0);
   }
@@ -6171,7 +6171,7 @@
     const list = Array.isArray(parts) ? parts : [];
     const text = list
       .filter((part) => part && typeof part === "object" && !isImagePart(part))
-      .map((part) => readString$1I(part.text))
+      .map((part) => readString$1J(part.text))
       .filter(Boolean)
       .join("\n");
     const imageCount = list.filter(isImagePart).length;
@@ -6203,7 +6203,7 @@
     return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 
-  function readString$1I(value) {
+  function readString$1J(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6284,8 +6284,8 @@
     if (!ledger || typeof ledger !== "object") return null;
     if (!params || typeof params !== "object") return null;
 
-    const provider = readString$1H(params.provider);
-    const model = readString$1H(params.model);
+    const provider = readString$1I(params.provider);
+    const model = readString$1I(params.model);
     const inputTokens = readFiniteNumber$5(params.inputTokens);
     const outputTokens = readFiniteNumber$5(params.outputTokens);
     const totalTokens = readFiniteNumber$5(params.totalTokens)
@@ -6305,7 +6305,7 @@
     const cost = resolveCost(ledger, {
       provider,
       model,
-      callKind: readString$1H(params.callKind) || null,
+      callKind: readString$1I(params.callKind) || null,
       inputTokens,
       outputTokens
     });
@@ -6319,7 +6319,7 @@
     const entry = {
       ts: Number.isFinite(params.ts) ? params.ts : Date.now(),
       phase: normalizePhase(params.phase),
-      callKind: readString$1H(params.callKind) || null,
+      callKind: readString$1I(params.callKind) || null,
       provider: provider || null,
       model: model || null,
       inputTokens,
@@ -6375,7 +6375,7 @@
     const output = readFiniteNumber$5(raw.output);
     if (input == null && output == null) return null;
     const per = readPositiveNumber$2(raw.per) || DEFAULT_PRICING_PER;
-    const currency = readString$1H(raw.currency) || "USD";
+    const currency = readString$1I(raw.currency) || "USD";
     return { input, output, per, currency };
   }
 
@@ -6438,8 +6438,8 @@
   }
 
   function compositeKey(provider, model) {
-    const p = readString$1H(provider).toLowerCase();
-    const m = readString$1H(model).toLowerCase();
+    const p = readString$1I(provider).toLowerCase();
+    const m = readString$1I(model).toLowerCase();
     if (!p && !m) return "";
     return `${p || "n/a"}:${m || "n/a"}`;
   }
@@ -6466,7 +6466,7 @@
     return (input || 0) + (output || 0);
   }
 
-  function readString$1H(value) {
+  function readString$1I(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6747,7 +6747,7 @@
     if (!result || typeof result !== "object") return true;
     const output = result.output && typeof result.output === "object" ? result.output : {};
     if (output.ok === false) return true;
-    return readString$1G(output.status) === "failed" || readString$1G(output.status) === "blocked";
+    return readString$1H(output.status) === "failed" || readString$1H(output.status) === "blocked";
   }
 
   function createActionSignature(action, args) {
@@ -6769,7 +6769,7 @@
   function createDecision$2(action, code, actionValue, count, signature) {
     return {
       action,
-      actionName: readString$1G(actionValue && actionValue.name) || null,
+      actionName: readString$1H(actionValue && actionValue.name) || null,
       code,
       count,
       message: createMessage(action, code, actionValue, count),
@@ -6778,7 +6778,7 @@
   }
 
   function createMessage(action, code, actionValue, count) {
-    const name = readString$1G(actionValue && actionValue.name) || "action";
+    const name = readString$1H(actionValue && actionValue.name) || "action";
     if (code === "exact_failure_block") return `${name} repeated the same failing arguments ${count} time(s). Choose a different approach.`;
     if (code === "same_action_failure_halt") return `${name} failed ${count} time(s). Stop retrying this action path.`;
     if (code === "same_action_failure_warn") return `${name} has repeated failures. Inspect the failure and change strategy.`;
@@ -6790,12 +6790,12 @@
   function normalizeDecision(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     return {
-      action: readString$1G(value.action) || "allow",
-      actionName: readString$1G(value.actionName) || null,
-      code: readString$1G(value.code) || "allow",
+      action: readString$1H(value.action) || "allow",
+      actionName: readString$1H(value.actionName) || null,
+      code: readString$1H(value.code) || "allow",
       count: readPositiveInteger$h(value.count, 0),
-      message: readString$1G(value.message),
-      signature: readString$1G(value.signature) || null
+      message: readString$1H(value.message),
+      signature: readString$1H(value.signature) || null
     };
   }
 
@@ -6803,7 +6803,7 @@
     const output = {};
     if (!value || typeof value !== "object" || Array.isArray(value)) return output;
     for (const [key, count] of Object.entries(value)) {
-      const normalizedKey = readString$1G(key);
+      const normalizedKey = readString$1H(key);
       if (!normalizedKey) continue;
       output[normalizedKey] = readPositiveInteger$h(count, 0);
     }
@@ -6815,8 +6815,8 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) return output;
     for (const [key, entry] of Object.entries(value)) {
       if (!entry || typeof entry !== "object") continue;
-      const normalizedKey = readString$1G(key);
-      const outputHash = readString$1G(entry.outputHash);
+      const normalizedKey = readString$1H(key);
+      const outputHash = readString$1H(entry.outputHash);
       if (!normalizedKey || !outputHash) continue;
       output[normalizedKey] = {
         count: readPositiveInteger$h(entry.count, 0),
@@ -6830,7 +6830,7 @@
     return Number.isInteger(value) && value >= 0 ? value : fallback;
   }
 
-  function readString$1G(value) {
+  function readString$1H(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6924,7 +6924,7 @@
       candidate: {
         chars: readNumber$k(source.candidate && source.candidate.chars),
         cjkChars: readNumber$k(source.candidate && source.candidate.cjkChars),
-        path: readString$1F(source.candidate && source.candidate.path) || null,
+        path: readString$1G(source.candidate && source.candidate.path) || null,
         words: readNumber$k(source.candidate && source.candidate.words)
       },
       memoryEntriesAdded: readNumber$k(source.memoryEntriesAdded),
@@ -6934,13 +6934,13 @@
       requestedLength: {
         observed: readNumber$k(source.requestedLength && source.requestedLength.observed),
         requested: readNumber$k(source.requestedLength && source.requestedLength.requested),
-        statsKey: readString$1F(source.requestedLength && source.requestedLength.statsKey) || null
+        statsKey: readString$1G(source.requestedLength && source.requestedLength.statsKey) || null
       },
       searchPassCount: readNumber$k(source.searchPassCount),
       searchResultUrlCount: readNumber$k(source.searchResultUrlCount),
       skill: {
-        active: readString$1F(source.skill && source.skill.active) || null,
-        lastRead: readString$1F(source.skill && source.skill.lastRead) || null,
+        active: readString$1G(source.skill && source.skill.active) || null,
+        lastRead: readString$1G(source.skill && source.skill.lastRead) || null,
         loadedCount: readNumber$k(source.skill && source.skill.loadedCount)
       },
       sourceMinimumPassed: source.sourceMinimumPassed === true,
@@ -6984,7 +6984,7 @@
       return {
         chars: readNumber$k(packetStats.chars),
         cjkChars: readNumber$k(packetStats.cjkChars),
-        path: readString$1F(packet.candidate.path) || null,
+        path: readString$1G(packet.candidate.path) || null,
         words: readNumber$k(packetStats.words)
       };
     }
@@ -6992,7 +6992,7 @@
       ? runState.virtualWorkspace
       : null;
     const quality = workspace && workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const path = readString$1F(quality.finalCandidatePath) || "final_candidate.md";
+    const path = readString$1G(quality.finalCandidatePath) || "final_candidate.md";
     const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
       ? workspace.files[path]
       : null;
@@ -7019,8 +7019,8 @@
       ? packet.requestedLength
       : null;
     const requestedValue = readNumber$k(requested && requested.value);
-    const statsKey = readString$1F(requested && requested.statsKey) ||
-      (readString$1F(requested && requested.unit) === "words" ? "words" : "chars");
+    const statsKey = readString$1G(requested && requested.statsKey) ||
+      (readString$1G(requested && requested.unit) === "words" ? "words" : "chars");
     if (!requestedValue || !statsKey) return null;
     const candidateStats = packet && packet.candidate && typeof packet.candidate === "object"
       ? (packet.candidate.textStats || packet.candidate.stats)
@@ -7052,10 +7052,10 @@
       ? runState.todoState
       : null;
     if (!todoState || todoState.status !== "active") return false;
-    if (readString$1F(todoState.activeItemId)) return true;
+    if (readString$1G(todoState.activeItemId)) return true;
     if (!Array.isArray(todoState.items)) return false;
     return todoState.items.some((item) => {
-      const status = readString$1F(item && item.status);
+      const status = readString$1G(item && item.status);
       return status === "active" || status === "pending" || status === "blocked";
     });
   }
@@ -7090,7 +7090,7 @@
     const quality = workspace && workspace.quality && typeof workspace.quality === "object"
       ? workspace.quality
       : null;
-    const path = readString$1F(quality && quality.finalCandidatePath) || "final_candidate.md";
+    const path = readString$1G(quality && quality.finalCandidatePath) || "final_candidate.md";
     const file = workspace &&
       workspace.files &&
       workspace.files[path] &&
@@ -7150,7 +7150,7 @@
   function countRelevantReadSources(readSources) {
     const sources = Array.isArray(readSources) ? readSources : [];
     return sources.filter((source) => {
-      const quality = readString$1F(source && source.quality);
+      const quality = readString$1G(source && source.quality);
       return source && source.ok !== false && quality !== "thin" && quality !== "rejected";
     }).length;
   }
@@ -7171,7 +7171,7 @@
     const urls = new Set();
     const list = Array.isArray(results) ? results : [];
     for (const item of list) {
-      const url = readString$1F(item && (item.url || item.link || item.href));
+      const url = readString$1G(item && (item.url || item.link || item.href));
       if (url) urls.add(url);
     }
     return urls.size;
@@ -7181,7 +7181,7 @@
     const urls = new Set();
     const list = Array.isArray(readSources) ? readSources : [];
     for (const item of list) {
-      const url = readString$1F(item && item.url);
+      const url = readString$1G(item && item.url);
       if (url) urls.add(url);
     }
     return urls.size;
@@ -7189,10 +7189,10 @@
 
   function readSkillLabel(value) {
     if (!value || typeof value !== "object") return null;
-    return readString$1F(value.name) || readString$1F(value.skillId) || null;
+    return readString$1G(value.name) || readString$1G(value.skillId) || null;
   }
 
-  function readString$1F(value) {
+  function readString$1G(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -7216,18 +7216,18 @@
       return createQualityDetail("thin", "missing_source", [], {});
     }
 
-    const existingTier = readString$1E(source.tier).toLowerCase();
+    const existingTier = readString$1F(source.tier).toLowerCase();
     if (READ_SOURCE_TIERS.has(existingTier)) {
       return normalizeExistingQualityDetail(source, existingTier);
     }
 
-    const url = readString$1E(source.url).toLowerCase();
-    const title = readString$1E(source.title).toLowerCase();
-    const text = readString$1E(source.text).toLowerCase();
-    const platform = readString$1E(source.platform).toLowerCase();
+    const url = readString$1F(source.url).toLowerCase();
+    const title = readString$1F(source.title).toLowerCase();
+    const text = readString$1F(source.text).toLowerCase();
+    const platform = readString$1F(source.platform).toLowerCase();
     const originStatus = typeof source.originStatus === "number" ? source.originStatus : null;
     const bytes = typeof source.bytes === "number" ? source.bytes : 0;
-    const query = readString$1E(options.query).toLowerCase();
+    const query = readString$1F(options.query).toLowerCase();
     const overlap = countTokenOverlap$2(query, `${title} ${text} ${url}`);
     const metrics = {
       bytes,
@@ -7293,7 +7293,7 @@
   }
 
   function countReadSourcesByTier(value, tier) {
-    const normalizedTier = readString$1E(tier).toLowerCase();
+    const normalizedTier = readString$1F(tier).toLowerCase();
     const sources = Array.isArray(value) ? value : [];
     let count = 0;
 
@@ -7329,8 +7329,8 @@
     if (existing) {
       return createQualityDetail(
         tier,
-        readString$1E(existing.reason) || "explicit_tier",
-        Array.isArray(existing.signals) ? existing.signals.map(readString$1E).filter(Boolean) : [],
+        readString$1F(existing.reason) || "explicit_tier",
+        Array.isArray(existing.signals) ? existing.signals.map(readString$1F).filter(Boolean) : [],
         existing.metrics && typeof existing.metrics === "object" ? existing.metrics : {}
       );
     }
@@ -7338,7 +7338,7 @@
       bytes: typeof source.bytes === "number" ? source.bytes : 0,
       originStatus: typeof source.originStatus === "number" ? source.originStatus : null,
       status: typeof source.status === "number" ? source.status : null,
-      textLength: readString$1E(source.text).length
+      textLength: readString$1F(source.text).length
     });
   }
 
@@ -7352,18 +7352,18 @@
         status: typeof safeMetrics.status === "number" ? safeMetrics.status : null,
         textLength: typeof safeMetrics.textLength === "number" ? safeMetrics.textLength : 0
       },
-      reason: readString$1E(reason) || "unknown",
-      signals: Array.isArray(signals) ? signals.map(readString$1E).filter(Boolean).slice(0, 8) : [],
+      reason: readString$1F(reason) || "unknown",
+      signals: Array.isArray(signals) ? signals.map(readString$1F).filter(Boolean).slice(0, 8) : [],
       tier
     };
   }
 
   function createThinSignals({ bytes, text }) {
     const signals = [];
-    if (readString$1E(text) === "loading") signals.push("loading");
-    if (THIN_PAGE_PATTERNS.some((pattern) => pattern.test(readString$1E(text)))) signals.push("thin_pattern");
+    if (readString$1F(text) === "loading") signals.push("loading");
+    if (THIN_PAGE_PATTERNS.some((pattern) => pattern.test(readString$1F(text)))) signals.push("thin_pattern");
     if (bytes > 0 && bytes < 160) signals.push(`bytes:${bytes}`);
-    if (readString$1E(text).length < 120) signals.push(`text:${readString$1E(text).length}`);
+    if (readString$1F(text).length < 120) signals.push(`text:${readString$1F(text).length}`);
     return signals.length > 0 ? signals : ["thin_content"];
   }
 
@@ -7414,14 +7414,14 @@
 
     let parsed;
     try {
-      parsed = new URL(readString$1E(url));
+      parsed = new URL(readString$1F(url));
     } catch {
       return false;
     }
 
     const domainCompact = parsed.hostname.replace(/^www\./i, "").replace(/[^a-z0-9]+/gi, "");
     const pathCompact = parsed.pathname.replace(/[^a-z0-9]+/gi, "");
-    const titleCompact = readString$1E(title).replace(/[^a-z0-9]+/gi, "").toLowerCase();
+    const titleCompact = readString$1F(title).replace(/[^a-z0-9]+/gi, "").toLowerCase();
     const haystack = `${domainCompact} ${pathCompact} ${titleCompact}`;
     const matched = queryTokens.some((token) => haystack.includes(token));
     if (!matched) return false;
@@ -7429,10 +7429,10 @@
     const lowValue = [
       ...MARKETPLACE_PATTERNS$1,
       ...COMMUNITY_PATTERNS$1
-    ].some((pattern) => pattern.test(readString$1E(url)) || pattern.test(readString$1E(title)));
+    ].some((pattern) => pattern.test(readString$1F(url)) || pattern.test(readString$1F(title)));
     if (lowValue) return false;
 
-    return readString$1E(text).length >= 180;
+    return readString$1F(text).length >= 180;
   }
 
   function extractDistinctiveTokens(value) {
@@ -7463,7 +7463,7 @@
       return 0;
     }
 
-    const haystackText = readString$1E(haystack).toLowerCase();
+    const haystackText = readString$1F(haystack).toLowerCase();
     let count = 0;
 
     for (const token of queryTokens) {
@@ -7476,14 +7476,14 @@
   }
 
   function tokenize$4(value) {
-    return readString$1E(value)
+    return readString$1F(value)
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/i)
       .filter((token) => token.length >= 3)
       .slice(0, 12);
   }
 
-  function readString$1E(value) {
+  function readString$1F(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -7516,8 +7516,8 @@
       ? detectEvidenceGaps({ readSources, searchResults, sourceQuality })
       : [];
     const finalAllowed = !required || gaps.length === 0;
-    const previousPhase = readString$1D(previous.phase);
-    const phase = readString$1D(options.phase)
+    const previousPhase = readString$1E(previous.phase);
+    const phase = readString$1E(options.phase)
       || (finalAllowed ? "ready_to_finalize" : inferResearchPhase({ readSources, searchResults, previousPhase }));
     const finalReason = finalAllowed
       ? (required ? "evidence_quality_gate_passed" : "not_long_research")
@@ -7569,24 +7569,24 @@
     const context = runState && runState.researchContext && typeof runState.researchContext === "object"
       ? runState.researchContext
       : {};
-    const recoveryMode = readString$1D(options && options.recoveryMode)
-      || readString$1D(state.recoveryMode);
+    const recoveryMode = readString$1E(options && options.recoveryMode)
+      || readString$1E(state.recoveryMode);
     const prompt = recoveryMode === "finalize_existing_evidence"
-      ? readString$1D(runState && runState.threadGoalAnchorText)
-        || readString$1D(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)
-        || readString$1D(runState && runState.originalQuery)
-        || readString$1D(options && options.prompt)
-        || readString$1D(runState && runState.observationSummary && runState.observationSummary.prompt)
-      : readString$1D(options && options.prompt)
-        || readString$1D(runState && runState.originalQuery)
-        || readString$1D(runState && runState.observationSummary && runState.observationSummary.prompt);
-    const topic = readString$1D(state.topic) || extractResearchTopic(runState, options);
+      ? readString$1E(runState && runState.threadGoalAnchorText)
+        || readString$1E(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)
+        || readString$1E(runState && runState.originalQuery)
+        || readString$1E(options && options.prompt)
+        || readString$1E(runState && runState.observationSummary && runState.observationSummary.prompt)
+      : readString$1E(options && options.prompt)
+        || readString$1E(runState && runState.originalQuery)
+        || readString$1E(runState && runState.observationSummary && runState.observationSummary.prompt);
+    const topic = readString$1E(state.topic) || extractResearchTopic(runState, options);
     const queries = Array.isArray(state.queries) && state.queries.length > 0
       ? state.queries
       : collectQueries(runState);
     const searchLog = collectSearchLog(context);
     const sourceNotes = collectSourceNotes(context);
-    const gaps = Array.isArray(state.gaps) ? state.gaps.map(readString$1D).filter(Boolean) : [];
+    const gaps = Array.isArray(state.gaps) ? state.gaps.map(readString$1E).filter(Boolean) : [];
     const reportLoop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
       ? runState.researchReportLoop
       : {};
@@ -7612,7 +7612,7 @@
       claimEvidence: Array.isArray(reportLoop.claimEvidence) ? reportLoop.claimEvidence.slice(0, 12) : [],
       finalReadiness: {
         allowed: state.finalAllowed === true,
-        reason: readString$1D(state.finalReason) || "n/a",
+        reason: readString$1E(state.finalReason) || "n/a",
         remainingGaps: gaps
       },
       gaps,
@@ -7621,14 +7621,14 @@
         searchStrategy: "start broad, read promising sources, then retry for official or primary sources when evidence is weak"
       },
       progress: {
-        phase: readString$1D(state.phase) || "idle",
+        phase: readString$1E(state.phase) || "idle",
         qualityGateRequired: state.qualityGateRequired === true,
         vetoCount: Number.isInteger(state.vetoCount) && state.vetoCount >= 0 ? state.vetoCount : 0
       },
-      reportLoop: reportLoop && readString$1D(reportLoop.status) ? {
-        finalMode: readString$1D(reportLoop.finalMode) || null,
+      reportLoop: reportLoop && readString$1E(reportLoop.status) ? {
+        finalMode: readString$1E(reportLoop.finalMode) || null,
         sourceMinimum: reportLoop.sourceMinimum && typeof reportLoop.sourceMinimum === "object" ? reportLoop.sourceMinimum : null,
-        status: readString$1D(reportLoop.status),
+        status: readString$1E(reportLoop.status),
         vetoCount: Number.isInteger(reportLoop.vetoCount) && reportLoop.vetoCount >= 0 ? reportLoop.vetoCount : 0
       } : null,
       queries,
@@ -7729,16 +7729,16 @@
       // the recovery prompt.
       runState && runState.researchThreadSlice && runState.researchThreadSlice.topic,
       runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeTopic,
-      extractTopicFromPrompt(readString$1D(runState && runState.threadGoalAnchorText)),
-      extractTopicFromPrompt(readString$1D(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)),
+      extractTopicFromPrompt(readString$1E(runState && runState.threadGoalAnchorText)),
+      extractTopicFromPrompt(readString$1E(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)),
       runState && runState.turnState && runState.turnState.topicAnchorText,
       runState && runState.inputResolution && runState.inputResolution.intentState && runState.inputResolution.intentState.topic,
-      extractTopicFromPrompt(readString$1D(runState && runState.originalQuery)),
-      extractTopicFromPrompt(readString$1D(runState && runState.observationSummary && runState.observationSummary.prompt)),
+      extractTopicFromPrompt(readString$1E(runState && runState.originalQuery)),
+      extractTopicFromPrompt(readString$1E(runState && runState.observationSummary && runState.observationSummary.prompt)),
       runState && runState.researchReportLoop && runState.researchReportLoop.lastTopic
     ];
     for (const candidate of candidates) {
-      const topic = readString$1D(candidate);
+      const topic = readString$1E(candidate);
       if (isUsableStableTopic(topic, options)) return topic;
     }
     return "";
@@ -7798,9 +7798,9 @@
             : [];
       return {
         id: `search-${index + 1}`,
-        query: readString$1D(pass && (pass.query || pass.lastExecutedQuery)) || "n/a",
+        query: readString$1E(pass && (pass.query || pass.lastExecutedQuery)) || "n/a",
         resultCount: items.length,
-        strategy: readString$1D(pass && pass.strategy) || readString$1D(pass && pass.kind) || "search"
+        strategy: readString$1E(pass && pass.strategy) || readString$1E(pass && pass.kind) || "search"
       };
     });
   }
@@ -7816,14 +7816,14 @@
         quality: tier === "usable" ? "medium" : tier,
         qualityDetail,
         status: source && typeof source.status === "number" ? source.status : null,
-        title: readString$1D(source && source.title) || readString$1D(source && source.url) || `Read source ${index + 1}`,
-        url: readString$1D(source && source.url)
+        title: readString$1E(source && source.title) || readString$1E(source && source.url) || `Read source ${index + 1}`,
+        url: readString$1E(source && source.url)
       };
     });
   }
 
   function createDraftOutline(topic) {
-    const label = readString$1D(topic) || "the research topic";
+    const label = readString$1E(topic) || "the research topic";
     return [
       `What is publicly verifiable about ${label}`,
       "Key supporting evidence",
@@ -7833,7 +7833,7 @@
   }
 
   function createResearchQuestions(topic) {
-    const label = readString$1D(topic) || "the topic";
+    const label = readString$1E(topic) || "the topic";
     return [
       `What direct public sources mention ${label}?`,
       `Which sources are primary, official, or otherwise strong for ${label}?`,
@@ -7852,8 +7852,8 @@
     if (gaps.length > 0) {
       notes.push(`Evidence gaps remain: ${gaps.join(", ")}.`);
     }
-    if (readString$1D(state.finalReason)) {
-      notes.push(`Final readiness reason: ${readString$1D(state.finalReason)}.`);
+    if (readString$1E(state.finalReason)) {
+      notes.push(`Final readiness reason: ${readString$1E(state.finalReason)}.`);
     }
     return notes;
   }
@@ -7883,8 +7883,8 @@
     }
     if (state.qualityGateRequired === true) {
       timeline.push({
-        label: readString$1D(state.finalReason) || "Evidence checked",
-        phase: readString$1D(state.phase) || "gap_check",
+        label: readString$1E(state.finalReason) || "Evidence checked",
+        phase: readString$1E(state.phase) || "gap_check",
         status: state.finalAllowed === true ? "done" : "blocked"
       });
     }
@@ -7909,12 +7909,12 @@
   // No path inspects user prompt text. Mandarin and English prompts
   // behave identically.
   function isLongResearchRun(runState, options) {
-    const explicitActivation = readString$1D(runState && runState.researchActivation).toLowerCase()
-      || readString$1D(options && options.researchActivation).toLowerCase();
+    const explicitActivation = readString$1E(runState && runState.researchActivation).toLowerCase()
+      || readString$1E(options && options.researchActivation).toLowerCase();
     if (explicitActivation === "long_research" || LONG_RESEARCH_SKILL_IDS.has(explicitActivation)) {
       return true;
     }
-    const selectedSkill = readString$1D(runState && runState.selectedSkill).toLowerCase();
+    const selectedSkill = readString$1E(runState && runState.selectedSkill).toLowerCase();
     const activeSkill = readSkillName$1(runState && runState.agentSkillContext && runState.agentSkillContext.activeSkill);
     const lastReadSkill = readSkillName$1(runState && runState.agentSkillContext && runState.agentSkillContext.lastReadSkill);
     return [selectedSkill, activeSkill, lastReadSkill].some((skillId) => LONG_RESEARCH_SKILL_IDS.has(skillId));
@@ -7922,7 +7922,7 @@
 
   function readSkillName$1(value) {
     if (!value || typeof value !== "object") return "";
-    return (readString$1D(value.skillId) || readString$1D(value.name)).toLowerCase();
+    return (readString$1E(value.skillId) || readString$1E(value.name)).toLowerCase();
   }
 
   function extractResearchTopic(runState, options) {
@@ -7930,9 +7930,9 @@
       const stableTopic = readStableResearchTopic(runState, options);
       if (stableTopic) return stableTopic;
     }
-    const prompt = readString$1D(options && options.prompt)
-      || readString$1D(runState && runState.originalQuery)
-      || readString$1D(runState && runState.observationSummary && runState.observationSummary.prompt);
+    const prompt = readString$1E(options && options.prompt)
+      || readString$1E(runState && runState.originalQuery)
+      || readString$1E(runState && runState.observationSummary && runState.observationSummary.prompt);
     return extractTopicFromPrompt(prompt);
   }
 
@@ -7962,11 +7962,11 @@
   }
 
   function readCurrentPrompt(runState, options) {
-    return readString$1D(options && options.prompt)
-      || readString$1D(runState && runState.observationSummary && runState.observationSummary.prompt)
-      || readString$1D(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.goal)
-      || readString$1D(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.goal)
-      || readString$1D(runState && runState.originalQuery);
+    return readString$1E(options && options.prompt)
+      || readString$1E(runState && runState.observationSummary && runState.observationSummary.prompt)
+      || readString$1E(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.goal)
+      || readString$1E(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.goal)
+      || readString$1E(runState && runState.originalQuery);
   }
 
   function hasExistingResearchArtifacts(runState) {
@@ -7981,7 +7981,7 @@
       ? runState.virtualWorkspace
       : {};
     const files = workspace.files && typeof workspace.files === "object" ? workspace.files : {};
-    if (Object.values(files).some((file) => file && typeof file === "object" && readString$1D(file.content))) return true;
+    if (Object.values(files).some((file) => file && typeof file === "object" && readString$1E(file.content))) return true;
     const graph = runState.researchEvidenceGraph && typeof runState.researchEvidenceGraph === "object"
       ? runState.researchEvidenceGraph
       : {};
@@ -7990,18 +7990,18 @@
     const researchWorkspace = runState.researchWorkspace && typeof runState.researchWorkspace === "object"
       ? runState.researchWorkspace
       : {};
-    if (readString$1D(researchWorkspace.brief && researchWorkspace.brief.topic)) return true;
+    if (readString$1E(researchWorkspace.brief && researchWorkspace.brief.topic)) return true;
     const loop = runState.researchReportLoop && typeof runState.researchReportLoop === "object"
       ? runState.researchReportLoop
       : {};
-    if (loop.enabled === true || Boolean(readString$1D(loop.status) && readString$1D(loop.status) !== "idle")) return true;
+    if (loop.enabled === true || Boolean(readString$1E(loop.status) && readString$1E(loop.status) !== "idle")) return true;
     // AGRUN-214m — a hydrated thread research slice (topic + evidence
     // from a previous turn) counts as existing artefacts even when the
     // current run has not yet touched researchContext.
     const slice = runState.researchThreadSlice && typeof runState.researchThreadSlice === "object"
       ? runState.researchThreadSlice
       : null;
-    return Boolean(slice && readString$1D(slice.topic));
+    return Boolean(slice && readString$1E(slice.topic));
   }
 
   function isFollowUpTurn(runState, options) {
@@ -8010,12 +8010,12 @@
       runState && runState.turnState && runState.turnState.turnIntentKind,
       runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind,
       runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind
-    ].map(readString$1D);
+    ].map(readString$1E);
     return kinds.includes("follow_up") || kinds.includes("continuation");
   }
 
   function hasFinalizeExistingEvidenceIntent(prompt) {
-    const text = readString$1D(prompt).toLowerCase();
+    const text = readString$1E(prompt).toLowerCase();
     if (!text) return false;
     return /\bfinali[sz]e\b/.test(text) ||
       /\b(?:answer|summari[sz]e|produce|write|complete|finish)\b/.test(text) && /\b(?:existing|available|collected|already|current|gathered)\b/.test(text) ||
@@ -8024,7 +8024,7 @@
   }
 
   function hasExplicitMoreResearchIntent(prompt) {
-    const text = readString$1D(prompt).toLowerCase();
+    const text = readString$1E(prompt).toLowerCase();
     if (/\b(?:without|no|do not|don't)\s+(?:more\s+)?(?:search|research|read|look\s+up|find)\b/.test(text)) {
       return false;
     }
@@ -8033,10 +8033,10 @@
   }
 
   function hasExplicitNewTopicIntent(runState, options) {
-    const kind = readString$1D(options && options.turnIntent && options.turnIntent.kind)
-      || readString$1D(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind)
-      || readString$1D(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind)
-      || readString$1D(runState && runState.turnState && runState.turnState.turnIntentKind);
+    const kind = readString$1E(options && options.turnIntent && options.turnIntent.kind)
+      || readString$1E(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind)
+      || readString$1E(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind)
+      || readString$1E(runState && runState.turnState && runState.turnState.turnIntentKind);
     if (kind === "new_task") return true;
     const prompt = readCurrentPrompt(runState, options);
     if (!prompt) return false;
@@ -8047,14 +8047,14 @@
 
   function isUsableStableTopic(topic, options) {
     if (!topic) return false;
-    if (options && options.skipPromptTopic && topic === extractTopicFromPrompt(readString$1D(options.prompt))) return false;
+    if (options && options.skipPromptTopic && topic === extractTopicFromPrompt(readString$1E(options.prompt))) return false;
     if (hasFinalizeExistingEvidenceIntent(topic)) return false;
     if (/^(?:research topic|n\/a)$/i.test(topic)) return false;
     return true;
   }
 
   function normalizeTopicKey$1(value) {
-    return readString$1D(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return readString$1E(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
 
   function collectSearchResults(runState) {
@@ -8074,7 +8074,7 @@
       : {};
     const queries = [];
     const push = (value) => {
-      const normalized = readString$1D(value);
+      const normalized = readString$1E(value);
       if (normalized && !queries.includes(normalized)) queries.push(normalized);
     };
     push(context.lastQuery);
@@ -8097,7 +8097,7 @@
     return Number.isInteger(value) && value > 0 ? value : null;
   }
 
-  function readString$1D(value) {
+  function readString$1E(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -8196,7 +8196,7 @@
   }
 
   function isActionErrorRefresh(context) {
-    const status = readString$1C(context && context.status);
+    const status = readString$1D(context && context.status);
     return status === "action_error_self_correct"
       || status === "validation_error_self_correct"
       || status === "preflight_error_self_correct";
@@ -8212,10 +8212,10 @@
 
   function evaluateActionPatternConvergence(runState, context = {}) {
     const previous = normalizeActionPatternConvergenceState(context.previous || runState && runState.actionPatternConvergence);
-    const actionName = readString$1C(context.actionName) || readActionName$1(context.decision);
-    const fingerprint = readString$1C(context.fingerprint) || fingerprintAction(context.decision) || null;
-    const outcomeHash = readString$1C(context.outcomeHash) || createOutcomeHash(runState, context, actionName);
-    const semanticFingerprint = readString$1C(context.semanticFingerprint) ||
+    const actionName = readString$1D(context.actionName) || readActionName$2(context.decision);
+    const fingerprint = readString$1D(context.fingerprint) || fingerprintAction(context.decision) || null;
+    const outcomeHash = readString$1D(context.outcomeHash) || createOutcomeHash(runState, context, actionName);
+    const semanticFingerprint = readString$1D(context.semanticFingerprint) ||
       createSemanticTerminalFingerprint(runState, context, actionName);
     const snapshot = createProgressSnapshot$1(runState);
     const progress = diffProgress$1(previous.progressSnapshot, snapshot);
@@ -8335,7 +8335,7 @@
       semanticFingerprint,
       semanticRepeatCount: repeatedSemanticFingerprintCount,
       status,
-      stage: readString$1C(context.status) || readString$1C(context.stage) || null
+      stage: readString$1D(context.status) || readString$1D(context.stage) || null
     });
 
     return {
@@ -8396,17 +8396,17 @@
       stepsWithoutObservableProgress: normalized.stepsWithoutObservableProgress,
       progressSnapshot: summarizeProgressSnapshot(normalized.progressSnapshot),
       recentPatterns: normalized.recentPatterns.slice(-6).map((entry) => ({
-        actionName: readString$1C(entry.actionName) || null,
+        actionName: readString$1D(entry.actionName) || null,
         cycle: readNullableNumber$5(entry.cycle),
-        fingerprint: readString$1C(entry.fingerprint) || null,
-        outcomeHash: readString$1C(entry.outcomeHash) || null,
+        fingerprint: readString$1D(entry.fingerprint) || null,
+        outcomeHash: readString$1D(entry.outcomeHash) || null,
         patternKind: readPatternKind(entry.patternKind),
-        progress: Array.isArray(entry.progress) ? entry.progress.map(readString$1C).filter(Boolean).slice(0, 6) : [],
+        progress: Array.isArray(entry.progress) ? entry.progress.map(readString$1D).filter(Boolean).slice(0, 6) : [],
         repeatCount: readNumber$j(entry.repeatCount),
-        semanticFingerprint: readString$1C(entry.semanticFingerprint) || null,
+        semanticFingerprint: readString$1D(entry.semanticFingerprint) || null,
         semanticRepeatCount: readNumber$j(entry.semanticRepeatCount),
-        status: readString$1C(entry.status) || "tracking",
-        stage: readString$1C(entry.stage) || null
+        status: readString$1D(entry.status) || "tracking",
+        stage: readString$1D(entry.stage) || null
       })),
       convergenceSignal: signal ? cloneValue(signal) : null,
       terminalCorrectionState: cloneValue(normalized.terminalCorrectionState),
@@ -8425,25 +8425,25 @@
   function createReadOnlyPlanningState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
-    const forbiddenActions = readStringArray$5(source.forbiddenActions);
-    const allowedNextMoves = readStringArray$5(source.allowedNextMoves);
+    const forbiddenActions = readStringArray$6(source.forbiddenActions);
+    const allowedNextMoves = readStringArray$6(source.allowedNextMoves);
     const ignoredCount = readNumber$j(source.ignoredCount);
-    const explicitEscalation = readString$1C(source.escalation);
+    const explicitEscalation = readString$1D(source.escalation);
     const escalation = explicitEscalation === "hard_veto" || explicitEscalation === "advisory"
       ? explicitEscalation
       : (active && ignoredCount >= READ_ONLY_PLANNING_HARD_VETO_THRESHOLD ? "hard_veto" : "advisory");
     return {
       active,
-      status: readString$1C(source.status) || (active ? "active" : "none"),
-      reason: readString$1C(source.reason) || null,
-      forbiddenMove: readString$1C(source.forbiddenMove) || (active ? "repeat_read_only_planning_without_productive_progress" : null),
+      status: readString$1D(source.status) || (active ? "active" : "none"),
+      reason: readString$1D(source.reason) || null,
+      forbiddenMove: readString$1D(source.forbiddenMove) || (active ? "repeat_read_only_planning_without_productive_progress" : null),
       forbiddenActions: (forbiddenActions.length > 0
         ? forbiddenActions
         : DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS).slice(0, 12),
       allowedNextMoves: (allowedNextMoves.length > 0
         ? allowedNextMoves
         : DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES).slice(0, 12),
-      requiredCorrection: readString$1C(source.requiredCorrection) || null,
+      requiredCorrection: readString$1D(source.requiredCorrection) || null,
       stepsWithoutProductiveProgress: readNumber$j(source.stepsWithoutProductiveProgress),
       consecutiveProductiveSteps: readNumber$j(source.consecutiveProductiveSteps),
       ignoredCount,
@@ -8451,9 +8451,9 @@
       activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
       lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
       lastIgnoredAtCycle: readNullableNumber$5(source.lastIgnoredAtCycle),
-      transitionalDimensions: readStringArray$5(source.transitionalDimensions).slice(0, 8),
-      lastActionName: readString$1C(source.lastActionName) || null,
-      clearedReason: active ? null : (readString$1C(source.clearedReason) || null)
+      transitionalDimensions: readStringArray$6(source.transitionalDimensions).slice(0, 8),
+      lastActionName: readString$1D(source.lastActionName) || null,
+      clearedReason: active ? null : (readString$1D(source.clearedReason) || null)
     };
   }
 
@@ -8496,28 +8496,28 @@
     const active = source.active === true;
     return {
       active,
-      status: readString$1C(source.status) || (active ? "active" : "none"),
-      reason: readString$1C(source.reason) || null,
-      forbiddenMove: readString$1C(source.forbiddenMove) || (active ? "repeat_structure_repair_without_audit_delta" : null),
-      forbiddenActions: (readStringArray$5(source.forbiddenActions).length > 0
-        ? readStringArray$5(source.forbiddenActions)
+      status: readString$1D(source.status) || (active ? "active" : "none"),
+      reason: readString$1D(source.reason) || null,
+      forbiddenMove: readString$1D(source.forbiddenMove) || (active ? "repeat_structure_repair_without_audit_delta" : null),
+      forbiddenActions: (readStringArray$6(source.forbiddenActions).length > 0
+        ? readStringArray$6(source.forbiddenActions)
         : DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS).slice(0, 12),
-      allowedNextMoves: (readStringArray$5(source.allowedNextMoves).length > 0
-        ? readStringArray$5(source.allowedNextMoves)
+      allowedNextMoves: (readStringArray$6(source.allowedNextMoves).length > 0
+        ? readStringArray$6(source.allowedNextMoves)
         : DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES).slice(0, 12),
-      requiredCorrection: readString$1C(source.requiredCorrection) || null,
+      requiredCorrection: readString$1D(source.requiredCorrection) || null,
       repeatedStructureNoProgressCount: readNumber$j(source.repeatedStructureNoProgressCount),
       structureProgressCount: readNumber$j(source.structureProgressCount),
-      lastActionName: readString$1C(source.lastActionName) || null,
+      lastActionName: readString$1D(source.lastActionName) || null,
       lastStructureSnapshot: normalizeStructureSnapshot(source.lastStructureSnapshot),
-      activeIssueCodes: readStringArray$5(source.activeIssueCodes).slice(0, 8),
+      activeIssueCodes: readStringArray$6(source.activeIssueCodes).slice(0, 8),
       repeatedHeadingSamples: normalizeStructureSamples$1(source.repeatedHeadingSamples, "heading"),
       repeatedNumberSamples: normalizeStructureSamples$1(source.repeatedNumberSamples, "number"),
-      escalation: readString$1C(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      escalation: readString$1D(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
       activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
       lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
       lastNoProgressAtCycle: readNullableNumber$5(source.lastNoProgressAtCycle),
-      clearedReason: active ? null : (readString$1C(source.clearedReason) || null)
+      clearedReason: active ? null : (readString$1D(source.clearedReason) || null)
     };
   }
 
@@ -8563,21 +8563,21 @@
     const active = source.active === true;
     return {
       active,
-      status: readString$1C(source.status) || (active ? "active" : "none"),
-      reason: readString$1C(source.reason) || null,
-      forbiddenMove: readString$1C(source.forbiddenMove) || (active ? "repeat_workspace_write_without_growth" : null),
-      forbiddenActions: (readStringArray$5(source.forbiddenActions).length > 0
-        ? readStringArray$5(source.forbiddenActions)
+      status: readString$1D(source.status) || (active ? "active" : "none"),
+      reason: readString$1D(source.reason) || null,
+      forbiddenMove: readString$1D(source.forbiddenMove) || (active ? "repeat_workspace_write_without_growth" : null),
+      forbiddenActions: (readStringArray$6(source.forbiddenActions).length > 0
+        ? readStringArray$6(source.forbiddenActions)
         : DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS).slice(0, 6),
-      allowedNextMoves: (readStringArray$5(source.allowedNextMoves).length > 0
-        ? readStringArray$5(source.allowedNextMoves)
+      allowedNextMoves: (readStringArray$6(source.allowedNextMoves).length > 0
+        ? readStringArray$6(source.allowedNextMoves)
         : DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES).slice(0, 8),
-      requiredCorrection: readString$1C(source.requiredCorrection) || null,
+      requiredCorrection: readString$1D(source.requiredCorrection) || null,
       stallCount: readNumber$j(source.stallCount),
-      escalation: readString$1C(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      escalation: readString$1D(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
       activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
       lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
-      clearedReason: active ? null : (readString$1C(source.clearedReason) || null)
+      clearedReason: active ? null : (readString$1D(source.clearedReason) || null)
     };
   }
 
@@ -8606,43 +8606,43 @@
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
     return {
-      status: readString$1C(source.status) || (active ? "active" : "none"),
+      status: readString$1D(source.status) || (active ? "active" : "none"),
       active,
-      reason: readString$1C(source.reason) || null,
-      actionName: readString$1C(source.actionName) || null,
-      forbiddenMove: readString$1C(source.forbiddenMove) || null,
-      allowedNextMoves: readStringArray$5(source.allowedNextMoves).slice(0, 8),
-      requiredCorrection: readString$1C(source.requiredCorrection) || null,
+      reason: readString$1D(source.reason) || null,
+      actionName: readString$1D(source.actionName) || null,
+      forbiddenMove: readString$1D(source.forbiddenMove) || null,
+      allowedNextMoves: readStringArray$6(source.allowedNextMoves).slice(0, 8),
+      requiredCorrection: readString$1D(source.requiredCorrection) || null,
       firstTriggeredAtCycle: readNullableNumber$5(source.firstTriggeredAtCycle),
       lastTriggeredAtCycle: readNullableNumber$5(source.lastTriggeredAtCycle),
       ignoredTerminalCorrectionCount: readNumber$j(source.ignoredTerminalCorrectionCount),
       lastIgnoredAtCycle: readNullableNumber$5(source.lastIgnoredAtCycle),
-      lastSemanticFingerprint: readString$1C(source.lastSemanticFingerprint) || null,
-      lastOutcomeHash: readString$1C(source.lastOutcomeHash) || null,
-      clearedReason: active ? null : (readString$1C(source.clearedReason) || null)
+      lastSemanticFingerprint: readString$1D(source.lastSemanticFingerprint) || null,
+      lastOutcomeHash: readString$1D(source.lastOutcomeHash) || null,
+      clearedReason: active ? null : (readString$1D(source.clearedReason) || null)
     };
   }
 
   function createTerminalRetryCooldownState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
-    const forbiddenTerminalActions = readStringArray$5(source.forbiddenTerminalActions);
+    const forbiddenTerminalActions = readStringArray$6(source.forbiddenTerminalActions);
     return {
       active,
-      status: readString$1C(source.status) || (active ? "active" : "none"),
-      reason: readString$1C(source.reason) || null,
+      status: readString$1D(source.status) || (active ? "active" : "none"),
+      reason: readString$1D(source.reason) || null,
       forbiddenTerminalActions: (forbiddenTerminalActions.length > 0
         ? forbiddenTerminalActions
         : DEFAULT_FORBIDDEN_TERMINAL_ACTIONS).slice(0, 8),
-      allowedNextMoves: readStringArray$5(source.allowedNextMoves).slice(0, 8),
-      validTerminalException: readString$1C(source.validTerminalException) || DEFAULT_VALID_TERMINAL_EXCEPTION,
+      allowedNextMoves: readStringArray$6(source.allowedNextMoves).slice(0, 8),
+      validTerminalException: readString$1D(source.validTerminalException) || DEFAULT_VALID_TERMINAL_EXCEPTION,
       blockedTerminalRetryCount: readNumber$j(source.blockedTerminalRetryCount),
       executedPublishCount: readNumber$j(source.executedPublishCount),
       consecutiveExecutedPublishCount: readNumber$j(source.consecutiveExecutedPublishCount),
       firstActivatedAtCycle: readNullableNumber$5(source.firstActivatedAtCycle),
       lastActivatedAtCycle: readNullableNumber$5(source.lastActivatedAtCycle),
       lastBlockedAtCycle: readNullableNumber$5(source.lastBlockedAtCycle),
-      clearedReason: active ? null : (readString$1C(source.clearedReason) || null)
+      clearedReason: active ? null : (readString$1D(source.clearedReason) || null)
     };
   }
 
@@ -8666,7 +8666,7 @@
       blockedTerminalRetryCount: prior.blockedTerminalRetryCount + (preflightBlocked ? 1 : 0),
       executedPublishCount: prior.executedPublishCount + (executedPublish ? 1 : 0),
       consecutiveExecutedPublishCount: executedPublish
-        ? (readString$1C(previousLastActionName) === "workspace_publish_candidate"
+        ? (readString$1D(previousLastActionName) === "workspace_publish_candidate"
           ? prior.consecutiveExecutedPublishCount + 1
           : 1)
         : 0,
@@ -8688,13 +8688,13 @@
     }
     const signalMoves = signal && Array.isArray(signal.allowedNextMoves) ? signal.allowedNextMoves : [];
     const correctionMoves = correction.allowedNextMoves || [];
-    const allowedNextMoves = readStringArray$5(correctionMoves.length > 0 ? correctionMoves : signalMoves).slice(0, 8);
+    const allowedNextMoves = readStringArray$6(correctionMoves.length > 0 ? correctionMoves : signalMoves).slice(0, 8);
     return {
       ...base,
       active: true,
       status: "active",
       reason: correction.reason ||
-        readString$1C(signal && signal.reason) ||
+        readString$1D(signal && signal.reason) ||
         "terminal_retry_cooldown_active",
       forbiddenTerminalActions: DEFAULT_FORBIDDEN_TERMINAL_ACTIONS.slice(),
       allowedNextMoves,
@@ -8760,7 +8760,7 @@
         consecutiveProductiveSteps: consecutive,
         stepsWithoutProductiveProgress: 0,
         lastUpdatedAtCycle: cycle,
-        lastActionName: readString$1C(actionName) || prior.lastActionName
+        lastActionName: readString$1D(actionName) || prior.lastActionName
       };
     }
     const transitionalSignal = signal &&
@@ -8802,7 +8802,7 @@
     return {
       active: true,
       status: ignoredCount >= DEFAULT_REPEAT_THRESHOLD ? "escalated" : "active",
-      reason: readString$1C(signal && signal.reason) ||
+      reason: readString$1D(signal && signal.reason) ||
         prior.reason ||
         (readOnlyNoProgressThreshold
           ? "read_only_planning_sequence_without_productive_progress"
@@ -8810,7 +8810,7 @@
       forbiddenMove: "repeat_read_only_planning_without_productive_progress",
       forbiddenActions,
       allowedNextMoves,
-      requiredCorrection: readString$1C(signal && signal.requiredCorrection) ||
+      requiredCorrection: readString$1D(signal && signal.requiredCorrection) ||
         "Stop repeating search, planning, skill-tool, or read-only review without productive progress. Use read_url to turn search leads into sources, mutate the workspace meaningfully, sync TodoState with todo_advance/todo_run_next, or publish only a valid limited result with concrete remainingGaps.",
       stepsWithoutProductiveProgress: Math.max(
         prior.stepsWithoutProductiveProgress + (isTrackableAction(actionName, context) ? 1 : 0),
@@ -8826,7 +8826,7 @@
       transitionalDimensions: Array.isArray(progress && progress.transitionalDimensions)
         ? progress.transitionalDimensions.slice(0, 8)
         : prior.transitionalDimensions,
-      lastActionName: readString$1C(actionName) || prior.lastActionName,
+      lastActionName: readString$1D(actionName) || prior.lastActionName,
       clearedReason: null
     };
   }
@@ -8896,14 +8896,14 @@
     const progressCount = prior.structureProgressCount + (improved || changed ? 1 : 0);
     const shouldActivate = prior.active ||
       repeatedNoProgress >= STRUCTURE_REPAIR_NO_PROGRESS_THRESHOLD ||
-      readString$1C(context && context.status) === "structure_repair_preflight_block";
+      readString$1D(context && context.status) === "structure_repair_preflight_block";
 
     if (!shouldActivate) {
       return {
         ...prior,
         repeatedStructureNoProgressCount: repeatedNoProgress,
         structureProgressCount: progressCount,
-        lastActionName: readString$1C(actionName) || prior.lastActionName,
+        lastActionName: readString$1D(actionName) || prior.lastActionName,
         lastStructureSnapshot: snapshot,
         activeIssueCodes: snapshot.issueCodes,
         repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
@@ -8927,7 +8927,7 @@
       requiredCorrection: buildStructureRepairRequiredCorrection(snapshot),
       repeatedStructureNoProgressCount: repeatedNoProgress,
       structureProgressCount: progressCount,
-      lastActionName: readString$1C(actionName) || prior.lastActionName,
+      lastActionName: readString$1D(actionName) || prior.lastActionName,
       lastStructureSnapshot: snapshot,
       activeIssueCodes: snapshot.issueCodes,
       repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
@@ -8971,7 +8971,7 @@
   }) {
     const prior = createWorkspaceMutationGrowthConvergenceState(previous);
     const cycle = readNullableNumber$5(runState && runState.cycleCount);
-    const name = readString$1C(actionName);
+    const name = readString$1D(actionName);
 
     if (isTerminalCompleted$1(actionName, context)) {
       return {
@@ -9108,10 +9108,10 @@
       return {
         ...prior,
         status: prior.ignoredTerminalCorrectionCount >= DEFAULT_REPEAT_THRESHOLD ? "escalated" : "active",
-        actionName: readString$1C(actionName) || prior.actionName,
+        actionName: readString$1D(actionName) || prior.actionName,
         lastTriggeredAtCycle: prior.lastTriggeredAtCycle != null ? prior.lastTriggeredAtCycle : cycle,
-        lastSemanticFingerprint: readString$1C(semanticFingerprint) || prior.lastSemanticFingerprint,
-        lastOutcomeHash: readString$1C(outcomeHash) || prior.lastOutcomeHash,
+        lastSemanticFingerprint: readString$1D(semanticFingerprint) || prior.lastSemanticFingerprint,
+        lastOutcomeHash: readString$1D(outcomeHash) || prior.lastOutcomeHash,
         clearedReason: null
       };
     }
@@ -9123,18 +9123,18 @@
       return {
         status: ignoredCount >= DEFAULT_REPEAT_THRESHOLD ? "escalated" : "active",
         active: true,
-        reason: readString$1C(signal.reason) || "same_terminal_intent_without_observable_progress",
-        actionName: readString$1C(signal.actionName) || readString$1C(actionName) || prior.actionName,
-        forbiddenMove: readString$1C(signal.forbiddenMove) || "repeat_same_terminal_intent",
-        allowedNextMoves: readStringArray$5(signal.allowedNextMoves).slice(0, 8),
-        requiredCorrection: readString$1C(signal.requiredCorrection) ||
+        reason: readString$1D(signal.reason) || "same_terminal_intent_without_observable_progress",
+        actionName: readString$1D(signal.actionName) || readString$1D(actionName) || prior.actionName,
+        forbiddenMove: readString$1D(signal.forbiddenMove) || "repeat_same_terminal_intent",
+        allowedNextMoves: readStringArray$6(signal.allowedNextMoves).slice(0, 8),
+        requiredCorrection: readString$1D(signal.requiredCorrection) ||
           "Do not repeat the same publish/finalize terminal intent until observable progress changes, or publish a valid limited result with concrete remainingGaps.",
         firstTriggeredAtCycle: prior.firstTriggeredAtCycle != null ? prior.firstTriggeredAtCycle : cycle,
         lastTriggeredAtCycle: cycle,
         ignoredTerminalCorrectionCount: ignoredCount,
         lastIgnoredAtCycle: wasActive && isTerminal ? cycle : prior.lastIgnoredAtCycle,
-        lastSemanticFingerprint: readString$1C(signal.semanticFingerprint) || readString$1C(semanticFingerprint) || prior.lastSemanticFingerprint,
-        lastOutcomeHash: readString$1C(signal.outcomeHash) || readString$1C(outcomeHash) || prior.lastOutcomeHash,
+        lastSemanticFingerprint: readString$1D(signal.semanticFingerprint) || readString$1D(semanticFingerprint) || prior.lastSemanticFingerprint,
+        lastOutcomeHash: readString$1D(signal.outcomeHash) || readString$1D(outcomeHash) || prior.lastOutcomeHash,
         clearedReason: null
       };
     }
@@ -9143,12 +9143,12 @@
       return {
         ...prior,
         status: ignoredCount >= DEFAULT_REPEAT_THRESHOLD ? "escalated" : "active",
-        actionName: readString$1C(actionName) || prior.actionName,
+        actionName: readString$1D(actionName) || prior.actionName,
         ignoredTerminalCorrectionCount: ignoredCount,
         lastIgnoredAtCycle: cycle,
         lastTriggeredAtCycle: prior.lastTriggeredAtCycle != null ? prior.lastTriggeredAtCycle : cycle,
-        lastSemanticFingerprint: readString$1C(semanticFingerprint) || prior.lastSemanticFingerprint,
-        lastOutcomeHash: readString$1C(outcomeHash) || prior.lastOutcomeHash,
+        lastSemanticFingerprint: readString$1D(semanticFingerprint) || prior.lastSemanticFingerprint,
+        lastOutcomeHash: readString$1D(outcomeHash) || prior.lastOutcomeHash,
         clearedReason: null
       };
     }
@@ -9157,16 +9157,16 @@
 
   function isTerminalCorrectionPreflightBlock(context) {
     const output = readRecord$1(context && context.output);
-    return readString$1C(output.kind) === "terminal_correction_preflight_block";
+    return readString$1D(output.kind) === "terminal_correction_preflight_block";
   }
 
   function isReadOnlyPlanningPreflightBlock(context) {
     const output = readRecord$1(context && context.output);
-    return readString$1C(output.kind) === "read_only_planning_preflight_block";
+    return readString$1D(output.kind) === "read_only_planning_preflight_block";
   }
 
   function isExecutedWorkspacePublish(actionName, context) {
-    if (readString$1C(actionName) !== "workspace_publish_candidate") return false;
+    if (readString$1D(actionName) !== "workspace_publish_candidate") return false;
     return !isTerminalCorrectionPreflightBlock(context);
   }
 
@@ -9220,10 +9220,10 @@
   function isTerminalCompleted$1(actionName, context) {
     if (!isSemanticTerminalAction(actionName, context)) return false;
     const output = readRecord$1(context && context.output);
-    const kind = readString$1C(output.kind);
+    const kind = readString$1D(output.kind);
     if (kind === "final_response") return true;
-    if (readString$1C(output.control) === "complete") return true;
-    if (readString$1C(context && context.status) === "complete") return true;
+    if (readString$1D(output.control) === "complete") return true;
+    if (readString$1D(context && context.status) === "complete") return true;
     return false;
   }
 
@@ -9346,7 +9346,7 @@
   }
 
   function isLengthDeficitChurnAction(runState, actionName) {
-    const name = readString$1C(actionName);
+    const name = readString$1D(actionName);
     return LENGTH_DEFICIT_CHURN_ACTIONS.includes(name) && hasRequestedLengthDeficit(runState);
   }
 
@@ -9385,7 +9385,7 @@
       moves.push("change_arguments", "choose_different_action");
     }
     moves.push("valid_limited_with_remainingGaps");
-    return Array.from(new Set(moves.map(readString$1C).filter(Boolean))).slice(0, 8);
+    return Array.from(new Set(moves.map(readString$1D).filter(Boolean))).slice(0, 8);
   }
 
   function readReadOnlyPlanningForbiddenActions(runState) {
@@ -9406,7 +9406,7 @@
       ...DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES,
       ...(Array.isArray(signalMoves) ? signalMoves : [])
     ].filter((move) => {
-      const value = readString$1C(move);
+      const value = readString$1D(move);
       return value && !forbidden.has(value);
     });
     return Array.from(new Set(moves)).slice(0, 12);
@@ -9423,13 +9423,13 @@
     const output = readRecord$1(context && context.output);
     const candidate = readOutputCandidateSnapshot(output) || readCandidateSnapshot$2(runState);
     const facts = {
-      actionName: readString$1C(actionName) || null,
+      actionName: readString$1D(actionName) || null,
       candidate: summarizeCandidateForHash(candidate),
-      control: readString$1C(output.control) || null,
+      control: readString$1D(output.control) || null,
       issueCodes: readReadinessIssueCodes(context, output),
-      kind: readString$1C(output.kind) || null,
+      kind: readString$1D(output.kind) || null,
       publishBlockStatus: readPublishBlockStatus(runState, output),
-      status: readString$1C(output.status) || readString$1C(context && context.status) || null
+      status: readString$1D(output.status) || readString$1D(context && context.status) || null
     };
     return hashCompactFacts(facts);
   }
@@ -9462,17 +9462,17 @@
   }
 
   function isSemanticTerminalAction(actionName, context) {
-    const name = readString$1C(actionName);
+    const name = readString$1D(actionName);
     if (name === "workspace_publish_candidate") return true;
     if (name === "finalize" || name === "final" || name === "planner_finalize" || name === "planner_final") return true;
-    const source = readString$1C(context && context.sourceLabel);
+    const source = readString$1D(context && context.sourceLabel);
     return source === "planner_finalize" || source === "planner_final" || source === "planner_finalizer" || source === "plan_synthesize";
   }
 
   function normalizeTerminalActionName(actionName, context) {
-    const name = readString$1C(actionName);
+    const name = readString$1D(actionName);
     if (name === "workspace_publish_candidate") return "workspace_publish_candidate";
-    const source = readString$1C(context && context.sourceLabel);
+    const source = readString$1D(context && context.sourceLabel);
     if (source) return source === "planner_final" ? "planner_finalize" : source;
     return name === "final" ? "planner_finalize" : (name || "finalize");
   }
@@ -9485,7 +9485,7 @@
       return {
         chars: readNumber$j(workspaceStats.chars),
         cjkChars: readNumber$j(workspaceStats.cjkChars),
-        path: readString$1C(workspaceCandidate.path) || null,
+        path: readString$1D(workspaceCandidate.path) || null,
         words: readNumber$j(workspaceStats.words),
         version: readNullableNumber$5(workspaceCandidate.version)
       };
@@ -9495,7 +9495,7 @@
       return {
         chars: readNumber$j(textStats.chars),
         cjkChars: readNumber$j(textStats.cjkChars),
-        path: readString$1C(output.path) || null,
+        path: readString$1D(output.path) || null,
         words: readNumber$j(textStats.words),
         version: null
       };
@@ -9506,7 +9506,7 @@
       return {
         chars: readNumber$j(candidateStats.chars),
         cjkChars: readNumber$j(candidateStats.cjkChars),
-        path: readString$1C(candidate.path) || null,
+        path: readString$1D(candidate.path) || null,
         words: readNumber$j(candidateStats.words),
         version: readNullableNumber$5(candidate.version)
       };
@@ -9519,7 +9519,7 @@
     return {
       chars: readNumber$j(candidate.chars),
       cjkChars: readNumber$j(candidate.cjkChars),
-      path: readString$1C(candidate.path) || null,
+      path: readString$1D(candidate.path) || null,
       words: readNumber$j(candidate.words)
     };
   }
@@ -9527,9 +9527,9 @@
   function readPublishBlockStatus(runState, output) {
     const outputSignal = output && readRecord$1(output.publishBlockSignal);
     const runSignal = runState && readRecord$1(runState.publishBlockSignal);
-    return readString$1C(output && output.status) ||
-      readString$1C(outputSignal && outputSignal.lastStatus) ||
-      readString$1C(runSignal && runSignal.lastStatus) ||
+    return readString$1D(output && output.status) ||
+      readString$1D(outputSignal && outputSignal.lastStatus) ||
+      readString$1D(runSignal && runSignal.lastStatus) ||
       null;
   }
 
@@ -9544,7 +9544,7 @@
     for (const list of candidates) {
       if (!Array.isArray(list)) continue;
       for (const issue of list) {
-        const code = readString$1C(issue) || readString$1C(issue && (issue.code || issue.status || issue.reason));
+        const code = readString$1D(issue) || readString$1D(issue && (issue.code || issue.status || issue.reason));
         if (code) codes.push(code);
       }
     }
@@ -9577,9 +9577,9 @@
       ? packet.requestedLength
       : null;
     if (!requested) return null;
-    const unit = readString$1C(requested.unit) || "chars";
+    const unit = readString$1D(requested.unit) || "chars";
     return {
-      statsKey: readString$1C(requested.statsKey) || (unit === "words" ? "words" : unit === "cjkChars" ? "cjkChars" : "chars"),
+      statsKey: readString$1D(requested.statsKey) || (unit === "words" ? "words" : unit === "cjkChars" ? "cjkChars" : "chars"),
       unit,
       value: readNumber$j(requested.value)
     };
@@ -9593,10 +9593,10 @@
     return {
       kind: "action_pattern_convergence",
       status: readStatus$1(source.status),
-      lastFingerprint: readString$1C(source.lastFingerprint) || null,
-      lastOutcomeHash: readString$1C(source.lastOutcomeHash) || null,
-      lastSemanticFingerprint: readString$1C(source.lastSemanticFingerprint) || null,
-      lastActionName: readString$1C(source.lastActionName) || null,
+      lastFingerprint: readString$1D(source.lastFingerprint) || null,
+      lastOutcomeHash: readString$1D(source.lastOutcomeHash) || null,
+      lastSemanticFingerprint: readString$1D(source.lastSemanticFingerprint) || null,
+      lastActionName: readString$1D(source.lastActionName) || null,
       repeatedFingerprintCount: readNumber$j(source.repeatedFingerprintCount),
       repeatedSemanticFingerprintCount: readNumber$j(source.repeatedSemanticFingerprintCount),
       errorRepeatCount: readNumber$j(source.errorRepeatCount),
@@ -9658,7 +9658,7 @@
       ? quality.finalCandidateStructure
       : null;
     if (!structure) return normalizeStructureSnapshot(null);
-    const issueCodes = readStringArray$5(structure.issueCodes).sort().slice(0, 8);
+    const issueCodes = readStringArray$6(structure.issueCodes).sort().slice(0, 8);
     const repeatedHeadingSamples = normalizeStructureSamples$1(structure.repeatedHeadingSamples, "heading");
     const repeatedNumberSamples = normalizeStructureSamples$1(structure.repeatedNumberSamples, "number");
     const duplicateHeadingCount = readNumber$j(structure.duplicateHeadingCount);
@@ -9670,7 +9670,7 @@
       ok: structure.ok === true,
       repeatedHeadingSamples,
       repeatedNumberSamples,
-      status: readString$1C(structure.status) || (structure.ok === true ? "pass" : "fail")
+      status: readString$1D(structure.status) || (structure.ok === true ? "pass" : "fail")
     };
     return normalizeStructureSnapshot({
       ...facts,
@@ -9681,15 +9681,15 @@
 
   function normalizeStructureSnapshot(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    const issueCodes = readStringArray$5(source.issueCodes).sort().slice(0, 8);
+    const issueCodes = readStringArray$6(source.issueCodes).sort().slice(0, 8);
     const repeatedHeadingSamples = normalizeStructureSamples$1(source.repeatedHeadingSamples, "heading");
     const repeatedNumberSamples = normalizeStructureSamples$1(source.repeatedNumberSamples, "number");
     const duplicateHeadingCount = readNumber$j(source.duplicateHeadingCount);
     const duplicateNumberCount = readNumber$j(source.duplicateNumberCount);
     const ok = source.ok === true;
     const present = source.present === true;
-    const status = readString$1C(source.status) || (present ? (ok ? "pass" : "fail") : "missing");
-    const signature = readString$1C(source.signature) || hashCompactFacts({
+    const status = readString$1D(source.status) || (present ? (ok ? "pass" : "fail") : "missing");
+    const signature = readString$1D(source.signature) || hashCompactFacts({
       duplicateHeadingCount,
       duplicateNumberCount,
       issueCodes,
@@ -9734,7 +9734,7 @@
     return list
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const label = readString$1C(entry[name]);
+        const label = readString$1D(entry[name]);
         const count = readNumber$j(entry.count);
         if (!label || count <= 0) return null;
         return { [name]: label, count };
@@ -9743,7 +9743,7 @@
       .sort((a, b) => {
         const countDelta = readNumber$j(b.count) - readNumber$j(a.count);
         if (countDelta !== 0) return countDelta;
-        return readString$1C(a[name]).localeCompare(readString$1C(b[name]));
+        return readString$1D(a[name]).localeCompare(readString$1D(b[name]));
       })
       .slice(0, 5);
   }
@@ -9759,7 +9759,7 @@
       "workspace_read",
       "workspace_replace",
       "workspace_write"
-    ].includes(readString$1C(actionName));
+    ].includes(readString$1D(actionName));
   }
 
   function isStructureImproved$1(previous, next) {
@@ -9799,21 +9799,21 @@
     return parts.join(" ");
   }
 
-  function readActionName$1(decision) {
-    return readString$1C(decision && (decision.name || decision.actionName));
+  function readActionName$2(decision) {
+    return readString$1D(decision && (decision.name || decision.actionName));
   }
 
   function isTrackableAction(actionName, context) {
-    if (readString$1C(context && context.status) === "before_action") return false;
-    return Boolean(readString$1C(actionName));
+    if (readString$1D(context && context.status) === "before_action") return false;
+    return Boolean(readString$1D(actionName));
   }
 
   function isReadOnlyPlanningAction(actionName) {
-    return DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS.includes(readString$1C(actionName));
+    return DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS.includes(readString$1D(actionName));
   }
 
   function readStatus$1(value) {
-    const status = readString$1C(value);
+    const status = readString$1D(value);
     if (status === "terminal_correction_active") return status;
     if (status === "read_only_planning_active") return status;
     if (status === "structure_repair_active") return status;
@@ -9823,17 +9823,17 @@
   }
 
   function readPatternKind(value) {
-    const text = readString$1C(value);
+    const text = readString$1D(value);
     if (text === "transitional_only_progress") return "transitional_only_progress";
     return text === "semantic_terminal" ? "semantic_terminal" : "exact_action";
   }
 
-  function readString$1C(value) {
+  function readString$1D(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readStringArray$5(value) {
-    return Array.isArray(value) ? value.map(readString$1C).filter(Boolean) : [];
+  function readStringArray$6(value) {
+    return Array.isArray(value) ? value.map(readString$1D).filter(Boolean) : [];
   }
 
   function readRecord$1(value) {
@@ -9905,8 +9905,8 @@
     pushUnique(aliases, cleanEntityName(topic));
 
     for (const source of sources) {
-      const text = readString$1B(source && source.text);
-      const title = readString$1B(source && source.title);
+      const text = readString$1C(source && source.text);
+      const title = readString$1C(source && source.title);
       const registered = text.match(/\bRegistered\s+Name\s*(?:\*\*)?\s*:?\s*(?:\*\*)?([A-Z0-9][A-Za-z0-9 .,&'()-]{2,90})/i);
       if (registered) pushUnique(aliases, cleanEntityName(registered[1]));
       const titleAlias = title.match(/^(.+?)(?:\s+[-|]\s+|\s+\|\s+)(?:Overview|About|Profile|Registry|Repository)/i);
@@ -9914,7 +9914,7 @@
     }
 
     for (const result of searchResults) {
-      const title = readString$1B(result && result.title);
+      const title = readString$1C(result && result.title);
       const candidate = title.match(/^(.+?)(?:\s+[-|]\s+|\s+\|\s+)(?:Overview|About|Profile|Registry|Repository)/i);
       if (candidate) pushUnique(aliases, cleanEntityName(candidate[1]));
     }
@@ -9925,7 +9925,7 @@
   function collectIdentifiers(sources) {
     const identifiers = [];
     for (const source of sources) {
-      const text = `${readString$1B(source && source.title)} ${readString$1B(source && source.text)}`;
+      const text = `${readString$1C(source && source.title)} ${readString$1C(source && source.text)}`;
       const patterns = [
         /\b(?:UEN|Company\s+Registration\s+No\.?|Registration\s+No\.?|Entity\s+Number)\s*:?\s*([A-Z0-9-]{5,32})/gi,
         /\b([0-9]{6,10}[A-Z])\b/g
@@ -9945,7 +9945,7 @@
     for (const source of sources) {
       const authority = source && source.authority && typeof source.authority === "object" ? source.authority : {};
       if (authority.authorityTier === "official" || authority.authorityTier === "primary") {
-        pushUnique(urls, readString$1B(source && source.url));
+        pushUnique(urls, readString$1C(source && source.url));
       }
     }
     return urls.slice(0, 6);
@@ -9953,7 +9953,7 @@
 
   function inferEntityType(topic, sources, searchResults) {
     const haystack = `${topic} ${sources.map((source) => `${source.title} ${source.url} ${source.text}`).join(" ")} ${searchResults.map((item) => `${item.title} ${item.url} ${item.snippet}`).join(" ")}`;
-    const normalizedTopic = readString$1B(topic);
+    const normalizedTopic = readString$1C(topic);
     if (/\b(?:pte\.?\s*ltd\.?|ltd\.?|limited|llc|inc\.?|corp\.?|corporation|company|registered\s+name|uen|companies?\s+house|business\s+profile)\b/i.test(haystack)) {
       return "company";
     }
@@ -9973,7 +9973,7 @@
   }
 
   function looksLikeStableHandle(value) {
-    const text = readString$1B(value);
+    const text = readString$1C(value);
     if (!text || /\s/.test(text)) return false;
     return /^[a-z0-9][a-z0-9_.-]{2,80}$/i.test(text) && /\d/.test(text);
   }
@@ -10008,14 +10008,14 @@
   }
 
   function cleanEntityName(value) {
-    return readString$1B(value)
+    return readString$1C(value)
       .replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, "")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 120);
   }
 
-  function readString$1B(value) {
+  function readString$1C(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -10066,7 +10066,7 @@
       if (normalized) genericTokens.add(normalized);
     }
     return Array.from(new Set(
-      readString$1A(value)
+      readString$1B(value)
         .toLowerCase()
         .replace(/https?:\/\/\S+/g, " ")
         .replace(/[^a-z0-9]+/g, " ")
@@ -10078,7 +10078,7 @@
   }
 
   function readRegistrableDomainLabel(host) {
-    const labels = readString$1A(host)
+    const labels = readString$1B(host)
       .toLowerCase()
       .replace(/^www\./, "")
       .split(".")
@@ -10096,7 +10096,7 @@
   }
 
   function readHostnameOrHost(value) {
-    const text = readString$1A(value);
+    const text = readString$1B(value);
     if (!text) return "";
     try {
       return new URL(text).hostname.toLowerCase();
@@ -10106,14 +10106,14 @@
   }
 
   function normalizeCompact(value) {
-    return readString$1A(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+    return readString$1B(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
   }
 
   function normalizeToken(value) {
-    return readString$1A(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+    return readString$1B(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
   }
 
-  function readString$1A(value) {
+  function readString$1B(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -10135,13 +10135,13 @@
 
   function evaluateResearchSourceAuthority(source, context = {}) {
     const value = source && typeof source === "object" ? source : {};
-    const quality = readString$1z(value.quality).toLowerCase();
-    const sourceType = readString$1z(value.sourceType).toLowerCase();
-    const qualityReason = readString$1z(value.qualityDetail && value.qualityDetail.reason).toLowerCase();
-    const title = readString$1z(value.title);
-    const url = readString$1z(value.url);
-    const text = readString$1z(value.text);
-    const topic = readString$1z(context.topic);
+    const quality = readString$1A(value.quality).toLowerCase();
+    const sourceType = readString$1A(value.sourceType).toLowerCase();
+    const qualityReason = readString$1A(value.qualityDetail && value.qualityDetail.reason).toLowerCase();
+    const title = readString$1A(value.title);
+    const url = readString$1A(value.url);
+    const text = readString$1A(value.text);
+    const topic = readString$1A(context.topic);
     const host = readHostname$1(url);
     const haystack = `${title} ${url} ${text}`.toLowerCase();
     const sourceLabel = `${host} ${title} ${url}`.toLowerCase();
@@ -10283,7 +10283,7 @@
       const authority = source && source.authority && typeof source.authority === "object"
         ? source.authority
         : evaluateResearchSourceAuthority(source);
-      const tier = readString$1z(authority.authorityTier) || "context";
+      const tier = readString$1A(authority.authorityTier) || "context";
       if (Object.prototype.hasOwnProperty.call(counts, tier)) counts[tier] += 1;
       if (authority.corroborationRole === "primary_record") roles.primaryRecord = true;
       if (authority.corroborationRole === "self_claim") roles.selfClaim = true;
@@ -10306,7 +10306,7 @@
   }
 
   function sourceAuthorityAllowsClaim(authority, riskKind) {
-    const kind = readString$1z(riskKind) || "general";
+    const kind = readString$1A(riskKind) || "general";
     const source = authority && typeof authority === "object" ? authority : {};
     const allowed = Array.isArray(source.allowedClaimKinds) ? source.allowedClaimKinds : [];
     if (kind === "general") {
@@ -10325,8 +10325,8 @@
       allowedClaimKinds: Array.from(new Set(Array.isArray(value.allowedClaimKinds) ? value.allowedClaimKinds.filter(Boolean) : [])),
       authorityReasons: Array.from(new Set(Array.isArray(value.authorityReasons) ? value.authorityReasons.filter(Boolean) : [])),
       authorityScore: Number.isFinite(value.authorityScore) ? value.authorityScore : 0,
-      authorityTier: readString$1z(value.authorityTier) || "context",
-      corroborationRole: readString$1z(value.corroborationRole) || "context_only"
+      authorityTier: readString$1A(value.authorityTier) || "context",
+      corroborationRole: readString$1A(value.corroborationRole) || "context_only"
     };
   }
 
@@ -10337,7 +10337,7 @@
   function matchesTopicTokens({ haystack, topic }) {
     const tokens = readDistinctiveTopicTokens$1(topic);
     if (tokens.length === 0) return true;
-    return tokens.some((token) => readString$1z(haystack).includes(token));
+    return tokens.some((token) => readString$1A(haystack).includes(token));
   }
 
   function looksLikeOwnedDomain(url, topic) {
@@ -10350,13 +10350,13 @@
 
   function readHostname$1(value) {
     try {
-      return new URL(readString$1z(value)).hostname.toLowerCase();
+      return new URL(readString$1A(value)).hostname.toLowerCase();
     } catch {
       return "";
     }
   }
 
-  function readString$1z(value) {
+  function readString$1A(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -10470,13 +10470,13 @@
   }
 
   function buildResearchEvidenceGraph(runState, context = {}) {
-    const prompt = readString$1y(context.prompt)
-      || readString$1y(runState && runState.originalQuery)
-      || readString$1y(runState && runState.observationSummary && runState.observationSummary.prompt);
-    const topic = readString$1y(context.topic)
-      || readString$1y(runState && runState.researchState && runState.researchState.topic)
-      || readString$1y(runState && runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic)
-      || readString$1y(runState && runState.researchWorkspace && runState.researchWorkspace.brief && runState.researchWorkspace.brief.topic)
+    const prompt = readString$1z(context.prompt)
+      || readString$1z(runState && runState.originalQuery)
+      || readString$1z(runState && runState.observationSummary && runState.observationSummary.prompt);
+    const topic = readString$1z(context.topic)
+      || readString$1z(runState && runState.researchState && runState.researchState.topic)
+      || readString$1z(runState && runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic)
+      || readString$1z(runState && runState.researchWorkspace && runState.researchWorkspace.brief && runState.researchWorkspace.brief.topic)
       || extractTopic$1(prompt);
     let sourceMinimum = readSourceMinimum$3(runState, context);
     const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
@@ -10495,7 +10495,7 @@
     const observations = sourceArtifacts.flatMap((artifact) => extractSourceObservations(artifact, topic));
     sourceMinimum = normalizeSourceMinimumWithArtifacts(sourceMinimum, sourceArtifacts, observations);
     const directClaims = createDirectClaimEvidence(observations);
-    const proposedClaims = createProposedClaimEvidence(readString$1y(context.proposedText), {
+    const proposedClaims = createProposedClaimEvidence(readString$1z(context.proposedText), {
       directClaims,
       sourceArtifacts,
       sourceMinimum,
@@ -10547,7 +10547,7 @@
     // non-verifying — i.e. zero observations were produced from the reads.
     const allBlockedOrUnusable = sourceArtifacts.every((source) => {
       if (!source) return true;
-      const tier = source.authority && readString$1y(source.authority.authorityTier);
+      const tier = source.authority && readString$1z(source.authority.authorityTier);
       return tier === "blocked" || tier === "non_verifying" || source.ok === false;
     });
     if (!allBlockedOrUnusable) return [];
@@ -10565,15 +10565,15 @@
     const evidence = [];
     for (const item of aggregated) {
       if (!item || typeof item !== "object") continue;
-      const url = readString$1y(item.url);
+      const url = readString$1z(item.url);
       if (!url || !/^https?:\/\//i.test(url) || seen.has(url)) continue;
-      const title = readString$1y(item.title);
-      const snippet = readString$1y(item.snippet);
+      const title = readString$1z(item.title);
+      const snippet = readString$1z(item.snippet);
       if (!snippet && !title) continue;
       const haystack = `${title} ${snippet}`.toLowerCase();
       if (!topicTokens.every((token) => haystack.includes(token))) continue;
-      const sourceCategory = readString$1y(item.sourceCategory) || "unknown";
-      if (sourceCategory === "unknown" && !readString$1y(item.engine)) continue;
+      const sourceCategory = readString$1z(item.sourceCategory) || "unknown";
+      if (sourceCategory === "unknown" && !readString$1z(item.engine)) continue;
       seen.add(url);
       evidence.push({
         id: `snippet-${evidence.length + 1}`,
@@ -10588,7 +10588,7 @@
   }
 
   function tokenizeForSnippetMatch(value) {
-    return readString$1y(value)
+    return readString$1z(value)
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/)
       .filter((token) => token.length >= 3);
@@ -10655,7 +10655,7 @@
     const finalSourceIds = [];
 
     for (const claim of claimGraph) {
-      const claimId = readString$1y(claim && (claim.claimId || claim.id));
+      const claimId = readString$1z(claim && (claim.claimId || claim.id));
       if (!claimId) continue;
       if (claim.decision === "include") {
         includedClaimIds.push(claimId);
@@ -10676,7 +10676,7 @@
     return {
       downgradedClaimIds,
       evidenceGaps: Array.isArray(safeGraph.evidenceGaps) ? safeGraph.evidenceGaps.slice() : [],
-      finalMode: readString$1y(mode) || chooseFinalMode(null, safeGraph),
+      finalMode: readString$1z(mode) || chooseFinalMode(null, safeGraph),
       finalSourceIds,
       includedClaimIds,
       omittedClaimIds
@@ -10684,7 +10684,7 @@
   }
 
   function classifyResearchClaimRisk(claim) {
-    const value = readString$1y(claim);
+    const value = readString$1z(claim);
     for (const [kind, pattern] of Object.entries(HIGH_RISK_PATTERNS)) {
       if (pattern.test(value)) return kind;
     }
@@ -10693,7 +10693,7 @@
 
   function chooseFinalMode(runState, graph) {
     const loop = {};
-    if (readString$1y(loop.finalMode) === "final_with_limitations") return "final_with_limitations";
+    if (readString$1z(loop.finalMode) === "final_with_limitations") return "final_with_limitations";
     if (graph.sourceMinimum.passed !== true) return "final_with_limitations";
     if (graph.coverage && graph.coverage.independent !== true) return "final_with_limitations";
     if (graph.authorityCoverage && graph.authorityCoverage.passed !== true) return "final_with_limitations";
@@ -10703,9 +10703,9 @@
   function createSourceArtifact(source, index, topic) {
     const qualityDetail = explainReadSourceQuality(source, { query: topic });
     const id = `S${index}`;
-    const text = readString$1y(source && source.text);
-    const title = readString$1y(source && source.title) || readString$1y(source && source.url) || `Source ${index}`;
-    const url = readString$1y(source && source.url);
+    const text = readString$1z(source && source.text);
+    const title = readString$1z(source && source.title) || readString$1z(source && source.url) || `Source ${index}`;
+    const url = readString$1z(source && source.url);
     const sourceType = classifySourceType({ title, topic, url });
     const topicRelevance = explainTopicRelevance({ text, title, url }, topic);
     const baseQuality = sourceType === "profile_directory"
@@ -10913,7 +10913,7 @@
       const sourceIds = Array.isArray(claim.sourceIds) ? claim.sourceIds.filter(Boolean) : [];
       const supportingSources = sourceIds.map((sourceId) => sourcesById.get(sourceId)).filter(Boolean);
       const authorityMix = summarizeClaimAuthorityMix(supportingSources);
-      const riskKind = readString$1y(claim.riskKind) || "general";
+      const riskKind = readString$1z(claim.riskKind) || "general";
       const hasAllowedAuthority = supportingSources.some((source) => (
         sourceAuthorityAllowsClaim(source.authority, riskKind)
       ));
@@ -10927,8 +10927,8 @@
       });
       return {
         authorityMix,
-        claim: readString$1y(claim.claim),
-        claimId: readString$1y(claim.id) || `claim-${index + 1}`,
+        claim: readString$1z(claim.claim),
+        claimId: readString$1z(claim.id) || `claim-${index + 1}`,
         conflicts: [],
         decision: decision.decision,
         reason: decision.reason,
@@ -10944,7 +10944,7 @@
   function summarizeClaimAuthorityMix(sources) {
     const counts = {};
     for (const source of Array.isArray(sources) ? sources : []) {
-      const tier = readString$1y(source && source.authority && source.authority.authorityTier) || "unknown";
+      const tier = readString$1z(source && source.authority && source.authority.authorityTier) || "unknown";
       counts[tier] = (counts[tier] || 0) + 1;
     }
     return counts;
@@ -10996,7 +10996,7 @@
 
   function createEvidenceGaps({ authorityCoverage, claimEvidence, claimGraph, coverage, entity, sourceMinimum }) {
     const gaps = [];
-    const entityType = readString$1y(entity && entity.entityType) || "topic";
+    const entityType = readString$1z(entity && entity.entityType) || "topic";
     if (sourceMinimum.passed !== true) {
       gaps.push(`source minimum not met: ${sourceMinimum.readSources}/${sourceMinimum.minReadSources} read source(s), ${sourceMinimum.relevantSources}/${sourceMinimum.minRelevantSources} relevant source(s)`);
     }
@@ -11038,7 +11038,7 @@
     return claimEvidence.some((claim) => (
       claim.riskKind === riskKind &&
       claim.supportStatus === "direct" &&
-      !/\b(?:no|not|without|unverified|not\s+directly|not\s+verified)\b/i.test(readString$1y(claim.claim))
+      !/\b(?:no|not|without|unverified|not\s+directly|not\s+verified)\b/i.test(readString$1z(claim.claim))
     ));
   }
 
@@ -11073,7 +11073,7 @@
     return sourceArtifacts.filter((source) => (
       usedSourceIds.has(source.id) &&
       isFinalSourceArtifact(source) &&
-      /^https?:\/\//i.test(readString$1y(source.url))
+      /^https?:\/\//i.test(readString$1z(source.url))
     ));
   }
 
@@ -11096,9 +11096,9 @@
       // report (Cloudflare title replacing the original page title) and
       // also force `collectResearchReportSourceArtifacts` away from the
       // snippet fallback even though no usable text was retrieved.
-      readString$1y(source.quality) !== "blocked" &&
-      !(source.authority && readString$1y(source.authority.authorityTier) === "blocked") &&
-      /^https?:\/\//i.test(readString$1y(source.url))
+      readString$1z(source.quality) !== "blocked" &&
+      !(source.authority && readString$1z(source.authority.authorityTier) === "blocked") &&
+      /^https?:\/\//i.test(readString$1z(source.url))
     )).slice(0, 5);
   }
 
@@ -11107,14 +11107,14 @@
     const sources = [];
     const seenUrls = new Set();
     for (const item of snippetEvidence) {
-      const url = readString$1y(item && item.url);
+      const url = readString$1z(item && item.url);
       if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
       seenUrls.add(url);
       sources.push({
         id: `snippet-${sources.length + 1}`,
         quality: "snippet",
         qualityDetail: { reason: "search_snippet" },
-        title: readString$1y(item && item.title) || url,
+        title: readString$1z(item && item.title) || url,
         url
       });
       if (sources.length >= 5) break;
@@ -11133,8 +11133,8 @@
   // graph + envelope.
 
   function extractRepositoryName(source) {
-    const title = readString$1y(source && source.title);
-    const url = readString$1y(source && source.url);
+    const title = readString$1z(source && source.title);
+    const url = readString$1z(source && source.url);
     const repoTitleMatch = title.match(/(?:^|\s)([A-Za-z0-9_.-]+)\s+repository\b/i);
     if (repoTitleMatch) return cleanRepositoryName(repoTitleMatch[1]);
     try {
@@ -11154,7 +11154,7 @@
   }
 
   function cleanRepositoryName(value) {
-    return readString$1y(value)
+    return readString$1z(value)
       .replace(/\s*[-|]\s*GitHub\s*$/i, "")
       .replace(/\s+/g, " ")
       .trim()
@@ -11177,12 +11177,12 @@
     const ids = Array.isArray(claim && claim.supportingSourceIds)
       ? claim.supportingSourceIds
       : Array.isArray(claim && claim.sourceIds) ? claim.sourceIds : [];
-    return ids.map(readString$1y).filter(Boolean);
+    return ids.map(readString$1z).filter(Boolean);
   }
 
   function isFinalSourceArtifact(source) {
     if (!source || source.sourceType === "profile_directory") return false;
-    const authorityTier = readString$1y(source.authority && source.authority.authorityTier);
+    const authorityTier = readString$1z(source.authority && source.authority.authorityTier);
     if (authorityTier === "blocked" || authorityTier === "non_verifying" || authorityTier === "context") return false;
     if (source.topicRelevance && source.topicRelevance.relevant === false) return false;
     return true;
@@ -11236,9 +11236,9 @@
       ? context.aggregatedSearchResults
       : Array.isArray(context.searchResults) ? context.searchResults : [];
     return results.map((item) => ({
-      snippet: readString$1y(item && item.snippet),
-      title: readString$1y(item && item.title),
-      url: readString$1y(item && item.url)
+      snippet: readString$1z(item && item.snippet),
+      title: readString$1z(item && item.title),
+      url: readString$1z(item && item.url)
     }));
   }
 
@@ -11309,7 +11309,7 @@
   }
 
   function splitEvidenceSentences(text) {
-    return readString$1y(text)
+    return readString$1z(text)
       .replace(/\s+/g, " ")
       .split(/(?<=[.!?])\s+|[\r\n]+/)
       .map(cleanObservationText)
@@ -11318,7 +11318,7 @@
   }
 
   function isCleanFindingSentence(sentence) {
-    const value = readString$1y(sentence);
+    const value = readString$1z(sentence);
     if (value.length < 32 || value.length > 240 || NOISE_RE.test(value)) return false;
     if (UI_EMOJI_RE.test(value)) return false;
     if (looksLikeUiNavLabel(value)) return false;
@@ -11330,7 +11330,7 @@
   }
 
   function looksLikeUiNavLabel(value) {
-    const text = readString$1y(value);
+    const text = readString$1z(value);
     if (!text) return false;
     const tokens = text.split(/\s+/).filter(Boolean);
     if (tokens.length < 5) return false;
@@ -11343,7 +11343,7 @@
   }
 
   function scoreEvidenceSentence(sentence, topic, artifact) {
-    const value = readString$1y(sentence).toLowerCase();
+    const value = readString$1z(sentence).toLowerCase();
     if (!value || NOISE_RE.test(value)) return -5;
     let score = 0;
     for (const token of tokenize$3(topic)) {
@@ -11371,7 +11371,7 @@
     if (!isUsableEvidenceArtifact(source)) return false;
     if (!sourceAuthorityAllowsClaim(source && source.authority, riskKind)) return false;
     const text = `${source.title} ${source.url} ${source.text}`.toLowerCase();
-    const claimText = readString$1y(claim).toLowerCase();
+    const claimText = readString$1z(claim).toLowerCase();
     if (!text || !claimText) return false;
     if (riskKind !== "general" && !riskPhraseAppearsInSource(claimText, text)) {
       return false;
@@ -11391,7 +11391,7 @@
   }
 
   function riskPhraseAppearsInSource(claimText, sourceText) {
-    const distinctiveTokens = readString$1y(claimText)
+    const distinctiveTokens = readString$1z(claimText)
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/i)
       .filter((token) => token.length >= 5 && !STOP_WORDS.has(token));
@@ -11400,7 +11400,7 @@
   }
 
   function extractClaimCandidates$1(text) {
-    const value = readString$1y(text);
+    const value = readString$1z(text);
     if (!value) return [];
     const lines = value.split(/\r?\n/);
     const claims = [];
@@ -11424,7 +11424,7 @@
     const best = sentences
       .map((sentence) => ({ score: scoreEvidenceSentence(sentence, topic, { sourceType: "general"}), sentence }))
       .sort((a, b) => b.score - a.score)[0];
-    return readString$1y(best && best.sentence).slice(0, MAX_SOURCE_SNIPPET_CHARS);
+    return readString$1z(best && best.sentence).slice(0, MAX_SOURCE_SNIPPET_CHARS);
   }
 
   function sanitizeGraphForState(graph) {
@@ -11459,7 +11459,7 @@
   }
 
   function cleanObservationText(value) {
-    return readString$1y(value)
+    return readString$1z(value)
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/[*_`#>]/g, "")
       .replace(/\s+/g, " ")
@@ -11471,7 +11471,7 @@
   }
 
   function truncateAtSentenceBoundary(value, maxChars) {
-    const text = readString$1y(value);
+    const text = readString$1z(value);
     if (!text || text.length <= maxChars) return text;
     const candidate = text.slice(0, maxChars);
     const lastSentenceEnd = Math.max(
@@ -11490,11 +11490,11 @@
   }
 
   function normalizedKey(value) {
-    return readString$1y(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return readString$1z(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
 
   function tokenize$3(value) {
-    return readString$1y(value)
+    return readString$1z(value)
       .toLowerCase()
       .replace(/https?:\/\/\S+/g, " ")
       .replace(/[^a-z0-9]+/g, " ")
@@ -11504,7 +11504,7 @@
 
   function readHostname(value) {
     try {
-      return new URL(readString$1y(value)).hostname.toLowerCase();
+      return new URL(readString$1z(value)).hostname.toLowerCase();
     } catch {
       return "";
     }
@@ -11512,14 +11512,14 @@
 
   function readPathname(value) {
     try {
-      return new URL(readString$1y(value)).pathname.toLowerCase();
+      return new URL(readString$1z(value)).pathname.toLowerCase();
     } catch {
       return "";
     }
   }
 
   function extractTopic$1(prompt) {
-    const value = readString$1y(prompt);
+    const value = readString$1z(prompt);
     const topicPhrase = value.match(/\btopic\s*[:=]?\s*["'“”‘’`]([^"'“”‘’`]{2,160})["'“”‘’`]/i);
     if (topicPhrase) return topicPhrase[1].trim();
     const quoted = value.match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
@@ -11538,7 +11538,7 @@
       .slice(0, 120);
   }
 
-  function readString$1y(value) {
+  function readString$1z(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -11550,7 +11550,7 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
-    const decision = readString$1x(value.decision);
+    const decision = readString$1y(value.decision);
     if (decision !== "ready" && decision !== "limited") {
       return null;
     }
@@ -11559,8 +11559,8 @@
     );
     const normalized = {
       decision,
-      evidenceMode: readString$1x(value.evidenceMode) || null,
-      limitations: readString$1x(value.limitations) || null
+      evidenceMode: readString$1y(value.evidenceMode) || null,
+      limitations: readString$1y(value.limitations) || null
     };
     if (requirementsAssessment) {
       normalized.requirementsAssessment = requirementsAssessment;
@@ -11584,9 +11584,9 @@
       finalCandidateReady: quality.finalCandidateReady === true,
       finalCandidateStats,
       researchFinalAllowed: researchState.finalAllowed === true,
-      researchFinalReason: readString$1x(researchState.finalReason) || null,
+      researchFinalReason: readString$1y(researchState.finalReason) || null,
       researchGaps: Array.isArray(researchState.gaps)
-        ? researchState.gaps.map(readString$1x).filter(Boolean).slice(0, 12)
+        ? researchState.gaps.map(readString$1y).filter(Boolean).slice(0, 12)
         : [],
       researchQualityGateRequired: researchState.qualityGateRequired === true,
       successfulReadUrlCount
@@ -11611,7 +11611,7 @@
       const originStatus = typeof source.originStatus === "number" ? source.originStatus : null;
       if (status != null && status >= 400) return false;
       if (originStatus != null && originStatus >= 400) return false;
-      return Boolean(readString$1x(source.text) || readString$1x(source.title));
+      return Boolean(readString$1y(source.text) || readString$1y(source.title));
     }).length;
   }
 
@@ -11628,13 +11628,13 @@
       observedLength: readFiniteNumber$3(value.observedLength) ?? readFiniteNumber$3(value.actualLength),
       observedLengthUnit: normalizeLengthUnit(value.observedLengthUnit || value.lengthUnit),
       remainingGaps: Array.isArray(value.remainingGaps)
-        ? value.remainingGaps.map(readString$1x).filter(Boolean).slice(0, 12)
+        ? value.remainingGaps.map(readString$1y).filter(Boolean).slice(0, 12)
         : [],
       requestedLength: readFiniteNumber$3(value.requestedLength),
       requirementSatisfied: typeof value.requirementSatisfied === "boolean" ? value.requirementSatisfied : null,
-      summary: readString$1x(value.summary) || null,
+      summary: readString$1y(value.summary) || null,
       successfulReadUrlCount: readFiniteNumber$3(value.successfulReadUrlCount),
-      userRequirementSummary: readString$1x(value.userRequirementSummary) || null
+      userRequirementSummary: readString$1y(value.userRequirementSummary) || null
     };
   }
 
@@ -11651,7 +11651,7 @@
   }
 
   function normalizeLengthUnit(value) {
-    const text = readString$1x(value).toLowerCase();
+    const text = readString$1y(value).toLowerCase();
     if (text === "word" || text === "words") return "words";
     if (text === "token" || text === "tokens") return "tokens";
     if (text === "cjk_chars" || text.includes("\u4e2d\u6587") || text === "\u5b57" || text === "\u5b57\u6570") return "cjk_chars";
@@ -11667,13 +11667,13 @@
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1x(value) {
+  function readString$1y(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function applyTerminalFinalContract(options = {}) {
     const runState = options.runState && typeof options.runState === "object" ? options.runState : null;
-    const source = readString$1w(options.source) || "final_response";
+    const source = readString$1x(options.source) || "final_response";
     const contractText = readTerminalContractText(options);
     const suffixAudit = normalizeExplicitFinalSuffix(options.text, contractText);
     const readinessAudit = inspectTerminalReadinessConsistency({
@@ -11739,13 +11739,13 @@
     if (researchGateBlocked && assessment.evidenceSatisfied === true) {
       issues.push({
         code: "evidence_satisfied_conflicts_with_research_gate",
-        researchFinalReason: readString$1w(researchState.finalReason) || null
+        researchFinalReason: readString$1x(researchState.finalReason) || null
       });
     }
     if (researchGateBlocked && finalReadiness.decision === "ready") {
       issues.push({
         code: "ready_conflicts_with_research_gate",
-        researchFinalReason: readString$1w(researchState.finalReason) || null
+        researchFinalReason: readString$1x(researchState.finalReason) || null
       });
     }
 
@@ -11824,7 +11824,7 @@
 
   function normalizeExplicitFinalSuffix(text, contractText) {
     const suffix = extractExplicitFinalSuffix(contractText);
-    const source = readString$1w(text);
+    const source = readString$1x(text);
     if (!suffix) {
       return {
         count: 0,
@@ -11870,7 +11870,7 @@
     const seen = new Set();
     const text = [];
     for (const piece of pieces) {
-      const value = readString$1w(piece);
+      const value = readString$1x(piece);
       if (!value || seen.has(value)) continue;
       seen.add(value);
       text.push(value);
@@ -11879,7 +11879,7 @@
   }
 
   function extractRequestedLengthContract(prompt) {
-    const value = readString$1w(prompt);
+    const value = readString$1x(prompt);
     if (!value) return null;
     const wordMatch = value.match(/\b(\d{2,6})\s*[- ]?words?\b/i);
     if (wordMatch) {
@@ -11909,14 +11909,14 @@
   }
 
   function extractExplicitFinalSuffix(prompt) {
-    const value = readString$1w(prompt);
+    const value = readString$1x(prompt);
     if (!value) return "";
     const match = value.match(/\bend\s+exactly\s*(?::|(?:with|as)\s+)([`"'“”]?)([A-Za-z0-9_.:/-]{3,160})\1/i);
-    return match ? readString$1w(match[2]) : "";
+    return match ? readString$1x(match[2]) : "";
   }
 
   function summarizeFinalText(content) {
-    const text = readString$1w(content);
+    const text = readString$1x(content);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -11928,7 +11928,7 @@
   }
 
   function readStatsKeyForUnit(unit) {
-    const value = readString$1w(unit).toLowerCase();
+    const value = readString$1x(unit).toLowerCase();
     if (value === "words" || value === "word") return "words";
     if (value === "cjk_chars" || value === "cjk" || value.includes("cjk")) return "cjkChars";
     if (value === "non_whitespace_chars" || value === "nonwhitespacechars") return "nonWhitespaceChars";
@@ -11991,7 +11991,7 @@
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1w(value) {
+  function readString$1x(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -12028,20 +12028,20 @@
   function normalizeCandidatePathMismatchSignal(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
     if (!source) return null;
-    const mismatchKind = readString$1v(source.mismatchKind);
+    const mismatchKind = readString$1w(source.mismatchKind);
     const selectedPath = normalizeWorkspacePath(source.selectedPath);
     if (!mismatchKind || !selectedPath) return null;
     return {
-      action: readString$1v(source.action) || null,
+      action: readString$1w(source.action) || null,
       activePath: normalizeWorkspacePath(source.activePath) || selectedPath,
       finalizedPath: normalizeWorkspacePath(source.finalizedPath) || null,
       kind: "candidate_path_mismatch_signal",
       lastWrittenPath: normalizeWorkspacePath(source.lastWrittenPath) || null,
       mismatchKind,
-      observedAt: readString$1v(source.observedAt) || null,
+      observedAt: readString$1w(source.observedAt) || null,
       publishedPath: normalizeWorkspacePath(source.publishedPath) || null,
       selectedPath,
-      status: readString$1v(source.status) || "observed",
+      status: readString$1w(source.status) || "observed",
       writtenPath: normalizeWorkspacePath(source.writtenPath) || null
     };
   }
@@ -12207,7 +12207,7 @@
   }
 
   function isContentWriteAction(action) {
-    const value = readString$1v(action);
+    const value = readString$1w(action);
     return value === "write" ||
       value === "replace" ||
       value === "append" ||
@@ -12246,7 +12246,7 @@
   }
 
   function normalizeLifecycleStatus(value) {
-    const status = readString$1v(value);
+    const status = readString$1w(value);
     if (!status) return "";
     if (
       status === "idle" ||
@@ -12263,12 +12263,12 @@
   }
 
   function normalizeWorkspacePath(value) {
-    const path = readString$1v(value);
+    const path = readString$1w(value);
     if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return "";
     return path;
   }
 
-  function readString$1v(value) {
+  function readString$1w(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -12314,7 +12314,7 @@
     // longer pre-populated; AI creates files by calling workspace_write.
     return {
       enabled: options.enabled === true,
-      mode: readString$1u(options.mode) || "complex_response",
+      mode: readString$1v(options.mode) || "complex_response",
       files: {},
       operations: [],
       pendingPatch: null,
@@ -12359,16 +12359,16 @@
       if (path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) continue;
       const file = source && typeof source === "object" ? source : {};
       files[path] = {
-        content: readString$1u(file.content),
+        content: readString$1v(file.content),
         path,
-        updatedAt: readString$1u(file.updatedAt) || null,
+        updatedAt: readString$1v(file.updatedAt) || null,
         version: readPositiveInteger$f(file.version) || 0
       };
     }
     const quality = normalizeWorkspaceQuality(value.quality);
     return {
       enabled: value.enabled === true,
-      mode: readString$1u(value.mode) || "complex_response",
+      mode: readString$1v(value.mode) || "complex_response",
       files,
       operations: normalizeOperations(value.operations),
       pendingPatch: normalizePendingPatch(value.pendingPatch),
@@ -12397,7 +12397,7 @@
     // ADR-0013 — workspace path validation is recoverable, not fatal.
     // Returns { ok, path?, error? }. Callers translate failure into an
     // invalid_args observation rather than throwing.
-    const value = readString$1u(path);
+    const value = readString$1v(path);
     if (!value) {
       return { ok: false, error: "workspace_path_required", path: value };
     }
@@ -12453,7 +12453,7 @@
     const pathValidation = validateWorkspacePathRecoverable(path);
     if (!pathValidation.ok) {
       return addWorkspaceFileStats({
-        ...createWorkspaceFile(readString$1u(path) || "", ""),
+        ...createWorkspaceFile(readString$1v(path) || "", ""),
         status: "invalid_args",
         error: pathValidation.error,
         message: describeWorkspacePathError(pathValidation.error)
@@ -12470,7 +12470,7 @@
 
   function readWorkspaceFinalCandidate$1(workspace, path) {
     const source = normalizeVirtualWorkspace(workspace) || createEmptyVirtualWorkspace();
-    const resolvedPath = readString$1u(path) || readFinalCandidatePath(source);
+    const resolvedPath = readString$1v(path) || readFinalCandidatePath(source);
     const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
     if (!pathValidation.ok) {
       return addWorkspaceFileStats({
@@ -12494,7 +12494,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "read",
-        path: readString$1u(path) || "<unset>",
+        path: readString$1v(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
@@ -12550,14 +12550,14 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "write",
-        path: readString$1u(path) || "<unset>",
+        path: readString$1v(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
       }, options);
       refreshWorkspaceQuality(workspace);
       return {
-        ...createWorkspaceFile(readString$1u(path) || "", ""),
+        ...createWorkspaceFile(readString$1v(path) || "", ""),
         status: "invalid_args",
         error: pathValidation.error,
         message: describeWorkspacePathError(pathValidation.error)
@@ -12565,7 +12565,7 @@
     }
     const filePath = pathValidation.path;
     const maxFileChars = readPositiveInteger$f(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
-    const nextContent = truncate$2(readString$1u(content), maxFileChars);
+    const nextContent = truncate$2(readString$1v(content), maxFileChars);
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     workspace.files[filePath] = {
       content: nextContent,
@@ -12598,7 +12598,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "insert_after_section",
-        path: readString$1u(path) || "<unset>",
+        path: readString$1v(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
@@ -12631,8 +12631,8 @@
       });
     }
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-    const current = readString$1u(file.content);
-    const addition = readString$1u(content);
+    const current = readString$1v(file.content);
+    const addition = readString$1v(content);
     const insertResult = insertAfterMarkdownSection(current, targetHeading, addition, options);
     const maxFileChars = readPositiveInteger$f(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
     workspace.files[filePath] = {
@@ -12679,7 +12679,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "remove",
-        path: readString$1u(path) || "<unset>",
+        path: readString$1v(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
@@ -12690,12 +12690,12 @@
         status: "invalid_args",
         error: pathValidation.error,
         message: describeWorkspacePathError(pathValidation.error),
-        file: { ...createWorkspaceFile(readString$1u(path) || "", "") }
+        file: { ...createWorkspaceFile(readString$1v(path) || "", "") }
       };
     }
     const filePath = pathValidation.path;
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-    const hadContent = readString$1u(file.content).length > 0;
+    const hadContent = readString$1v(file.content).length > 0;
     workspace.files[filePath] = createWorkspaceFile(filePath, "");
     if (hadContent) {
       workspace.version += 1;
@@ -12721,7 +12721,7 @@
     if (!fromValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "move",
-        path: readString$1u(from) || "<unset>",
+        path: readString$1v(from) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(fromValidation.error),
         cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
@@ -12755,7 +12755,7 @@
       return { moved: false, status: "same_path", error: "same_path", message: `workspace_move source and destination are the same: ${fromPath}`, fromFile: workspace.files[fromPath] || null, toFile: null };
     }
     const fromFile = workspace.files[fromPath] || createWorkspaceFile(fromPath, "");
-    const sourceContent = readString$1u(fromFile.content);
+    const sourceContent = readString$1v(fromFile.content);
     if (!sourceContent) {
       appendWorkspaceOperation(workspace, {
         action: "move",
@@ -12768,7 +12768,7 @@
       return { moved: false, status: "source_not_found", error: "source_not_found", message: `workspace_move source ${fromPath} has no content`, fromFile: workspace.files[fromPath] || null, toFile: null };
     }
     const toFile = workspace.files[toPath] || createWorkspaceFile(toPath, "");
-    if (readString$1u(toFile.content) && options.overwrite !== true) {
+    if (readString$1v(toFile.content) && options.overwrite !== true) {
       appendWorkspaceOperation(workspace, {
         action: "move",
         path: fromPath,
@@ -12812,7 +12812,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "replace",
-        path: readString$1u(path) || "<unset>",
+        path: readString$1v(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0
@@ -12932,7 +12932,7 @@
     const pathValidation = validateWorkspacePathRecoverable(path);
     if (!pathValidation.ok) {
       const patch = createInvalidPendingPatch({
-        path: readString$1u(path) || "",
+        path: readString$1v(path) || "",
         status: "invalid_args",
         riskFlags: ["not_found"],
         message: describeWorkspacePathError(pathValidation.error)
@@ -13014,11 +13014,11 @@
         error: "pending_patch_missing",
         file: null,
         message: "workspace_apply_patch requires a valid pending patch from workspace_propose_patch.",
-        patchId: readString$1u(patchId) || null,
+        patchId: readString$1v(patchId) || null,
         status: "missing_pending_patch"
       };
     }
-    const requestedPatchId = readString$1u(patchId);
+    const requestedPatchId = readString$1v(patchId);
     if (requestedPatchId && requestedPatchId !== pending.patchId) {
       return {
         changed: false,
@@ -13109,12 +13109,12 @@
       kind: "virtual_workspace_pending_patch",
       operations: [],
       patchId: `patch-${Date.now()}-invalid`,
-      path: readString$1u(options.path),
-      previewSummary: readString$1u(options.message) || "Patch preview could not be created.",
-      riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString$1u).filter(Boolean) : [],
+      path: readString$1v(options.path),
+      previewSummary: readString$1v(options.message) || "Patch preview could not be created.",
+      riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString$1v).filter(Boolean) : [],
       structureAfter: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
       structureBefore: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
-      status: readString$1u(options.status) || "preview_blocked",
+      status: readString$1v(options.status) || "preview_blocked",
       valid: false,
       version: 1,
       afterContent: ""
@@ -13144,7 +13144,7 @@
     return source
       .map((operation) => {
         const op = operation && typeof operation === "object" && !Array.isArray(operation) ? operation : {};
-        const type = readString$1u(op.type || op.operation || op.action);
+        const type = readString$1v(op.type || op.operation || op.action);
         if (type === "replace") {
           return {
             type,
@@ -13212,7 +13212,7 @@
         continue;
       }
       if (operation.type === "append") {
-        const addition = readString$1u(operation.content);
+        const addition = readString$1v(operation.content);
         if (!addition) {
           riskFlags.push("no_growth");
           diagnostics.push({ status: "empty_content", type: operation.type });
@@ -13225,7 +13225,7 @@
       }
       if (operation.type === "insert_after_section") {
         const targetHeading = normalizeHeadingText(operation.heading);
-        const addition = readString$1u(operation.content);
+        const addition = readString$1v(operation.content);
         if (!targetHeading || !addition) {
           riskFlags.push("not_found");
           diagnostics.push({ status: "invalid_args", type: operation.type });
@@ -13272,7 +13272,7 @@
 
   function summarizePatchOperation(operation) {
     if (!operation || typeof operation !== "object") return null;
-    const type = readString$1u(operation.type);
+    const type = readString$1v(operation.type);
     if (!type) return null;
     if (type === "replace") {
       return {
@@ -13308,7 +13308,7 @@
   }
 
   function summarizePatchPreview(operations, facts) {
-    const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString$1u(operation && operation.type)).filter(Boolean);
+    const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString$1v(operation && operation.type)).filter(Boolean);
     const beforeWords = facts && facts.beforeStats ? facts.beforeStats.words : 0;
     const afterWords = facts && facts.afterStats ? facts.afterStats.words : 0;
     const riskFlags = Array.isArray(facts && facts.riskFlags) ? facts.riskFlags : [];
@@ -13363,8 +13363,8 @@
   }
 
   function formatNormalizedHeadingLine(currentLine, replacement) {
-    const current = readString$1u(currentLine);
-    const text = readString$1u(replacement);
+    const current = readString$1v(currentLine);
+    const text = readString$1v(replacement);
     if (!current || !text) return "";
     if (/^#{1,6}\s+\S/.test(text)) {
       return text.replace(/\s+#+\s*$/, "").trim();
@@ -13381,14 +13381,14 @@
       duplicateHeadingCount: readPositiveInteger$f(structure.duplicateHeadingCount) || 0,
       duplicateNumberCount: readPositiveInteger$f(structure.duplicateNumberCount) || 0,
       headingCount: readPositiveInteger$f(structure.headingCount) || 0,
-      issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString$1u).filter(Boolean).slice(0, 8) : [],
+      issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString$1v).filter(Boolean).slice(0, 8) : [],
       ok: structure.ok === true,
       repeatedHeadingContexts: normalizeStructureContexts(structure.repeatedHeadingContexts, "heading"),
       repeatedHeadingSamples: normalizeRepeatedHeadingSamples(structure.repeatedHeadingSamples),
       repeatedNumberContexts: normalizeStructureContexts(structure.repeatedNumberContexts, "number"),
       repeatedNumberSamples: normalizeRepeatedNumberSamples(structure.repeatedNumberSamples),
       sectionNumberRepairHints: normalizeSectionNumberRepairHints(structure.sectionNumberRepairHints),
-      status: readString$1u(structure.status) || "unknown"
+      status: readString$1v(structure.status) || "unknown"
     };
   }
 
@@ -13523,7 +13523,7 @@
   }
 
   function normalizeWorkspaceQuotes(value) {
-    return readString$1u(value)
+    return readString$1v(value)
       .replace(/[‘’‚‛]/g, "'")
       .replace(/[“”„‟]/g, "\"")
       .replace(/[‐‑‒–—―]/g, "-");
@@ -13556,7 +13556,7 @@
       force: true,
       prompt: options.prompt
     });
-    const resolvedPath = readString$1u(path) || "final_candidate.md";
+    const resolvedPath = readString$1v(path) || "final_candidate.md";
     const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
@@ -13576,9 +13576,9 @@
     }
     const filePath = pathValidation.path;
     let file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-    if (filePath === "final_candidate.md" && !readString$1u(file.content)) {
+    if (filePath === "final_candidate.md" && !readString$1v(file.content)) {
       const draft = workspace.files["draft.md"] || createWorkspaceFile("draft.md", "");
-      const draftContent = readString$1u(draft.content);
+      const draftContent = readString$1v(draft.content);
       if (draftContent) {
         file = {
           content: draftContent,
@@ -13598,7 +13598,7 @@
         recordWorkspaceCandidateWrite(workspace, filePath, { action: "promote" });
       }
     }
-    const ready = readString$1u(file.content).length > 0;
+    const ready = readString$1v(file.content).length > 0;
     workspace.quality.finalCandidatePath = filePath;
     workspace.quality.finalCandidateReady = ready;
     refreshWorkspaceQuality(workspace, { prompt: options.prompt });
@@ -13633,7 +13633,7 @@
       : null;
     const terminalRepairActive = terminalRepairState && terminalRepairState.active === true;
     const terminalRepairAllowedActions = terminalRepairActive
-      ? readStringArray$4(terminalRepairState.allowedActions)
+      ? readStringArray$5(terminalRepairState.allowedActions)
       : [];
     const quality = source.quality && typeof source.quality === "object" ? source.quality : {};
     const finalCandidatePath = readFinalCandidatePath(source);
@@ -13643,7 +13643,7 @@
       ? opts.candidatePathMismatchSignal
       : candidateProjection.candidatePathMismatchSignal;
     const finalCandidateFile = source.files[finalCandidatePath] || null;
-    const finalCandidateContent = readString$1u(finalCandidateFile && finalCandidateFile.content);
+    const finalCandidateContent = readString$1v(finalCandidateFile && finalCandidateFile.content);
     const finalCandidateStats = summarizeTextStats$2(finalCandidateContent);
     const finalCandidateStatus = readFinalCandidateStatus(source, finalCandidatePath, quality);
     const inspectedFinalCandidateStructure = inspectWorkspaceCandidateStructure(finalCandidateContent);
@@ -13663,9 +13663,9 @@
       : null;
     const checks = Array.isArray(quality.checks)
       ? quality.checks.map((check) => {
-        const code = readString$1u(check && check.code);
-        const status = readString$1u(check && check.status);
-        const reason = readString$1u(check && check.reason);
+        const code = readString$1v(check && check.code);
+        const status = readString$1v(check && check.status);
+        const reason = readString$1v(check && check.reason);
         return [code, status, reason].filter(Boolean).join("=");
       }).filter(Boolean).slice(0, 12)
       : [];
@@ -13684,7 +13684,7 @@
         ].join("\n");
       });
     const contentFileCount = Object.keys(source.files)
-      .filter((path) => readString$1u(source.files[path] && source.files[path].content))
+      .filter((path) => readString$1v(source.files[path] && source.files[path].content))
       .length;
     if (files.length === 0) {
       return "";
@@ -13704,7 +13704,7 @@
         : null,
       [
         "Virtual workspace advisory state:",
-        `quality_status=${readString$1u(quality.status) || "n/a"}`,
+        `quality_status=${readString$1v(quality.status) || "n/a"}`,
         `final_candidate_path=${finalCandidatePath}`,
         `candidate_lifecycle=activePath:${candidateLifecycle.activePath || "n/a"}, draftPaths:${candidateLifecycle.draftPaths.length > 0 ? candidateLifecycle.draftPaths.join(",") : "none"}, lastWrittenPath:${candidateLifecycle.lastWrittenPath || "none"}, lastReadPath:${candidateLifecycle.lastReadPath || "none"}, finalizedPath:${candidateLifecycle.finalizedPath || "none"}, publishedPath:${candidateLifecycle.publishedPath || "none"}, status:${candidateLifecycle.status || "n/a"}`,
         candidatePathMismatchSignal
@@ -13756,7 +13756,7 @@
   }
 
   function formatStructureRepairAdvisory(finalCandidateStructure, allowedActions) {
-    const reason = readString$1u(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
+    const reason = readString$1v(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
     const actions = Array.isArray(allowedActions) ? allowedActions : [];
     const canPatch = actions.includes("workspace_propose_patch") || actions.includes("workspace_apply_patch");
     const canRewrite = actions.includes("workspace_write") || actions.includes("workspace_replace");
@@ -13769,9 +13769,9 @@
   function formatStructureContextLine(contexts, key) {
     return (Array.isArray(contexts) ? contexts : [])
       .map((context) => {
-        const label = readString$1u(context && context[key]);
+        const label = readString$1v(context && context[key]);
         const occurrences = (Array.isArray(context && context.occurrences) ? context.occurrences : [])
-          .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString$1u(occurrence.raw)}"`)
+          .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString$1v(occurrence.raw)}"`)
           .filter(Boolean)
           .join(", ");
         return label && occurrences ? `${label} -> ${occurrences}` : null;
@@ -13785,9 +13785,9 @@
     return (Array.isArray(hints) ? hints : [])
       .map((hint) => {
         const lineNumber = readPositiveInteger$f(hint && hint.lineNumber);
-        const currentNumber = readString$1u(hint && hint.currentNumber);
+        const currentNumber = readString$1v(hint && hint.currentNumber);
         const candidateNumber = readPositiveInteger$f(hint && hint.candidateNumber);
-        const raw = truncate$2(readString$1u(hint && hint.raw), 160);
+        const raw = truncate$2(readString$1v(hint && hint.raw), 160);
         if (lineNumber == null || !currentNumber || candidateNumber == null || !raw) return null;
         return `lineNumber ${lineNumber} currentNumber ${currentNumber} candidateNumber ${candidateNumber} raw "${raw}"`;
       })
@@ -13797,15 +13797,15 @@
   }
 
   function selectWorkspacePromptFiles(source, options = {}) {
-    const finalCandidatePath = readString$1u(options.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1v(options.finalCandidatePath) || "final_candidate.md";
     const maxFiles = readPositiveInteger$f(options.maxFiles) || 5;
     const files = Object.keys(source.files)
       .sort()
       .map((path) => source.files[path])
-      .filter((file) => readString$1u(file && file.content));
+      .filter((file) => readString$1v(file && file.content));
     const selected = files.slice(-maxFiles);
-    const finalCandidate = files.find((file) => readString$1u(file && file.path) === finalCandidatePath);
-    if (!finalCandidate || selected.some((file) => readString$1u(file && file.path) === finalCandidatePath)) {
+    const finalCandidate = files.find((file) => readString$1v(file && file.path) === finalCandidatePath);
+    if (!finalCandidate || selected.some((file) => readString$1v(file && file.path) === finalCandidatePath)) {
       return selected;
     }
     return selected.length >= maxFiles
@@ -13889,13 +13889,13 @@
     // advisory-only and AI decides what to do with it.
     const fileContent = (path) => {
       const file = workspace.files && workspace.files[path];
-      return readString$1u(file && file.content);
+      return readString$1v(file && file.content);
     };
     const outline = fileContent("outline.md");
     const evidence = fileContent("evidence.json");
     const draft = fileContent("draft.md");
     const critique = fileContent("critique.md");
-    const finalCandidatePath = readString$1u(options.finalCandidatePath) || readFinalCandidatePath(workspace);
+    const finalCandidatePath = readString$1v(options.finalCandidatePath) || readFinalCandidatePath(workspace);
     const finalCandidate = fileContent(finalCandidatePath);
     const finalCandidateSameAsOutline = Boolean(outline && finalCandidate && normalizeComparableText$4(outline) === normalizeComparableText$4(finalCandidate));
     const draftSameAsOutline = Boolean(outline && draft && normalizeComparableText$4(outline) === normalizeComparableText$4(draft));
@@ -13932,7 +13932,7 @@
   }
 
   function inspectWorkspaceCandidateStructure(text, options = {}) {
-    const value = readString$1u(text);
+    const value = readString$1v(text);
     const maxSamples = readPositiveInteger$f(options.maxSamples) || 5;
     if (!value) {
       return {
@@ -13994,8 +13994,8 @@
       }));
     const sectionNumberRepairHints = buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSamples);
     const firstHeading = headings[0] || null;
-    const title = readString$1u(firstHeading && firstHeading.raw);
-    const normalizedTitle = readString$1u(firstHeading && firstHeading.normalized);
+    const title = readString$1v(firstHeading && firstHeading.raw);
+    const normalizedTitle = readString$1v(firstHeading && firstHeading.normalized);
     const rawPromptTitle = Boolean(
       title.length > 140 ||
       /^research report generate\b/i.test(title) ||
@@ -14029,7 +14029,7 @@
 
   function buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSamples) {
     const repeatedNumbers = new Set((Array.isArray(repeatedNumberSamples) ? repeatedNumberSamples : [])
-      .map((entry) => readString$1u(entry && entry.number))
+      .map((entry) => readString$1v(entry && entry.number))
       .filter(Boolean));
     if (repeatedNumbers.size === 0) return [];
     const levelCounters = new Map();
@@ -14039,10 +14039,10 @@
         const level = readPositiveInteger$f(heading.level) || 0;
         const next = (levelCounters.get(level) || 0) + 1;
         levelCounters.set(level, next);
-        if (!repeatedNumbers.has(readString$1u(heading.number))) return null;
+        if (!repeatedNumbers.has(readString$1v(heading.number))) return null;
         return {
           candidateNumber: next,
-          currentNumber: readString$1u(heading.number),
+          currentNumber: readString$1v(heading.number),
           level,
           lineNumber: heading.lineNumber,
           raw: truncate$2(heading.raw, 160)
@@ -14056,7 +14056,7 @@
     const quality = workspace && typeof workspace === "object" && workspace.quality && typeof workspace.quality === "object"
       ? workspace.quality
       : {};
-    const path = readString$1u(quality.finalCandidatePath);
+    const path = readString$1v(quality.finalCandidatePath);
     if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) {
       return "final_candidate.md";
     }
@@ -14068,7 +14068,7 @@
   }
 
   function normalizeComparableText$4(value) {
-    return readString$1u(value)
+    return readString$1v(value)
       .toLowerCase()
       .replace(/[`*_#>-]/g, "")
       .replace(/\s+/g, " ")
@@ -14090,8 +14090,8 @@
       workspace.quality = createWorkspaceQuality();
     }
     workspace.quality.lastRead = {
-      observedAt: readString$1u(file.updatedAt) || new Date().toISOString(),
-      path: readString$1u(file.path),
+      observedAt: readString$1v(file.updatedAt) || new Date().toISOString(),
+      path: readString$1v(file.path),
       textStats: summarizeTextStats$2(file.content)
     };
   }
@@ -14102,7 +14102,7 @@
   // `availableHeadings` to the AI when the requested heading is not
   // found.
   function collectMarkdownHeadings(text) {
-    const value = readString$1u(text);
+    const value = readString$1v(text);
     if (!value) return [];
     const lines = value.split(/\r?\n/);
     const headings = [];
@@ -14119,14 +14119,14 @@
   }
 
   function collectMarkdownHeadingsDetailed(text) {
-    const value = readString$1u(text);
+    const value = readString$1v(text);
     if (!value) return [];
     const lines = value.split(/\r?\n/);
     const headings = [];
     for (let index = 0; index < lines.length; index += 1) {
       const level = readHeadingLevel(lines[index]);
       if (level == null) continue;
-      const raw = readString$1u(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
+      const raw = readString$1v(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
       const normalized = normalizeHeadingText(lines[index]);
       const numberMatch = normalized.match(/^(\d{1,3})(?:\s|$)/);
       headings.push({
@@ -14155,7 +14155,7 @@
 
   function createWorkspaceFile(path, content) {
     return {
-      content: readString$1u(content),
+      content: readString$1v(content),
       path,
       updatedAt: null,
       version: 0
@@ -14165,25 +14165,25 @@
   function appendWorkspaceOperation(workspace, operation, options = {}) {
     const maxOperations = readPositiveInteger$f(options.maxOperations) || DEFAULT_MAX_OPERATIONS;
     const next = {
-      action: readString$1u(operation.action) || "workspace",
+      action: readString$1v(operation.action) || "workspace",
       createdAt: new Date().toISOString(),
       cycle: readPositiveInteger$f(operation.cycle) || 0,
       id: `vw-${Date.now()}-${workspace.operations.length + 1}`,
-      path: readString$1u(operation.path) || null,
-      status: readString$1u(operation.status) || "ok",
-      summary: truncate$2(readString$1u(operation.summary), DEFAULT_MAX_OPERATION_CHARS)
+      path: readString$1v(operation.path) || null,
+      status: readString$1v(operation.status) || "ok",
+      summary: truncate$2(readString$1v(operation.summary), DEFAULT_MAX_OPERATION_CHARS)
     };
     workspace.operations = normalizeOperations(workspace.operations).concat(next).slice(-maxOperations);
   }
 
   function summarizeWorkspaceFile(file) {
-    const content = readString$1u(file && file.content);
+    const content = readString$1v(file && file.content);
     return {
       hasContent: content.length > 0,
-      path: readString$1u(file && file.path),
+      path: readString$1v(file && file.path),
       size: content.length,
       textStats: summarizeTextStats$2(content),
-      updatedAt: readString$1u(file && file.updatedAt) || null,
+      updatedAt: readString$1v(file && file.updatedAt) || null,
       version: readPositiveInteger$f(file && file.version) || 0
     };
   }
@@ -14201,13 +14201,13 @@
       .map((entry, index) => {
         if (!entry || typeof entry !== "object") return null;
         return {
-          action: readString$1u(entry.action) || "workspace",
-          createdAt: readString$1u(entry.createdAt) || null,
+          action: readString$1v(entry.action) || "workspace",
+          createdAt: readString$1v(entry.createdAt) || null,
           cycle: readPositiveInteger$f(entry.cycle) || 0,
-          id: readString$1u(entry.id) || `vw-${index + 1}`,
-          path: readString$1u(entry.path) || null,
-          status: readString$1u(entry.status) || "ok",
-          summary: truncate$2(readString$1u(entry.summary), DEFAULT_MAX_OPERATION_CHARS)
+          id: readString$1v(entry.id) || `vw-${index + 1}`,
+          path: readString$1v(entry.path) || null,
+          status: readString$1v(entry.status) || "ok",
+          summary: truncate$2(readString$1v(entry.summary), DEFAULT_MAX_OPERATION_CHARS)
         };
       })
       .filter(Boolean)
@@ -14219,27 +14219,27 @@
     if (!source) return null;
     const pathValidation = validateWorkspacePathRecoverable(source.path);
     if (!pathValidation.ok) return null;
-    const patchId = readString$1u(source.patchId);
+    const patchId = readString$1v(source.patchId);
     if (!patchId) return null;
     return {
       afterContent: typeof source.afterContent === "string" ? source.afterContent : "",
-      afterHash: readString$1u(source.afterHash),
+      afterHash: readString$1v(source.afterHash),
       afterWords: readPositiveInteger$f(source.afterWords) || 0,
       baseVersion: readPositiveInteger$f(source.baseVersion) || 0,
-      beforeHash: readString$1u(source.beforeHash),
+      beforeHash: readString$1v(source.beforeHash),
       beforeWords: readPositiveInteger$f(source.beforeWords) || 0,
       changed: source.changed === true,
-      createdAt: readString$1u(source.createdAt) || null,
+      createdAt: readString$1v(source.createdAt) || null,
       deltaWords: typeof source.deltaWords === "number" && Number.isFinite(source.deltaWords) ? source.deltaWords : 0,
       kind: "virtual_workspace_pending_patch",
       operations: Array.isArray(source.operations) ? source.operations.map(summarizePatchOperation).filter(Boolean).slice(0, 8) : [],
       patchId,
       path: pathValidation.path,
-      previewSummary: readString$1u(source.previewSummary),
-      riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString$1u).filter(Boolean).slice(0, 8) : [],
+      previewSummary: readString$1v(source.previewSummary),
+      riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString$1v).filter(Boolean).slice(0, 8) : [],
       structureAfter: summarizePatchStructure(source.structureAfter),
       structureBefore: summarizePatchStructure(source.structureBefore),
-      status: readString$1u(source.status) || "preview_blocked",
+      status: readString$1v(source.status) || "preview_blocked",
       valid: source.valid === true,
       version: readPositiveInteger$f(source.version) || 1
     };
@@ -14252,31 +14252,31 @@
         .map((check) => {
           if (!check || typeof check !== "object") return null;
           return {
-            name: readString$1u(check.name) || "check",
-            reason: readString$1u(check.reason) || "n/a",
-            status: readString$1u(check.status) || "unknown"
+            name: readString$1v(check.name) || "check",
+            reason: readString$1v(check.reason) || "n/a",
+            status: readString$1v(check.status) || "unknown"
           };
         })
         .filter(Boolean),
-      finalCandidatePath: readString$1u(source.finalCandidatePath) || "final_candidate.md",
+      finalCandidatePath: readString$1v(source.finalCandidatePath) || "final_candidate.md",
       finalCandidateReady: source.finalCandidateReady === true,
       finalCandidateStructure: normalizeWorkspaceCandidateStructure(source.finalCandidateStructure),
       finalCandidateStats: normalizeTextStats$4(source.finalCandidateStats),
       lastRead: normalizeWorkspaceLastRead(source.lastRead),
       lastIssueCodes: Array.isArray(source.lastIssueCodes)
-        ? source.lastIssueCodes.map(readString$1u).filter(Boolean)
+        ? source.lastIssueCodes.map(readString$1v).filter(Boolean)
         : [],
-      status: readString$1u(source.status) || "needs_draft"
+      status: readString$1v(source.status) || "needs_draft"
     };
   }
 
   function normalizeWorkspaceLastRead(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
     if (!source) return null;
-    const path = readString$1u(source.path);
+    const path = readString$1v(source.path);
     if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
     return {
-      observedAt: readString$1u(source.observedAt) || null,
+      observedAt: readString$1v(source.observedAt) || null,
       path,
       textStats: normalizeTextStats$4(source.textStats)
     };
@@ -14290,17 +14290,17 @@
       duplicateNumberCount: readPositiveInteger$f(source.duplicateNumberCount) || 0,
       headingCount: readPositiveInteger$f(source.headingCount) || 0,
       issueCodes: Array.isArray(source.issueCodes)
-        ? source.issueCodes.map(readString$1u).filter(Boolean).slice(0, 12)
+        ? source.issueCodes.map(readString$1v).filter(Boolean).slice(0, 12)
         : [],
       ok: source.ok === true,
-      reason: readString$1u(source.reason) || "n/a",
+      reason: readString$1v(source.reason) || "n/a",
       repeatedHeadingContexts: normalizeStructureContexts(source.repeatedHeadingContexts, "heading"),
       repeatedHeadingSamples: normalizeRepeatedHeadingSamples(source.repeatedHeadingSamples),
       repeatedNumberContexts: normalizeStructureContexts(source.repeatedNumberContexts, "number"),
       repeatedNumberSamples: normalizeRepeatedNumberSamples(source.repeatedNumberSamples),
       sectionNumberRepairHints: normalizeSectionNumberRepairHints(source.sectionNumberRepairHints),
-      status: readString$1u(source.status) || "unknown",
-      title: truncate$2(readString$1u(source.title), 200)
+      status: readString$1v(source.status) || "unknown",
+      title: truncate$2(readString$1v(source.title), 200)
     };
   }
 
@@ -14310,8 +14310,8 @@
         if (!entry || typeof entry !== "object") return null;
         const lineNumber = readPositiveInteger$f(entry.lineNumber);
         const candidateNumber = readPositiveInteger$f(entry.candidateNumber);
-        const currentNumber = readString$1u(entry.currentNumber);
-        const raw = readString$1u(entry.raw);
+        const currentNumber = readString$1v(entry.currentNumber);
+        const raw = readString$1v(entry.raw);
         if (lineNumber == null || candidateNumber == null || !currentNumber || !raw) return null;
         return {
           candidateNumber,
@@ -14329,7 +14329,7 @@
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const heading = readString$1u(entry.heading);
+        const heading = readString$1v(entry.heading);
         if (!heading) return null;
         return {
           count: readPositiveInteger$f(entry.count) || 1,
@@ -14344,7 +14344,7 @@
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const number = readString$1u(entry.number);
+        const number = readString$1v(entry.number);
         if (!number) return null;
         return {
           count: readPositiveInteger$f(entry.count) || 1,
@@ -14359,13 +14359,13 @@
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const label = readString$1u(entry[key]);
+        const label = readString$1v(entry[key]);
         if (!label) return null;
         const occurrences = (Array.isArray(entry.occurrences) ? entry.occurrences : [])
           .map((occurrence) => {
             if (!occurrence || typeof occurrence !== "object") return null;
             const lineNumber = readPositiveInteger$f(occurrence.lineNumber);
-            const raw = readString$1u(occurrence.raw);
+            const raw = readString$1v(occurrence.raw);
             if (lineNumber == null || !raw) return null;
             return {
               lineNumber,
@@ -14389,12 +14389,12 @@
     if (!source || source.enabled !== true) return false;
     if (Array.isArray(source.operations) && source.operations.length > 0) return true;
     return Object.values(source.files || {}).some((file) => (
-      file && typeof file === "object" && readString$1u(file.content)
+      file && typeof file === "object" && readString$1v(file.content)
     ));
   }
 
   function truncate$2(value, maxChars) {
-    const text = readString$1u(value);
+    const text = readString$1v(value);
     const limit = readPositiveInteger$f(maxChars) || DEFAULT_MAX_FILE_CHARS$1;
     return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 3))}...`;
   }
@@ -14405,8 +14405,8 @@
   }
 
   function insertAfterMarkdownSection(text, targetHeading, addition, options = {}) {
-    const current = readString$1u(text);
-    const insertText = readString$1u(addition);
+    const current = readString$1v(text);
+    const insertText = readString$1v(addition);
     if (!current || !insertText) {
       return { changed: false, content: current, availableHeadings: collectMarkdownHeadings(current) };
     }
@@ -14437,12 +14437,12 @@
   }
 
   function readHeadingLevel(value) {
-    const match = readString$1u(value).match(/^(#{1,6})\s+\S/);
+    const match = readString$1v(value).match(/^(#{1,6})\s+\S/);
     return match ? match[1].length : null;
   }
 
   function normalizeHeadingText(value) {
-    return readString$1u(value)
+    return readString$1v(value)
       .replace(/^#{1,6}\s+/, "")
       .replace(/\s+#+\s*$/, "")
       .toLowerCase()
@@ -14465,7 +14465,7 @@
     // Read-only inspector — invalid path returns a neutral protocol view
     // so the planner block stays observable without throwing. Callers that
     // care about validity (publish action) check filePath themselves.
-    const resolvedPath = readString$1u(path) || "final_candidate.md";
+    const resolvedPath = readString$1v(path) || "final_candidate.md";
     const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
     const filePath = pathValidation.ok ? pathValidation.path : resolvedPath;
     const source = normalizeVirtualWorkspace(workspace);
@@ -14506,14 +14506,14 @@
   function readFinalCandidateStatus(source, finalCandidatePath, quality) {
     const file = source && source.files ? source.files[finalCandidatePath] : null;
     if (!file) return "missing";
-    const content = readString$1u(file && file.content);
+    const content = readString$1v(file && file.content);
     if (!content) return "empty";
     if (quality && quality.finalCandidateReady === true) return "ready";
     return "drafted";
   }
 
   function summarizeTextStats$2(value) {
-    const text = readString$1u(value);
+    const text = readString$1v(value);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -14547,13 +14547,13 @@
     return entries.length > 0 ? `{${entries.join(",")}}` : "{}";
   }
 
-  function readString$1u(value) {
+  function readString$1v(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readStringArray$4(value) {
+  function readStringArray$5(value) {
     return Array.isArray(value)
-      ? value.map(readString$1u).filter(Boolean)
+      ? value.map(readString$1v).filter(Boolean)
       : [];
   }
 
@@ -14639,7 +14639,7 @@
       activeConflictDimensions,
       candidate,
       conflictCodes,
-      finalReadinessDecision: readString$1t(finalReadiness && finalReadiness.decision) || null,
+      finalReadinessDecision: readString$1u(finalReadiness && finalReadiness.decision) || null,
       hasProgress: progressSignals.all.length > 0,
       observableDeficits,
       packet,
@@ -14669,9 +14669,9 @@
       : null;
     return {
       activeConflictDimensions: Array.isArray(value.activeConflictDimensions)
-        ? value.activeConflictDimensions.map(readString$1t).filter(Boolean).slice(0, 6)
+        ? value.activeConflictDimensions.map(readString$1u).filter(Boolean).slice(0, 6)
         : [],
-      status: readString$1t(value.status) || "tracking",
+      status: readString$1u(value.status) || "tracking",
       repeatedSourceReadinessConflictCount: readNumber$f(value.repeatedSourceReadinessConflictCount),
       repeatedLengthReadinessConflictCount: readNumber$f(value.repeatedLengthReadinessConflictCount),
       repeatedReadinessConflictCount: readNumber$f(value.repeatedReadinessConflictCount),
@@ -14679,7 +14679,7 @@
       stepsWithoutNewEvidence: readNumber$f(value.stepsWithoutNewEvidence),
       lastSuccessfulReadUrlCount: readNumber$f(value.lastSuccessfulReadUrlCount),
       lastConflictCodes: Array.isArray(value.lastConflictCodes)
-        ? value.lastConflictCodes.map(readString$1t).filter(Boolean).slice(0, 8)
+        ? value.lastConflictCodes.map(readString$1u).filter(Boolean).slice(0, 8)
         : [],
       sourceMinimum: sourceMinimum ? {
         passed: sourceMinimum.passed === true,
@@ -14689,7 +14689,7 @@
         minRelevant: readNumber$f(sourceMinimum.minRelevantSources)
       } : null,
       candidate: candidate ? {
-        path: readString$1t(candidate.path) || null,
+        path: readString$1u(candidate.path) || null,
         chars: readNullableNumber$4(candidate.chars),
         cjkChars: readNullableNumber$4(candidate.cjkChars),
         words: readNullableNumber$4(candidate.words)
@@ -14698,26 +14698,26 @@
         lengthDeficit: readNullableNumber$4(deficits.lengthDeficit),
         lengthObserved: readNullableNumber$4(deficits.lengthObserved),
         lengthRequested: readNullableNumber$4(deficits.lengthRequested),
-        lengthUnit: readString$1t(deficits.lengthUnit) || null,
+        lengthUnit: readString$1u(deficits.lengthUnit) || null,
         readSourceDeficit: readNullableNumber$4(deficits.readSourceDeficit),
         relevantSourceDeficit: readNullableNumber$4(deficits.relevantSourceDeficit)
       } : null,
       sourceProgressSignals: Array.isArray(value.sourceProgressSignals)
-        ? value.sourceProgressSignals.map(readString$1t).filter(Boolean).slice(0, 8)
+        ? value.sourceProgressSignals.map(readString$1u).filter(Boolean).slice(0, 8)
         : [],
       workspaceProgressSignals: Array.isArray(value.workspaceProgressSignals)
-        ? value.workspaceProgressSignals.map(readString$1t).filter(Boolean).slice(0, 8)
+        ? value.workspaceProgressSignals.map(readString$1u).filter(Boolean).slice(0, 8)
         : [],
       acceptanceConvergenceSignal: signal ? {
-        kind: readString$1t(signal.kind) || "acceptance_convergence_signal",
-        status: readString$1t(signal.status) || null,
-        reason: readString$1t(signal.reason) || null,
-        forbiddenReadiness: readString$1t(signal.forbiddenReadiness) || null,
+        kind: readString$1u(signal.kind) || "acceptance_convergence_signal",
+        status: readString$1u(signal.status) || null,
+        reason: readString$1u(signal.reason) || null,
+        forbiddenReadiness: readString$1u(signal.forbiddenReadiness) || null,
         allowedNextMoves: Array.isArray(signal.allowedNextMoves)
-          ? signal.allowedNextMoves.map(readString$1t).filter(Boolean).slice(0, 6)
+          ? signal.allowedNextMoves.map(readString$1u).filter(Boolean).slice(0, 6)
           : [],
         requiredLimitedFields: Array.isArray(signal.requiredLimitedFields)
-          ? signal.requiredLimitedFields.map(readString$1t).filter(Boolean).slice(0, 6)
+          ? signal.requiredLimitedFields.map(readString$1u).filter(Boolean).slice(0, 6)
           : [],
         requiredCorrection: signal.requiredCorrection && typeof signal.requiredCorrection === "object"
           ? cloneValue(signal.requiredCorrection)
@@ -14851,7 +14851,7 @@
       },
       requiredLimitedFields: Array.from(new Set(requiredLimitedFields)),
       researchFinalAllowed: progress.researchState ? progress.researchState.finalAllowed === true : null,
-      researchFinalReason: progress.researchState ? readString$1t(progress.researchState.finalReason) || null : null,
+      researchFinalReason: progress.researchState ? readString$1u(progress.researchState.finalReason) || null : null,
       sourceMinimum: progress.sourceMinimum ? cloneValue(progress.sourceMinimum) : null,
       status: "needs_correction"
     };
@@ -14893,13 +14893,13 @@
     const codes = [];
     if (Array.isArray(context && context.conflictIssues)) {
       context.conflictIssues.forEach((issue) => {
-        const code = readString$1t(issue && issue.code) || readString$1t(issue);
+        const code = readString$1u(issue && issue.code) || readString$1u(issue);
         if (code) codes.push(code);
       });
     }
-    const status = readString$1t(context && context.status);
+    const status = readString$1u(context && context.status);
     if (status === "readiness_audit_failed") codes.push("readiness_audit_failed");
-    const decision = readString$1t(finalReadiness && finalReadiness.decision);
+    const decision = readString$1u(finalReadiness && finalReadiness.decision);
     const assessment = finalReadiness && finalReadiness.requirementsAssessment && typeof finalReadiness.requirementsAssessment === "object"
       ? finalReadiness.requirementsAssessment
       : null;
@@ -14927,12 +14927,12 @@
 
   function isValidLimitedWithGaps(finalReadiness, context = {}) {
     if (!finalReadiness || typeof finalReadiness !== "object") return false;
-    if (readString$1t(finalReadiness.decision) !== "limited") return false;
+    if (readString$1u(finalReadiness.decision) !== "limited") return false;
     const assessment = finalReadiness.requirementsAssessment && typeof finalReadiness.requirementsAssessment === "object"
       ? finalReadiness.requirementsAssessment
       : null;
     if (!assessment || !Array.isArray(assessment.remainingGaps)) return false;
-    if (assessment.remainingGaps.map(readString$1t).filter(Boolean).length === 0) return false;
+    if (assessment.remainingGaps.map(readString$1u).filter(Boolean).length === 0) return false;
     const researchGateBlocked = context.researchState && context.researchState.finalAllowed === false;
     const sourceMinimumFailed = context.sourceMinimum && context.sourceMinimum.passed === false;
     const lengthFailed = context.observableDeficits && readNumber$f(context.observableDeficits.lengthDeficit) > 0;
@@ -14960,7 +14960,7 @@
   function readObservableDeficits$1({ candidate, requestedLength, sourceMinimum }) {
     const source = sourceMinimum && typeof sourceMinimum === "object" ? sourceMinimum : null;
     const requested = requestedLength && typeof requestedLength === "object" ? requestedLength : null;
-    const statsKey = requested ? readString$1t(requested.statsKey) || readStatsKeyForUnit(requested.unit) : "";
+    const statsKey = requested ? readString$1u(requested.statsKey) || readStatsKeyForUnit(requested.unit) : "";
     const observedLength = candidate && statsKey && Number.isFinite(candidate[statsKey])
       ? candidate[statsKey]
       : null;
@@ -14971,7 +14971,7 @@
         : null,
       lengthObserved: observedLength,
       lengthRequested: requestedValue,
-      lengthUnit: requested ? readString$1t(requested.unit) || null : null,
+      lengthUnit: requested ? readString$1u(requested.unit) || null : null,
       readSourceDeficit: source
         ? Math.max(0, readNumber$f(source.minReadSources) - readNumber$f(source.readSources))
         : null,
@@ -14996,10 +14996,10 @@
 
   function buildNextMoveContract$1(signal) {
     const dimensions = Array.isArray(signal.activeConflictDimensions)
-      ? signal.activeConflictDimensions.map(readString$1t).filter(Boolean)
+      ? signal.activeConflictDimensions.map(readString$1u).filter(Boolean)
       : [];
     const moves = Array.isArray(signal.allowedNextMoves)
-      ? signal.allowedNextMoves.map(readString$1t).filter(Boolean)
+      ? signal.allowedNextMoves.map(readString$1u).filter(Boolean)
       : [];
     const deficits = signal.observableDeficits && typeof signal.observableDeficits === "object"
       ? signal.observableDeficits
@@ -15008,7 +15008,7 @@
       ? [
           readNumber$f(deficits.readSourceDeficit) > 0 ? `readSourceDeficit=${readNumber$f(deficits.readSourceDeficit)}` : "",
           readNumber$f(deficits.relevantSourceDeficit) > 0 ? `relevantSourceDeficit=${readNumber$f(deficits.relevantSourceDeficit)}` : "",
-          readNumber$f(deficits.lengthDeficit) > 0 ? `lengthDeficit=${readNumber$f(deficits.lengthDeficit)} ${readString$1t(deficits.lengthUnit) || ""}`.trim() : ""
+          readNumber$f(deficits.lengthDeficit) > 0 ? `lengthDeficit=${readNumber$f(deficits.lengthDeficit)} ${readString$1u(deficits.lengthUnit) || ""}`.trim() : ""
         ].filter(Boolean).join(", ")
       : "";
     return [
@@ -15067,7 +15067,7 @@
       chars: stats.chars,
       cjkChars: stats.cjkChars,
       nonWhitespaceChars: stats.nonWhitespaceChars,
-      path: readString$1t(packetCandidate && packetCandidate.path) || readString$1t(file && file.path) || readString$1t(quality.finalCandidatePath) || null,
+      path: readString$1u(packetCandidate && packetCandidate.path) || readString$1u(file && file.path) || readString$1u(quality.finalCandidatePath) || null,
       words: stats.words
     };
   }
@@ -15084,9 +15084,9 @@
       ? packet.requestedLength
       : null;
     if (packetLength && Number.isFinite(packetLength.value)) {
-      const unit = readString$1t(packetLength.unit) || null;
+      const unit = readString$1u(packetLength.unit) || null;
       return {
-        statsKey: readString$1t(packetLength.statsKey) || readStatsKeyForUnit(unit),
+        statsKey: readString$1u(packetLength.statsKey) || readStatsKeyForUnit(unit),
         unit,
         value: packetLength.value
       };
@@ -15103,11 +15103,11 @@
       : {};
     return {
       finalAllowed: packetEvidence ? packetEvidence.researchFinalAllowed === true : state.finalAllowed === true,
-      finalReason: packetEvidence ? readString$1t(packetEvidence.researchFinalReason) || null : readString$1t(state.finalReason) || null,
+      finalReason: packetEvidence ? readString$1u(packetEvidence.researchFinalReason) || null : readString$1u(state.finalReason) || null,
       gaps: packetEvidence && Array.isArray(packetEvidence.researchGaps)
-        ? packetEvidence.researchGaps.map(readString$1t).filter(Boolean).slice(0, 12)
+        ? packetEvidence.researchGaps.map(readString$1u).filter(Boolean).slice(0, 12)
         : Array.isArray(state.gaps)
-          ? state.gaps.map(readString$1t).filter(Boolean).slice(0, 12)
+          ? state.gaps.map(readString$1u).filter(Boolean).slice(0, 12)
           : [],
       qualityGateRequired: packetEvidence ? packetEvidence.researchQualityGateRequired === true : state.qualityGateRequired === true
     };
@@ -15123,7 +15123,7 @@
     return {
       count: readNumber$f((packetPublish && packetPublish.count) ?? signal.count),
       cyclesRemaining: readNullableNumber$4((packetPublish && packetPublish.cyclesRemaining) ?? signal.cyclesRemaining),
-      lastStatus: readString$1t((packetPublish && packetPublish.lastStatus) ?? signal.lastStatus) || null
+      lastStatus: readString$1u((packetPublish && packetPublish.lastStatus) ?? signal.lastStatus) || null
     };
   }
 
@@ -15153,7 +15153,7 @@
       : {};
     return {
       activeConflictDimensions: Array.isArray(source.activeConflictDimensions)
-        ? source.activeConflictDimensions.map(readString$1t).filter(Boolean).slice(0, 6)
+        ? source.activeConflictDimensions.map(readString$1u).filter(Boolean).slice(0, 6)
         : [],
       acceptanceConvergenceSignal: source.acceptanceConvergenceSignal && typeof source.acceptanceConvergenceSignal === "object"
         ? cloneValue(source.acceptanceConvergenceSignal)
@@ -15162,7 +15162,7 @@
         ? cloneValue(source.lastCandidateStats)
         : null,
       lastConflictCodes: Array.isArray(source.lastConflictCodes)
-        ? source.lastConflictCodes.map(readString$1t).filter(Boolean).slice(0, 8)
+        ? source.lastConflictCodes.map(readString$1u).filter(Boolean).slice(0, 8)
         : [],
       lastObservableDeficits: source.lastObservableDeficits && typeof source.lastObservableDeficits === "object"
         ? cloneValue(source.lastObservableDeficits)
@@ -15177,12 +15177,12 @@
       repeatedReadinessConflictCount: readNumber$f(source.repeatedReadinessConflictCount),
       repeatedSourceReadinessConflictCount: readNumber$f(source.repeatedSourceReadinessConflictCount),
       sourceProgressSignals: Array.isArray(source.sourceProgressSignals)
-        ? source.sourceProgressSignals.map(readString$1t).filter(Boolean).slice(0, 8)
+        ? source.sourceProgressSignals.map(readString$1u).filter(Boolean).slice(0, 8)
         : [],
-      status: readString$1t(source.status) || "tracking",
+      status: readString$1u(source.status) || "tracking",
       stepsWithoutNewEvidence: readNumber$f(source.stepsWithoutNewEvidence),
       workspaceProgressSignals: Array.isArray(source.workspaceProgressSignals)
-        ? source.workspaceProgressSignals.map(readString$1t).filter(Boolean).slice(0, 8)
+        ? source.workspaceProgressSignals.map(readString$1u).filter(Boolean).slice(0, 8)
         : [],
       version: 1
     };
@@ -15202,7 +15202,7 @@
 
   function readRequestedLength$1(runState, context) {
     const contractText = readTerminalContractText({
-      request: context && context.request || { prompt: readString$1t(context && context.prompt) },
+      request: context && context.request || { prompt: readString$1u(context && context.prompt) },
       runState
     });
     const contract = extractRequestedLengthContract(contractText);
@@ -15214,7 +15214,7 @@
     };
   }
 
-  function readString$1t(value) {
+  function readString$1u(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -15409,36 +15409,36 @@
     const deficits = Array.isArray(value.recoverableDeficits)
       ? value.recoverableDeficits.map((entry) => ({
           allowedNextMoves: Array.isArray(entry.allowedNextMoves)
-            ? entry.allowedNextMoves.map(readString$1s).filter(Boolean).slice(0, 6)
+            ? entry.allowedNextMoves.map(readString$1t).filter(Boolean).slice(0, 6)
             : [],
           deficit: readNullableNumber$3(entry.deficit),
-          dimension: readString$1s(entry.dimension) || "requirement",
+          dimension: readString$1t(entry.dimension) || "requirement",
           observed: cloneValue(entry.observed),
           recoverable: entry.recoverable === true,
-          requiredAttempt: readString$1s(entry.requiredAttempt) || null,
+          requiredAttempt: readString$1t(entry.requiredAttempt) || null,
           target: cloneValue(entry.target),
-          unit: readString$1s(entry.unit) || null,
-          whyRecoverable: readString$1s(entry.whyRecoverable) || null
+          unit: readString$1t(entry.unit) || null,
+          whyRecoverable: readString$1t(entry.whyRecoverable) || null
         })).slice(0, 6)
       : [];
     return {
       kind: "requirement_recovery_evaluator",
-      status: readString$1s(value.status) || "tracking",
+      status: readString$1t(value.status) || "tracking",
       recoverableDeficits: deficits,
       validLimitedAllowed: value.validLimitedAllowed !== false,
       requiredAttemptBeforeLimited: Array.isArray(value.requiredAttemptBeforeLimited)
-        ? value.requiredAttemptBeforeLimited.map(readString$1s).filter(Boolean).slice(0, 6)
+        ? value.requiredAttemptBeforeLimited.map(readString$1t).filter(Boolean).slice(0, 6)
         : [],
       forbiddenMoves: Array.isArray(value.forbiddenMoves)
-        ? value.forbiddenMoves.map(readString$1s).filter(Boolean).slice(0, 6)
+        ? value.forbiddenMoves.map(readString$1t).filter(Boolean).slice(0, 6)
         : [],
       recoverySignals: value.recoverySignals && typeof value.recoverySignals === "object"
         ? {
             source: Array.isArray(value.recoverySignals.source)
-              ? value.recoverySignals.source.map(readString$1s).filter(Boolean).slice(0, 8)
+              ? value.recoverySignals.source.map(readString$1t).filter(Boolean).slice(0, 8)
               : [],
             workspace: Array.isArray(value.recoverySignals.workspace)
-              ? value.recoverySignals.workspace.map(readString$1s).filter(Boolean).slice(0, 8)
+              ? value.recoverySignals.workspace.map(readString$1t).filter(Boolean).slice(0, 8)
               : []
           }
         : { source: [], workspace: [] },
@@ -15446,7 +15446,7 @@
         ? {
             chars: readNullableNumber$3(value.lastCandidateStats.chars),
             cjkChars: readNullableNumber$3(value.lastCandidateStats.cjkChars),
-            path: readString$1s(value.lastCandidateStats.path) || null,
+            path: readString$1t(value.lastCandidateStats.path) || null,
             words: readNullableNumber$3(value.lastCandidateStats.words)
           }
         : null,
@@ -15454,7 +15454,7 @@
         ? cloneValue(value.lastObservableDeficits)
         : null,
       convergence: summarizeRequirementRecoveryConvergence(value.convergence),
-      nextMoveContract: readString$1s(value.nextMoveContract) || null
+      nextMoveContract: readString$1t(value.nextMoveContract) || null
     };
   }
 
@@ -15462,7 +15462,7 @@
     const finalReadiness = context.finalReadiness && typeof context.finalReadiness === "object"
       ? context.finalReadiness
       : null;
-    if (!finalReadiness || readString$1s(finalReadiness.decision) !== "limited") {
+    if (!finalReadiness || readString$1t(finalReadiness.decision) !== "limited") {
       return { ok: true, evaluator: evaluateRequirementRecovery(runState, context) };
     }
     const evaluator = evaluateRequirementRecovery(runState, context);
@@ -15491,7 +15491,7 @@
       : null;
     if (!repair || repair.active !== true) return false;
     if (!Array.isArray(recoverableDeficits) || recoverableDeficits.length === 0) return false;
-    const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString$1s(entry && entry.dimension)).filter(Boolean)));
+    const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString$1t(entry && entry.dimension)).filter(Boolean)));
     if (dimensions.includes("source")) return false;
     if (dimensions.some((dimension) => dimension !== "length")) return false;
     if (!workspaceSignals || workspaceSignals.expansionAttempted !== true) return false;
@@ -15573,7 +15573,7 @@
     workspaceSignals
   }) {
     const previousConvergence = normalizeRequirementRecoveryConvergenceState(previous && previous.convergence);
-    const actionName = readString$1s(context && context.actionName);
+    const actionName = readString$1t(context && context.actionName);
     const finalReadiness = readFinalReadiness(context);
     const sourceRecoverable = recoverableDeficits.some((entry) => entry.dimension === "source");
     const lengthRecoverable = recoverableDeficits.some((entry) => entry.dimension === "length");
@@ -15675,7 +15675,7 @@
       cjkChars: candidate ? readNumber$e(candidate.cjkChars) : null,
       deficit: deficits.lengthDeficit,
       requested: requestedLength && Number.isFinite(requestedLength.value) ? requestedLength.value : null,
-      unit: requestedLength ? readString$1s(requestedLength.unit) || null : null,
+      unit: requestedLength ? readString$1t(requestedLength.unit) || null : null,
       words: candidate ? readNumber$e(candidate.words) : null
     };
   }
@@ -15737,15 +15737,15 @@
   }
 
   function isValidLimitedWithConcreteGaps(finalReadiness, deficits) {
-    if (!finalReadiness || readString$1s(finalReadiness.decision) !== "limited") return false;
+    if (!finalReadiness || readString$1t(finalReadiness.decision) !== "limited") return false;
     const assessment = finalReadiness.requirementsAssessment &&
       typeof finalReadiness.requirementsAssessment === "object"
       ? finalReadiness.requirementsAssessment
       : finalReadiness;
     const gaps = Array.isArray(assessment.remainingGaps)
-      ? assessment.remainingGaps.map(readString$1s).filter(Boolean)
+      ? assessment.remainingGaps.map(readString$1t).filter(Boolean)
       : Array.isArray(finalReadiness.remainingGaps)
-        ? finalReadiness.remainingGaps.map(readString$1s).filter(Boolean)
+        ? finalReadiness.remainingGaps.map(readString$1t).filter(Boolean)
         : [];
     if (gaps.length === 0) return false;
     if (sourceHasDeficit(deficits) && assessment.evidenceSatisfied !== false) return false;
@@ -15756,9 +15756,9 @@
 
   function isBlockedTerminalOutput(output) {
     if (!output || typeof output !== "object") return false;
-    const kind = readString$1s(output.kind);
-    const status = readString$1s(output.status);
-    const control = readString$1s(output.control);
+    const kind = readString$1t(output.kind);
+    const status = readString$1t(output.status);
+    const control = readString$1t(output.control);
     if (kind.includes("blocked") || kind.includes("continuation")) return true;
     if (status === "blocked" || status === "error" || status === "continue") return true;
     return control === "continue";
@@ -15833,7 +15833,7 @@
       attempts: readNumber$e(value.attempts),
       dimension,
       exhausted: value.exhausted === true,
-      lastEffectiveAction: readString$1s(value.lastEffectiveAction) || null,
+      lastEffectiveAction: readString$1t(value.lastEffectiveAction) || null,
       lastObserved: value.lastObserved && typeof value.lastObserved === "object" ? cloneValue(value.lastObserved) : null,
       progressCount: readNumber$e(value.progressCount),
       repeatedNoProgressCount: readNumber$e(value.repeatedNoProgressCount)
@@ -15853,8 +15853,8 @@
       recommendedContract: normalized.recommendedContract,
       terminalPattern: normalized.terminalPattern
         ? {
-            kind: readString$1s(normalized.terminalPattern.kind) || null,
-            message: readString$1s(normalized.terminalPattern.message) || null,
+            kind: readString$1t(normalized.terminalPattern.kind) || null,
+            message: readString$1t(normalized.terminalPattern.message) || null,
             threshold: readNullableNumber$3(normalized.terminalPattern.threshold)
           }
         : null
@@ -15862,7 +15862,7 @@
   }
 
   function summarizeDimensionState(value) {
-    const normalized = normalizeDimensionState(value, readString$1s(value && value.dimension) || "requirement");
+    const normalized = normalizeDimensionState(value, readString$1t(value && value.dimension) || "requirement");
     return {
       attempts: normalized.attempts,
       exhausted: normalized.exhausted,
@@ -15874,12 +15874,12 @@
   }
 
   function readBudgetStateValue(value) {
-    const text = readString$1s(value);
+    const text = readString$1t(value);
     return ["enough", "low", "exhausted"].includes(text) ? text : "";
   }
 
   function readRecommendedContractValue(value) {
-    const text = readString$1s(value);
+    const text = readString$1t(value);
     return ["continue_recovery", "valid_limited_allowed", "fail_fast_debug"].includes(text) ? text : "";
   }
 
@@ -15912,9 +15912,9 @@
   function isSourceDeficitRecoverable(readUrlRecoverySignal, sourceSignals) {
     if (!sourceSignals.hasAnyEvidenceWork) return true;
     if (!readUrlRecoverySignal) return false;
-    if (!SOURCE_RECOVERY_STATUSES.has(readString$1s(readUrlRecoverySignal.status))) return false;
+    if (!SOURCE_RECOVERY_STATUSES.has(readString$1t(readUrlRecoverySignal.status))) return false;
     if (sourceSignals.alternateCandidateCount > 0 && !sourceSignals.alternateAttempted) return true;
-    if (readString$1s(readUrlRecoverySignal.status) === "retryable_failure" && readNumber$e(readUrlRecoverySignal.sameUrlAttemptCount) <= 1) return true;
+    if (readString$1t(readUrlRecoverySignal.status) === "retryable_failure" && readNumber$e(readUrlRecoverySignal.sameUrlAttemptCount) <= 1) return true;
     return false;
   }
 
@@ -15922,7 +15922,7 @@
     const researchState = runState && runState.researchState && typeof runState.researchState === "object"
       ? runState.researchState
       : null;
-    const finalReason = readString$1s(researchState && researchState.finalReason);
+    const finalReason = readString$1t(researchState && researchState.finalReason);
     if (researchState && (
       researchState.qualityGateRequired === true ||
       researchState.finalAllowed === false ||
@@ -15930,7 +15930,7 @@
     )) {
       return true;
     }
-    if (readUrlRecoverySignal && readString$1s(readUrlRecoverySignal.status) !== "none") return true;
+    if (readUrlRecoverySignal && readString$1t(readUrlRecoverySignal.status) !== "none") return true;
     const readSources = runState && runState.researchContext && Array.isArray(runState.researchContext.readSources)
       ? runState.researchContext.readSources
       : [];
@@ -15939,7 +15939,7 @@
   }
 
   function readWorkspaceRecoverySignals(runState, candidate) {
-    const path = readString$1s(candidate && candidate.path);
+    const path = readString$1t(candidate && candidate.path);
     const operations = runState && runState.virtualWorkspace && Array.isArray(runState.virtualWorkspace.operations)
       ? runState.virtualWorkspace.operations
       : [];
@@ -15948,10 +15948,10 @@
       (!path || operation.path === path)
     ));
     const expansionAttempted = relevant.some((operation) => (
-      WORKSPACE_RECOVERY_ACTIONS.has(readString$1s(operation.action)) &&
-      readString$1s(operation.status) === "ok"
+      WORKSPACE_RECOVERY_ACTIONS.has(readString$1t(operation.action)) &&
+      readString$1t(operation.status) === "ok"
     ));
-    const readAttempted = relevant.some((operation) => readString$1s(operation.action) === "read");
+    const readAttempted = relevant.some((operation) => readString$1t(operation.action) === "read");
     const signals = [];
     if (readAttempted) signals.push("workspace_read_attempted");
     if (expansionAttempted) signals.push("workspace_expansion_attempted");
@@ -15987,7 +15987,7 @@
   }
 
   function readObservableDeficits({ candidate, requestedLength, sourceMinimum }) {
-    const statsKey = requestedLength ? readString$1s(requestedLength.statsKey) || readStatsKeyForUnit(requestedLength.unit) : "";
+    const statsKey = requestedLength ? readString$1t(requestedLength.statsKey) || readStatsKeyForUnit(requestedLength.unit) : "";
     const observedLength = candidate && statsKey && Number.isFinite(candidate[statsKey])
       ? candidate[statsKey]
       : null;
@@ -15998,7 +15998,7 @@
         : 0,
       lengthObserved: observedLength,
       lengthRequested: requestedValue,
-      lengthUnit: requestedLength ? readString$1s(requestedLength.unit) || null : null,
+      lengthUnit: requestedLength ? readString$1t(requestedLength.unit) || null : null,
       readSourceDeficit: sourceMinimum
         ? Math.max(0, readNumber$e(sourceMinimum.minReadSources) - readNumber$e(sourceMinimum.readSources))
         : 0,
@@ -16027,7 +16027,7 @@
       chars: stats.chars,
       cjkChars: stats.cjkChars,
       nonWhitespaceChars: stats.nonWhitespaceChars,
-      path: readString$1s(packetCandidate && packetCandidate.path) || readString$1s(file && file.path) || null,
+      path: readString$1t(packetCandidate && packetCandidate.path) || readString$1t(file && file.path) || null,
       words: stats.words
     };
   }
@@ -16038,9 +16038,9 @@
       ? packet.requestedLength
       : null;
     if (packetLength && Number.isFinite(packetLength.value)) {
-      const unit = readString$1s(packetLength.unit) || null;
+      const unit = readString$1t(packetLength.unit) || null;
       return {
-        statsKey: readString$1s(packetLength.statsKey) || readStatsKeyForUnit(unit),
+        statsKey: readString$1t(packetLength.statsKey) || readStatsKeyForUnit(unit),
         unit,
         value: packetLength.value
       };
@@ -16051,7 +16051,7 @@
       ? context.finalReadiness.requirementsAssessment
       : null;
     if (assessment && Number.isFinite(assessment.requestedLength)) {
-      const unit = readString$1s(assessment.observedLengthUnit) || null;
+      const unit = readString$1t(assessment.observedLengthUnit) || null;
       return {
         statsKey: readStatsKeyForUnit(unit),
         unit,
@@ -16064,8 +16064,8 @@
     });
     const extracted = extractRequestedLengthContract(text);
     return extracted ? {
-      statsKey: readString$1s(extracted.statsKey) || readStatsKeyForUnit(extracted.unit),
-      unit: readString$1s(extracted.unit) || null,
+      statsKey: readString$1t(extracted.statsKey) || readStatsKeyForUnit(extracted.unit),
+      unit: readString$1t(extracted.unit) || null,
       value: extracted.value
     } : null;
   }
@@ -16117,11 +16117,11 @@
   }
 
   function normalizeUrl(value) {
-    const text = readString$1s(value);
+    const text = readString$1t(value);
     return text ? text.replace(/\/+$/, "") : "";
   }
 
-  function readString$1s(value) {
+  function readString$1t(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -16182,8 +16182,8 @@
 
   function classifyReadUrlFailure(output) {
     const source = output && typeof output === "object" ? output : {};
-    const error = readString$1r(source.error);
-    const reason = readString$1r(source.reason) || error || null;
+    const error = readString$1s(source.error);
+    const reason = readString$1s(source.reason) || error || null;
     const statusCode = readStatusCode(source.status);
     const originStatus = readStatusCode(source.originStatus);
     const effectiveStatus = originStatus ?? statusCode;
@@ -16199,7 +16199,7 @@
       };
     }
 
-    if (RETRYABLE_ERRORS.has(error) || RETRYABLE_ERRORS.has(readString$1r(source.code))) {
+    if (RETRYABLE_ERRORS.has(error) || RETRYABLE_ERRORS.has(readString$1s(source.code))) {
       return {
         category: "transient",
         error: error || null,
@@ -16223,7 +16223,7 @@
 
     if (
       NON_RETRYABLE_ERRORS.has(error) ||
-      NON_RETRYABLE_ERRORS.has(readString$1r(source.code)) ||
+      NON_RETRYABLE_ERRORS.has(readString$1s(source.code)) ||
       (effectiveStatus != null && NON_RETRYABLE_STATUS_CODES.has(effectiveStatus))
     ) {
       return {
@@ -16248,7 +16248,7 @@
 
   function refreshReadUrlRecoverySignal(runState, context = {}) {
     if (!runState || typeof runState !== "object") return null;
-    const actionName = readString$1r(context.actionName);
+    const actionName = readString$1s(context.actionName);
     if (actionName !== "read_url" && actionName !== "web_search") {
       return normalizeSignal(runState.readUrlRecoverySignal);
     }
@@ -16289,7 +16289,7 @@
       return next;
     }
 
-    const failedUrl = readString$1r(output.url) || readString$1r(context.url) || current.failedUrl || null;
+    const failedUrl = readString$1s(output.url) || readString$1s(context.url) || current.failedUrl || null;
     const classification = classifyReadUrlFailure(output);
     const attemptCount = countFailedReadAttempts(runState, failedUrl, output);
     const alternateSourceCandidates = readAlternateSourceCandidates(runState, failedUrl);
@@ -16398,7 +16398,7 @@
         output &&
         source.ok === false &&
         normalizeUrlKey$1(source.url) === currentUrl &&
-        readString$1r(source.error) === readString$1r(output.error) &&
+        readString$1s(source.error) === readString$1s(output.error) &&
         readStatusCode(source.status) === readStatusCode(output.status)
       )
     ));
@@ -16457,14 +16457,14 @@
 
   function normalizeCandidate$1(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const url = readString$1r(value.url);
+    const url = readString$1s(value.url);
     if (!url) return null;
     return {
-      domain: readString$1r(value.domain) || readDomain$6(url),
-      query: readString$1r(value.query) || null,
+      domain: readString$1s(value.domain) || readDomain$6(url),
+      query: readString$1s(value.query) || null,
       rank: readNullableNumber$2(value.rank),
-      snippet: readString$1r(value.snippet) || readString$1r(value.content) || null,
-      title: readString$1r(value.title) || url,
+      snippet: readString$1s(value.snippet) || readString$1s(value.content) || null,
+      title: readString$1s(value.title) || url,
       url
     };
   }
@@ -16483,27 +16483,27 @@
       : createReadUrlRecoverySignalState();
     return {
       kind: "read_url_recovery_signal",
-      status: readString$1r(source.status) || "none",
-      failedUrl: readString$1r(source.failedUrl) || null,
+      status: readString$1s(source.status) || "none",
+      failedUrl: readString$1s(source.failedUrl) || null,
       statusCode: readStatusCode(source.statusCode),
       originStatus: readStatusCode(source.originStatus),
-      reason: readString$1r(source.reason) || null,
+      reason: readString$1s(source.reason) || null,
       retryable: source.retryable === true,
       sameUrlAttemptCount: readNumber$d(source.sameUrlAttemptCount),
       alternateSourceCandidates: Array.isArray(source.alternateSourceCandidates)
         ? source.alternateSourceCandidates.map(normalizeCandidate$1).filter(Boolean).slice(0, MAX_ALTERNATE_SOURCE_CANDIDATES)
         : [],
       allowedNextMoves: Array.isArray(source.allowedNextMoves)
-        ? source.allowedNextMoves.map(readString$1r).filter(Boolean).slice(0, 8)
+        ? source.allowedNextMoves.map(readString$1s).filter(Boolean).slice(0, 8)
         : [],
-      forbiddenMove: readString$1r(source.forbiddenMove) || null,
+      forbiddenMove: readString$1s(source.forbiddenMove) || null,
       updatedAtCycle: readNullableNumber$2(source.updatedAtCycle),
-      updatedBy: readString$1r(source.updatedBy) || null
+      updatedBy: readString$1s(source.updatedBy) || null
     };
   }
 
   function normalizeUrlKey$1(value) {
-    const url = readString$1r(value);
+    const url = readString$1s(value);
     if (!url) return "";
     try {
       const parsed = new URL(url);
@@ -16526,7 +16526,7 @@
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
-  function readString$1r(value) {
+  function readString$1s(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -16640,7 +16640,7 @@
       readSources: readSources.length,
       relevantSources
     };
-    const topic = readString$1q(researchState.topic) || extractTopic(prompt);
+    const topic = readString$1r(researchState.topic) || extractTopic(prompt);
     const candidateText = readDecisionText(context) || readWorkspaceFinalCandidate(runState) || readWorkspaceDraft$1(runState);
     const evidenceGraph = buildResearchEvidenceGraph(runState, {
       proposedText: candidateText,
@@ -16654,8 +16654,8 @@
       claimGraph: evidenceGraph.claimGraph || [],
       evidenceGraph,
       prompt,
-      recoveryMode: readString$1q(context && context.recoveryMode)
-        || readString$1q(researchState.recoveryMode)
+      recoveryMode: readString$1r(context && context.recoveryMode)
+        || readString$1r(researchState.recoveryMode)
         || null,
       required: researchState.qualityGateRequired === true,
       researchState: cloneValue(researchState),
@@ -16684,7 +16684,7 @@
     if (!decision || typeof decision !== "object" || decision.name !== "web_search") return null;
     const args = decision.args && typeof decision.args === "object" ? decision.args : {};
     const previous = normalizeLoopState(runState.researchReportLoop);
-    const query = readString$1q(args.query);
+    const query = readString$1r(args.query);
     const recentQueries = previous.recentQueries.slice();
     if (query) {
       recentQueries.push(query);
@@ -16710,14 +16710,14 @@
     const reset = applyTopicChangeReset(runState, previous, evaluation);
     const base = reset || previous;
     const gateSignal = buildGateSignal(evaluation, config, {
-      finalMode: readString$1q(context && context.finalMode) || base.finalMode,
-      status: readString$1q(context && context.status) || inferGateSignalStatus(evaluation),
+      finalMode: readString$1r(context && context.finalMode) || base.finalMode,
+      status: readString$1r(context && context.status) || inferGateSignalStatus(evaluation),
       vetoCount: base.vetoCount
     });
     gateSignal.acceptancePacket = buildAcceptancePacket(runState, evaluation, config, {
-      actionName: readString$1q(context && context.actionName) || null,
+      actionName: readString$1r(context && context.actionName) || null,
       request: context && context.request,
-      prompt: readString$1q(context && context.prompt),
+      prompt: readString$1r(context && context.prompt),
       status: gateSignal.status
     });
     return commitResearchReportLoop(runState, evaluation, {
@@ -16769,9 +16769,9 @@
       cycles: readCycleBudget(runState),
       evidence: {
         researchFinalAllowed: researchState.finalAllowed === true,
-        researchFinalReason: readString$1q(researchState.finalReason) || null,
+        researchFinalReason: readString$1r(researchState.finalReason) || null,
         researchGaps: Array.isArray(researchState.gaps)
-          ? researchState.gaps.map(readString$1q).filter(Boolean).slice(0, 12)
+          ? researchState.gaps.map(readString$1r).filter(Boolean).slice(0, 12)
           : [],
         researchQualityGateRequired: researchState.qualityGateRequired === true,
         sourceMinimum,
@@ -16785,8 +16785,8 @@
         minReadSources: config.minReadSources,
         minRelevantSources: config.minRelevantSources
       },
-      status: readString$1q(context && context.status) || null,
-      updatedBy: readString$1q(context && context.actionName) || null
+      status: readString$1r(context && context.status) || null,
+      updatedBy: readString$1r(context && context.actionName) || null
     };
   }
 
@@ -16831,13 +16831,13 @@
     const lastRead = quality.lastRead && typeof quality.lastRead === "object" ? quality.lastRead : null;
     return {
       lastRead: lastRead ? {
-        observedAt: readString$1q(lastRead.observedAt) || null,
-        path: readString$1q(lastRead.path) || null,
+        observedAt: readString$1r(lastRead.observedAt) || null,
+        path: readString$1r(lastRead.path) || null,
         textStats: normalizeTextStats$1(lastRead.textStats)
       } : null,
-      path: readString$1q(file && file.path) || readString$1q(quality.finalCandidatePath) || null,
+      path: readString$1r(file && file.path) || readString$1r(quality.finalCandidatePath) || null,
       ready: quality.finalCandidateReady === true,
-      status: readString$1q(quality.finalCandidateStatus) || null,
+      status: readString$1r(quality.finalCandidateStatus) || null,
       textStats: normalizeTextStats$1(
         (file && file.textStats) || quality.finalCandidateStats
       )
@@ -16846,7 +16846,7 @@
 
   function readRequestedLength(runState, context) {
     const contractText = readTerminalContractText({
-      request: context && context.request || { prompt: readString$1q(context && context.prompt) },
+      request: context && context.request || { prompt: readString$1r(context && context.prompt) },
       runState
     });
     const contract = extractRequestedLengthContract(contractText);
@@ -16887,7 +16887,7 @@
       cyclesRemaining: Number.isFinite(signal.cyclesRemaining) ? signal.cyclesRemaining : null,
       cyclesUsed: Number.isFinite(signal.cyclesUsed) ? signal.cyclesUsed : null,
       lastCycle: Number.isFinite(signal.lastCycle) ? signal.lastCycle : null,
-      lastStatus: readString$1q(signal.lastStatus) || null,
+      lastStatus: readString$1r(signal.lastStatus) || null,
       recentBlocks: Array.isArray(signal.recentBlocks) ? cloneValue(signal.recentBlocks).slice(-5) : [],
       statusCounts: signal.statusCounts && typeof signal.statusCounts === "object"
         ? cloneValue(signal.statusCounts)
@@ -16909,7 +16909,7 @@
       : null;
     if (!workspace) return false;
     const file = readWorkspaceFinalCandidate$1(workspace);
-    return Boolean(file && readString$1q(file.content));
+    return Boolean(file && readString$1r(file.content));
   }
 
   // 2026-05-09 — `buildVetoObservation` deleted alongside
@@ -16937,7 +16937,7 @@
       lastSearchAttempt: cloneValue(previous.lastSearchAttempt || null),
       lastTopic: normalizeTopicKey(evaluation.topic) || previous.lastTopic || null,
       recentQueries: Array.isArray(previous.recentQueries) ? previous.recentQueries.slice() : [],
-      recoveryMode: readString$1q(evaluation.recoveryMode) || null,
+      recoveryMode: readString$1r(evaluation.recoveryMode) || null,
       sourceMinimum: evaluation.sourceMinimum,
       status: options.status || "evaluating",
       vetoCount: readPositiveInteger$e(options.vetoCount) || 0,
@@ -17014,12 +17014,12 @@
       claimGraph: Array.isArray(value.claimGraph) ? cloneValue(value.claimGraph) : [],
       cycles: Array.isArray(value.cycles) ? cloneValue(value.cycles) : [],
       enabled: value.enabled === true,
-      finalMode: readString$1q(value.finalMode) || null,
+      finalMode: readString$1r(value.finalMode) || null,
       gateSignal: value.gateSignal && typeof value.gateSignal === "object" ? cloneValue(value.gateSignal) : null,
       lastSearchAttempt: value.lastSearchAttempt && typeof value.lastSearchAttempt === "object" ? cloneValue(value.lastSearchAttempt) : null,
-      lastTopic: readString$1q(value.lastTopic) || null,
+      lastTopic: readString$1r(value.lastTopic) || null,
       recentQueries: Array.isArray(value.recentQueries) ? cloneValue(value.recentQueries) : [],
-      recoveryMode: readString$1q(value.recoveryMode) || null,
+      recoveryMode: readString$1r(value.recoveryMode) || null,
       sourceMinimum: {
         minReadSources: readPositiveInteger$e(sourceMinimum.minReadSources) || DEFAULT_MIN_READ_SOURCES,
         minRelevantSources: readPositiveInteger$e(sourceMinimum.minRelevantSources) || DEFAULT_MIN_RELEVANT_SOURCES,
@@ -17027,7 +17027,7 @@
         readSources: readNumber$c(sourceMinimum.readSources),
         relevantSources: readNumber$c(sourceMinimum.relevantSources)
       },
-      status: readString$1q(value.status) || "idle",
+      status: readString$1r(value.status) || "idle",
       vetoCount: readPositiveInteger$e(value.vetoCount) || 0,
       version: readPositiveInteger$e(value.version) || 2
     };
@@ -17035,7 +17035,7 @@
 
   function applyTopicChangeReset(runState, previous, evaluation) {
     const nextTopic = normalizeTopicKey(evaluation && evaluation.topic);
-    const priorTopic = readString$1q(previous && previous.lastTopic) || null;
+    const priorTopic = readString$1r(previous && previous.lastTopic) || null;
     if (!nextTopic || !priorTopic || nextTopic === priorTopic) return null;
     if (typeof runState !== "object" || !runState) return null;
     if (Array.isArray(previous.cycles) && previous.cycles.length === 0 && (previous.vetoCount || 0) === 0) {
@@ -17061,7 +17061,7 @@
 
   function readDecisionText(context) {
     const decision = context && context.decision && typeof context.decision === "object" ? context.decision : null;
-    return decision ? readString$1q(decision.answer) || readString$1q(decision.text) : "";
+    return decision ? readString$1r(decision.answer) || readString$1r(decision.text) : "";
   }
 
   function readWorkspaceFinalCandidate(runState) {
@@ -17071,7 +17071,7 @@
     const file = workspace.files && typeof workspace.files === "object"
       ? workspace.files["final_candidate.md"]
       : null;
-    return file && typeof file === "object" ? readString$1q(file.content) : "";
+    return file && typeof file === "object" ? readString$1r(file.content) : "";
   }
 
   function readWorkspaceDraft$1(runState) {
@@ -17081,29 +17081,29 @@
     const file = workspace.files && typeof workspace.files === "object"
       ? workspace.files["draft.md"]
       : null;
-    return file && typeof file === "object" ? readString$1q(file.content) : "";
+    return file && typeof file === "object" ? readString$1r(file.content) : "";
   }
 
   function readPrompt$5(runState, context) {
-    return readString$1q(context && context.prompt)
-      || readString$1q(runState && runState.observationSummary && runState.observationSummary.prompt)
-      || readString$1q(runState && runState.originalQuery);
+    return readString$1r(context && context.prompt)
+      || readString$1r(runState && runState.observationSummary && runState.observationSummary.prompt)
+      || readString$1r(runState && runState.originalQuery);
   }
 
   function extractTopic(prompt) {
-    const quoted = readString$1q(prompt).match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
+    const quoted = readString$1r(prompt).match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
     if (quoted) return quoted[1].trim();
-    return readString$1q(prompt).slice(0, 160);
+    return readString$1r(prompt).slice(0, 160);
   }
 
   function normalizeTopicKey(value) {
-    const text = readString$1q(value);
+    const text = readString$1r(value);
     if (!text) return null;
     const trimmed = text.trim().toLowerCase().replace(/\s+/g, " ");
     return trimmed.length >= 3 ? trimmed : null;
   }
 
-  function readString$1q(value) {
+  function readString$1r(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -17267,15 +17267,15 @@
     return {
       kind: "terminal_repair_state",
       active,
-      mode: readString$1p(source.mode) || (active ? "terminal_repair" : "none"),
-      reason: readString$1p(source.reason) || null,
-      activeDeficits: readStringArray$3(source.activeDeficits).slice(0, 8),
+      mode: readString$1q(source.mode) || (active ? "terminal_repair" : "none"),
+      reason: readString$1q(source.reason) || null,
+      activeDeficits: readStringArray$4(source.activeDeficits).slice(0, 8),
       observableDeficits: normalizeObservableDeficits(source.observableDeficits),
-      allowedActions: readStringArray$3(source.allowedActions).slice(0, 16),
-      budgetState: readString$1p(source.budgetState) || "unknown",
-      escalation: readString$1p(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
-        forbiddenDecisions: readStringArray$3(source.forbiddenDecisions).slice(0, 8),
-        requiredRepair: readString$1p(source.requiredRepair) || null,
+      allowedActions: readStringArray$4(source.allowedActions).slice(0, 16),
+      budgetState: readString$1q(source.budgetState) || "unknown",
+      escalation: readString$1q(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+        forbiddenDecisions: readStringArray$4(source.forbiddenDecisions).slice(0, 8),
+        requiredRepair: readString$1q(source.requiredRepair) || null,
         validPublishContract: normalizeValidPublishContract(source.validPublishContract),
         lengthExpansionSignal: normalizeLengthExpansionSignal(source.lengthExpansionSignal),
         advisoryPersistenceSignal: normalizeAdvisoryPersistenceSignal(source.advisoryPersistenceSignal),
@@ -17285,7 +17285,7 @@
       lastUpdatedAtCycle: readNullableNumber$1(source.lastUpdatedAtCycle),
       lastIgnoredAtCycle: readNullableNumber$1(source.lastIgnoredAtCycle),
       progressSnapshot: normalizeProgressSnapshot(source.progressSnapshot),
-      clearedReason: active ? null : (readString$1p(source.clearedReason) || null),
+      clearedReason: active ? null : (readString$1q(source.clearedReason) || null),
       version: 1
     };
   }
@@ -17303,7 +17303,7 @@
     const cycle = readNullableNumber$1(runState && runState.cycleCount);
     const snapshot = createProgressSnapshot(runState);
     const progress = diffProgress(previous.progressSnapshot, snapshot);
-    const actionName = readString$1p(context.actionName);
+    const actionName = readString$1q(context.actionName);
     const output = readRecord(context.output);
     const completedTerminal = isTerminalCompleted(actionName, context);
 
@@ -17319,7 +17319,7 @@
     });
 
     const publishProtocolActionPending = isPublishProtocolRepairReason(previous.reason) &&
-      readString$1p(context && context.status) === "before_action";
+      readString$1q(context && context.status) === "before_action";
     const publishProtocolRequiredActionCompleted = isPublishProtocolRequiredActionCompleted(
       previous.reason,
       actionName,
@@ -17331,10 +17331,10 @@
       !publishProtocolRequiredActionCompleted &&
       isPublishProtocolStillBlockedForReason(runState, previous.reason);
     const publishProtocolTransitionPending =
-      readString$1p(previous.reason) === "missing_finalize_after_latest_write" &&
+      readString$1q(previous.reason) === "missing_finalize_after_latest_write" &&
       actionName === "workspace_finalize_candidate" &&
-      (readString$1p(output && output.kind) === "virtual_workspace_finalize_candidate" ||
-        readString$1p(context && context.status) === "after_workspace_finalize_candidate");
+      (readString$1q(output && output.kind) === "virtual_workspace_finalize_candidate" ||
+        readString$1q(context && context.status) === "after_workspace_finalize_candidate");
     if (
       previous.active &&
       !facts.forceActive &&
@@ -17462,7 +17462,7 @@
       ignoredCount,
       observed,
       requested,
-      unit: readString$1p(length.unit) || "words",
+      unit: readString$1q(length.unit) || "words",
       gap: Math.max(requested - observed, 0)
     };
   }
@@ -17479,7 +17479,7 @@
       : {};
     const reasons = [];
     const hints = [];
-    if (readString$1p(readiness.decision) !== "limited") {
+    if (readString$1q(readiness.decision) !== "limited") {
       reasons.push("missing_limited_decision");
     }
     const assessment = readiness.requirementsAssessment && typeof readiness.requirementsAssessment === "object"
@@ -17533,7 +17533,7 @@
   }
 
   function getPublishProtocolRequiredActionForReason(reason) {
-    const value = readString$1p(reason);
+    const value = readString$1q(reason);
     if (value === "missing_finalize_after_latest_write") return "workspace_finalize_candidate";
     if (value === "missing_latest_workspace_read") return "workspace_read";
     return "";
@@ -17544,7 +17544,7 @@
       ? terminalRepairState
       : {};
     const requiredAction = getPublishProtocolRequiredActionForReason(state.reason);
-    return Boolean(requiredAction && requiredAction === readString$1p(actionName));
+    return Boolean(requiredAction && requiredAction === readString$1q(actionName));
   }
 
   function resolvePublishProtocolActionContract(runState) {
@@ -17587,8 +17587,8 @@
       ? terminalRepairState.observableDeficits.length
       : null;
     const requested = readNumber$b(length && length.requested);
-    const unit = readString$1p(length && length.unit) || "words";
-    const path = readString$1p(actionArgs && actionArgs.path);
+    const unit = readString$1q(length && length.unit) || "words";
+    const path = readString$1q(actionArgs && actionArgs.path);
     if (!path || !requested) return sourceDeficits.slice();
     const stats = readWorkspaceFileStats(options && options.runState, path);
     const observed = readNumber$b(stats && stats[unit]);
@@ -17599,24 +17599,24 @@
   }
 
   function readTerminalRepairGaps(assessment, readiness) {
-    const gaps = readStringArray$3(assessment && assessment.remainingGaps);
+    const gaps = readStringArray$4(assessment && assessment.remainingGaps);
     if (gaps.length > 0) return gaps;
-    const fallback = readString$1p(
+    const fallback = readString$1q(
       readiness && (readiness.limitations || readiness.limitation || readiness.remainingGap)
-    ) || readString$1p(
+    ) || readString$1q(
       assessment && (assessment.limitations || assessment.limitation || assessment.remainingGap)
     );
     return fallback ? [fallback] : [];
   }
 
   function isBudgetConstrainedForLimitedPublish(terminalRepairState) {
-    const budgetState = readString$1p(terminalRepairState && terminalRepairState.budgetState);
+    const budgetState = readString$1q(terminalRepairState && terminalRepairState.budgetState);
     // ADR-0033 Tier A.8 (X1 fix) — hard_veto means AI has hit the wall on
     // structure repair (ignoredCount past the high-water mark). Even on
     // "enough" budget the rational next move is publish_limited with structure
     // noted in remainingGaps. Treat hard_veto state as constrained for the
     // purpose of allowing a limited publish contract.
-    const escalation = readString$1p(terminalRepairState && terminalRepairState.escalation);
+    const escalation = readString$1q(terminalRepairState && terminalRepairState.escalation);
     return budgetState === "low" || budgetState === "exhausted" || escalation === "hard_veto";
   }
 
@@ -17649,7 +17649,7 @@
   }
 
   function summarizeTextStats$1(value) {
-    const text = readString$1p(value);
+    const text = readString$1q(value);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -17666,15 +17666,15 @@
     const lengthStatus = readLengthStatus(packet, runState);
     const structure = readStructureStatus(runState);
     const todo = readTodoStatus(runState);
-    const actionName = readString$1p(context && context.actionName);
+    const actionName = readString$1q(context && context.actionName);
     const actionPattern = readRecord(runState && runState.actionPatternConvergence);
     const correction = readRecord(actionPattern && actionPattern.terminalCorrectionState);
     const cooldown = readRecord(actionPattern && actionPattern.terminalRetryCooldown);
     const readOnlyPlanning = readRecord(actionPattern && actionPattern.readOnlyPlanningState);
     const output = readRecord(context && context.output);
-    const publishBlocked = readString$1p(output && output.kind) === "virtual_workspace_publish_blocked" ||
-      readString$1p(output && output.kind) === "terminal_correction_preflight_block" ||
-      readString$1p(output && output.kind) === "terminal_repair_preflight_block";
+    const publishBlocked = readString$1q(output && output.kind) === "virtual_workspace_publish_blocked" ||
+      readString$1q(output && output.kind) === "terminal_correction_preflight_block" ||
+      readString$1q(output && output.kind) === "terminal_repair_preflight_block";
     const readinessBlocked = isReadinessRepairOutput(output);
     const deficits = [];
     const observableDeficits = {
@@ -17728,11 +17728,11 @@
     // structure observation and decides; the runtime does not force repair.
     if (structure && structure.ok === false) {
       observableDeficits.structure = {
-        issueCodes: readStringArray$3(structure.issueCodes).slice(0, 8),
-        reason: readString$1p(structure.reason) || readString$1p(structure.status) || "structure_not_ready",
+        issueCodes: readStringArray$4(structure.issueCodes).slice(0, 8),
+        reason: readString$1q(structure.reason) || readString$1q(structure.status) || "structure_not_ready",
         repeatedHeadingSamples: normalizeStructureSamples(structure.repeatedHeadingSamples, "heading"),
         repeatedNumberSamples: normalizeStructureSamples(structure.repeatedNumberSamples, "number"),
-        status: readString$1p(structure.status) || "fail"
+        status: readString$1q(structure.status) || "fail"
       };
     }
 
@@ -17781,8 +17781,8 @@
       observableDeficits,
       reason: structureRepairReason ||
         outputRepairReason ||
-        readString$1p(correction && correction.reason) ||
-        readString$1p(cooldown && cooldown.reason) ||
+        readString$1q(correction && correction.reason) ||
+        readString$1q(cooldown && cooldown.reason) ||
         (finalizedStructureBlocked ? "finalized_candidate_structure_not_ready" : null) ||
         (proactiveBudgetRepair ? `${budgetState}_budget_with_observable_deficits` : null) ||
         (readOnlyPlanningActive && activeDeficits.length > 0 ? "read_only_planning_with_observable_deficits" : null) ||
@@ -17802,15 +17802,15 @@
     return {
       kind: "readiness_payload_deficit",
       issues,
-      message: readString$1p((audit && audit.message) || result.message) || null,
-      status: readString$1p(result.status) || readString$1p(audit && audit.status) || "readiness_audit_failed"
+      message: readString$1q((audit && audit.message) || result.message) || null,
+      status: readString$1q(result.status) || readString$1q(audit && audit.status) || "readiness_audit_failed"
     };
   }
 
   function isReadinessRepairOutput(output) {
     const result = readRecord(output) || {};
-    const status = readString$1p(result.status);
-    const reason = readString$1p(result.reason);
+    const status = readString$1q(result.status);
+    const reason = readString$1q(result.reason);
     if (status === "readiness_audit_failed") return true;
     if (status.includes("readiness") || reason.includes("readiness")) return true;
     const audit = readRecord(result.readinessAudit);
@@ -17829,12 +17829,12 @@
         const issue = readRecord(entry);
         if (!issue) return null;
         return {
-          code: readString$1p(issue.code) || "readiness_payload_mismatch",
-          correction: readString$1p(issue.correction) || null,
+          code: readString$1q(issue.code) || "readiness_payload_mismatch",
+          correction: readString$1q(issue.correction) || null,
           declared: issue.declared != null ? issue.declared : null,
-          field: readString$1p(issue.field) || null,
+          field: readString$1q(issue.field) || null,
           observed: issue.observed != null ? issue.observed : null,
-          unit: readString$1p(issue.unit) || null
+          unit: readString$1q(issue.unit) || null
         };
       })
       .filter(Boolean)
@@ -17847,7 +17847,7 @@
     const observed = readNumber$b(length.observed);
     const requested = readNumber$b(length.requested);
     if (!requested || observed >= requested) return null;
-    const unit = readString$1p(length.unit) || "words";
+    const unit = readString$1q(length.unit) || "words";
     const content = readFinalCandidateContent(runState);
     const perSectionDelta = buildPerSectionLengthDeltas(content, {
       requested,
@@ -17867,7 +17867,7 @@
 
   function buildAdvisoryPersistenceSignal(ignoredCount, escalation) {
     const count = readNumber$b(ignoredCount);
-    if (readString$1p(escalation) !== "advisory") return null;
+    if (readString$1q(escalation) !== "advisory") return null;
     if (count < TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD) return null;
     return {
       kind: "terminal_repair_advisory_persistence_signal",
@@ -17885,7 +17885,7 @@
   }
 
   function isReadinessOnlyDeficits(deficits) {
-    const active = Array.isArray(deficits) ? deficits.map(readString$1p).filter(Boolean) : [];
+    const active = Array.isArray(deficits) ? deficits.map(readString$1q).filter(Boolean) : [];
     return active.length === 1 && active[0] === "readiness";
   }
 
@@ -17898,7 +17898,7 @@
     })) {
       return [];
     }
-    const actions = readStringArray$3(allowedActions);
+    const actions = readStringArray$4(allowedActions);
     const preferredActions = [
       "workspace_insert_after_section",
       "workspace_multi_edit",
@@ -17918,7 +17918,7 @@
     // exit condition for the structure-deficit branch, so AI can publish a
     // limited candidate (with structure in remainingGaps) instead of being
     // pinned into an unfixable repair loop.
-      const hardVetoActive = readString$1p(escalation) === "hard_veto";
+      const hardVetoActive = readString$1q(escalation) === "hard_veto";
       const lowBudget = budgetState === "low" || budgetState === "exhausted" || hardVetoActive;
       const todoLimitedPublishAllowed = isBudgetConstrainedForLimitedPublish({
         budgetState,
@@ -17936,7 +17936,7 @@
       const hasProductDeficit = hasSource || hasLength || hasStructureRepairSignal;
     const terminalLoopOnly = deficits.includes("terminal_loop") &&
       !deficits.some((name) => name === "source" || name === "length" || name === "structure" || name === "todo");
-    const publishProtocolReason = readString$1p(reason);
+    const publishProtocolReason = readString$1q(reason);
     const readOnlyPlanningForbiddenActions = readOnlyPlanningHardVetoForbiddenActions(runState);
     const workspaceMutationGrowthHardVeto = isWorkspaceMutationGrowthHardVetoActive(runState);
     const lengthLimitedPublishAllowed = shouldExposeLimitedPublishForBudget({
@@ -17948,7 +17948,7 @@
     const workspacePatchSurface = getWorkspacePatchRepairSurface(runState);
     const sourceHasUnreadCandidates = hasUnreadSourceCandidates(runState);
     const publishProtocolContract = resolvePublishProtocolActionContract(runState);
-    const protocolRecoveryAction = readString$1p(publishProtocolContract && publishProtocolContract.requiredAction);
+    const protocolRecoveryAction = readString$1q(publishProtocolContract && publishProtocolContract.requiredAction);
     const protocolRequiredAction = isPublishProtocolRepairReason(publishProtocolReason)
       ? protocolRecoveryAction
       : "";
@@ -18213,14 +18213,14 @@
 
   function hasEmptyFinalCandidateDeficit(observableDeficits, runState) {
     const structure = observableDeficitsRecord(observableDeficits, "structure");
-    const issueCodes = readStringArray$3(structure && structure.issueCodes);
+    const issueCodes = readStringArray$4(structure && structure.issueCodes);
     if (issueCodes.some((code) => code === "candidate_empty" || code === "missing_candidate_content")) {
       return true;
     }
     const workspace = readRecord(runState && runState.virtualWorkspace);
     if (!workspace) return false;
     const quality = readRecord(workspace && workspace.quality);
-    const finalCandidateStatus = readString$1p(quality && quality.finalCandidateStatus);
+    const finalCandidateStatus = readString$1q(quality && quality.finalCandidateStatus);
     if (finalCandidateStatus === "candidate_empty" || finalCandidateStatus === "missing_candidate_content") {
       return true;
     }
@@ -18247,7 +18247,7 @@
   function isWorkspaceMutationGrowthHardVetoActive(runState) {
     const convergence = readRecord(runState && runState.actionPatternConvergence);
     const state = readRecord(convergence && convergence.workspaceMutationGrowthConvergence);
-    return Boolean(state && state.active === true && readString$1p(state.escalation) === "hard_veto");
+    return Boolean(state && state.active === true && readString$1q(state.escalation) === "hard_veto");
   }
 
   function addWorkspacePatchRepairActions(actions, surface, options = {}) {
@@ -18270,7 +18270,7 @@
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const pendingPatch = readRecord(workspace && workspace.pendingPatch);
     if (!pendingPatch) return "fresh";
-    const status = readString$1p(pendingPatch.status);
+    const status = readString$1q(pendingPatch.status);
     if (pendingPatch.valid === true && status === "preview_ready") {
       return "apply_ready";
     }
@@ -18284,8 +18284,8 @@
     const convergence = readRecord(runState && runState.actionPatternConvergence);
     const state = readRecord(convergence && convergence.readOnlyPlanningState);
     if (!state || state.active !== true) return new Set();
-    if (readString$1p(state.escalation) !== "hard_veto") return new Set();
-    return new Set(readStringArray$3(state.forbiddenActions));
+    if (readString$1q(state.escalation) !== "hard_veto") return new Set();
+    return new Set(readStringArray$4(state.forbiddenActions));
   }
 
   function hasUnreadSourceCandidates(runState) {
@@ -18319,7 +18319,7 @@
   function readCandidateUrl(candidate) {
     const source = readRecord(candidate);
     if (!source) return "";
-    return readString$1p(source.url) || readString$1p(source.link) || readString$1p(source.href);
+    return readString$1q(source.url) || readString$1q(source.link) || readString$1q(source.href);
   }
 
   function filterReadOnlyPlanningChurnActions(actions, options = {}) {
@@ -18339,7 +18339,7 @@
     if (remove.size === 0) return source;
     const filtered = source.filter((actionName) => {
       if (!remove.has(actionName)) return true;
-      if (actionName === readString$1p(options.protocolRequiredAction)) return true;
+      if (actionName === readString$1q(options.protocolRequiredAction)) return true;
       return !forbidden.has(actionName);
     });
     return filtered.length > 0 ? filtered : source;
@@ -18347,14 +18347,14 @@
 
   function applyMultiWriteIterationNudge(actions, options = {}) {
     const hasStructureRepairSignal = Boolean(observableDeficitsRecord(options.observableDeficits, "structure"));
-    const source = readStringArray$3(actions).filter((actionName) => (
+    const source = readStringArray$4(actions).filter((actionName) => (
       !hasStructureRepairSignal || actionName !== "workspace_multi_edit"
     ));
     if (!shouldSurfaceMultiWriteIterationNudge(options)) return source;
     const workspace = readRecord(options.runState && options.runState.virtualWorkspace);
     const finalPath = readFinalCandidatePathFromWorkspace(options.runState);
     const finalFile = readRecord(workspace && workspace.files && workspace.files[finalPath]);
-    const hasCandidateContent = readString$1p(finalFile && finalFile.content).length > 0 ||
+    const hasCandidateContent = readString$1q(finalFile && finalFile.content).length > 0 ||
       readNumber$b(finalFile && finalFile.textStats && finalFile.textStats.words) > 0 ||
       readNumber$b(finalFile && finalFile.textStats && finalFile.textStats.chars) > 0;
     const preferred = hasCandidateContent
@@ -18374,7 +18374,7 @@
   }
 
   function shouldSurfaceMultiWriteIterationNudge(options = {}) {
-    const budgetState = readString$1p(options.budgetState);
+    const budgetState = readString$1q(options.budgetState);
     if (budgetState === "exhausted") return false;
     const activeDeficits = Array.isArray(options.activeDeficits) ? options.activeDeficits : [];
     if (activeDeficits.includes("source")) return false;
@@ -18389,7 +18389,7 @@
   function countWorkspaceWriteOperations(runState) {
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const operations = Array.isArray(workspace && workspace.operations) ? workspace.operations : [];
-    return operations.filter((operation) => readString$1p(operation && operation.action) === "write").length;
+    return operations.filter((operation) => readString$1q(operation && operation.action) === "write").length;
   }
 
   function countWorkspaceExpansionIterations(runState) {
@@ -18402,7 +18402,7 @@
       "replace",
       "write"
     ]);
-    return operations.filter((operation) => expansionActions.has(readString$1p(operation && operation.action))).length;
+    return operations.filter((operation) => expansionActions.has(readString$1q(operation && operation.action))).length;
   }
 
   function readFinalCandidateContent(runState) {
@@ -18412,15 +18412,15 @@
       ? workspace.files
       : null;
     const file = files && finalPath ? files[finalPath] : null;
-    return readString$1p(file && file.content);
+    return readString$1q(file && file.content);
   }
 
   function buildPerSectionLengthDeltas(content, options = {}) {
-    const text = readString$1p(content);
+    const text = readString$1q(content);
     if (!text) return [];
     const requested = readNumber$b(options.requested);
     if (!requested) return [];
-    const unit = readString$1p(options.unit) || "words";
+    const unit = readString$1q(options.unit) || "words";
     const sections = splitMarkdownSections(text);
     if (sections.length === 0) return [];
     const target = Math.ceil(requested / sections.length);
@@ -18437,7 +18437,7 @@
   }
 
   function splitMarkdownSections(text) {
-    const lines = readString$1p(text).split(/\r?\n/);
+    const lines = readString$1q(text).split(/\r?\n/);
     const sections = [];
     let current = null;
     for (const line of lines) {
@@ -18467,15 +18467,15 @@
   }
 
   function resolveActiveRepairReason(previous, facts, actionName, context) {
-    const previousReason = readString$1p(previous && previous.reason);
-    const factReason = readString$1p(facts && facts.reason);
-    const name = readString$1p(actionName);
-    const status = readString$1p(context && context.status);
+    const previousReason = readString$1q(previous && previous.reason);
+    const factReason = readString$1q(facts && facts.reason);
+    const name = readString$1q(actionName);
+    const status = readString$1q(context && context.status);
     const output = readRecord(context && context.output);
     if (
       previousReason === "missing_finalize_after_latest_write" &&
       name === "workspace_finalize_candidate" &&
-      (readString$1p(output && output.kind) === "virtual_workspace_finalize_candidate" || status === "after_workspace_finalize_candidate")
+      (readString$1q(output && output.kind) === "virtual_workspace_finalize_candidate" || status === "after_workspace_finalize_candidate")
     ) {
       const publishProtocol = readRecord(output && output.publishProtocol);
       if (publishProtocol && publishProtocol.readAfterLatestContentChange === true) {
@@ -18486,7 +18486,7 @@
     if (
       previousReason === "missing_latest_workspace_read" &&
       name === "workspace_read" &&
-      (readString$1p(output && output.kind) === "virtual_workspace_read" || status === "after_workspace_read")
+      (readString$1q(output && output.kind) === "virtual_workspace_read" || status === "after_workspace_read")
     ) {
       return factReason || "terminal_repair_required";
     }
@@ -18497,14 +18497,14 @@
   }
 
   function isPublishProtocolRepairReason(value) {
-    const reason = readString$1p(value);
+    const reason = readString$1q(value);
     return reason === "missing_finalize_after_latest_write" || reason === "missing_latest_workspace_read";
   }
 
   function isPublishProtocolStillBlockedForReason(runState, reason) {
     const protocol = readCurrentPublishProtocol(runState);
     if (!protocol) return false;
-    const value = readString$1p(reason);
+    const value = readString$1q(reason);
     if (value === "missing_finalize_after_latest_write") {
       return protocol.finalizedAfterLatestWrite !== true;
     }
@@ -18515,10 +18515,10 @@
   }
 
   function isPublishProtocolRequiredActionCompleted(reason, actionName, output, status) {
-    const repairReason = readString$1p(reason);
-    const name = readString$1p(actionName);
-    const outputKind = readString$1p(output && output.kind);
-    const phase = readString$1p(status);
+    const repairReason = readString$1q(reason);
+    const name = readString$1q(actionName);
+    const outputKind = readString$1q(output && output.kind);
+    const phase = readString$1q(status);
     if (repairReason === "missing_finalize_after_latest_write") {
       return name === "workspace_finalize_candidate" &&
         (outputKind === "virtual_workspace_finalize_candidate" || phase === "after_workspace_finalize_candidate");
@@ -18531,8 +18531,8 @@
   }
 
   function readOutputRepairReason(output) {
-    const status = readString$1p(output && output.status);
-    const reason = readString$1p(output && output.reason);
+    const status = readString$1q(output && output.status);
+    const reason = readString$1q(output && output.reason);
     for (const value of [status, reason]) {
       if (!value) continue;
       if (value === "ok" || value === "complete" || value === "completed") continue;
@@ -18547,7 +18547,7 @@
     return value
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const label = readString$1p(entry[key]);
+        const label = readString$1q(entry[key]);
         if (!label) return null;
         return {
           count: readNumber$b(entry.count),
@@ -18577,7 +18577,7 @@
     // ADR-0033 Tier A.8 (X1 fix) — hard_veto state counts as constrained so the
     // contract surface stops insisting on structure repair when AI can't make
     // progress. AI must still mention structure in remainingGaps to publish.
-    const hardVetoActive = readString$1p(escalation) === "hard_veto";
+    const hardVetoActive = readString$1q(escalation) === "hard_veto";
     const constrained = budgetState === "low" || budgetState === "exhausted" || hardVetoActive;
     const todoRequiresSyncFirst = deficits.includes("todo") && !constrained;
     return {
@@ -18612,8 +18612,8 @@
       ? observableDeficits.readiness
       : null;
     const issues = Array.isArray(readiness && readiness.issues) ? readiness.issues : [];
-    const observedLengthIssue = issues.find((issue) => readString$1p(issue && issue.code) === "observed_length_mismatch");
-    const sourceCountIssue = issues.find((issue) => readString$1p(issue && issue.code) === "successful_read_url_count_mismatch");
+    const observedLengthIssue = issues.find((issue) => readString$1q(issue && issue.code) === "observed_length_mismatch");
+    const sourceCountIssue = issues.find((issue) => readString$1q(issue && issue.code) === "successful_read_url_count_mismatch");
     return {
       finalReadiness: {
         decision: "ready",
@@ -18657,7 +18657,7 @@
     if (structure) {
       const issueCodes = Array.isArray(structure.issueCodes) && structure.issueCodes.length > 0
         ? structure.issueCodes.join(",")
-        : (readString$1p(structure.reason) || "structure_not_ready");
+        : (readString$1q(structure.reason) || "structure_not_ready");
       remainingGaps.push(`Structure is still not ready: ${issueCodes}.`);
     }
     if (todo) {
@@ -18711,7 +18711,7 @@
     const todo = observableDeficits && observableDeficits.todo && typeof observableDeficits.todo === "object"
       ? observableDeficits.todo
       : null;
-    const protocolReason = readString$1p(reason);
+    const protocolReason = readString$1q(reason);
     if (protocolReason === "missing_finalize_after_latest_write") {
       parts.push("Publish protocol deficit: workspace content changed after the last finalized candidate; run workspace_finalize_candidate for the selected path before publishing.");
     } else if (protocolReason === "missing_latest_workspace_read") {
@@ -18773,13 +18773,13 @@
     if (deficits.includes("readiness") && readiness) {
       const issueSummary = Array.isArray(readiness.issues) && readiness.issues.length > 0
         ? readiness.issues.map((issue) => {
-            const field = readString$1p(issue.field);
-            const code = readString$1p(issue.code) || "readiness_payload_mismatch";
+            const field = readString$1q(issue.field);
+            const code = readString$1q(issue.code) || "readiness_payload_mismatch";
             const declared = issue.declared != null ? ` declared=${issue.declared}` : "";
             const observed = issue.observed != null ? ` observed=${issue.observed}` : "";
             return `${code}${field ? ` field=${field}` : ""}${declared}${observed}`;
           }).join(" | ")
-        : readString$1p(readiness.message) || "readiness payload mismatch";
+        : readString$1q(readiness.message) || "readiness payload mismatch";
       parts.push(`Readiness payload deficit: prior finalReadiness did not match observable runtime facts (${issueSummary}). Correct only the listed finalReadiness fields and retry with the allowed actions; do not add source or workspace work unless source, length, structure, or Todo deficits are also active.`);
     }
     if (Array.isArray(allowedActions) && allowedActions.length > 0) {
@@ -18814,8 +18814,8 @@
 
   function readLengthStatus(packet, runState) {
     const requested = readRecord(packet && packet.requestedLength);
-    const statsKey = readString$1p(requested && requested.statsKey) ||
-      (readString$1p(requested && requested.unit) === "words" ? "words" : "chars");
+    const statsKey = readString$1q(requested && requested.statsKey) ||
+      (readString$1q(requested && requested.unit) === "words" ? "words" : "chars");
     const requestedValue = readNumber$b(requested && requested.value);
     if (!requestedValue || !statsKey) return null;
     const candidate = readRecord(packet && packet.candidate) ||
@@ -18824,17 +18824,17 @@
       readCandidateStatsFromWorkspace(runState);
     return {
       observed: readNumber$b(stats && stats[statsKey]),
-      path: readString$1p(candidate && candidate.path) || readFinalCandidatePathFromWorkspace(runState),
+      path: readString$1q(candidate && candidate.path) || readFinalCandidatePathFromWorkspace(runState),
       requested: requestedValue,
       statsKey,
-      unit: readString$1p(requested && requested.unit) || statsKey
+      unit: readString$1q(requested && requested.unit) || statsKey
     };
   }
 
   function readFinalCandidatePathFromWorkspace(runState) {
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const quality = readRecord(workspace && workspace.quality);
-    return readString$1p(quality && quality.finalCandidatePath) || "final_candidate.md";
+    return readString$1q(quality && quality.finalCandidatePath) || "final_candidate.md";
   }
 
   function readCurrentPublishProtocol(runState) {
@@ -18858,10 +18858,10 @@
       ? workspace.files
       : null;
     if (!files) return null;
-    const selectedPath = readString$1p(currentPath) || readFinalCandidatePathFromWorkspace(runState);
+    const selectedPath = readString$1q(currentPath) || readFinalCandidatePathFromWorkspace(runState);
     let best = null;
     for (const [path, file] of Object.entries(files)) {
-      const safePath = readString$1p(path);
+      const safePath = readString$1q(path);
       if (!safePath || safePath === selectedPath) continue;
       const stats = readRecord(file && file.textStats);
       const value = readNumber$b(stats && stats[statsKey]);
@@ -18890,27 +18890,27 @@
     const protocol = inspectWorkspacePublishProtocol(workspace, readFinalCandidatePathFromWorkspace(runState));
     return quality && (
       quality.finalCandidateReady === true ||
-      readString$1p(quality.finalCandidateStatus) === "needs_structure_repair" ||
-      readString$1p(quality.finalCandidateStatus) === "ready" ||
+      readString$1q(quality.finalCandidateStatus) === "needs_structure_repair" ||
+      readString$1q(quality.finalCandidateStatus) === "ready" ||
       (protocol && protocol.finalizedAfterLatestWrite === true)
     );
   }
 
   function readTodoStatus(runState) {
     const todoState = readRecord(runState && runState.todoState);
-    if (!todoState || readString$1p(todoState.status) !== "active") {
+    if (!todoState || readString$1q(todoState.status) !== "active") {
       return { unfinishedCount: 0, activeItemId: null };
     }
     const items = Array.isArray(todoState.items) ? todoState.items : [];
     const unfinished = items.filter((item) => {
-      const status = readString$1p(item && item.status);
+      const status = readString$1q(item && item.status);
       return status === "active" || status === "pending" || status === "blocked";
     });
     return {
-      activeItemId: readString$1p(todoState.activeItemId) || null,
+      activeItemId: readString$1q(todoState.activeItemId) || null,
       unfinishedCount: unfinished.length,
-      pendingCount: unfinished.filter((item) => readString$1p(item.status) === "pending").length,
-      blockedCount: unfinished.filter((item) => readString$1p(item.status) === "blocked").length
+      pendingCount: unfinished.filter((item) => readString$1q(item.status) === "pending").length,
+      blockedCount: unfinished.filter((item) => readString$1q(item.status) === "blocked").length
     };
   }
 
@@ -19003,31 +19003,31 @@
   }
 
   function isTerminalAttempt(actionName, context) {
-    const name = readString$1p(actionName);
+    const name = readString$1q(actionName);
     if (name === "workspace_publish_candidate" || name === "finalize" || name === "final") return true;
-    const type = readString$1p(context && context.decision && context.decision.type);
+    const type = readString$1q(context && context.decision && context.decision.type);
     return type === "finalize" || type === "final";
   }
 
   function isTerminalCompleted(actionName, context) {
     if (!isTerminalAttempt(actionName, context)) return false;
     const output = readRecord(context && context.output);
-    if (readString$1p(output && output.kind) === "final_response") return true;
-    if (readString$1p(output && output.control) === "complete") return true;
-    return readString$1p(context && context.status) === "complete";
+    if (readString$1q(output && output.kind) === "final_response") return true;
+    if (readString$1q(output && output.control) === "complete") return true;
+    return readString$1q(context && context.status) === "complete";
   }
 
   function isNoProgressRecoveryAttempt(actionName, output, facts) {
-    const name = readString$1p(actionName);
+    const name = readString$1q(actionName);
     const result = readRecord(output);
     if (
-      readString$1p(result && result.kind) === "terminal_repair_preflight_block" ||
-      readString$1p(result && result.reason).startsWith("terminal_repair_")
+      readString$1q(result && result.kind) === "terminal_repair_preflight_block" ||
+      readString$1q(result && result.reason).startsWith("terminal_repair_")
     ) {
       return true;
     }
     if (name !== "workspace_propose_patch") return false;
-    if (readString$1p(result && result.status) !== "preview_blocked") return false;
+    if (readString$1q(result && result.status) !== "preview_blocked") return false;
     const deficits = Array.isArray(facts && facts.activeDeficits) ? facts.activeDeficits : [];
     const observable = facts && facts.observableDeficits && typeof facts.observableDeficits === "object"
       ? facts.observableDeficits
@@ -19056,19 +19056,19 @@
   function normalizeValidPublishContract(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
-      decision: readString$1p(source.decision) || "limited",
-      remainingGaps: readString$1p(source.remainingGaps) || "non-empty string array with concrete blockers",
-      evidenceSatisfied: source.evidenceSatisfied === false ? false : readString$1p(source.evidenceSatisfied) || "match observed evidence facts",
-      lengthSatisfied: source.lengthSatisfied === false ? false : readString$1p(source.lengthSatisfied) || "match observed candidate stats",
-      requirementSatisfied: source.requirementSatisfied === false ? false : readString$1p(source.requirementSatisfied) || "match observed facts",
-      structureRequirement: readString$1p(source.structureRequirement) || "not blocking",
-      todoRequirement: readString$1p(source.todoRequirement) || "not blocking",
-      budgetState: readString$1p(source.budgetState) || "unknown",
+      decision: readString$1q(source.decision) || "limited",
+      remainingGaps: readString$1q(source.remainingGaps) || "non-empty string array with concrete blockers",
+      evidenceSatisfied: source.evidenceSatisfied === false ? false : readString$1q(source.evidenceSatisfied) || "match observed evidence facts",
+      lengthSatisfied: source.lengthSatisfied === false ? false : readString$1q(source.lengthSatisfied) || "match observed candidate stats",
+      requirementSatisfied: source.requirementSatisfied === false ? false : readString$1q(source.requirementSatisfied) || "match observed facts",
+      structureRequirement: readString$1q(source.structureRequirement) || "not blocking",
+      todoRequirement: readString$1q(source.todoRequirement) || "not blocking",
+      budgetState: readString$1q(source.budgetState) || "unknown",
       observableDeficits: normalizeObservableDeficits(source.observableDeficits),
       requiredArgsExample: source.requiredArgsExample && typeof source.requiredArgsExample === "object" && !Array.isArray(source.requiredArgsExample)
         ? cloneValue(source.requiredArgsExample)
         : null,
-      validTerminalException: readString$1p(source.validTerminalException) || DEFAULT_VALID_PUBLISH_EXCEPTION
+      validTerminalException: readString$1q(source.validTerminalException) || DEFAULT_VALID_PUBLISH_EXCEPTION
       };
   }
 
@@ -19079,10 +19079,10 @@
     const requested = readNumber$b(source.requested);
     if (!requested || observed >= requested) return null;
     return {
-      kind: readString$1p(source.kind) || "lengthExpansionSignal",
+      kind: readString$1q(source.kind) || "lengthExpansionSignal",
       observed,
       requested,
-      unit: readString$1p(source.unit) || "words",
+      unit: readString$1q(source.unit) || "words",
       gap: readNumber$b(source.gap) || Math.max(requested - observed, 0),
       perSectionDelta: Array.isArray(source.perSectionDelta)
         ? source.perSectionDelta.map(normalizeSectionDelta).filter(Boolean).slice(0, 8)
@@ -19096,7 +19096,7 @@
     const source = readRecord(value);
     if (!source) return null;
     return {
-      heading: readString$1p(source.heading).slice(0, 120),
+      heading: readString$1q(source.heading).slice(0, 120),
       observed: readNumber$b(source.observed),
       target: readNumber$b(source.target),
       gap: readNumber$b(source.gap)
@@ -19109,7 +19109,7 @@
     const ignoredCount = readNumber$b(source.ignoredCount);
     if (ignoredCount < TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD) return null;
     return {
-      kind: readString$1p(source.kind) || "terminal_repair_advisory_persistence_signal",
+      kind: readString$1q(source.kind) || "terminal_repair_advisory_persistence_signal",
       ignoredCount,
       vetoThreshold: readNumber$b(source.vetoThreshold) || TERMINAL_REPAIR_HIGH_WATER_MARK,
       stepsRemainingBeforeHardVeto: readNumber$b(source.stepsRemainingBeforeHardVeto)
@@ -19125,18 +19125,18 @@
   function normalizeActionOrderingSignal(value) {
     const source = readRecord(value);
     if (!source) return null;
-    const kind = readString$1p(source.kind);
+    const kind = readString$1q(source.kind);
     if (!kind) return null;
     return {
       kind,
-      preferredActions: readStringArray$3(source.preferredActions).slice(0, 8),
-      reason: readString$1p(source.reason) || null,
+      preferredActions: readStringArray$4(source.preferredActions).slice(0, 8),
+      reason: readString$1q(source.reason) || null,
       workspaceWriteCount: readNumber$b(source.workspaceWriteCount)
     };
   }
 
   function mentionsGap(gaps, keywords) {
-    const text = readStringArray$3(gaps).join(" ").toLowerCase();
+    const text = readStringArray$4(gaps).join(" ").toLowerCase();
     return keywords.some((keyword) => text.includes(keyword));
   }
 
@@ -19144,12 +19144,12 @@
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   }
 
-  function readString$1p(value) {
+  function readString$1q(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readStringArray$3(value) {
-    return Array.isArray(value) ? value.map(readString$1p).filter(Boolean) : [];
+  function readStringArray$4(value) {
+    return Array.isArray(value) ? value.map(readString$1q).filter(Boolean) : [];
   }
 
   function readNumber$b(value) {
@@ -19217,7 +19217,7 @@
   const CONTINUATION_FINAL_SOURCE = "continuation_required";
   const CONTINUATION_TERMINALIZER = "max_steps_continuation";
 
-  function readString$1o(value) {
+  function readString$1p(value) {
     return typeof value === "string" && value.trim() ? value.trim() : "";
   }
 
@@ -19271,23 +19271,23 @@
       total: items.length
     };
     const status = deriveLifecycleStatus(todoState, state, counts);
-    const threadId = readString$1o(state.threadId) || "default";
-    const todoId = readString$1o(todoState.id) || "todo";
-    const activeItemId = readString$1o(activeItem?.id) || null;
+    const threadId = readString$1p(state.threadId) || "default";
+    const todoId = readString$1p(todoState.id) || "todo";
+    const activeItemId = readString$1p(activeItem?.id) || null;
     const hasUnfinishedWork = counts.active > 0 || counts.pending > 0;
 
     return {
       activeItemId,
-      activeItemLabel: readString$1o(activeItem?.label) || null,
+      activeItemLabel: readString$1p(activeItem?.label) || null,
       activePosition: readActivePosition(todoState, activeItemId),
       canCancel: status === "running" || status === "paused" || status === "blocked",
       canContinue: status === "paused" && hasUnfinishedWork && !state.pendingApproval,
       counts,
-      goal: readString$1o(todoState.goal) || null,
+      goal: readString$1p(todoState.goal) || null,
       reason: status === "paused"
         ? CONTINUATION_FINAL_SOURCE
         : (state.pendingApproval ? "pending_approval" : null),
-      runId: readString$1o(state.runId) || null,
+      runId: readString$1p(state.runId) || null,
       status,
       taskId: `todo-task:${threadId}:${todoId}`,
       threadId,
@@ -19553,7 +19553,7 @@
   const CLAIM_LINE_RE = /^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+)$/;
 
   function analyzeClaimCoverage(text, context = {}) {
-    const value = readString$1n(text);
+    const value = readString$1o(text);
     const sourceNotes = readSourceNotes(context);
     const sourceQuality = readSourceQuality(context);
     const gaps = readGaps(context);
@@ -19592,7 +19592,7 @@
   }
 
   function ensureClaimCoverageSection(text, context = {}) {
-    const value = readString$1n(text);
+    const value = readString$1o(text);
     if (!value) return "";
     const analysis = analyzeClaimCoverage(value, context);
     if (!analysis.claimCoverageRequired || analysis.hasClaimCoverageSection) return value;
@@ -19600,7 +19600,7 @@
   }
 
   function normalizeConstrainedEvidenceClaims(text, context = {}) {
-    const value = readString$1n(text);
+    const value = readString$1o(text);
     if (!value) return "";
     if (looksLikeCompiledEvidenceReport(value)) return value;
     const analysis = analyzeClaimCoverage(value, context);
@@ -19733,17 +19733,17 @@
     const loop = context && context.researchReportLoop && typeof context.researchReportLoop === "object"
       ? context.researchReportLoop
       : null;
-    const status = loop ? readString$1n(loop.status) : "";
+    const status = loop ? readString$1o(loop.status) : "";
     return Boolean(
       loop &&
-      (loop.enabled === true || readString$1n(loop.finalMode) || (status && status !== "idle"))
+      (loop.enabled === true || readString$1o(loop.finalMode) || (status && status !== "idle"))
     );
   }
 
 
 
   function extractClaimCandidates(text) {
-    const lines = readString$1n(text).split(/\r?\n/);
+    const lines = readString$1o(text).split(/\r?\n/);
     const claims = [];
     for (const line of lines) {
       const trimmed = line.trim();
@@ -19763,7 +19763,7 @@
   }
 
   function cleanupClaim(value) {
-    return readString$1n(value)
+    return readString$1o(value)
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/[*_`]/g, "")
       .replace(/\s+/g, " ")
@@ -19800,13 +19800,13 @@
       []
         .concat(Array.isArray(state.gaps) ? state.gaps : [])
         .concat(Array.isArray(readiness.remainingGaps) ? readiness.remainingGaps : [])
-        .map(readString$1n)
+        .map(readString$1o)
         .filter(Boolean)
     ));
   }
 
   function insertBeforeSources$1(text, section) {
-    const value = readString$1n(text);
+    const value = readString$1o(text);
     const marker = /\n(?:#{1,6}\s*)?Sources\s*:?\s*\n/i.exec(value);
     if (!marker) return [value, section].filter(Boolean).join("\n\n");
     const sourceStart = marker.index + 1;
@@ -19815,7 +19815,7 @@
     return [before, section, sources].filter(Boolean).join("\n\n");
   }
 
-  function readString$1n(value) {
+  function readString$1o(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -19824,7 +19824,7 @@
   }
 
   function normalizeBlankLines$1(text) {
-    return readString$1n(text)
+    return readString$1o(text)
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n");
   }
@@ -19975,10 +19975,10 @@
       ? workspace.finalReadiness
       : {};
     const workspaceGaps = Array.isArray(readiness.remainingGaps)
-      ? readiness.remainingGaps.map(readString$1m).filter(Boolean)
+      ? readiness.remainingGaps.map(readString$1n).filter(Boolean)
       : [];
     const stateGaps = researchState && Array.isArray(researchState.gaps)
-      ? researchState.gaps.map(readString$1m).filter(Boolean)
+      ? researchState.gaps.map(readString$1n).filter(Boolean)
       : [];
     const sourceQuality = researchState && researchState.sourceQuality && typeof researchState.sourceQuality === "object"
       ? researchState.sourceQuality
@@ -19989,7 +19989,7 @@
   }
 
   function hasResearchQualitySections(text) {
-    const value = readString$1m(text);
+    const value = readString$1n(text);
     const hasSourceQuality = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:source\s+quality|source\s+assessment|evidence\s+quality|quality\s+of\s+sources)\b/i.test(value);
     const hasGaps = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:evidence\s+gaps?|limitations?|limits\s+of\s+the\s+evidence)\b/i.test(value);
     return hasSourceQuality && hasGaps;
@@ -19999,10 +19999,10 @@
     const loop = context && context.researchReportLoop && typeof context.researchReportLoop === "object"
       ? context.researchReportLoop
       : null;
-    const status = loop ? readString$1m(loop.status) : "";
+    const status = loop ? readString$1n(loop.status) : "";
     return Boolean(
       loop &&
-      (loop.enabled === true || readString$1m(loop.finalMode) || (status && status !== "idle"))
+      (loop.enabled === true || readString$1n(loop.finalMode) || (status && status !== "idle"))
     );
   }
 
@@ -20034,7 +20034,7 @@
     const gaps = []
       .concat(Array.isArray(state.gaps) ? state.gaps : [])
       .concat(Array.isArray(readiness.remainingGaps) ? readiness.remainingGaps : [])
-      .map(readString$1m)
+      .map(readString$1n)
       .filter(Boolean);
     const unique = Array.from(new Set(gaps)).slice(0, 6);
     if (unique.length === 0) {
@@ -20044,7 +20044,7 @@
   }
 
   function ensureAnalystReportScaffold(text, context = {}) {
-    const value = readString$1m(text);
+    const value = readString$1n(text);
     if (!value || !isResearchReportLoopActive(context)) return value;
 
     const title = "Research Report";
@@ -20059,7 +20059,7 @@
   }
 
   function stripUserFacingResearchDiagnostics(text) {
-    const lines = readString$1m(text).split(/\r?\n/);
+    const lines = readString$1n(text).split(/\r?\n/);
     const output = [];
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index];
@@ -20078,11 +20078,11 @@
   }
 
   function isResearchDiagnosticLine(line) {
-    return /\b(?:final answer with explicit limitations|source minimum|relevant source|read source|authority coverage|source-authority gate|quality gate|structured evidence gate|workspace|OODAE|TodoState|debug)\b/i.test(readString$1m(line));
+    return /\b(?:final answer with explicit limitations|source minimum|relevant source|read source|authority coverage|source-authority gate|quality gate|structured evidence gate|workspace|OODAE|TodoState|debug)\b/i.test(readString$1n(line));
   }
 
   function stripStandaloneVerificationCaveats(text) {
-    const lines = readString$1m(text).split(/\r?\n/);
+    const lines = readString$1n(text).split(/\r?\n/);
     return lines
       .filter((line) => !/^\s*(?:[-*+]\s*)?(?:Employment \/ company|Education \/ profile-directory) claims: not directly verified from the read source\(s\) in this run\.\s*$/i.test(line))
       .join("\n")
@@ -20108,11 +20108,11 @@
     const workspace = context && context.researchWorkspace && typeof context.researchWorkspace === "object"
       ? context.researchWorkspace
       : {};
-    return readString$1m(graph.topic) || readString$1m(loop.topic) || readString$1m(workspace.topic);
+    return readString$1n(graph.topic) || readString$1n(loop.topic) || readString$1n(workspace.topic);
   }
 
   function insertBeforeSources(text, sections) {
-    const value = readString$1m(text);
+    const value = readString$1n(text);
     const marker = /\n(?:#{1,6}\s*)?Sources\s*:?\s*\n/i.exec(value);
     if (!marker) return [value, sections].filter(Boolean).join("\n\n");
     const sourceStart = marker.index + 1;
@@ -20158,7 +20158,7 @@
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1m(value) {
+  function readString$1n(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20172,20 +20172,20 @@
     const state = runState && typeof runState === "object" ? runState : {};
     return readNonResumePrompt(state.observationSummary && state.observationSummary.prompt) ||
       readNonResumePrompt(state.originalQuery) ||
-      readString$1l(state.todoState && state.todoState.goal) ||
+      readString$1m(state.todoState && state.todoState.goal) ||
       readNonResumePrompt(state.threadGoalAnchorText) ||
       readNonResumePrompt(request && request.prompt);
   }
 
   function readNonResumePrompt(value) {
-    const text = readString$1l(value);
+    const text = readString$1m(value);
     if (/^resume\s+the\s+paused\s+long[-\s]?running\s+task\b/i.test(text)) {
       return "";
     }
     return text;
   }
 
-  function readString$1l(value) {
+  function readString$1m(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20200,16 +20200,16 @@
   // a follow-up task; this removes the language bias as the minimum viable fix.
 
   function isExternalSourceCoveragePrompt(value) {
-    const prompt = readString$1k(value);
+    const prompt = readString$1l(value);
     return prompt.length > 0;
   }
 
   function isNewsLikeSourceCoveragePrompt(value) {
-    const prompt = readString$1k(value);
+    const prompt = readString$1l(value);
     return prompt.length > 0;
   }
 
-  function readString$1k(value) {
+  function readString$1l(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20320,7 +20320,7 @@
   function extractCandidateListSegments(prompt) {
     const segments = [];
     for (const match of prompt.matchAll(LIST_INTRO_PATTERN)) {
-      const raw = readString$1j(match[1]);
+      const raw = readString$1k(match[1]);
       if (!raw) continue;
       const stopped = raw.split(SEGMENT_STOP_PATTERN)[0] || raw;
       segments.push(stopped);
@@ -20339,7 +20339,7 @@
   }
 
   function normalizeTarget(raw) {
-    const cleaned = collapseWhitespace$1(readString$1j(raw)
+    const cleaned = collapseWhitespace$1(readString$1k(raw)
       .replace(/^the\s+/i, "")
       .replace(/\b(?:for|on|at)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{4}).*$/i, "")
       .replace(/\b(?:news|headlines?|report|research|briefing|roundup)\b.*$/i, ""));
@@ -20380,11 +20380,11 @@
         aliases.add(alias);
       }
     }
-    return Array.from(aliases).map((alias) => readString$1j(alias)).filter(Boolean);
+    return Array.from(aliases).map((alias) => readString$1k(alias)).filter(Boolean);
   }
 
   function normalizeComparableText$3(value) {
-    return readString$1j(value)
+    return readString$1k(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -20394,10 +20394,10 @@
   }
 
   function collapseWhitespace$1(value) {
-    return readString$1j(value).replace(/\s+/g, " ").trim();
+    return readString$1k(value).replace(/\s+/g, " ").trim();
   }
 
-  function readString$1j(value) {
+  function readString$1k(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20450,17 +20450,17 @@
   };
 
   function normalizeSearchPassItems(items, options = {}) {
-    const query = readString$1i(options.query);
-    const baseQuery = readString$1i(options.baseQuery) || query;
+    const query = readString$1j(options.query);
+    const baseQuery = readString$1j(options.baseQuery) || query;
     const passIndex = typeof options.passIndex === "number" ? options.passIndex : 0;
     const entityTokens = extractEntityTokens(baseQuery);
 
     return (Array.isArray(items) ? items : []).map((item, index) => {
-      const url = readString$1i(item && item.url);
-      const title = readString$1i(item && item.title) || `Result ${index + 1}`;
-      const snippet = readString$1i(item && item.snippet) || readString$1i(item && item.content);
+      const url = readString$1j(item && item.url);
+      const title = readString$1j(item && item.title) || `Result ${index + 1}`;
+      const snippet = readString$1j(item && item.snippet) || readString$1j(item && item.content);
       const domain = readDomain$5(url);
-      const engine = readString$1i(item && item.engine) || readString$1i(item && item.source);
+      const engine = readString$1j(item && item.engine) || readString$1j(item && item.source);
       const sourceCategory = classifySearchSourceCategory({
         domain,
         entityTokens,
@@ -20506,10 +20506,10 @@
   }
 
   function classifySearchSourceCategory(options = {}) {
-    const domain = readString$1i(options.domain).toLowerCase();
-    const title = readString$1i(options.title).toLowerCase();
-    const snippet = readString$1i(options.snippet).toLowerCase();
-    const url = readString$1i(options.url).toLowerCase();
+    const domain = readString$1j(options.domain).toLowerCase();
+    const title = readString$1j(options.title).toLowerCase();
+    const snippet = readString$1j(options.snippet).toLowerCase();
+    const url = readString$1j(options.url).toLowerCase();
     const haystack = `${domain} ${title} ${snippet} ${url}`;
     const entityTokens = Array.isArray(options.entityTokens) ? options.entityTokens : [];
 
@@ -20546,7 +20546,7 @@
       return 0;
     }
 
-    const normalizedHaystack = readString$1i(haystack).toLowerCase();
+    const normalizedHaystack = readString$1j(haystack).toLowerCase();
     let count = 0;
 
     for (const token of queryTokens) {
@@ -20563,22 +20563,22 @@
       if (!item || typeof item !== "object") return false;
 
       // Synthetic items (grounded model answer, no URL) count as usable evidence.
-      if (!readString$1i(item.url) && readString$1i(item.snippet)) return true;
+      if (!readString$1j(item.url) && readString$1j(item.snippet)) return true;
 
-      return readString$1i(item.url) &&
-        readString$1i(item.sourceCategory) !== "community" &&
-        readString$1i(item.sourceCategory) !== "marketplace" &&
+      return readString$1j(item.url) &&
+        readString$1j(item.sourceCategory) !== "community" &&
+        readString$1j(item.sourceCategory) !== "marketplace" &&
         typeof item.sourceScore === "number" &&
         item.sourceScore >= 3;
     });
   }
 
   function scoreSearchResult(options) {
-    const domain = readString$1i(options.domain);
-    const title = readString$1i(options.title);
-    const snippet = readString$1i(options.snippet);
-    const url = readString$1i(options.url);
-    const category = readString$1i(options.sourceCategory) || "unknown";
+    const domain = readString$1j(options.domain);
+    const title = readString$1j(options.title);
+    const snippet = readString$1j(options.snippet);
+    const url = readString$1j(options.url);
+    const category = readString$1j(options.sourceCategory) || "unknown";
     const overlap = countTokenOverlap$1(options.query, `${title} ${snippet} ${url}`);
     let score = CATEGORY_WEIGHTS[category] || CATEGORY_WEIGHTS.unknown;
 
@@ -20604,11 +20604,11 @@
     const syntheticItems = [];
 
     for (const item of items) {
-      const url = readString$1i(item && item.url);
+      const url = readString$1j(item && item.url);
 
       // Synthetic items (no URL but have snippet) are kept as-is, not deduped.
       if (!url) {
-        if (readString$1i(item && item.snippet)) {
+        if (readString$1j(item && item.snippet)) {
           syntheticItems.push({ ...item });
         }
         continue;
@@ -20645,7 +20645,7 @@
 
       for (let index = 0; index < remaining.length; index += 1) {
         const item = remaining[index];
-        const domain = readString$1i(item && item.domain);
+        const domain = readString$1j(item && item.domain);
         const domainPenalty = (domainCounts.get(domain) || 0) * 1.5;
         const diversifiedScore = readNumber$7(item && item.sourceScore) - domainPenalty;
 
@@ -20656,7 +20656,7 @@
       }
 
       const next = remaining.splice(bestIndex, 1)[0];
-      const domain = readString$1i(next && next.domain);
+      const domain = readString$1j(next && next.domain);
       domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
       ordered.push(next);
     }
@@ -20665,7 +20665,7 @@
   }
 
   function looksOfficialDomain(domain, entityTokens) {
-    const normalizedDomain = readString$1i(domain).replace(/^www\./i, "");
+    const normalizedDomain = readString$1j(domain).replace(/^www\./i, "");
     if (!normalizedDomain) {
       return false;
     }
@@ -20688,7 +20688,7 @@
   }
 
   function tokenize$2(value) {
-    return readString$1i(value)
+    return readString$1j(value)
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/i)
       .filter((token) => token.length >= 2);
@@ -20702,7 +20702,7 @@
 
   function readDomain$5(value) {
     try {
-      return new URL(readString$1i(value)).hostname.toLowerCase();
+      return new URL(readString$1j(value)).hostname.toLowerCase();
     } catch {
       return "";
     }
@@ -20712,7 +20712,7 @@
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1i(value) {
+  function readString$1j(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20722,8 +20722,8 @@
   // via item.sourceCategory and judges relevance itself.
 
   function createSearchVerification(options = {}) {
-    const strategy = readString$1h(options.strategy) || "general_lookup";
-    const query = readString$1h(options.query);
+    const strategy = readString$1i(options.strategy) || "general_lookup";
+    const query = readString$1i(options.query);
     const rankedItems = Array.isArray(options.rankedItems) ? options.rankedItems : [];
     const readSources = Array.isArray(options.readSources) ? options.readSources : [];
     const supportiveSources = collectSupportiveSources(rankedItems, readSources, query);
@@ -20776,8 +20776,8 @@
 
   function readVerificationState(value) {
     const state = value && typeof value === "object"
-      ? readString$1h(value.state)
-      : readString$1h(value);
+      ? readString$1i(value.state)
+      : readString$1i(value);
 
     return state || "none";
   }
@@ -20802,15 +20802,15 @@
   }
 
   function normalizeSupportiveSource(item, query) {
-    const url = readString$1h(item && item.url);
+    const url = readString$1i(item && item.url);
     if (!url) {
       return null;
     }
 
     const domain = readDomain$4(url);
-    const title = readString$1h(item && item.title);
-    const snippet = readString$1h(item && (item.snippet || item.text));
-    const sourceCategory = readString$1h(item && item.sourceCategory) || classifySearchSourceCategory({
+    const title = readString$1i(item && item.title);
+    const snippet = readString$1i(item && (item.snippet || item.text));
+    const sourceCategory = readString$1i(item && item.sourceCategory) || classifySearchSourceCategory({
       domain,
       snippet,
       title,
@@ -20861,7 +20861,7 @@
   }
 
   function extractEntityTuple(text, entityHint) {
-    const normalizedText = readString$1h(text);
+    const normalizedText = readString$1i(text);
     if (!normalizedText) {
       return null;
     }
@@ -20893,7 +20893,7 @@
   }
 
   function extractEntityHint(query) {
-    return readString$1h(query)
+    return readString$1i(query)
       .toLowerCase()
       .replace(/\b(boss|ceo|director|founder|owner|managing director|who|is|the|of)\b/g, " ")
       .replace(/[^a-z0-9]+/g, " ")
@@ -20904,7 +20904,7 @@
   }
 
   function normalizeEntityValue(value) {
-    return readString$1h(value)
+    return readString$1i(value)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
@@ -20916,13 +20916,13 @@
 
   function readDomain$4(value) {
     try {
-      return new URL(readString$1h(value)).hostname.toLowerCase();
+      return new URL(readString$1i(value)).hostname.toLowerCase();
     } catch {
       return "";
     }
   }
 
-  function readString$1h(value) {
+  function readString$1i(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -21009,7 +21009,7 @@
     const targetAwareSources = selectTargetAwareSources({
       requireConcreteArticle: isArticleLikePrompt(options && options.prompt),
       limit,
-      prompt: readString$1g(options && options.prompt),
+      prompt: readString$1h(options && options.prompt),
       readSources,
       searchResults,
       verificationState,
@@ -21021,7 +21021,7 @@
     }
 
     for (const item of readSources) {
-      const url = readString$1g(item.url);
+      const url = readString$1h(item.url);
       if (!url || seenUrls.has(url) || !isReadableEvidenceSource(item) || !isDirectEvidenceUrl(url)) {
         continue;
       }
@@ -21032,7 +21032,7 @@
       seenUrls.add(url);
       sources.push({
         kind: "read_url",
-        title: readString$1g(item.title) || readString$1g(matchingSearchByUrl.get(url)?.title) || url,
+        title: readString$1h(item.title) || readString$1h(matchingSearchByUrl.get(url)?.title) || url,
         url
       });
 
@@ -21050,7 +21050,7 @@
       : searchResults;
 
     for (const item of searchCandidates) {
-      const url = readString$1g(item.url);
+      const url = readString$1h(item.url);
       if (!url || seenUrls.has(url) || !isDirectEvidenceUrl(url)) {
         continue;
       }
@@ -21069,7 +21069,7 @@
       seenUrls.add(url);
       sources.push({
         kind: "web_search",
-        title: readString$1g(item.title) || url,
+        title: readString$1h(item.title) || url,
         url
       });
 
@@ -21082,7 +21082,7 @@
   }
 
   function appendSourcesSection(text, sources) {
-    const normalizedText = stripGenericSourceLabels(readString$1g(text));
+    const normalizedText = stripGenericSourceLabels(readString$1h(text));
     const sourceList = Array.isArray(sources) ? sources.filter(Boolean) : [];
     const textWithoutModelSources = stripSourcesSection(normalizedText);
 
@@ -21130,8 +21130,8 @@
   }
 
   function formatSourceLine(item) {
-    const title = readString$1g(item && item.title);
-    const url = readString$1g(item && item.url);
+    const title = readString$1h(item && item.title);
+    const url = readString$1h(item && item.url);
 
     if (!title || title === url) {
       return `[${url}](${url})`;
@@ -21141,7 +21141,7 @@
   }
 
   function stripSourcesSection(text) {
-    const normalized = readString$1g(text);
+    const normalized = readString$1h(text);
     if (!normalized) return "";
 
     const lines = normalized.split(/\r?\n/);
@@ -21161,7 +21161,7 @@
   }
 
   function stripGenericSourceLabels(text) {
-    const normalized = readString$1g(text);
+    const normalized = readString$1h(text);
     if (!normalized) return "";
 
     return normalized
@@ -21172,21 +21172,21 @@
   }
 
   function isGenericSourceLabelLine(line) {
-    return /^\s*(?:[-*+]\s*)?(?:[*_]{0,2})?Sources?\s*:\s*(?:Web\s+Search(?:\s+Results?)?|Search(?:\s+Results?)?|web_search|Provider|Grounding|Model|Planned\s+Tool\s+Results?|Tool\s+Results?|Search\s+Data)(?:[*_]{0,2})?\s*$/i.test(readString$1g(line));
+    return /^\s*(?:[-*+]\s*)?(?:[*_]{0,2})?Sources?\s*:\s*(?:Web\s+Search(?:\s+Results?)?|Search(?:\s+Results?)?|web_search|Provider|Grounding|Model|Planned\s+Tool\s+Results?|Tool\s+Results?|Search\s+Data)(?:[*_]{0,2})?\s*$/i.test(readString$1h(line));
   }
 
   function isSourcesHeadingLine(line) {
-    return /^\s*(?:#{1,6}\s*)?(?:[*_]{1,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\s*:?\s*(?:[*_]{1,2})?\s*$/i.test(readString$1g(line));
+    return /^\s*(?:#{1,6}\s*)?(?:[*_]{1,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\s*:?\s*(?:[*_]{1,2})?\s*$/i.test(readString$1h(line));
   }
 
   function isUnsupportedInlineSourcesLine(line) {
-    const normalized = readString$1g(line);
+    const normalized = readString$1h(line);
     if (!normalized || /https?:\/\//i.test(normalized)) return false;
     return /^\s*(?:#{1,6}\s*)?(?:[*_]{0,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\b\s+.{1,180}$/i.test(normalized);
   }
 
   function escapeMarkdownLinkText(value) {
-    return readString$1g(value).replace(/[[\]]/g, "");
+    return readString$1h(value).replace(/[[\]]/g, "");
   }
 
   function normalizeSearchResults(value) {
@@ -21205,8 +21205,8 @@
         item && typeof item === "object" && !Array.isArray(item)
           ? {
               ...item,
-              title: readString$1g(item.title),
-              url: readString$1g(item.url)
+              title: readString$1h(item.title),
+              url: readString$1h(item.url)
             }
           : null
       ))
@@ -21214,7 +21214,7 @@
   }
 
   function selectTargetAwareSources(options) {
-    const targets = extractResearchCoverageTargets(readString$1g(options && options.prompt));
+    const targets = extractResearchCoverageTargets(readString$1h(options && options.prompt));
     if (targets.length < 2) return null;
 
     const candidates = collectSourceCandidates(options);
@@ -21244,11 +21244,11 @@
     const readSources = Array.isArray(options && options.readSources) ? options.readSources : [];
     const searchResults = Array.isArray(options && options.searchResults) ? options.searchResults : [];
     const verifiedUrls = options && options.verifiedUrls instanceof Set ? options.verifiedUrls : new Set();
-    const verificationState = readString$1g(options && options.verificationState);
+    const verificationState = readString$1h(options && options.verificationState);
     const candidates = [];
     const seenUrls = new Set();
     const push = (item, kind) => {
-      const url = readString$1g(item && item.url);
+      const url = readString$1h(item && item.url);
       if (!url || seenUrls.has(url) || !isDirectEvidenceUrl(url)) return;
       if (kind === "read_url" && !isReadableEvidenceSource(item)) return;
       if (kind === "web_search" && verificationState !== "none" && verifiedUrls.size > 0 && !verifiedUrls.has(url)) return;
@@ -21256,8 +21256,8 @@
       candidates.push({
         domain: readDomain$3(url),
         kind,
-        snippet: readString$1g(item && item.snippet) || readString$1g(item && item.content),
-        title: readString$1g(item && item.title) || url,
+        snippet: readString$1h(item && item.snippet) || readString$1h(item && item.content),
+        title: readString$1h(item && item.title) || url,
         url
       });
     };
@@ -21268,11 +21268,11 @@
   }
 
   function isConcreteArticleSource(source) {
-    const url = readString$1g(source && source.url);
+    const url = readString$1h(source && source.url);
     if (!isDirectEvidenceUrl(url)) return false;
 
-    const title = readString$1g(source && source.title);
-    const snippet = readString$1g(source && source.snippet) || readString$1g(source && source.content);
+    const title = readString$1h(source && source.title);
+    const snippet = readString$1h(source && source.snippet) || readString$1h(source && source.content);
     if (isNonNewsEvidenceSource({ title, snippet, url })) {
       return false;
     }
@@ -21291,9 +21291,9 @@
   }
 
   function isNonNewsEvidenceSource(source) {
-    const url = readString$1g(source && source.url);
-    const title = readString$1g(source && source.title);
-    const snippet = readString$1g(source && source.snippet);
+    const url = readString$1h(source && source.url);
+    const title = readString$1h(source && source.title);
+    const snippet = readString$1h(source && source.snippet);
     try {
       const parsed = new URL(url);
       const pathname = decodeURIComponent(parsed.pathname).toLowerCase();
@@ -21309,7 +21309,7 @@
       source.snippet,
       source.url,
       source.domain
-    ].map(readString$1g).join(" ");
+    ].map(readString$1h).join(" ");
     return Array.isArray(target && target.aliases)
       && target.aliases.some((alias) => hasComparablePhrase$1(haystack, alias));
   }
@@ -21326,7 +21326,7 @@
 
   function hasSpecificPath(url) {
     try {
-      const parsed = new URL(readString$1g(url));
+      const parsed = new URL(readString$1h(url));
       const segments = parsed.pathname
         .split("/")
         .map((segment) => decodeURIComponent(segment).toLowerCase().replace(/[^a-z0-9-]+/g, ""))
@@ -21341,7 +21341,7 @@
 
   function isHomepageOrGenericSection(url) {
     try {
-      const parsed = new URL(readString$1g(url));
+      const parsed = new URL(readString$1h(url));
       const segments = parsed.pathname
         .split("/")
         .map((segment) => decodeURIComponent(segment).toLowerCase().replace(/[^a-z0-9-]+/g, ""))
@@ -21354,7 +21354,7 @@
   }
 
   function normalizeComparableText$2(value) {
-    return readString$1g(value)
+    return readString$1h(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -21364,7 +21364,7 @@
   }
 
   function extractPromptFocusTerms(value) {
-    const text = readString$1g(value).toLowerCase();
+    const text = readString$1h(value).toLowerCase();
     if (!text) return [];
 
     const terms = [];
@@ -21396,7 +21396,7 @@
       source && source.content,
       source && source.text,
       source && source.url
-    ].map(readString$1g).join(" "));
+    ].map(readString$1h).join(" "));
 
     return terms.some((term) => haystack.includes(term));
   }
@@ -21414,7 +21414,7 @@
   }
 
   function addDirectUrl(sink, value) {
-    const url = readString$1g(value);
+    const url = readString$1h(value);
     if (isDirectEvidenceUrl(url)) {
       sink.add(url);
     }
@@ -21422,7 +21422,7 @@
 
   function readDomain$3(url) {
     try {
-      return new URL(readString$1g(url)).hostname.replace(/^www\./i, "");
+      return new URL(readString$1h(url)).hostname.replace(/^www\./i, "");
     } catch (error) {
       return "";
     }
@@ -21449,8 +21449,8 @@
       };
     }
 
-    const allowed = new Set(urls.map((url) => readString$1g(url)).filter(Boolean));
-    const kept = sources.filter((item) => allowed.has(readString$1g(item && item.url)));
+    const allowed = new Set(urls.map((url) => readString$1h(url)).filter(Boolean));
+    const kept = sources.filter((item) => allowed.has(readString$1h(item && item.url)));
     return {
       citations: kept.map((item) => item.url),
       sources: kept
@@ -21472,7 +21472,7 @@
 
     // Evidence citations take priority.
     for (const url of evidence) {
-      const normalized = readString$1g(url);
+      const normalized = readString$1h(url);
       if (normalized && !seen.has(normalized)) {
         seen.add(normalized);
         merged.push(normalized);
@@ -21480,7 +21480,7 @@
     }
 
     for (const citation of planner) {
-      const normalized = readString$1g(citation);
+      const normalized = readString$1h(citation);
       if (!normalized || /^https?:\/\//i.test(normalized) || seen.has(normalized)) continue;
       seen.add(normalized);
       merged.push(normalized);
@@ -21490,7 +21490,7 @@
   }
 
   function isDirectEvidenceUrl(value) {
-    const normalized = readString$1g(value);
+    const normalized = readString$1h(value);
     if (!isHttpUrl$1(normalized)) return false;
 
     try {
@@ -21510,10 +21510,10 @@
   }
 
   function isHttpUrl$1(value) {
-    return /^https?:\/\//i.test(readString$1g(value));
+    return /^https?:\/\//i.test(readString$1h(value));
   }
 
-  function readString$1g(value) {
+  function readString$1h(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -21588,13 +21588,13 @@
     const seen = new Set();
     const pushSource = (item, fallback = {}) => {
       if (!item || typeof item !== "object") return;
-      const url = readString$1f(item.url);
+      const url = readString$1g(item.url);
       if (!url || !isDirectEvidenceUrl(url) || seen.has(url)) return;
       const source = {
-        domain: readString$1f(item.domain) || readDomain$2(url),
-        query: readString$1f(item.query) || readString$1f(fallback.query),
-        snippet: readString$1f(item.snippet) || readString$1f(item.content) || readString$1f(fallback.snippet),
-        title: readString$1f(item.title) || readString$1f(fallback.title) || url,
+        domain: readString$1g(item.domain) || readDomain$2(url),
+        query: readString$1g(item.query) || readString$1g(fallback.query),
+        snippet: readString$1g(item.snippet) || readString$1g(item.content) || readString$1g(fallback.snippet),
+        title: readString$1g(item.title) || readString$1g(fallback.title) || url,
         url
       };
       if (requireConcreteArticle && !isConcreteArticleSource(source)) return;
@@ -21606,7 +21606,7 @@
     for (const item of readArray$1(context.aggregatedSearchResults)) pushSource(item);
     for (const item of readArray$1(context.searchResults)) pushSource(item);
     for (const pass of readArray$1(context.searchPasses)) {
-      const query = readString$1f(pass && pass.query);
+      const query = readString$1g(pass && pass.query);
       for (const item of readArray$1(pass && pass.items)) {
         pushSource(item, { query });
       }
@@ -21622,7 +21622,7 @@
       source && source.snippet,
       source && source.url,
       source && source.domain
-    ].map(readString$1f).join(" ");
+    ].map(readString$1g).join(" ");
     return aliases.some((alias) => hasComparablePhrase(haystack, alias));
   }
 
@@ -21642,14 +21642,14 @@
 
   function readDomain$2(url) {
     try {
-      return new URL(readString$1f(url)).hostname.replace(/^www\./i, "");
+      return new URL(readString$1g(url)).hostname.replace(/^www\./i, "");
     } catch (error) {
       return "";
     }
   }
 
   function normalizeComparableText$1(value) {
-    return readString$1f(value)
+    return readString$1g(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -21658,7 +21658,7 @@
       .trim();
   }
 
-  function readString$1f(value) {
+  function readString$1g(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -21675,8 +21675,8 @@
   const VIRTUAL_WORKSPACE_LEAK_RE = /^(?:#{1,6}\s*)?(?:\*\*)?\s*(virtual\s+workspace|workspace\s+(?:draft|files?|operations?|quality)|draft\s+workspace|final\s+candidate|critique\s+notes?)\s*(?:\*\*)?\s*:?\s*$/im;
 
   function analyzeFinalResponseQuality(text, context = {}) {
-    const value = readString$1e(text);
-    const prompt = readString$1e(context.prompt);
+    const value = readString$1f(text);
+    const prompt = readString$1f(context.prompt);
     const targets = extractResearchCoverageTargets(prompt);
     const issues = [];
 
@@ -21780,7 +21780,7 @@
   // (alias removed in PR 2).
   function noteFinalResponseQualityIssues(runState, context = {}) {
     const decision = context && context.decision && typeof context.decision === "object" ? context.decision : null;
-    const answer = readString$1e(decision && decision.answer);
+    const answer = readString$1f(decision && decision.answer);
     if (!answer) return null;
 
     const prompt = readPrompt$3(runState);
@@ -21798,16 +21798,16 @@
     runState.finalResponseQuality = {
       ...state,
       lastIssues: analysis.ok ? [] : analysis.issues.map((issue) => issue.code),
-      lastSource: readString$1e(context && context.source) || null,
+      lastSource: readString$1f(context && context.source) || null,
       vetoCount: analysis.ok ? noteCount : noteCount + 1
     };
     return null;
   }
 
   function normalizeFinalResponseStructure(text, context = {}) {
-    const value = readString$1e(text);
+    const value = readString$1f(text);
     if (!value) return "";
-    const prompt = readString$1e(context.prompt);
+    const prompt = readString$1f(context.prompt);
     const targets = extractResearchCoverageTargets(prompt);
     const sourceCleaned = shouldEnforceSourceLinkQuality(prompt, targets)
       ? stripTrailingSourcesBlock(stripUnsupportedSourceLabelLines(value))
@@ -21832,7 +21832,7 @@
 
     const output = [];
     for (const target of targets) {
-      const body = readString$1e(segments.get(target.key));
+      const body = readString$1f(segments.get(target.key));
       if (!body) continue;
       output.push(`${target.label}\n${body}`);
     }
@@ -21843,7 +21843,7 @@
 
   function findDuplicateTargetHeadings(text, targets) {
     if (!Array.isArray(targets) || targets.length < 2) return [];
-    const lines = readString$1e(text).split(/\r?\n/);
+    const lines = readString$1f(text).split(/\r?\n/);
     return targets.filter((target) => {
       const aliases = Array.isArray(target && target.aliases) ? target.aliases : [target && target.label];
       const count = lines.filter((line) => aliases.some((alias) => isHeadingForTarget(line, alias))).length;
@@ -21852,10 +21852,10 @@
   }
 
   function isHeadingForTarget(line, alias) {
-    const heading = readString$1e(line)
+    const heading = readString$1f(line)
       .replace(/^#{1,6}\s*/, "")
       .replace(/[:：]\s*$/, "");
-    const needle = readString$1e(alias);
+    const needle = readString$1f(alias);
     if (!heading || !needle) return false;
     const normalizedHeading = normalizeComparableText(heading);
     const normalizedNeedle = normalizeComparableText(needle);
@@ -21869,13 +21869,13 @@
   }
 
   function hasBareSourcesSection(text) {
-    const lines = readString$1e(text).split(/\r?\n/);
+    const lines = readString$1f(text).split(/\r?\n/);
     for (let index = 0; index < lines.length; index += 1) {
       if (!SOURCE_HEADING_RE.test(lines[index])) continue;
       const body = [];
       for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
         const line = lines[cursor];
-        if (!readString$1e(line)) {
+        if (!readString$1f(line)) {
           if (body.length > 0) break;
           continue;
         }
@@ -21884,7 +21884,7 @@
         if (body.length >= 6) break;
       }
       const bodyText = body.join("\n");
-      if (readString$1e(bodyText) && !MARKDOWN_LINK_RE.test(bodyText)) {
+      if (readString$1f(bodyText) && !MARKDOWN_LINK_RE.test(bodyText)) {
         return true;
       }
     }
@@ -21900,22 +21900,22 @@
   }
 
   function hasUnsupportedSourceLabel(text) {
-    return readString$1e(text).split(/\r?\n/).some((line) => {
+    return readString$1f(text).split(/\r?\n/).some((line) => {
       const match = line.match(SOURCE_LABEL_RE);
       if (!match) return false;
-      const value = readString$1e(match[1]);
+      const value = readString$1f(match[1]);
       if (!value) return false;
       return !MARKDOWN_LINK_RE.test(value);
     });
   }
 
   function stripUnsupportedSourceLabelLines(text) {
-    return readString$1e(text)
+    return readString$1f(text)
       .split(/\r?\n/)
       .filter((line) => {
         const match = line.match(SOURCE_LABEL_RE);
         if (!match) return true;
-        return MARKDOWN_LINK_RE.test(readString$1e(match[1]));
+        return MARKDOWN_LINK_RE.test(readString$1f(match[1]));
       })
       .join("\n")
       .replace(/\n{3,}/g, "\n\n")
@@ -21923,17 +21923,17 @@
   }
 
   function stripTrailingSourcesBlock(text) {
-    const lines = readString$1e(text).split(/\r?\n/);
+    const lines = readString$1f(text).split(/\r?\n/);
     for (let index = lines.length - 1; index >= 0; index -= 1) {
       if (SOURCE_HEADING_RE.test(lines[index])) {
         return lines.slice(0, index).join("\n").trim();
       }
     }
-    return readString$1e(text);
+    return readString$1f(text);
   }
 
   function stripInternalArtifactLines(text) {
-    return readString$1e(text)
+    return readString$1f(text)
       .split(/\r?\n/)
       .filter((line) => !isInternalArtifactLine(line))
       .join("\n")
@@ -21942,7 +21942,7 @@
   }
 
   function isInternalArtifactLine(line) {
-    const normalized = readString$1e(line).replace(/^`+|`+$/g, "").trim();
+    const normalized = readString$1f(line).replace(/^`+|`+$/g, "").trim();
     if (!normalized) return false;
     return /^\[\s*"[^"]*\b(?:search|read|analy[sz]e|todo|plan|fetch|inspect)\b[^"]*"\s*(?:,\s*"[^"]*")*\s*\]$/i.test(normalized);
   }
@@ -21959,10 +21959,10 @@
       ? workspace.finalReadiness
       : {};
     const workspaceGaps = Array.isArray(readiness.remainingGaps)
-      ? readiness.remainingGaps.map(readString$1e).filter(Boolean)
+      ? readiness.remainingGaps.map(readString$1f).filter(Boolean)
       : [];
     const stateGaps = researchState && Array.isArray(researchState.gaps)
-      ? researchState.gaps.map(readString$1e).filter(Boolean)
+      ? researchState.gaps.map(readString$1f).filter(Boolean)
       : [];
     const sourceQuality = researchState && researchState.sourceQuality && typeof researchState.sourceQuality === "object"
       ? researchState.sourceQuality
@@ -21976,7 +21976,7 @@
   }
 
   function hasResearchReportSections(text) {
-    const value = readString$1e(text);
+    const value = readString$1f(text);
     if (!value) return false;
     const hasSourceQuality = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:source\s+quality|source\s+assessment|evidence\s+quality|quality\s+of\s+sources)\b/i.test(value);
     const hasGaps = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:evidence\s+gaps?|limitations?|limits\s+of\s+the\s+evidence)\b/i.test(value);
@@ -21988,16 +21988,16 @@
   }
 
   function stripUnsupportedEvidenceLinks(text, context = {}) {
-    const prompt = readString$1e(context.prompt);
+    const prompt = readString$1f(context.prompt);
     if (!shouldEnforceSourceLinkQuality(prompt, context.targets)) {
-      return readString$1e(text);
+      return readString$1f(text);
     }
 
-    return readString$1e(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+[^)]*)\)/gi, (match, label, url) => {
-      const cleanLabel = readString$1e(label).replace(/^source\s*:\s*/i, "");
+    return readString$1f(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+[^)]*)\)/gi, (match, label, url) => {
+      const cleanLabel = readString$1f(label).replace(/^source\s*:\s*/i, "");
       return isConcreteArticleSource({ title: cleanLabel, url })
-        ? `[${cleanLabel || readString$1e(label)}](${url})`
-        : cleanLabel || readString$1e(label);
+        ? `[${cleanLabel || readString$1f(label)}](${url})`
+        : cleanLabel || readString$1f(label);
     });
   }
 
@@ -22008,13 +22008,13 @@
 
     function flush() {
       if (!activeTarget) return;
-      const body = readString$1e(buffer.join("\n"));
+      const body = readString$1f(buffer.join("\n"));
       if (body) {
         byKey.set(activeTarget.key, body);
       }
     }
 
-    for (const line of readString$1e(text).split(/\r?\n/)) {
+    for (const line of readString$1f(text).split(/\r?\n/)) {
       const nextTarget = targets.find((target) => {
         const aliases = Array.isArray(target && target.aliases) ? target.aliases : [target && target.label];
         return aliases.some((alias) => isHeadingForTarget(line, alias));
@@ -22039,7 +22039,7 @@
   }
 
   function normalizeComparableText(value) {
-    return readString$1e(value)
+    return readString$1f(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -22047,7 +22047,7 @@
       .trim();
   }
 
-  function readString$1e(value) {
+  function readString$1f(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22233,12 +22233,12 @@
     const sources = [];
     const seenUrls = new Set();
     for (const source of sourceArtifacts) {
-      const url = readString$1d(source && source.url);
+      const url = readString$1e(source && source.url);
       if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
       seenUrls.add(url);
       sources.push({
         kind: "research_evidence_graph",
-        title: readString$1d(source && source.title) || url,
+        title: readString$1e(source && source.title) || url,
         url
       });
       if (sources.length >= 8) break;
@@ -22314,7 +22314,7 @@
     }
   }
 
-  function readString$1d(value) {
+  function readString$1e(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22369,8 +22369,8 @@
       ? runState.researchReportLoop
       : null;
     if (!loop) return false;
-    const status = readString$1d(loop.status);
-    return loop.enabled === true || Boolean(readString$1d(loop.finalMode)) || Boolean(status && status !== "idle");
+    const status = readString$1e(loop.status);
+    return loop.enabled === true || Boolean(readString$1e(loop.finalMode)) || Boolean(status && status !== "idle");
   }
 
   function recordObservation$1(runState, pushStep, observation, detail) {
@@ -22755,7 +22755,7 @@
     const count = Number.isInteger(runState && runState.plannerInvalidCount)
       ? runState.plannerInvalidCount
       : 0;
-    const responseText = readString$1c(plannerResult && plannerResult.response && plannerResult.response.text);
+    const responseText = readString$1d(plannerResult && plannerResult.response && plannerResult.response.text);
     return {
       active: count > 0,
       count,
@@ -22767,7 +22767,7 @@
     };
   }
 
-  function readString$1c(value) {
+  function readString$1d(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22812,7 +22812,7 @@
   }
 
   function isExecutableTopicLikeTurn(prompt, turnIntent) {
-    const text = readString$1b(prompt);
+    const text = readString$1c(prompt);
 
     if (!text) {
       return false;
@@ -22821,7 +22821,7 @@
     if (
       !turnIntent ||
       typeof turnIntent !== "object" ||
-      readString$1b(turnIntent.kind) !== "new_task"
+      readString$1c(turnIntent.kind) !== "new_task"
     ) {
       return false;
     }
@@ -22843,7 +22843,7 @@
   }
 
   function isQuestionLikeText(value) {
-    const text = readString$1b(value);
+    const text = readString$1c(value);
     return /\?$/.test(text) || /^(what|which|who|when|where|why|how|do|does|did|can|could|would|should|is|are|am|will)\b/i.test(text);
   }
 
@@ -22858,10 +22858,10 @@
   }
 
   function trimTrailingPunctuation$2(value) {
-    return readString$1b(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1c(value).replace(/[.?!]+$/g, "").trim();
   }
 
-  function readString$1b(value) {
+  function readString$1c(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22881,7 +22881,7 @@
 
   function deriveOpenAmbiguity(pendingClarification) {
     return isPendingClarification$1(pendingClarification)
-      ? readString$1a(pendingClarification.question)
+      ? readString$1b(pendingClarification.question)
       : "";
   }
 
@@ -22901,22 +22901,22 @@
     }
 
     if (
-      readString$1a(options && options.currentGoal).length === 0 ||
-      readString$1a(options && options.currentTopic).length === 0 ||
-      readString$1a(options && options.goalQuality) !== "stable"
+      readString$1b(options && options.currentGoal).length === 0 ||
+      readString$1b(options && options.currentTopic).length === 0 ||
+      readString$1b(options && options.goalQuality) !== "stable"
     ) {
       return "unresolved";
     }
 
-    if (readString$1a(options && options.evidenceState) !== "none") {
+    if (readString$1b(options && options.evidenceState) !== "none") {
       return "inferable";
     }
 
-    if (readString$1a(options && options.promptSignal) !== "low") {
+    if (readString$1b(options && options.promptSignal) !== "low") {
       return "unresolved";
     }
 
-    if (readString$1a(options && options.semanticHint) === "inferable") {
+    if (readString$1b(options && options.semanticHint) === "inferable") {
       return "inferable";
     }
 
@@ -22929,7 +22929,7 @@
   }
 
   function detectClarificationLoopRisk(options) {
-    if (readString$1a(options && options.actionName) !== "ask_clarification") {
+    if (readString$1b(options && options.actionName) !== "ask_clarification") {
       return false;
     }
 
@@ -22947,8 +22947,8 @@
       return false;
     }
 
-    const currentGoal = readString$1a(options && options.currentGoal);
-    const currentTopic = readString$1a(options && options.currentTopic);
+    const currentGoal = readString$1b(options && options.currentGoal);
+    const currentTopic = readString$1b(options && options.currentTopic);
     if (!currentGoal || !currentTopic) {
       return false;
     }
@@ -22962,7 +22962,7 @@
       )
     );
 
-    if (readString$1a(options && options.promptSignal) !== "low" || !repeatedClarification) {
+    if (readString$1b(options && options.promptSignal) !== "low" || !repeatedClarification) {
       return false;
     }
 
@@ -22970,7 +22970,7 @@
       return true;
     }
 
-    return readString$1a(options && options.evidenceState) !== "none";
+    return readString$1b(options && options.evidenceState) !== "none";
   }
 
   function isPendingClarification$1(value) {
@@ -22978,22 +22978,22 @@
       value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
-      readString$1a(value.question)
+      readString$1b(value.question)
     );
   }
 
   function isResolvedResolution(value) {
-    const kind = readString$1a(value && value.kind);
+    const kind = readString$1b(value && value.kind);
     return RESOLVED_KINDS.has(kind);
   }
 
   function readClarificationStatus(value) {
-    const text = readString$1a(value);
+    const text = readString$1b(value);
     return text === "resolved" ? "resolved" : "none";
   }
 
   function readRecentTurnStats(text) {
-    const lines = readString$1a(text)
+    const lines = readString$1b(text)
       .split(/\r?\n+/)
       .map((line) => line.trim())
       .filter(Boolean);
@@ -23022,7 +23022,7 @@
   }
 
   function hasOptionStyleAmbiguity(value) {
-    return /\([A-Z]\)/.test(readString$1a(value));
+    return /\([A-Z]\)/.test(readString$1b(value));
   }
 
   function isLowSignalText(value) {
@@ -23031,10 +23031,10 @@
   }
 
   function trimTrailingPunctuation$1(value) {
-    return readString$1a(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1b(value).replace(/[.?!]+$/g, "").trim();
   }
 
-  function readString$1a(value) {
+  function readString$1b(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23108,11 +23108,11 @@
   }
 
   function normalizeValue(value) {
-    return readString$19(value).toLowerCase().replace(/\s+/g, " ");
+    return readString$1a(value).toLowerCase().replace(/\s+/g, " ");
   }
 
   function readTurnIntentKind(options) {
-    return readString$19(
+    return readString$1a(
       options &&
       typeof options === "object" &&
       options.turnIntent &&
@@ -23123,7 +23123,7 @@
   }
 
   function readExecutionClass(options) {
-    return readString$19(
+    return readString$1a(
       options &&
       typeof options === "object"
         ? options.executionClass
@@ -23131,7 +23131,7 @@
     );
   }
 
-  function readString$19(value) {
+  function readString$1a(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23154,7 +23154,7 @@
     const inquiryContext = normalizedResolution.inquiryContext;
     const prompt = readPrompt$2(request, observationSummary);
     const turnIntent = normalizedResolution.turnIntent;
-    const executionClass = readString$18(normalizedResolution.executionClass) || null;
+    const executionClass = readString$19(normalizedResolution.executionClass) || null;
     const goalQuality = classifyGoalQuality(inquiryContext.activeGoal, inquiryContext.activeTopic, {
           executionClass,
           prompt,
@@ -23179,7 +23179,7 @@
     });
 
     return {
-      activeQuery: readString$18(normalizedResolution.activeQuery),
+      activeQuery: readString$19(normalizedResolution.activeQuery),
       activeTask: inquiryContext.activeGoal || prompt,
       ambiguityState,
       clarificationStatus,
@@ -23204,11 +23204,11 @@
   }
 
   function createEvaluationState(options) {
-    const actionName = readString$18(options && options.actionName);
+    const actionName = readString$19(options && options.actionName);
     const plannerState = options && typeof options === "object" ? options.plannerState : null;
     const turnState = options && typeof options === "object" ? options.turnState : null;
-    const evidenceState = readString$18(plannerState && plannerState.evidenceState) || "none";
-    const promptSignal = readString$18(plannerState && plannerState.promptSignal) || "empty";
+    const evidenceState = readString$19(plannerState && plannerState.evidenceState) || "none";
+    const promptSignal = readString$19(plannerState && plannerState.promptSignal) || "empty";
     const pendingClarification = plannerState && plannerState.pendingClarification
       ? plannerState.pendingClarification
       : null;
@@ -23221,11 +23221,11 @@
       plannerState && plannerState.clarificationStatus
     );
     const ambiguityState = deriveAmbiguityState({
-      currentGoal: readString$18(plannerState && plannerState.currentGoal),
-      currentTopic: readString$18(plannerState && plannerState.currentTopic),
+      currentGoal: readString$19(plannerState && plannerState.currentGoal),
+      currentTopic: readString$19(plannerState && plannerState.currentTopic),
       evidenceState,
       fallbackClarificationStatus: clarificationStatus,
-      goalQuality: readString$18(plannerState && plannerState.goalQuality),
+      goalQuality: readString$19(plannerState && plannerState.goalQuality),
       lastResolution,
       pendingClarification,
       promptSignal,
@@ -23233,13 +23233,13 @@
     });
     const clarificationLoopRisk = detectClarificationLoopRisk({
       actionName,
-      currentGoal: readString$18(plannerState && plannerState.currentGoal),
-      currentTopic: readString$18(plannerState && plannerState.currentTopic),
+      currentGoal: readString$19(plannerState && plannerState.currentGoal),
+      currentTopic: readString$19(plannerState && plannerState.currentTopic),
       evidenceState,
       lastResolution,
       pendingClarification,
       promptSignal,
-      recentTurns: readString$18(options && options.sessionContext && options.sessionContext.recentTurns),
+      recentTurns: readString$19(options && options.sessionContext && options.sessionContext.recentTurns),
       semanticHint: ""
     });
 
@@ -23253,9 +23253,9 @@
       hasUserClarification: Boolean(
         plannerState && plannerState.hasUserClarification
       ) || Boolean(turnState && turnState.hasUserClarification),
-      nextState: readString$18(options && options.nextState) || null,
+      nextState: readString$19(options && options.nextState) || null,
       openAmbiguity: deriveOpenAmbiguity(pendingClarification) || null,
-      outcome: readString$18(options && options.outcome) || null
+      outcome: readString$19(options && options.outcome) || null
     };
   }
 
@@ -23311,15 +23311,15 @@
         };
 
     return {
-      activeQuery: readString$18(source.activeQuery),
-      evidenceState: readString$18(source.evidenceState) || "none",
+      activeQuery: readString$19(source.activeQuery),
+      evidenceState: readString$19(source.evidenceState) || "none",
       inquiryContext: normalizePlannerInquiryContext(
         source.inquiryContext && typeof source.inquiryContext === "object"
           ? source.inquiryContext
           : intentState
       ),
       shouldUseRecall: source.shouldUseRecall === true,
-      executionClass: readString$18(source.executionClass) || null,
+      executionClass: readString$19(source.executionClass) || null,
       turnIntent: source.turnIntent && typeof source.turnIntent === "object"
         ? source.turnIntent
         : null,
@@ -23349,7 +23349,7 @@
   }
 
   function trimTrailingPunctuation(value) {
-    return readString$18(value).replace(/[.?!]+$/g, "").trim();
+    return readString$19(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function readPrompt$2(request, normalizedInput) {
@@ -23365,7 +23365,7 @@
   }
 
   function readPlannerPromptSignal(request, observationSummary) {
-    const explicit = readString$18(observationSummary && observationSummary.promptSignal);
+    const explicit = readString$19(observationSummary && observationSummary.promptSignal);
     return explicit || classifyPromptSignal(readPrompt$2(request, null)).signal;
   }
 
@@ -23373,9 +23373,9 @@
     const source = value && typeof value === "object" ? value : {};
 
     return {
-      activeGoal: readString$18(source.activeGoal || source.goal),
-      activeQuery: readString$18(source.activeQuery),
-      activeTopic: readString$18(source.activeTopic || source.topic),
+      activeGoal: readString$19(source.activeGoal || source.goal),
+      activeQuery: readString$19(source.activeQuery),
+      activeTopic: readString$19(source.activeTopic || source.topic),
       lastClarificationResolution: source.lastClarificationResolution || source.lastResolution || null,
       pendingClarification: source.pendingClarification && typeof source.pendingClarification === "object"
         ? source.pendingClarification
@@ -23383,7 +23383,7 @@
     };
   }
 
-  function readString$18(value) {
+  function readString$19(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23410,15 +23410,15 @@
   }
 
   function normalizeAnchorText(value) {
-    return readString$17(value).replace(/[.?!]+$/g, "").trim();
+    return readString$18(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function looksLikeAffirmativePrompt(value) {
-    return /^(yes|yeah|yep|ok|okay|sure|go ahead|do it|just do it)\b/i.test(readString$17(value));
+    return /^(yes|yeah|yep|ok|okay|sure|go ahead|do it|just do it)\b/i.test(readString$18(value));
   }
 
   function inferClarifiedTopic(question) {
-    const text = readString$17(question);
+    const text = readString$18(question);
     const directMatch = text.match(/^do you mean\s+(.+?)(?:\s+specifically)?[?]?$/i);
 
     if (directMatch && directMatch[1]) {
@@ -23448,9 +23448,9 @@
     }
 
     return {
-      activeGoal: readString$17(intentState.goal),
-      activeQuery: readString$17(inputResolution && inputResolution.activeQuery),
-      activeTopic: readString$17(intentState.topic),
+      activeGoal: readString$18(intentState.goal),
+      activeQuery: readString$18(inputResolution && inputResolution.activeQuery),
+      activeTopic: readString$18(intentState.topic),
       continuityKind: "input_resolution",
       hasUserClarification: intentState.hasUserClarification === true,
       lastClarificationResolution: cloneResolution(intentState.lastResolution),
@@ -23460,12 +23460,12 @@
   }
 
   function matchClarificationOption(prompt, options) {
-    const normalizedPrompt = readString$17(prompt).toLowerCase();
+    const normalizedPrompt = readString$18(prompt).toLowerCase();
     const normalizedOptions = Array.isArray(options) ? options : [];
 
     for (const option of normalizedOptions) {
-      const key = readString$17(option && option.key);
-      const text = readString$17(option && option.text);
+      const key = readString$18(option && option.key);
+      const text = readString$18(option && option.text);
 
       if (!key || !text) {
         continue;
@@ -23545,14 +23545,14 @@
   }
 
   function tokenize$1(value) {
-    return readString$17(value)
+    return readString$18(value)
       .toLowerCase()
       .split(/[^a-z0-9]+/i)
       .map((token) => token.trim())
       .filter((token) => token.length > 1);
   }
 
-  function readString$17(value) {
+  function readString$18(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23561,9 +23561,9 @@
     const normalizedPrompt = normalizeAnchorText(prompt);
     if (!normalizedPrompt) {
       return {
-        activeGoal: readString$16(context.activeGoal),
-        activeQuery: readString$16(context.activeQuery),
-        activeTopic: readString$16(context.activeTopic),
+        activeGoal: readString$17(context.activeGoal),
+        activeQuery: readString$17(context.activeQuery),
+        activeTopic: readString$17(context.activeTopic),
         continuityKind: "preserve",
         hasUserClarification: false,
         lastClarificationResolution: cloneResolution(context.lastClarificationResolution),
@@ -23572,9 +23572,9 @@
       };
     }
 
-    const currentGoal = readString$16(context.activeGoal);
-    const currentQuery = readString$16(context.activeQuery);
-    const currentTopic = readString$16(context.activeTopic);
+    const currentGoal = readString$17(context.activeGoal);
+    const currentQuery = readString$17(context.activeQuery);
+    const currentTopic = readString$17(context.activeTopic);
     const pendingClarification = context.pendingClarification && typeof context.pendingClarification === "object"
       ? context.pendingClarification
       : null;
@@ -23582,7 +23582,7 @@
       && typeof options.turnIntent === "object"
       ? options.turnIntent
       : null;
-    const turnIntentKind = readString$16(turnIntent && turnIntent.kind);
+    const turnIntentKind = readString$17(turnIntent && turnIntent.kind);
 
     if (turnIntentKind === "new_task") {
       return {
@@ -23731,9 +23731,9 @@
   }
 
   function syncPromptInquiryContext(runState, request, options) {
-    const prompt = readString$16(request && request.prompt);
+    const prompt = readString$17(request && request.prompt);
 
-    if (!runState || !prompt || readString$16(request && request.type) === "approval_resolution") {
+    if (!runState || !prompt || readString$17(request && request.type) === "approval_resolution") {
       return;
     }
 
@@ -23772,7 +23772,7 @@
     return snapshot;
   }
 
-  function readString$16(value) {
+  function readString$17(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23820,18 +23820,18 @@
     const activeItem = findActiveItem(todoState, items);
     const unfinishedCount = counts.active + counts.pending + counts.blocked;
     const observation = {
-      activeItemId: readString$15(activeItem && activeItem.id) || null,
-      activeItemLabel: readString$15(activeItem && activeItem.label) || null,
+      activeItemId: readString$16(activeItem && activeItem.id) || null,
+      activeItemLabel: readString$16(activeItem && activeItem.label) || null,
       counts,
       items: items.map((item) => ({
-        id: readString$15(item && item.id) || null,
-        label: readString$15(item && item.label) || null,
-        status: readString$15(item && item.status) || "pending"
+        id: readString$16(item && item.id) || null,
+        label: readString$16(item && item.label) || null,
+        status: readString$16(item && item.status) || "pending"
       })),
       observedAt,
       source,
       status: unfinishedCount > 0 ? "unfinished_at_terminal" : "already_terminal_or_complete",
-      todoStateStatus: readString$15(todoState.status) || null,
+      todoStateStatus: readString$16(todoState.status) || null,
       unfinishedCount
     };
     runState.todoTerminalObservation = observation;
@@ -23874,7 +23874,7 @@
   }
 
   function findActiveItem(todoState, items) {
-    const activeItemId = readString$15(todoState && todoState.activeItemId);
+    const activeItemId = readString$16(todoState && todoState.activeItemId);
     if (activeItemId) {
       const byId = items.find((item) => item && item.id === activeItemId && item.status === "active");
       if (byId) return byId;
@@ -23882,7 +23882,7 @@
     return items.find((item) => item && item.status === "active") || null;
   }
 
-  function readString$15(value) {
+  function readString$16(value) {
     return typeof value === "string" && value.trim() ? value.trim() : "";
   }
 
@@ -24008,16 +24008,16 @@
       : null;
     const turnIntent = options && typeof options === "object" ? options.turnIntent : null;
     const executionClass = options && typeof options === "object"
-      ? readString$14(options.executionClass)
+      ? readString$15(options.executionClass)
       : "";
-    const turnIntentKind = readString$14(turnIntent && turnIntent.kind);
-    const currentPrompt = readString$14(observationSummary && observationSummary.prompt)
-      || readString$14(options && options.originalQuery)
-      || readString$14(turnIntent && turnIntent.goal);
+    const turnIntentKind = readString$15(turnIntent && turnIntent.kind);
+    const currentPrompt = readString$15(observationSummary && observationSummary.prompt)
+      || readString$15(options && options.originalQuery)
+      || readString$15(turnIntent && turnIntent.goal);
     const goalAnchorText = turnIntentKind === "new_task" && currentPrompt
       ? currentPrompt
-      : readString$14(intentState && intentState.goal)
-      || readString$14(inquiryContext && inquiryContext.activeGoal);
+      : readString$15(intentState && intentState.goal)
+      || readString$15(inquiryContext && inquiryContext.activeGoal);
     // 2026-05-09 — Prefer `researchState.topic` (AI-authored via tool
     // calls) when available; fall through to `intentState.topic` /
     // `inquiryContext.activeTopic` raw values otherwise.
@@ -24033,11 +24033,11 @@
     // never benefited. AI-first replacement: trust whatever the
     // upstream pipeline produces; AI sees the full original prompt
     // elsewhere via `originalQuery`.
-    const researchTopic = readString$14(
+    const researchTopic = readString$15(
       options && options.runState && options.runState.researchState && options.runState.researchState.topic
     );
-    const rawTopic = readString$14(intentState && intentState.topic)
-      || readString$14(inquiryContext && inquiryContext.activeTopic);
+    const rawTopic = readString$15(intentState && intentState.topic)
+      || readString$15(inquiryContext && inquiryContext.activeTopic);
     const topicAnchorText = researchTopic
       || extractStructuralTopic(rawTopic)
       || rawTopic;
@@ -24046,7 +24046,7 @@
       topicAnchorText,
       {
         executionClass,
-        prompt: readString$14(observationSummary && observationSummary.prompt),
+        prompt: readString$15(observationSummary && observationSummary.prompt),
         turnIntent
       }
     ).quality;
@@ -24092,7 +24092,7 @@
   }
 
   function deriveTurnStateStatus(goalQuality, intentState, inquiryContext, pendingApprovalAction, turnIntent) {
-    if (readString$14(turnIntent && turnIntent.kind) === "approval_resolution") {
+    if (readString$15(turnIntent && turnIntent.kind) === "approval_resolution") {
       return "running_control_step";
     }
 
@@ -24119,7 +24119,7 @@
       return "";
     }
 
-    return readString$14(pendingApproval.actionName);
+    return readString$15(pendingApproval.actionName);
   }
 
   function cloneStructuredValue$1(value) {
@@ -24129,7 +24129,7 @@
   }
 
   function extractStructuralTopic(value) {
-    const text = readString$14(value);
+    const text = readString$15(value);
     if (!text) return "";
     const topicPhrase = text.match(/\btopic\s*[:=]?\s*["'“”‘’`]([^"'“”‘’`]{2,160})["'“”‘’`]/i);
     if (topicPhrase) return topicPhrase[1].trim();
@@ -24137,7 +24137,7 @@
     return quoted ? quoted[1].trim() : "";
   }
 
-  function readString$14(value) {
+  function readString$15(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -24197,8 +24197,8 @@
       ? runState.researchReportLoop
       : null;
     if (!loop) return false;
-    const status = readString$13(loop.status);
-    return loop.enabled === true || Boolean(readString$13(loop.finalMode)) || Boolean(status && status !== "idle");
+    const status = readString$14(loop.status);
+    return loop.enabled === true || Boolean(readString$14(loop.finalMode)) || Boolean(status && status !== "idle");
   }
 
   function normalizeTerminalFinalText(rawText, runState, request, options = {}) {
@@ -24255,12 +24255,12 @@
     const sources = [];
     const seenUrls = new Set();
     for (const source of sourceArtifacts) {
-      const url = readString$13(source && source.url);
+      const url = readString$14(source && source.url);
       if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
       seenUrls.add(url);
       sources.push({
         kind: "research_evidence_graph",
-        title: readString$13(source && source.title) || url,
+        title: readString$14(source && source.title) || url,
         url
       });
       if (sources.length >= 8) break;
@@ -24271,7 +24271,7 @@
     };
   }
 
-  function readString$13(value) {
+  function readString$14(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -24894,8 +24894,8 @@
   }
 
   function sanitizeSkillToolArgs(rawArgs) {
-    const skillName = readString$12(rawArgs.skillName) || undefined;
-    const toolName = readString$12(rawArgs.toolName) || undefined;
+    const skillName = readString$13(rawArgs.skillName) || undefined;
+    const toolName = readString$13(rawArgs.toolName) || undefined;
 
     const nested = rawArgs.args && typeof rawArgs.args === "object" && !Array.isArray(rawArgs.args)
       ? rawArgs.args
@@ -25011,7 +25011,7 @@
     return String(value);
   }
 
-  function readString$12(value) {
+  function readString$13(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25172,7 +25172,7 @@
     const readSources = Array.isArray(context.readSources) ? context.readSources.slice() : [];
     const aggregatedSearchResults = aggregateRankedSearchResults(combinedPasses);
     const verification = createSearchVerification({
-      query: readString$11(output && output.query) || readString$11(context && context.lastQuery),
+      query: readString$12(output && output.query) || readString$12(context && context.lastQuery),
       rankedItems: aggregatedSearchResults,
       readSources,
       strategy: output && output.searchPlan ? output.searchPlan.strategy : ""
@@ -25181,7 +25181,7 @@
 
     return {
       aggregatedSearchResults: cloneValue(aggregatedSearchResults),
-      lastQuery: readString$11(output && output.lastExecutedQuery) || readString$11(output && output.query) || null,
+      lastQuery: readString$12(output && output.lastExecutedQuery) || readString$12(output && output.query) || null,
       readSources,
       searchPasses: combinedPasses,
       searchPlan: cloneValue(output && output.searchPlan) || null,
@@ -25210,7 +25210,7 @@
     return [];
   }
 
-  function readString$11(value) {
+  function readString$12(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25255,30 +25255,30 @@
       : {};
     const type = normalizeType$1(source.type);
     const event = {
-      actionName: readString$10(source.actionName) || readString$10(context.actionName) || undefined,
-      callId: readString$10(source.callId) || readString$10(context.callId) || undefined,
-      control: readString$10(source.control) || undefined,
+      actionName: readString$11(source.actionName) || readString$11(context.actionName) || undefined,
+      callId: readString$11(source.callId) || readString$11(context.callId) || undefined,
+      control: readString$11(source.control) || undefined,
       delta: typeof source.delta === "string" ? source.delta : undefined,
       durationMs: Number.isFinite(source.durationMs) ? source.durationMs : undefined,
       error: typeof source.error === "string" ? source.error : undefined,
       final: source.final === true,
-      kind: readString$10(source.kind) || undefined,
-      model: readString$10(source.model) || readString$10(context.model) || null,
+      kind: readString$11(source.kind) || undefined,
+      model: readString$11(source.model) || readString$11(context.model) || null,
       preliminary: source.preliminary === true,
-      provider: readString$10(source.provider) || readString$10(context.provider) || null,
+      provider: readString$11(source.provider) || readString$11(context.provider) || null,
       resultCount: Number.isFinite(source.resultCount) ? source.resultCount : undefined,
       sequence: Number.isInteger(source.sequence) && source.sequence > 0 ? source.sequence : null,
-      skillName: readString$10(source.skillName) || undefined,
-      status: readString$10(source.status) || undefined,
+      skillName: readString$11(source.skillName) || undefined,
+      status: readString$11(source.status) || undefined,
       timestamp: Number.isFinite(source.timestamp) ? source.timestamp : Date.now(),
-      toolName: readString$10(source.toolName) || undefined,
+      toolName: readString$11(source.toolName) || undefined,
       type
     };
     return stripUndefined(event);
   }
 
   function normalizeType$1(value) {
-    const type = readString$10(value);
+    const type = readString$11(value);
     if (type === "provider_stream_start") return type;
     if (type === "provider_text_delta") return type;
     if (type === "provider_stream_finish") return type;
@@ -25299,7 +25299,7 @@
     return output;
   }
 
-  function readString$10(value) {
+  function readString$11(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25653,7 +25653,7 @@
   // including host-provided corePattern/extendedPattern hooks, are deliberately
   // removed so the runtime cannot reclassify user intent from raw prompt text.
 
-  function readString$$(value) {
+  function readString$10(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25690,7 +25690,7 @@
    *     additive, not positional.
    */
 
-  function readString$_(value) {
+  function readString$$(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25830,7 +25830,7 @@
         const fn = readFunction(overrideValue);
         merged[key] = fn || defaultValue;
       } else {
-        const str = readString$_(overrideValue);
+        const str = readString$$(overrideValue);
         merged[key] = str || defaultValue;
       }
     }
@@ -25925,7 +25925,7 @@
   function maybeCreateTodoInspectLoopGuard(runState, config, context) {
     const normalized = normalizeTodoAutopilotConfig(config);
     if (!normalized.enabled) return null;
-    const actionName = readString$$(context && context.actionName);
+    const actionName = readString$10(context && context.actionName);
     if (actionName !== "todo_inspect") return null;
 
     const history = Array.isArray(context && context.actionHistory) ? context.actionHistory : [];
@@ -25989,7 +25989,7 @@
       return null;
     }
 
-    const actionName = readString$$(context && context.actionName);
+    const actionName = readString$10(context && context.actionName);
     if (isTodoPlanningAction(actionName)) return null;
 
     return {
@@ -26008,7 +26008,7 @@
     const normalized = normalizeTodoAutopilotConfig(config);
     if (!normalized.enabled) return null;
 
-    const actionName = readString$$(context && context.actionName);
+    const actionName = readString$10(context && context.actionName);
     const rules = normalized.actionProgressRules || {};
     const rule = rules[actionName];
     if (!rule) return null;
@@ -26036,7 +26036,7 @@
     const activeItem = findActiveTodoItem$2(todoState);
     if (!activeItem) return null;
 
-    const label = readString$$(activeItem.label);
+    const label = readString$10(activeItem.label);
     if (!label) return null;
     if (actionName === "workspace_finalize_candidate") {
       if (!(normalized.finalizationPattern instanceof RegExp)) return null;
@@ -26087,9 +26087,9 @@
     if (plan && plan.allowedInPlan === false) {
       return {
         allowedInPlan: false,
-        code: readString$Z(plan.code) || "skill_mutator_in_plan",
-        detail: readString$Z(plan.detail) || createStandaloneActionDetail(action),
-        reason: readString$Z(plan.reason) || "state_mutation"
+        code: readString$_(plan.code) || "skill_mutator_in_plan",
+        detail: readString$_(plan.detail) || createStandaloneActionDetail(action),
+        reason: readString$_(plan.reason) || "state_mutation"
       };
     }
     return {
@@ -26103,17 +26103,17 @@
   function formatStandalonePlanActionNames(actions) {
     const names = (Array.isArray(actions) ? actions : [])
       .filter((action) => readPlanActionContract(action).allowedInPlan === false)
-      .map((action) => readString$Z(action && action.name))
+      .map((action) => readString$_(action && action.name))
       .filter(Boolean);
     return names.length > 0 ? names.join(", ") : "actions marked standalone-only";
   }
 
   function createStandaloneActionDetail(action) {
-    const actionName = readString$Z(action && action.name) || "This action";
+    const actionName = readString$_(action && action.name) || "This action";
     return `${actionName} is marked standalone-only by its action metadata because it mutates planner/run state. Emit it as its own type:"action" envelope instead of placing it inside plan.actions. If you need more work after it runs, wait for the observation and choose the next action in the following OODAE cycle.`;
   }
 
-  function readString$Z(value) {
+  function readString$_(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -26146,14 +26146,14 @@
   // plans, the verifier nudge is not worth the loop cost.
   const VERIFIER_NUDGE_MIN_ITEMS = 3;
 
-  function readString$Y(value) {
+  function readString$Z(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readProvenance(runState) {
     if (!runState || typeof runState !== "object") return null;
-    const threadId = readString$Y(runState.threadId);
-    const turnId = readString$Y(runState.runId);
+    const threadId = readString$Z(runState.threadId);
+    const turnId = readString$Z(runState.runId);
     if (!threadId && !turnId) return null;
     return { threadId: threadId || "default", turnId: turnId || null };
   }
@@ -26229,7 +26229,11 @@
     },
     preflight: preflightTodoPlanAction,
     tier: 0,
-    execute: executeTodoPlanAction
+    execute: executeTodoPlanAction,
+    outputSchema: {
+      kinds: ["todo_plan_result"],
+      controls: ["continue"]
+    }
   });
 
   function preflightTodoPlanAction(context, args) {
@@ -26241,7 +26245,7 @@
     const validItems = items.filter((item) => (
       item &&
       typeof item === "object" &&
-      readString$Y(item.label)
+      readString$Z(item.label)
     ));
     if (validItems.length === 0) {
       throw new Error("todo_plan requires at least one item with a non-empty label in native_tools mode.");
@@ -26335,9 +26339,9 @@
    * re-anchor the goal because the planner forgot to.
    */
   function readGoalForPlan(args, runState, context) {
-    const explicit = readString$Y(args && args.goal);
+    const explicit = readString$Z(args && args.goal);
     if (explicit) return explicit;
-    const prompt = readString$Y(
+    const prompt = readString$Z(
       runState && runState.observationSummary && runState.observationSummary.prompt
     );
     if (prompt) {
@@ -26389,7 +26393,11 @@
         + "the move is not in the table (e.g. abandoned → done is rejected)."
     },
     tier: 0,
-    execute: executeTodoAdvanceAction
+    execute: executeTodoAdvanceAction,
+    outputSchema: {
+      kinds: ["todo_advance_result"],
+      controls: ["continue"]
+    }
   });
 
   async function executeTodoAdvanceAction(context, args) {
@@ -26398,11 +26406,11 @@
       throw new Error("todo_advance: runState is required");
     }
     const opts = args && typeof args === "object" ? args : {};
-    const itemId = readString$Y(opts.itemId);
+    const itemId = readString$Z(opts.itemId);
     if (!itemId) {
       throw new Error("todo_advance: itemId is required");
     }
-    const nextStatus = readString$Y(opts.nextStatus);
+    const nextStatus = readString$Z(opts.nextStatus);
     if (!nextStatus) {
       throw new Error("todo_advance: nextStatus is required");
     }
@@ -26466,7 +26474,11 @@
         + "todo_run_next."
     },
     tier: 0,
-    execute: executeTodoCancelAction
+    execute: executeTodoCancelAction,
+    outputSchema: {
+      kinds: ["todo_cancel_result"],
+      controls: ["continue"]
+    }
   });
 
   async function executeTodoCancelAction(context, args) {
@@ -26489,14 +26501,14 @@
     runState.todoState = next;
     emitTodoStateMutation(context, "cancel", next, {
       cancelledItemCount: next === current ? 0 : cancellableBefore,
-      reason: readString$Y(opts.reason || opts.note) || null
+      reason: readString$Z(opts.reason || opts.note) || null
     });
     return {
       control: "continue",
       output: {
         cancelledItemCount: next === current ? 0 : cancellableBefore,
         kind: "todo_cancel_result",
-        reason: readString$Y(opts.reason || opts.note) || null,
+        reason: readString$Z(opts.reason || opts.note) || null,
         todoState: serializeTodoState(next)
       },
       summary: `todo_cancel(items=${next === current ? 0 : cancellableBefore}, status=${next.status})`
@@ -26526,7 +26538,11 @@
         + "when no pending item remains it completes the plan. Do not use it merely because the runtime asks you to continue."
     },
     tier: 0,
-    execute: executeTodoRunNextAction
+    execute: executeTodoRunNextAction,
+    outputSchema: {
+      kinds: ["todo_run_next_result"],
+      controls: ["continue"]
+    }
   });
 
   async function executeTodoRunNextAction(context, args) {
@@ -26642,7 +26658,11 @@
         + "again — choose todo_run_next or the appropriate work action instead."
     },
     tier: 0,
-    execute: executeTodoInspectAction
+    execute: executeTodoInspectAction,
+    outputSchema: {
+      kinds: ["todo_inspect_result"],
+      controls: ["continue"]
+    }
   });
 
   async function executeTodoInspectAction(context, _args) {
@@ -26735,10 +26755,10 @@
 
     const hasVerificationItem = items.some((item) => {
       if (!item) return false;
-      const label = readString$Y(item.label);
+      const label = readString$Z(item.label);
       if (label && pattern.test(label)) return true;
       const notes = Array.isArray(item.notes) ? item.notes : [];
-      return notes.some((note) => note && pattern.test(readString$Y(note.text)));
+      return notes.some((note) => note && pattern.test(readString$Z(note.text)));
     });
     if (hasVerificationItem) return null;
 
@@ -26748,7 +26768,7 @@
         reason: "plan completed without any verify/test/check item"
       });
     }
-    return readString$Y(nudgeFn({ itemCount: items.length })) || null;
+    return readString$Z(nudgeFn({ itemCount: items.length })) || null;
   }
 
   function countCancellableTodoItems(todoState) {
@@ -26782,12 +26802,12 @@
 
     pushStep("read-url-requested", {
       maxBytes: typeof actionArgs?.maxBytes === "number" ? actionArgs.maxBytes : null,
-      method: readString$1O(actionArgs && actionArgs.method) || "GET",
-      mode: readString$1O(actionArgs && actionArgs.mode) || "auto",
+      method: readString$1P(actionArgs && actionArgs.method) || "GET",
+      mode: readString$1P(actionArgs && actionArgs.mode) || "auto",
       textLength: typeof actionArgs?.textLength === "number" ? actionArgs.textLength : null,
       textStart: typeof actionArgs?.textStart === "number" ? actionArgs.textStart : null,
       timeoutMs: typeof actionArgs?.timeoutMs === "number" ? actionArgs.timeoutMs : null,
-      url: readString$1O(actionArgs && actionArgs.url)
+      url: readString$1P(actionArgs && actionArgs.url)
     });
   }
 
@@ -26798,12 +26818,12 @@
 
     if (output.ok === false) {
       pushStep("read-url-failed", {
-        error: readString$1O(output.error),
-        message: readString$1O(output.message),
+        error: readString$1P(output.error),
+        message: readString$1P(output.message),
         originStatus: typeof output.originStatus === "number" ? output.originStatus : null,
-        reason: readString$1O(output.reason),
+        reason: readString$1P(output.reason),
         status: typeof output.status === "number" ? output.status : null,
-        url: readString$1O(output.url)
+        url: readString$1P(output.url)
       });
       return;
     }
@@ -26811,8 +26831,8 @@
     const quality = explainReadSourceQuality(output, { query });
     pushStep("read-url-completed", {
       bytes: typeof output.bytes === "number" ? output.bytes : 0,
-      contentType: readString$1O(output.contentType),
-      mode: readString$1O(output.mode),
+      contentType: readString$1P(output.contentType),
+      mode: readString$1P(output.mode),
       originStatus: typeof output.originStatus === "number" ? output.originStatus : null,
       qualityReason: quality.reason,
       qualitySignals: quality.signals,
@@ -26820,7 +26840,7 @@
       textRange: normalizeTextRange$3(output.textRange),
       tier: quality.tier,
       truncated: output.truncated === true,
-      url: readString$1O(output.url)
+      url: readString$1P(output.url)
     });
   }
 
@@ -26831,24 +26851,24 @@
 
     return {
       bytes: typeof source.bytes === "number" ? source.bytes : 0,
-      contentType: readString$1O(source.contentType),
-      error: readString$1O(source.error),
-      message: readString$1O(source.message),
-      mode: readString$1O(source.mode),
+      contentType: readString$1P(source.contentType),
+      error: readString$1P(source.error),
+      message: readString$1P(source.message),
+      mode: readString$1P(source.mode),
       ok: source.ok !== false,
       originStatus: typeof source.originStatus === "number" ? source.originStatus : null,
-      platform: readString$1O(source.platform),
-      reason: readString$1O(source.reason),
-      screenshotDataUrl: readString$1O(source.screenshotDataUrl),
-      screenshotMimeType: readString$1O(source.screenshotMimeType),
+      platform: readString$1P(source.platform),
+      reason: readString$1P(source.reason),
+      screenshotDataUrl: readString$1P(source.screenshotDataUrl),
+      screenshotMimeType: readString$1P(source.screenshotMimeType),
       sourceQualityDetail,
       status: typeof source.status === "number" ? source.status : null,
-      text: readString$1O(source.text),
+      text: readString$1P(source.text),
       textRange: normalizeTextRange$3(source.textRange),
       tier,
-      title: readString$1O(source.title),
+      title: readString$1P(source.title),
       truncated: source.truncated === true,
-      url: readString$1O(source.url)
+      url: readString$1P(source.url)
     };
   }
 
@@ -26878,7 +26898,7 @@
     const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
     const candidateSources = createSearchInquirySources(output);
 
-    inquiryContext.activeQuery = readString$1O(output && output.query) || inquiryContext.activeQuery;
+    inquiryContext.activeQuery = readString$1P(output && output.query) || inquiryContext.activeQuery;
     inquiryContext.candidateSources = candidateSources;
     inquiryContext.lastSearchResults = candidateSources.slice();
 
@@ -26923,15 +26943,15 @@
         ? runState.contextSnapshot.inquiryContext
         : null;
 
-    return readString$1O(inquiryContext && inquiryContext.activeQuery)
-      || readString$1O(runState && runState.researchContext && runState.researchContext.lastQuery)
-      || readString$1O(request && request.prompt);
+    return readString$1P(inquiryContext && inquiryContext.activeQuery)
+      || readString$1P(runState && runState.researchContext && runState.researchContext.lastQuery)
+      || readString$1P(request && request.prompt);
   }
 
   function syncPendingClarification(runState, output) {
     const snapshot = ensureContextSnapshot(runState);
     const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
-    const question = readString$1O(output && output.question) || readString$1O(output && output.text);
+    const question = readString$1P(output && output.question) || readString$1P(output && output.text);
 
     if (!question) {
       return;
@@ -26964,7 +26984,7 @@
   }
 
   function findCandidateSource(candidateSources, url) {
-    const normalizedUrl = readString$1O(url);
+    const normalizedUrl = readString$1P(url);
 
     if (!normalizedUrl) {
       return null;
@@ -26973,8 +26993,257 @@
     return (Array.isArray(candidateSources) ? candidateSources : []).find((item) => (
       item &&
       typeof item === "object" &&
-      readString$1O(item.url) === normalizedUrl
+      readString$1P(item.url) === normalizedUrl
     )) || null;
+  }
+
+  // AGRUN-248-B — Single source of truth for action result envelopes.
+  //
+  // Every action.execute(...) result flows through normalizeActionResultEnvelope()
+  // once. Downstream consumers (handleActionResult, recordObservation, Inspector,
+  // guardrail refresh, action-executed step detail) read only the envelope shape.
+  //
+  // Envelope v1:
+  //   { resultEnvelopeVersion: "v1", actionName, control, status, ok, kind,
+  //     summary, reason, metrics: { resultCount, durationMs }, body }
+  //
+  // AI-first: runtime validates *mechanical shape* only. Action body is opaque
+  // pass-through; per-action body schemas are out of scope for v1.
+
+  const ACTION_RESULT_ENVELOPE_VERSION = "v1";
+
+  const ALLOWED_CONTROLS$1 = Object.freeze(["continue", "stop", "complete"]);
+  const FALLBACK_BLOCKED_STATUS_VALUES = Object.freeze(
+    new Set(["blocked", "failed", "aborted", "denied"])
+  );
+
+  function normalizeActionResultEnvelope({ action, rawResult, durationMs }) {
+    const actionName = readActionName$1(action);
+    const durationMsNumber = readDurationMs(durationMs);
+
+    if (!rawResult || typeof rawResult !== "object" || Array.isArray(rawResult)) {
+      return createProtocolErrorEnvelope({
+        actionName,
+        durationMs: durationMsNumber,
+        reason: "envelope_missing_result",
+        summary: `${actionName} returned no result object`,
+        body: { error: "action_returned_non_object", ok: false }
+      });
+    }
+
+    const control = readString$Y(rawResult.control);
+    const body = rawResult.output && typeof rawResult.output === "object" && !Array.isArray(rawResult.output)
+      ? rawResult.output
+      : {};
+    const summary = readString$Y(rawResult.summary) || `${actionName} executed`;
+    const schema = action && action.outputSchema && typeof action.outputSchema === "object"
+      ? action.outputSchema
+      : null;
+
+    if (!ALLOWED_CONTROLS$1.includes(control)) {
+      return createProtocolErrorEnvelope({
+        actionName,
+        durationMs: durationMsNumber,
+        reason: "envelope_invalid_control",
+        summary: `${actionName} returned unsupported control "${control || "<empty>"}"`,
+        body
+      });
+    }
+
+    if (schema) {
+      const allowedControls = readKindArray(schema.controls);
+      if (allowedControls.length > 0 && !allowedControls.includes(control)) {
+        return createProtocolErrorEnvelope({
+          actionName,
+          durationMs: durationMsNumber,
+          reason: "envelope_control_mismatch",
+          summary: `${actionName} control "${control}" not in declared controls [${allowedControls.join(",")}]`,
+          body
+        });
+      }
+
+      const allowedKinds = readKindArray(schema.kinds);
+      const bodyKind = readString$Y(body.kind);
+      if (bodyKind && allowedKinds.length > 0 && !allowedKinds.includes(bodyKind)) {
+        return createProtocolErrorEnvelope({
+          actionName,
+          durationMs: durationMsNumber,
+          reason: "envelope_kind_mismatch",
+          summary: `${actionName} kind "${bodyKind}" not in declared kinds [${allowedKinds.join(",")}]`,
+          body
+        });
+      }
+      const envelopeKind = bodyKind || (allowedKinds.length > 0 ? allowedKinds[0] : "");
+      if (!envelopeKind) {
+        return createProtocolErrorEnvelope({
+          actionName,
+          durationMs: durationMsNumber,
+          reason: "envelope_missing_kind",
+          summary: `${actionName} produced no kind and outputSchema declares no fallback`,
+          body
+        });
+      }
+      return finalizeEnvelope({
+        actionName,
+        control,
+        kind: envelopeKind,
+        schema,
+        body,
+        summary,
+        durationMs: durationMsNumber
+      });
+    }
+
+    // outputSchema:null waiver path — body kind passes through unchanged.
+    const envelopeKind = readString$Y(body.kind) || actionName;
+    return finalizeEnvelope({
+      actionName,
+      control,
+      kind: envelopeKind,
+      schema: null,
+      body,
+      summary,
+      durationMs: durationMsNumber
+    });
+  }
+
+  function createExecuteErrorEnvelope({ action, error, durationMs }) {
+    const actionName = readActionName$1(action);
+    const errorMessage = readString$Y(error && error.message) || "action_execute_error";
+    return finalizeEnvelopeRaw({
+      actionName,
+      control: "continue",
+      status: "protocol_error",
+      kind: "action_execute_error",
+      summary: `${actionName} failed: ${errorMessage}`,
+      reason: "execute_threw",
+      metrics: { resultCount: null, durationMs: readDurationMs(durationMs) },
+      body: {
+        error: errorMessage,
+        errorStage: "execute",
+        ok: false,
+        status: "failed"
+      }
+    });
+  }
+
+  function createProtocolErrorEnvelope({
+    actionName,
+    durationMs,
+    reason,
+    summary,
+    body
+  }) {
+    return finalizeEnvelopeRaw({
+      actionName: readActionName$1({ name: actionName }),
+      control: "continue",
+      status: "protocol_error",
+      kind: "action_envelope_protocol_error",
+      summary: summary || `${actionName} returned a malformed envelope`,
+      reason: reason || "envelope_protocol_error",
+      metrics: { resultCount: null, durationMs: readDurationMs(durationMs) },
+      body: body && typeof body === "object" && !Array.isArray(body)
+        ? body
+        : { ok: false }
+    });
+  }
+
+  function finalizeEnvelope({ actionName, control, kind, schema, body, summary, durationMs }) {
+    const status = deriveStatusFromBody(body);
+    const metrics = buildMetrics(schema, body, durationMs);
+    return finalizeEnvelopeRaw({
+      actionName,
+      control,
+      status,
+      kind,
+      summary,
+      reason: status === "blocked" ? readString$Y(body && body.reason) || readString$Y(body && body.status) || null : null,
+      metrics,
+      body
+    });
+  }
+
+  function finalizeEnvelopeRaw({
+    actionName,
+    control,
+    status,
+    kind,
+    summary,
+    reason,
+    metrics,
+    body
+  }) {
+    return Object.freeze({
+      resultEnvelopeVersion: ACTION_RESULT_ENVELOPE_VERSION,
+      actionName,
+      control,
+      status,
+      ok: status === "success",
+      kind,
+      summary,
+      reason: reason || null,
+      metrics: Object.freeze({
+        resultCount: metrics && typeof metrics.resultCount === "number" ? metrics.resultCount : null,
+        durationMs: metrics && typeof metrics.durationMs === "number" ? metrics.durationMs : 0
+      }),
+      body
+    });
+  }
+
+  function deriveStatusFromBody(body) {
+    if (!body || typeof body !== "object") return "success";
+    if (body.ok === false) return "blocked";
+    const status = readString$Y(body.status).toLowerCase();
+    if (status && FALLBACK_BLOCKED_STATUS_VALUES.has(status)) return "blocked";
+    return "success";
+  }
+
+  function buildMetrics(schema, body, durationMs) {
+    const metricsSchema = schema && schema.metrics && typeof schema.metrics === "object" && !Array.isArray(schema.metrics)
+      ? schema.metrics
+      : null;
+    let resultCount = null;
+    if (metricsSchema && typeof metricsSchema.resultCount === "string") {
+      resultCount = readMetricPath(body, metricsSchema.resultCount);
+    }
+    return { resultCount, durationMs };
+  }
+
+  function readMetricPath(body, path) {
+    if (!body || typeof body !== "object") return null;
+    const segments = String(path).split(".");
+    let cursor = body;
+    for (const segment of segments) {
+      if (!segment) continue;
+      if (segment === "length") {
+        if (Array.isArray(cursor)) return cursor.length;
+        if (typeof cursor === "string") return cursor.length;
+        return null;
+      }
+      if (cursor == null || typeof cursor !== "object") return null;
+      cursor = cursor[segment];
+    }
+    if (typeof cursor === "number" && Number.isFinite(cursor)) return cursor;
+    if (Array.isArray(cursor)) return cursor.length;
+    return null;
+  }
+
+  function readKindArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((entry) => readString$Y(entry)).filter(Boolean);
+  }
+
+  function readActionName$1(action) {
+    return readString$Y(action && action.name) || "unknown_action";
+  }
+
+  function readDurationMs(value) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return 0;
+    return value;
+  }
+
+  function readString$Y(value) {
+    return typeof value === "string" ? value.trim() : "";
   }
 
   const LATE_BUDGET_PATCH_PREVIEW_ACTIONS = new Set([
@@ -27292,7 +27561,7 @@
 
     const actionStartedAt = Date.now();
     try {
-      const actionResult = await action.execute({
+      const rawResult = await action.execute({
         activeAgentSkill: runState.agentSkillContext.activeSkill,
         agentSkillIndexProvider,
         agentSkills: Array.isArray(agentSkills) ? agentSkills : [],
@@ -27305,6 +27574,22 @@
         searchResults: runState.researchContext.searchResults,
         webSearchEndpoint: readWebSearchEndpoint(rawInput, request)
       }, actionArgs);
+      const actionDurationMs = Date.now() - actionStartedAt;
+      const envelope = normalizeActionResultEnvelope({
+        action,
+        rawResult,
+        durationMs: actionDurationMs
+      });
+      // Shim keeps the legacy `{ control, output, summary }` shape so the
+      // many downstream consumers (refreshActionGuardrail, syncSearchInquiryContext,
+      // recordObservation, handleActionResult, ...) keep reading body fields via
+      // `.output.*`. `.envelope` carries the v1 SSOT envelope for new consumers.
+      const actionResult = {
+        control: envelope.control,
+        output: envelope.body,
+        summary: envelope.summary,
+        envelope
+      };
       refreshActionGuardrail({
         action,
         actionArgs,
@@ -27315,14 +27600,15 @@
         runtimeConfig
       });
 
-      const actionDurationMs = Date.now() - actionStartedAt;
       const actionExecutedDetail = {
         actionName,
         callId,
-        control: actionResult.control,
-        durationMs: actionDurationMs,
-        query: readActionQuery(actionName, actionResult.output),
-        resultCount: readActionResultCount(actionName, actionResult.output),
+        control: envelope.control,
+        durationMs: envelope.metrics.durationMs,
+        kind: envelope.kind,
+        resultCount: envelope.metrics.resultCount == null ? undefined : envelope.metrics.resultCount,
+        resultEnvelopeVersion: envelope.resultEnvelopeVersion,
+        status: envelope.status,
         skillName: capturedSkillName || readToolSkillName$1(actionName, runState, actionResult.output, decision),
         toolName: capturedToolName || readToolName$1(actionName, actionResult.output, decision)
       };
@@ -27336,8 +27622,8 @@
       );
       runState.actState = {
         actionName,
-        control: actionResult.control,
-        outputKind: readString$1O(actionResult.output && actionResult.output.kind) || "object"
+        control: envelope.control,
+        outputKind: envelope.kind
       };
       runState.lastAction = actionName;
       runState.pendingApproval = null;
@@ -27540,14 +27826,23 @@
         steps
       });
     } catch (error) {
+      const actionDurationMs = Date.now() - actionStartedAt;
+      const errorEnvelope = createExecuteErrorEnvelope({
+        action,
+        error,
+        durationMs: actionDurationMs
+      });
       const { message: errorMessage } = normalizeThrownError(error);
 
       const actionErrorDetail = {
         actionName,
         callId,
-        durationMs: Date.now() - actionStartedAt,
+        durationMs: errorEnvelope.metrics.durationMs,
         error: errorMessage,
-        cycle: runState.cycleCount
+        cycle: runState.cycleCount,
+        kind: errorEnvelope.kind,
+        resultEnvelopeVersion: errorEnvelope.resultEnvelopeVersion,
+        status: errorEnvelope.status
       };
       pushStep("action-execute-error", actionErrorDetail);
       streamEmitter.emit("action_error", actionErrorDetail);
@@ -27566,15 +27861,20 @@
       // The previous canSelfCorrect / fatal split has been removed; every
       // throw flows through the same observation path so the planner can
       // react. maxSteps and explicit caller abort are the only run terminators.
+      // AGRUN-248-B — the error envelope is the SSOT shape; the legacy
+      // synthetic `result: { control, output, summary }` is now derived from
+      // the envelope so guardrail accounting and observation derivation read
+      // the same fields whether the action succeeded or threw.
       refreshActionGuardrail({
         action,
         actionArgs,
         actionName,
         pushStep,
         result: {
-          control: "continue",
-          output: { ok: false, status: "failed", error: errorMessage },
-          summary: errorMessage
+          control: errorEnvelope.control,
+          output: errorEnvelope.body,
+          summary: errorEnvelope.summary,
+          envelope: errorEnvelope
         },
         runState,
         runtimeConfig
@@ -27656,17 +27956,17 @@
       return undefined;
     }
 
-    const explicitOutput = readString$1O(output && output.skill);
+    const explicitOutput = readString$1P(output && output.skill);
     if (explicitOutput) {
       return explicitOutput;
     }
 
-    const explicitDecision = readString$1O(decision && decision.args && decision.args.skillName);
+    const explicitDecision = readString$1P(decision && decision.args && decision.args.skillName);
     if (explicitDecision) {
       return explicitDecision;
     }
 
-    return readString$1O(runState.agentSkillContext && runState.agentSkillContext.activeSkill && runState.agentSkillContext.activeSkill.name) || undefined;
+    return readString$1P(runState.agentSkillContext && runState.agentSkillContext.activeSkill && runState.agentSkillContext.activeSkill.name) || undefined;
   }
 
   function readToolName$1(actionName, output, decision) {
@@ -27674,17 +27974,9 @@
       return undefined;
     }
 
-    return readString$1O(output && output.tool) ||
-      readString$1O(decision && decision.args && decision.args.toolName) ||
+    return readString$1P(output && output.tool) ||
+      readString$1P(decision && decision.args && decision.args.toolName) ||
       undefined;
-  }
-
-  function readActionQuery(actionName, output) {
-    if (actionName !== "web_search" || !output || typeof output !== "object") {
-      return undefined;
-    }
-
-    return readString$1O(output.query) || undefined;
   }
 
   function markActionProgress(runState, actionName, output) {
@@ -27698,8 +27990,8 @@
 
   function refreshLongRunAcceptanceGate(options) {
     if (!options || typeof options !== "object") return null;
-    const actionName = readString$1O(options && options.actionName);
-    const status = readString$1O(options && options.status);
+    const actionName = readString$1P(options && options.actionName);
+    const status = readString$1P(options && options.status);
     if (!shouldRefreshLongRunAcceptanceGate$1(actionName, status)) return null;
     const loop = refreshResearchReportLoopGate(
       options.runState,
@@ -27885,10 +28177,10 @@
       ? runState.terminalRepairState
       : null;
     if (!repair || repair.active !== true) return null;
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (!actionName) return null;
     const allowedActions = Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1O).filter(Boolean)
+      ? repair.allowedActions.map(readString$1P).filter(Boolean)
       : [];
     const allowed = allowedActions.includes(actionName);
     const isPublish = actionName === "workspace_publish_candidate";
@@ -27905,7 +28197,7 @@
     const reason = isPublish && !validPublish
       ? "terminal_repair_invalid_publish"
       : "terminal_repair_action_not_allowed";
-    const escalation = readString$1O(repair.escalation);
+    const escalation = readString$1P(repair.escalation);
       const isHardVeto = escalation === "hard_veto" && reason === "terminal_repair_action_not_allowed";
       const protocolHint = buildTerminalRepairProtocolHint(repair);
       const budgetExpansionSignal = isHardVeto
@@ -27962,7 +28254,7 @@
   }
 
   function buildTerminalRepairProtocolHint(repair) {
-    const reason = readString$1O(repair && repair.reason);
+    const reason = readString$1P(repair && repair.reason);
     if (reason === "missing_finalize_after_latest_write") {
       return " Current publish protocol blocker requires workspace_finalize_candidate for the candidate, then workspace_read, before another publish attempt.";
     }
@@ -27974,7 +28266,7 @@
 
   function isReadinessOnlyPublishRetryAllowed(repair) {
     const deficits = Array.isArray(repair && repair.activeDeficits)
-      ? repair.activeDeficits.map(readString$1O).filter(Boolean)
+      ? repair.activeDeficits.map(readString$1P).filter(Boolean)
       : [];
     if (!deficits.includes("readiness")) return false;
     return !deficits.some((name) => [
@@ -27987,7 +28279,7 @@
   }
 
   function maybeBlockTerminalCorrectionRetry(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (actionName !== "workspace_publish_candidate") return null;
     const runState = options && options.runState;
     const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
@@ -28031,12 +28323,12 @@
         forbiddenTerminalActions: Array.isArray(cooldown && cooldown.forbiddenTerminalActions)
           ? cooldown.forbiddenTerminalActions.slice(0, 8)
           : ["workspace_publish_candidate", "finalize"],
-        validTerminalException: readString$1O(cooldown && cooldown.validTerminalException) ||
+        validTerminalException: readString$1P(cooldown && cooldown.validTerminalException) ||
           "workspace_publish_candidate with decision=limited + non-empty remainingGaps + false failed-dimension flags",
         blockedTerminalRetryCount,
         executedPublishCount: readFiniteNumber$1(cooldown && cooldown.executedPublishCount),
         consecutiveExecutedPublishCount: readFiniteNumber$1(cooldown && cooldown.consecutiveExecutedPublishCount),
-        reason: readString$1O(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
+        reason: readString$1P(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
       },
       invalidPublishReasons: publishValidation.reasons.slice(0, 8),
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
@@ -28055,7 +28347,7 @@
   }
 
   function maybeBlockActionPatternRepeat(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (!actionName || actionName === "workspace_publish_candidate" || actionName === "finalize") return null;
     const runState = options && options.runState;
     const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
@@ -28065,7 +28357,7 @@
       ? runState.terminalRepairState
       : null;
     const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1O).filter(Boolean)
+      ? repair.allowedActions.map(readString$1P).filter(Boolean)
       : [];
     const unnecessaryClarificationBlock = maybeBlockUnnecessaryLongResearchClarification({
       actionName,
@@ -28088,7 +28380,7 @@
       convergence,
       pushStep: options && options.pushStep
     });
-    if (earlyMutationGrowthBlock && readString$1O(earlyMutationGrowthBlock.output && earlyMutationGrowthBlock.output.escalation) === "hard_veto") {
+    if (earlyMutationGrowthBlock && readString$1P(earlyMutationGrowthBlock.output && earlyMutationGrowthBlock.output.escalation) === "hard_veto") {
       return earlyMutationGrowthBlock;
     }
     const lengthRewriteBlock = maybeBlockLengthDeficitRewrite({
@@ -28148,10 +28440,10 @@
       ? convergence.convergenceSignal
       : null;
     if (!signal) return null;
-    if (readString$1O(signal.patternKind) !== "exact_action") return null;
-    if (readString$1O(signal.forbiddenMove) !== "repeat_same_action_args") return null;
+    if (readString$1P(signal.patternKind) !== "exact_action") return null;
+    if (readString$1P(signal.forbiddenMove) !== "repeat_same_action_args") return null;
     const currentFingerprint = fingerprintAction(options.decision);
-    if (!currentFingerprint || currentFingerprint !== readString$1O(signal.fingerprint)) return null;
+    if (!currentFingerprint || currentFingerprint !== readString$1P(signal.fingerprint)) return null;
     const repeatCount = readFiniteNumber$1(signal.repeatCount) || readFiniteNumber$1(convergence.repeatedFingerprintCount);
     const message = `Action pattern convergence is active: do not repeat ${actionName} with the same arguments after ${repeatCount} no-progress attempt(s). Change arguments, choose a different recovery action, mutate the workspace meaningfully, gather evidence, or publish only a valid limited result when allowed.`;
     const output = {
@@ -28183,11 +28475,11 @@
   }
 
   function maybeBlockUnnecessaryLongResearchClarification(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (actionName !== "ask_clarification") return null;
     const runState = options && options.runState;
     if (!isLongResearchHarnessActive(runState, {
-      prompt: readString$1O(options && options.request && options.request.prompt)
+      prompt: readString$1P(options && options.request && options.request.prompt)
     })) {
       return null;
     }
@@ -28231,11 +28523,11 @@
   }
 
   function maybeBlockLongResearchSearchWithoutRead(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (actionName !== "web_search") return null;
     const runState = options && options.runState;
     if (!isLongResearchHarnessActive(runState, {
-      prompt: readString$1O(options && options.request && options.request.prompt)
+      prompt: readString$1P(options && options.request && options.request.prompt)
     })) return null;
     const searchPassCount = countSearchPasses(runState);
     if (searchPassCount < 2) return null;
@@ -28306,7 +28598,7 @@
       : null;
     if (!loop) return false;
     if (loop.enabled === true) return true;
-    const status = readString$1O(loop.status);
+    const status = readString$1P(loop.status);
     if (status && status !== "idle" && status !== "none") return true;
     return Boolean(
       loop.gateSignal &&
@@ -28323,10 +28615,10 @@
       ? runState.inquiryContext
       : {};
     if (plannerState.hasOpenAmbiguity === true) return true;
-    if (readString$1O(plannerState.openAmbiguity)) return true;
+    if (readString$1P(plannerState.openAmbiguity)) return true;
     if (plannerState.pendingClarification && typeof plannerState.pendingClarification === "object") return true;
     if (inquiryContext.pendingClarification && typeof inquiryContext.pendingClarification === "object") return true;
-    if (readString$1O(inquiryContext.openAmbiguity)) return true;
+    if (readString$1P(inquiryContext.openAmbiguity)) return true;
     return false;
   }
 
@@ -28343,7 +28635,7 @@
     const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
       ? workspace.files
       : {};
-    return Object.values(files).some((file) => readString$1O(file && file.content));
+    return Object.values(files).some((file) => readString$1P(file && file.content));
   }
 
   function countSearchPasses(runState) {
@@ -28376,7 +28668,7 @@
     }
     const urls = new Set();
     for (const item of candidates) {
-      const url = readString$1O(item && item.url);
+      const url = readString$1P(item && item.url);
       if (url) urls.add(url);
     }
     return urls.size;
@@ -28430,13 +28722,13 @@
   }
 
   function maybeBlockReadOnlyPlanningLoop(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     const runState = options && options.runState;
     const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
       ? runState.terminalRepairState
       : null;
     const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1O).filter(Boolean)
+      ? repair.allowedActions.map(readString$1P).filter(Boolean)
       : [];
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
@@ -28450,15 +28742,15 @@
       // for this specific action. Hard_veto means the model has repeatedly ignored the advisory
       // and the action is demonstrably causing churn — override the repair allowance.
       const isHardVetoForAction = state && state.active === true &&
-        readString$1O(state.escalation) === "hard_veto" &&
+        readString$1P(state.escalation) === "hard_veto" &&
         Array.isArray(state.forbiddenActions) &&
-        state.forbiddenActions.map(readString$1O).filter(Boolean).includes(actionName);
+        state.forbiddenActions.map(readString$1P).filter(Boolean).includes(actionName);
       if (!isHardVetoForAction) return null;
     }
     if (!state || state.active !== true) return null;
-    if (readString$1O(state.escalation) !== "hard_veto") return null;
+    if (readString$1P(state.escalation) !== "hard_veto") return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1O).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1P).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
     const ignoredCount = readFiniteNumber$1(state.ignoredCount) + 1;
@@ -28495,7 +28787,7 @@
 
   function readStateAllowedNextMovesWithSignal(state, limit, source) {
     const allowedNextMoves = Array.isArray(state && state.allowedNextMoves)
-      ? state.allowedNextMoves.map(readString$1O).filter(Boolean).slice(0, limit)
+      ? state.allowedNextMoves.map(readString$1P).filter(Boolean).slice(0, limit)
       : [];
     return {
       allowedNextMoves,
@@ -28510,7 +28802,7 @@
   }
 
   function maybeBlockWorkspaceNoProgressLoop(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (actionName !== "workspace_read" && actionName !== "workspace_replace") return null;
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
@@ -28618,7 +28910,7 @@
   }
 
   function maybeBlockSatisfiedCandidateMutation(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (![
       "workspace_write",
       "workspace_insert_after_section",
@@ -28668,7 +28960,7 @@
   }
 
   function maybeBlockLengthDeficitRewrite(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (actionName !== "workspace_write" && actionName !== "workspace_replace") return null;
     const runState = options && options.runState;
     const deficit = readWorkspaceLengthDeficit(runState);
@@ -28678,7 +28970,7 @@
       ? options.actionArgs
       : {};
     const proposedText = actionName === "workspace_write"
-      ? readString$1O(args.content || args.text || args.markdown)
+      ? readString$1P(args.content || args.text || args.markdown)
       : "";
     const proposedLength = actionName === "workspace_replace"
       ? estimateWorkspaceReplaceLength(runState, args, deficit)
@@ -28732,7 +29024,7 @@
   }
 
   function maybeBlockLateBudgetWorkspaceProtocolWindow(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     const isPatchPreview = LATE_BUDGET_PATCH_PREVIEW_ACTIONS.has(actionName);
     const isWorkspaceMutation = LATE_BUDGET_WORKSPACE_MUTATION_ACTIONS.has(actionName);
     if (!isPatchPreview && !isWorkspaceMutation) return null;
@@ -28800,7 +29092,7 @@
     const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
       ? workspace.files[path]
       : null;
-    return Boolean(readString$1O(file && file.content));
+    return Boolean(readString$1P(file && file.content));
   }
 
   function readRemainingCyclesAfterCurrentAction(runState) {
@@ -28821,9 +29113,9 @@
       ? runState.virtualWorkspace.pendingPatch
       : null;
     const firstOperationWithPath = Array.isArray(args.operations)
-      ? args.operations.find((operation) => readString$1O(operation && operation.path))
+      ? args.operations.find((operation) => readString$1P(operation && operation.path))
       : null;
-    const operationPath = readString$1O(firstOperationWithPath && firstOperationWithPath.path);
+    const operationPath = readString$1P(firstOperationWithPath && firstOperationWithPath.path);
     const workspaceQuality = runState &&
       runState.virtualWorkspace &&
       runState.virtualWorkspace.quality &&
@@ -28842,12 +29134,12 @@
       : packet.candidate && typeof packet.candidate === "object"
         ? packet.candidate
         : {};
-    return readString$1O(args.path) ||
-      readString$1O(args.to) ||
-      readString$1O(pendingPatch && pendingPatch.path) ||
+    return readString$1P(args.path) ||
+      readString$1P(args.to) ||
+      readString$1P(pendingPatch && pendingPatch.path) ||
       operationPath ||
-      readString$1O(workspaceQuality.finalCandidatePath) ||
-      readString$1O(candidate.path) ||
+      readString$1P(workspaceQuality.finalCandidatePath) ||
+      readString$1P(candidate.path) ||
       "final_candidate.md";
   }
 
@@ -28877,7 +29169,7 @@
     }
     const items = Array.isArray(todoState.items) ? todoState.items : [];
     const unfinished = items.filter((item) => {
-      const status = readString$1O(item && item.status) || "pending";
+      const status = readString$1P(item && item.status) || "pending";
       return status === "active" || status === "pending" || status === "blocked";
     });
     return {
@@ -28897,7 +29189,7 @@
       total: Array.isArray(items) ? items.length : 0
     };
     for (const item of Array.isArray(items) ? items : []) {
-      const status = readString$1O(item && item.status) || "pending";
+      const status = readString$1P(item && item.status) || "pending";
       if (Object.prototype.hasOwnProperty.call(counts, status)) {
         counts[status] += 1;
       }
@@ -28906,7 +29198,7 @@
   }
 
   function maybeBlockStructureRepairLoop(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
       : null;
@@ -28915,11 +29207,11 @@
       : null;
     if (!state || state.active !== true) return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1O).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1P).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
     const repeatedStructureNoProgressCount = readFiniteNumber$1(state.repeatedStructureNoProgressCount);
-    const isHardVeto = readString$1O(state.escalation) === "hard_veto";
+    const isHardVeto = readString$1P(state.escalation) === "hard_veto";
     const allowedMoves = readStateAllowedNextMovesWithSignal(state, 12, "structureRepairConvergence");
     const message = isHardVeto
       ? `HARD VETO — structure repair convergence has blocked ${actionName} ${repeatedStructureNoProgressCount} time(s) without improving the structure audit. allowedNextMoves is the recovery surface when populated. A coherent repair can use workspace_write or workspace_replace to produce a deduplicated outline with unique headings and section numbers, then workspace_finalize_candidate. If recovery is not feasible, workspace_publish_candidate with finalReadiness.decision='limited' is valid when remainingGaps names every structure issue.`
@@ -28940,7 +29232,7 @@
       activeIssueCodes: Array.isArray(state.activeIssueCodes) ? state.activeIssueCodes.slice(0, 8) : [],
       repeatedHeadingSamples: Array.isArray(state.repeatedHeadingSamples) ? state.repeatedHeadingSamples.slice(0, 5) : [],
       repeatedNumberSamples: Array.isArray(state.repeatedNumberSamples) ? state.repeatedNumberSamples.slice(0, 5) : [],
-      requiredCorrection: readString$1O(state.requiredCorrection) || null,
+      requiredCorrection: readString$1P(state.requiredCorrection) || null,
       message
     };
     if (typeof options.pushStep === "function") {
@@ -28958,7 +29250,7 @@
   }
 
   function maybeBlockWorkspaceMutationGrowthLoop(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
       : null;
@@ -28967,11 +29259,11 @@
       : null;
     if (!state || state.active !== true) return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1O).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1P).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
     const stallCount = readFiniteNumber$1(state.stallCount);
-    const isHardVeto = readString$1O(state.escalation) === "hard_veto";
+    const isHardVeto = readString$1P(state.escalation) === "hard_veto";
     const allowedMoves = readStateAllowedNextMovesWithSignal(state, 8, "workspaceMutationGrowthConvergence");
     const message = isHardVeto
       ? `HARD VETO — workspace mutation has stalled ${stallCount} time(s) with tiny deltas while a length deficit persists. workspace_write overwrites the file, and workspace_replace can loop without growing the report. allowedNextMoves is the recovery surface when populated; valid recovery can use workspace_propose_patch then workspace_apply_patch for a validated repair, workspace_insert_after_section to add content, or workspace_finalize_candidate / workspace_publish_candidate_limited_with_remainingGaps if the target cannot be met.`
@@ -28989,7 +29281,7 @@
       allowedNextMoves: allowedMoves.allowedNextMoves,
       allowedNextMovesSignal: allowedMoves.signal,
       stallCount,
-      requiredCorrection: readString$1O(state.requiredCorrection) || null,
+      requiredCorrection: readString$1P(state.requiredCorrection) || null,
       message
     };
     if (typeof options.pushStep === "function") {
@@ -29006,7 +29298,7 @@
   }
 
   function maybeBlockWorkspaceSourceDeficitAfterPublishBlock(options) {
-    const actionName = readString$1O(options && options.actionName);
+    const actionName = readString$1P(options && options.actionName);
     if (![
       "workspace_finalize_candidate",
       "workspace_insert_after_section",
@@ -29038,7 +29330,7 @@
       observableDeficit: sourceDeficit,
       publishBlockSignal: {
         count: readFiniteNumber$1(runState.publishBlockSignal.count),
-        lastStatus: readString$1O(runState.publishBlockSignal.lastStatus) || null
+        lastStatus: readString$1P(runState.publishBlockSignal.lastStatus) || null
       },
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
       message
@@ -29085,7 +29377,7 @@
       : candidate.textStats && typeof candidate.textStats === "object"
         ? candidate.textStats
         : {};
-    const statsKey = readString$1O(requested.statsKey) || "words";
+    const statsKey = readString$1P(requested.statsKey) || "words";
     const observed = readFiniteNumber$1(stats[statsKey]);
     const requestedLength = readFiniteNumber$1(requested.value);
     const lengthSatisfied = requestedLength > 0 ? observed >= requestedLength : false;
@@ -29101,7 +29393,7 @@
           evidenceSatisfied: false,
           lengthSatisfied,
           observedLength: observed,
-          observedLengthUnit: readString$1O(requested.unit) || statsKey,
+          observedLengthUnit: readString$1P(requested.unit) || statsKey,
           remainingGaps: ["Source minimum / read_url evidence is still insufficient."],
           requestedLength: requestedLength || null,
           requirementSatisfied: false,
@@ -29156,7 +29448,7 @@
     const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
-    const statsKey = readString$1O(requested && requested.statsKey);
+    const statsKey = readString$1P(requested && requested.statsKey);
     const requestedValue = readFiniteNumber$1(requested && requested.value);
     if (!statsKey || requestedValue <= 0) return null;
     const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
@@ -29175,7 +29467,7 @@
       requested: requestedValue,
       satisfied: observed >= requestedValue,
       statsKey,
-      unit: readString$1O(requested.unit) || statsKey
+      unit: readString$1P(requested.unit) || statsKey
     };
   }
 
@@ -29195,10 +29487,10 @@
     if (!structure || structure.ok !== false) return null;
     return {
       ok: false,
-      status: readString$1O(structure.status) || "fail",
-      reason: readString$1O(structure.reason) || "candidate structure is not publishable",
+      status: readString$1P(structure.status) || "fail",
+      reason: readString$1P(structure.reason) || "candidate structure is not publishable",
       issueCodes: Array.isArray(structure.issueCodes)
-        ? structure.issueCodes.map(readString$1O).filter(Boolean).slice(0, 8)
+        ? structure.issueCodes.map(readString$1P).filter(Boolean).slice(0, 8)
         : []
     };
   }
@@ -29211,7 +29503,7 @@
 
   function estimateWorkspaceReplaceLength(runState, args, deficit) {
     const source = args && typeof args === "object" && !Array.isArray(args) ? args : {};
-    const path = readString$1O(source.path);
+    const path = readString$1P(source.path);
     const find = typeof source.find === "string" ? source.find : "";
     const replace = typeof source.replace === "string"
       ? source.replace
@@ -29244,8 +29536,8 @@
     // is never a "no-growth rewrite" merely because it is small relative to a
     // requested length; only a write that shrinks or barely changes the draft is.
     const source = deficit && typeof deficit === "object" ? deficit : {};
-    const statsKey = readString$1O(source.statsKey);
-    const unit = readString$1O(source.unit);
+    const statsKey = readString$1P(source.statsKey);
+    const unit = readString$1P(source.unit);
     if (statsKey !== "words" && unit !== "words") return 1;
     return 30;
   }
@@ -29261,7 +29553,7 @@
     const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
-    const statsKey = readString$1O(requested && requested.statsKey);
+    const statsKey = readString$1P(requested && requested.statsKey);
     const requestedValue = readFiniteNumber$1(requested && requested.value);
     if (!statsKey || requestedValue <= 0) return null;
     const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
@@ -29279,7 +29571,7 @@
       observed,
       requested: requestedValue,
       statsKey,
-      unit: readString$1O(requested.unit) || statsKey
+      unit: readString$1P(requested.unit) || statsKey
     };
   }
 
@@ -29288,26 +29580,26 @@
   }
 
   function countLatinWords(value) {
-    const text = readString$1O(value);
+    const text = readString$1P(value);
     if (!text) return 0;
     const words = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g);
     return Array.isArray(words) ? words.length : 0;
   }
 
   function countTextByLengthUnit(value, deficit) {
-    const statsKey = readString$1O(deficit && deficit.statsKey);
-    const unit = readString$1O(deficit && deficit.unit);
+    const statsKey = readString$1P(deficit && deficit.statsKey);
+    const unit = readString$1P(deficit && deficit.unit);
     if (statsKey === "cjkChars" || unit === "cjk_chars" || unit === "cjkChars" || unit === "cjk") {
       return countCjkChars(value);
     }
     if (statsKey === "chars" || unit === "chars" || unit === "characters") {
-      return readString$1O(value).length;
+      return readString$1P(value).length;
     }
     return countLatinWords(value);
   }
 
   function countCjkChars(value) {
-    const text = readString$1O(value);
+    const text = readString$1P(value);
     if (!text) return 0;
     const chars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g);
     return Array.isArray(chars) ? chars.length : 0;
@@ -29449,18 +29741,6 @@
     return { done: false };
   }
 
-  function readActionResultCount(actionName, output) {
-    if (actionName !== "web_search" || !output || typeof output !== "object") {
-      return undefined;
-    }
-
-    if (typeof output.count === "number" && Number.isFinite(output.count)) {
-      return output.count;
-    }
-
-    return Array.isArray(output.items) ? output.items.length : undefined;
-  }
-
   function normalizeActionPermissionJudgeConfig(value) {
     if (value == null || value === false) {
       return { enabled: false, classify: null, cache: true };
@@ -29596,7 +29876,11 @@
       guidance: "Use clarify only when the request remains ambiguous after checking confirmed session evidence and recent conversation."
     },
     tier: 0,
-    execute: executeAskClarificationAction
+    execute: executeAskClarificationAction,
+    outputSchema: {
+      kinds: ["clarification"],
+      controls: ["complete"]
+    }
   });
 
   async function executeAskClarificationAction(context, args) {
@@ -30067,6 +30351,10 @@
       },
       preflight: prepareExecuteSkillToolInvocation,
       tier: 0,
+      outputSchema: {
+        kinds: ["agent_skill_tool_result"],
+        controls: ["continue"]
+      },
       execute: async (context, args) => {
         await assertEarlyExecuteSkillPolicy(context, args);
         const invocation = await prepareExecuteSkillToolInvocationForExecution(context, args);
@@ -30711,6 +30999,11 @@
         guidance: "Call list_agent_skills (alias: list_skills) to discover skills relevant to the user's task. Pass a capability keyword like 'research', 'debug', or 'plan' as `query`. Iterate from simple to specific keywords if needed (max 5 calls per turn). Once you find a fit, call read_agent_skill to load its full instructions."
       },
       tier: 0,
+      outputSchema: {
+        kinds: ["agent_skill_catalog"],
+        controls: ["continue"],
+        metrics: { resultCount: "count" }
+      },
       execute: async (context, actionArgs) => {
         // ADR-0013: 5-turn budget guard prevents infinite skill-discovery loops.
         // Counter lives on agentSkillContext (mechanism, not policy).
@@ -30786,6 +31079,10 @@
         guidance: "Use read_agent_skill when the user explicitly asks for a bundled skill or when the skill instructions are needed before answering."
       },
       tier: 0,
+      outputSchema: {
+        kinds: ["agent_skill_document"],
+        controls: ["continue"]
+      },
       execute: async (context, args) => {
         const requestedSkill = readString$T(args && (args.skillName || args.name));
         const manifest = await getPolicyManifestForSkill(context, requestedSkill);
@@ -32046,7 +32343,11 @@
       guidance: "Use read_url when the user gives a URL directly or when web_search snippets are not enough and you need to inspect a page."
     },
     tier: 1,
-    execute: executeReadUrlAction
+    execute: executeReadUrlAction,
+    outputSchema: {
+      kinds: ["read_url_result", "read_url_recovery", "read_url_fallback"],
+      controls: ["continue"]
+    }
   });
 
   async function executeReadUrlAction(context, args) {
@@ -32394,6 +32695,10 @@
         guidance: "Use use_agent_skill only after read_agent_skill when the user explicitly wants that bundled skill or when its instructions must stay active across later planner steps."
       },
       tier: 0,
+      outputSchema: {
+        kinds: ["agent_skill_activated"],
+        controls: ["continue"]
+      },
       execute: async (context, args) => {
         const requestedSkill = readString$O(args && (args.skillName || args.name));
         const lastReadSkill = context.agentSkillContext && context.agentSkillContext.lastReadSkill;
@@ -32487,7 +32792,11 @@
       guidance: "Use workspace_list to inspect which virtual draft artifacts exist before relying on workspace content."
     },
     tier: 0,
-    execute: executeWorkspaceListAction
+    execute: executeWorkspaceListAction,
+    outputSchema: {
+      kinds: ["virtual_workspace_list"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceReadAction = Object.freeze({
@@ -32504,7 +32813,11 @@
     },
     tier: 0,
     execute: executeWorkspaceReadAction,
-    preflight: preflightWorkspacePath
+    preflight: preflightWorkspacePath,
+    outputSchema: {
+      kinds: ["virtual_workspace_read"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceWriteAction = Object.freeze({
@@ -32528,7 +32841,11 @@
     },
     tier: 0,
     execute: executeWorkspaceWriteAction,
-    preflight: preflightWorkspacePath
+    preflight: preflightWorkspacePath,
+    outputSchema: {
+      kinds: ["virtual_workspace_write"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceReplaceAction = Object.freeze({
@@ -32555,7 +32872,11 @@
     },
     tier: 0,
     execute: executeWorkspaceReplaceAction,
-    preflight: preflightWorkspaceMutationRequiresRead
+    preflight: preflightWorkspaceMutationRequiresRead,
+    outputSchema: {
+      kinds: ["virtual_workspace_replace"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceProposePatchAction = Object.freeze({
@@ -32586,7 +32907,11 @@
     },
     tier: 0,
     execute: executeWorkspaceProposePatchAction,
-    preflight: preflightWorkspacePath
+    preflight: preflightWorkspacePath,
+    outputSchema: {
+      kinds: ["virtual_workspace_propose_patch"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceApplyPatchAction = Object.freeze({
@@ -32607,7 +32932,11 @@
       guidance: "Use workspace_apply_patch only after workspace_propose_patch returned status=preview_ready with positive deltaWords and no blocking riskFlags. It applies only the latest valid pending patch; patchId mismatch, stale baseVersion, invalid preview, no_growth, not_found, ambiguous, or structure_maybe_worse are observable errors."
     },
     tier: 0,
-    execute: executeWorkspaceApplyPatchAction
+    execute: executeWorkspaceApplyPatchAction,
+    outputSchema: {
+      kinds: ["virtual_workspace_apply_patch"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceInsertAfterSectionAction = Object.freeze({
@@ -32634,7 +32963,11 @@
     },
     tier: 0,
     execute: executeWorkspaceInsertAfterSectionAction,
-    preflight: preflightWorkspaceMutationRequiresRead
+    preflight: preflightWorkspaceMutationRequiresRead,
+    outputSchema: {
+      kinds: ["virtual_workspace_insert_after_section"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceRemoveAction = Object.freeze({
@@ -32656,7 +32989,11 @@
     },
     tier: 0,
     execute: executeWorkspaceRemoveAction,
-    preflight: preflightWorkspacePath
+    preflight: preflightWorkspacePath,
+    outputSchema: {
+      kinds: ["virtual_workspace_remove"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceMoveAction = Object.freeze({
@@ -32684,6 +33021,10 @@
     preflight(context, args) {
       if (args && args.from != null) validateWorkspacePath(args.from);
       if (args && args.to != null) validateWorkspacePath(args.to);
+    },
+    outputSchema: {
+      kinds: ["virtual_workspace_move"],
+      controls: ["continue"]
     }
   });
 
@@ -32725,7 +33066,11 @@
       guidance: "Use workspace_multi_edit to batch multiple replace or insert_after_section operations in a single OODAE cycle. Each operation must include action (replace or insert_after_section), path, and operation-specific fields. With atomic:true (default false), the first failure rolls back all changes and returns status=aborted. Without atomic, partial success is allowed and each result entry shows its individual status. The file must have been workspace_read before the first mutation on that file in this batch — the same read-before-mutate rule as workspace_replace and workspace_insert_after_section."
     },
     tier: 0,
-    execute: executeWorkspaceMultiEditAction
+    execute: executeWorkspaceMultiEditAction,
+    outputSchema: {
+      kinds: ["virtual_workspace_multi_edit"],
+      controls: ["continue"]
+    }
   });
 
   const workspaceFinalizeCandidateAction = Object.freeze({
@@ -32751,6 +33096,10 @@
       if (args && args.path != null) {
         preflightWorkspacePath(context, args);
       }
+    },
+    outputSchema: {
+      kinds: ["virtual_workspace_finalize_candidate"],
+      controls: ["continue"]
     }
   });
 
@@ -32848,6 +33197,10 @@
       if (args && args.path != null) {
         preflightWorkspacePath(context, args);
       }
+    },
+    outputSchema: {
+      kinds: ["final_response", "virtual_workspace_publish_blocked"],
+      controls: ["complete", "continue"]
     }
   });
 
@@ -34434,6 +34787,10 @@
       },
       tier: 1,
       execute: executeRepoReadFileAction,
+      outputSchema: {
+        kinds: ["repo_file_result", "repo_file_tools_result"],
+        controls: ["continue"]
+      },
       preflight(context, args) {
         assertRepoPathAllowed(args && args.path, readConfig(context), "read");
       }
@@ -34458,6 +34815,11 @@
       },
       tier: 1,
       execute: executeRepoSearchAction,
+      outputSchema: {
+        kinds: ["repo_search_result", "repo_file_tools_result"],
+        controls: ["continue"],
+        metrics: { resultCount: "matches.length" }
+      },
       preflight(_context, args) {
         normalizeRepoSearchArgs(_context, args);
       }
@@ -35914,7 +36276,12 @@
       guidance: "Use web_search for current, factual, or lookup requests that need outside information."
     },
     tier: 1,
-    execute: executeWebSearchAction
+    execute: executeWebSearchAction,
+    outputSchema: {
+      kinds: ["web_search_result"],
+      controls: ["continue"],
+      metrics: { resultCount: "count" }
+    }
   });
 
   async function executeWebSearchAction(context, args) {
@@ -35928,7 +36295,7 @@
     const searchPlan = planWebSearch({
       maxPasses: readPositiveInteger$c(args && args.maxPasses) || readPositiveInteger$c(context.request && context.request.maxPasses),
       query: originalQuery,
-      siteHints: readStringArray$2(args && args.siteHints) || readStringArray$2(context.request && context.request.siteHints),
+      siteHints: readStringArray$3(args && args.siteHints) || readStringArray$3(context.request && context.request.siteHints),
       strategy: readString$H(args && args.strategy) || readString$H(context.request && context.request.strategy)
     });
     const readSources = Array.isArray(context && context.runState && context.runState.researchContext && context.runState.researchContext.readSources)
@@ -36269,10 +36636,85 @@
       : null;
   }
 
-  function readStringArray$2(value) {
+  function readStringArray$3(value) {
     return Array.isArray(value)
       ? value.map((item) => readString$H(item)).filter(Boolean)
       : null;
+  }
+
+  // AGRUN-248-B — Contract check for action outputSchema declarations.
+  //
+  // Every action descriptor must declare either:
+  //   outputSchema: { kinds: [...], controls: [...], metrics? }
+  // or an explicit waiver:
+  //   outputSchema: null
+  //
+  // Mirrors the style of assertPlannerActionArgsContract — fail fast at registry
+  // construction so no action can ship without an envelope contract decision.
+
+  const ALLOWED_CONTROLS = Object.freeze(new Set(["continue", "stop", "complete"]));
+
+  function assertActionOutputContract(actions) {
+    if (!Array.isArray(actions)) {
+      throw new Error("assertActionOutputContract requires an array of actions.");
+    }
+    for (const action of actions) {
+      if (!action || typeof action !== "object") continue;
+      if (!("outputSchema" in action)) {
+        throw new Error(
+          `Action "${actionName(action)}" must declare outputSchema (object) or outputSchema:null waiver.`
+        );
+      }
+      const schema = action.outputSchema;
+      if (schema === null) continue;
+      if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+        throw new Error(
+          `Action "${actionName(action)}" outputSchema must be an object or null; got ${typeof schema}.`
+        );
+      }
+      const kinds = readStringArray$2(schema.kinds);
+      if (kinds.length === 0) {
+        throw new Error(
+          `Action "${actionName(action)}" outputSchema.kinds must be a non-empty string array.`
+        );
+      }
+      const controls = readStringArray$2(schema.controls);
+      if (controls.length === 0) {
+        throw new Error(
+          `Action "${actionName(action)}" outputSchema.controls must be a non-empty string array.`
+        );
+      }
+      for (const control of controls) {
+        if (!ALLOWED_CONTROLS.has(control)) {
+          throw new Error(
+            `Action "${actionName(action)}" outputSchema.controls contains invalid value "${control}". Allowed: continue, stop, complete.`
+          );
+        }
+      }
+      if (schema.metrics != null) {
+        if (typeof schema.metrics !== "object" || Array.isArray(schema.metrics)) {
+          throw new Error(
+            `Action "${actionName(action)}" outputSchema.metrics must be an object when present.`
+          );
+        }
+        for (const [key, value] of Object.entries(schema.metrics)) {
+          if (typeof value !== "string" || !value.trim()) {
+            throw new Error(
+              `Action "${actionName(action)}" outputSchema.metrics.${key} must be a non-empty string path.`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  function readStringArray$2(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((entry) => (typeof entry === "string" ? entry.trim() : "")).filter(Boolean);
+  }
+
+  function actionName(action) {
+    return typeof action.name === "string" ? action.name : "<unnamed>";
   }
 
   function createActionRegistry(options = {}) {
@@ -36283,6 +36725,7 @@
       toolCallExamples: options.toolCallExamples
     }).map(withPermissionMetadata);
     assertPlannerActionArgsContract(actions);
+    assertActionOutputContract(actions);
     const index = new Map(actions.map((action) => [action.name, action]));
 
     return {
@@ -69346,7 +69789,7 @@ ${user}:`]
         ? "If the answer should stop without tools, use final or finalize."
         : "If the answer should stop without tools, use final. Do not return finalize in this context."
     ].join("\n");
-    const hostSystemPrompt = readString$1O(options && options.systemPrompt);
+    const hostSystemPrompt = readString$1P(options && options.systemPrompt);
     const systemPrompt = hostSystemPrompt
       ? [hostSystemPrompt, "", repairSystemPrompt].join("\n")
       : repairSystemPrompt;
@@ -69364,10 +69807,10 @@ ${user}:`]
       ...envelopeExamples,
       "",
       "Planner prompt:",
-      readString$1O(options && options.plannerPrompt) || "None",
+      readString$1P(options && options.plannerPrompt) || "None",
       "",
       "Invalid planner output to repair:",
-      readString$1O(options && options.responseText) || "None"
+      readString$1P(options && options.responseText) || "None"
     ].join("\n");
     const { response, text, value } = await requestSemanticJudge(options.request, {
       prompt,
@@ -69394,24 +69837,24 @@ ${user}:`]
     }
 
     if (type === "final") {
-      const answer = readString$1O(record.answer) || readString$1O(record.text);
+      const answer = readString$1P(record.answer) || readString$1P(record.text);
       return answer
         ? {
             answer,
             citations: Array.isArray(record.citations) ? record.citations : [],
             finalReadiness: normalizeFinalReadiness(record.finalReadiness),
-            reasoning: readString$1O(record.reasoning),
+            reasoning: readString$1P(record.reasoning),
             type
           }
         : null;
     }
 
     if (type === "clarify") {
-      const question = readString$1O(record.question) || readString$1O(record.text);
+      const question = readString$1P(record.question) || readString$1P(record.text);
       return question
         ? {
             question,
-            reasoning: readString$1O(record.reasoning),
+            reasoning: readString$1P(record.reasoning),
             type
           }
         : null;
@@ -69420,8 +69863,8 @@ ${user}:`]
     if (type === "finalize") {
       return {
         finalReadiness: normalizeFinalReadiness(record.finalReadiness),
-        instruction: readString$1O(record.instruction) || readString$1O(record.answer) || readString$1O(record.text),
-        reasoning: readString$1O(record.reasoning),
+        instruction: readString$1P(record.instruction) || readString$1P(record.answer) || readString$1P(record.text),
+        reasoning: readString$1P(record.reasoning),
         type
       };
     }
@@ -69433,10 +69876,10 @@ ${user}:`]
             actions,
             finalReadiness: normalizeFinalReadiness(record.finalReadiness),
             partial_ok: record.partial_ok === true,
-            reasoning: readString$1O(record.reasoning),
+            reasoning: readString$1P(record.reasoning),
             stitch: normalizeStitch$1(record.stitch),
             synthesize_per_action: record.synthesize_per_action === true,
-            synthesize_instruction: readString$1O(record.synthesize_instruction) || readString$1O(record.instruction),
+            synthesize_instruction: readString$1P(record.synthesize_instruction) || readString$1P(record.instruction),
             type
           }
         : null;
@@ -69450,13 +69893,13 @@ ${user}:`]
     return {
       args: readPlannerArgs(record),
       name,
-      reasoning: readString$1O(record.reasoning),
+      reasoning: readString$1P(record.reasoning),
       type
     };
   }
 
   function normalizeType(record) {
-    const explicitType = readString$1O(record.type || record.kind || record.decisionType);
+    const explicitType = readString$1P(record.type || record.kind || record.decisionType);
 
     if (
       explicitType === "action" ||
@@ -69472,19 +69915,19 @@ ${user}:`]
       return "plan";
     }
 
-    if (readString$1O(record.answer)) {
+    if (readString$1P(record.answer)) {
       return "final";
     }
 
-    if (readString$1O(record.question)) {
+    if (readString$1P(record.question)) {
       return "clarify";
     }
 
-    if (readString$1O(record.instruction)) {
+    if (readString$1P(record.instruction)) {
       return "finalize";
     }
 
-    if (readString$1O(record.name || record.action || record.tool || record.toolName)) {
+    if (readString$1P(record.name || record.action || record.tool || record.toolName)) {
       return "action";
     }
 
@@ -69492,7 +69935,7 @@ ${user}:`]
   }
 
   function normalizeActionName(record, options) {
-    const candidate = readString$1O(record.name || record.action || record.tool || record.toolName).toLowerCase();
+    const candidate = readString$1P(record.name || record.action || record.tool || record.toolName).toLowerCase();
     if (!candidate) {
       return "";
     }
@@ -69547,7 +69990,7 @@ ${user}:`]
       normalized.push({
         args: readPlannerArgs(record),
         name,
-        reasoning: readString$1O(record.reasoning),
+        reasoning: readString$1P(record.reasoning),
         section: normalizeSection$1(record.section),
         type: "action"
       });
@@ -69561,8 +70004,8 @@ ${user}:`]
       return null;
     }
     return {
-      prompt: readString$1O(record.prompt),
-      title: readString$1O(record.title)
+      prompt: readString$1P(record.prompt),
+      title: readString$1P(record.title)
     };
   }
 
@@ -69576,9 +70019,9 @@ ${user}:`]
       followups: Array.isArray(record.followups)
         ? record.followups.filter((item) => typeof item === "string")
         : [],
-      intro_prompt: readString$1O(record.intro_prompt),
-      outro_prompt: readString$1O(record.outro_prompt),
-      provenance: readString$1O(record.provenance)
+      intro_prompt: readString$1P(record.intro_prompt),
+      outro_prompt: readString$1P(record.outro_prompt),
+      provenance: readString$1P(record.provenance)
     };
   }
 
@@ -69588,11 +70031,11 @@ ${user}:`]
     }
 
     if (value.type === "final") {
-      return readString$1O(value.answer).length > 0;
+      return readString$1P(value.answer).length > 0;
     }
 
     if (value.type === "clarify") {
-      return readString$1O(value.question).length > 0;
+      return readString$1P(value.question).length > 0;
     }
 
     if (value.type === "finalize") {
@@ -69603,7 +70046,7 @@ ${user}:`]
       return Array.isArray(value.actions) && value.actions.length > 0;
     }
 
-    return value.type === "action" && readString$1O(value.name).length > 0;
+    return value.type === "action" && readString$1P(value.name).length > 0;
   }
 
   function shouldRejectTerminalEnvelope(envelope, options) {
@@ -69631,7 +70074,7 @@ ${user}:`]
     ) {
       return {
         instruction: "The requested skill is already active. Use the current active skill context to answer directly.",
-        reasoning: readString$1O(envelope.reasoning) || "Requested bundled agent skill is already active.",
+        reasoning: readString$1P(envelope.reasoning) || "Requested bundled agent skill is already active.",
         type: "finalize"
       };
     }
@@ -69651,7 +70094,7 @@ ${user}:`]
     ) {
       return {
         instruction: "The requested bundled tool result is already available. Use the existing tool evidence to answer directly.",
-        reasoning: readString$1O(envelope.reasoning) || "Requested bundled skill tool result is already available.",
+        reasoning: readString$1P(envelope.reasoning) || "Requested bundled skill tool result is already available.",
         type: "finalize"
       };
     }
@@ -69662,7 +70105,7 @@ ${user}:`]
     ) {
       return {
         instruction: "Read URL evidence is already available. Use the current source content to answer directly.",
-        reasoning: readString$1O(envelope.reasoning) || "Requested URL content is already available.",
+        reasoning: readString$1P(envelope.reasoning) || "Requested URL content is already available.",
         type: "finalize"
       };
     }
@@ -69672,20 +70115,20 @@ ${user}:`]
 
   function isMissingRequiredSkillToolFields(args, activeAgentSkill) {
     // If an active skill exists, the action handler can resolve from it — allow.
-    if (activeAgentSkill && typeof activeAgentSkill === "object" && readString$1O(activeAgentSkill.name)) {
+    if (activeAgentSkill && typeof activeAgentSkill === "object" && readString$1P(activeAgentSkill.name)) {
       return false;
     }
 
-    const skillName = readString$1O(args && args.skillName);
-    const toolName = readString$1O(args && args.toolName);
+    const skillName = readString$1P(args && args.skillName);
+    const toolName = readString$1P(args && args.toolName);
 
     // Both missing — inference fallback cannot reliably distinguish tools.
     return !skillName && !toolName;
   }
 
   function isAlreadyActiveSkill(requestedSkillName, activeAgentSkill) {
-    const requested = readString$1O(requestedSkillName).toLowerCase();
-    const active = readString$1O(activeAgentSkill && activeAgentSkill.name).toLowerCase();
+    const requested = readString$1P(requestedSkillName).toLowerCase();
+    const active = readString$1P(activeAgentSkill && activeAgentSkill.name).toLowerCase();
     return Boolean(requested && active && requested === active);
   }
 
@@ -69702,12 +70145,12 @@ ${user}:`]
       return false;
     }
 
-    const lastTool = readString$1O(lastResult.tool).toLowerCase();
+    const lastTool = readString$1P(lastResult.tool).toLowerCase();
     if (!lastTool) {
       return false;
     }
 
-    const requestedTool = readString$1O(args && args.toolName).toLowerCase();
+    const requestedTool = readString$1P(args && args.toolName).toLowerCase();
 
     // Exact match: planner explicitly requests the same tool that already ran.
     if (requestedTool && requestedTool === lastTool) {
@@ -69725,13 +70168,13 @@ ${user}:`]
   }
 
   function hasReadableSourceForUrl(url, readSources) {
-    const normalizedUrl = readString$1O(url).toLowerCase();
+    const normalizedUrl = readString$1P(url).toLowerCase();
     if (!normalizedUrl) {
       return false;
     }
 
     return (Array.isArray(readSources) ? readSources : []).some((item) => {
-      const sourceUrl = readString$1O(item && item.url).toLowerCase();
+      const sourceUrl = readString$1P(item && item.url).toLowerCase();
       return sourceUrl === normalizedUrl;
     });
   }
@@ -71803,7 +72246,7 @@ ${user}:`]
   function buildRecallPrompt(request) {
     return [
       "Latest user prompt:",
-      readString$1O(request && request.prompt) || "None",
+      readString$1P(request && request.prompt) || "None",
       "",
       "Session context:",
       JSON.stringify(request && request.sessionContext ? request.sessionContext : null, null, 2)
@@ -71812,7 +72255,7 @@ ${user}:`]
 
   function normalizeRecallValue(value) {
     const record = readObject$2(value) || {};
-    const answer = readString$1O(record.answer);
+    const answer = readString$1P(record.answer);
 
     return {
       answer,
@@ -71831,15 +72274,15 @@ ${user}:`]
       return null;
     }
 
-    const kind = readString$1O(record.kind);
-    const text = readString$1O(record.text);
+    const kind = readString$1P(record.kind);
+    const text = readString$1P(record.text);
     if (!kind || !text) {
       return null;
     }
 
     return {
       kind,
-      slot: readString$1O(record.slot) || null,
+      slot: readString$1P(record.slot) || null,
       text
     };
   }
@@ -71895,8 +72338,8 @@ ${user}:`]
     if (!isTodoShapedRun(runState)) return null;
     if (!runState || typeof runState !== "object" || runState.todoState) return null;
 
-    const goal = readString$$(runState.observationSummary && runState.observationSummary.prompt)
-      || readString$$(runState.originalQuery)
+    const goal = readString$10(runState.observationSummary && runState.observationSummary.prompt)
+      || readString$10(runState.originalQuery)
       || "Complete the complex task";
     const message = readErrorMessage$2(error);
     const next = applyTodoPlan(createTodoState({ goal }), {
@@ -74090,8 +74533,8 @@ ${user}:`]
     const items = buildPlanItems(decision, actions);
     if (items.length === 0) return null;
 
-    const goal = readString$$(runState.observationSummary && runState.observationSummary.prompt)
-      || readString$$(decision && decision.reasoning)
+    const goal = readString$10(runState.observationSummary && runState.observationSummary.prompt)
+      || readString$10(decision && decision.reasoning)
       || "Complete the planned multi-step task";
     const next = applyTodoPlan(createTodoState({ goal }), {
       activeItemId: items[0].id,
@@ -74114,7 +74557,7 @@ ${user}:`]
       items.push({ id: `plan-${items.length + 1}`, label, status: "pending" });
     }
 
-    if (readString$$(decision && decision.synthesize_instruction) !== "direct") {
+    if (readString$10(decision && decision.synthesize_instruction) !== "direct") {
       const synthLabel = "Synthesize the final user-facing answer";
       if (!seen.has(synthLabel)) {
         items.push({ id: `plan-${items.length + 1}`, label: synthLabel, status: "pending" });
@@ -74125,7 +74568,7 @@ ${user}:`]
   }
 
   function labelForAction(action) {
-    const name = readString$$(action && action.name);
+    const name = readString$10(action && action.name);
     if (name === "web_search") return "Search the web for relevant evidence";
     if (name === "read_url") return "Read selected source pages";
     if (name === "execute_skill_tool") return "Run the selected skill tool";
@@ -74136,7 +74579,7 @@ ${user}:`]
 
   function hasMultiActionPlan(planActions) {
     return Array.isArray(planActions) && planActions.filter((item) => {
-      const name = readString$$(item && item.name);
+      const name = readString$10(item && item.name);
       return name && !name.startsWith("todo_");
     }).length > 1;
   }
@@ -74182,7 +74625,7 @@ ${user}:`]
     const message = "Research finalize contract missing AI readiness: choose read_url/web_search/workspace work, or finalize again with finalReadiness.decision='limited'/'ready' plus optional finalReadiness.requirementsAssessment and honest limitations. Runtime is not judging source, length, or content sufficiency.";
     contract.status = "missing_ai_readiness";
     session.runState.researchFinalizeContract = contract;
-    const actionName = readString$1O(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1P(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const output = {
       contract: cloneValue(contract),
       kind: "research_finalize_contract",
@@ -74216,7 +74659,7 @@ ${user}:`]
     const declaredUnsatisfied = readDeclaredUnsatisfied(contract);
     if (declaredUnsatisfied.length === 0) return null;
 
-    const actionName = readString$1O(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1P(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const observed = contract.finalReadinessAssessment && typeof contract.finalReadinessAssessment === "object"
       ? contract.finalReadinessAssessment.observed
       : null;
@@ -74282,7 +74725,7 @@ ${user}:`]
       return null;
     }
 
-    const actionName = readString$1O(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1P(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const evaluator = refreshResearchAcceptanceEvaluator(session.runState, {
       actionName,
       conflictIssues: audit.issues,
@@ -74391,7 +74834,7 @@ ${user}:`]
       : null;
     if (!candidate && !draft && !workspaceContract) return null;
 
-    const actionName = readString$1O(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1P(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const signal = {
       actionName,
       cycle: runState.cycleCount,
@@ -74500,7 +74943,7 @@ ${user}:`]
     if (!contract || typeof contract !== "object") return false;
     const value = readNumber$1(contract.value);
     if (value <= 0) return false;
-    const unit = readString$1O(contract.unit).toLowerCase();
+    const unit = readString$1P(contract.unit).toLowerCase();
     if (unit === "words") return value >= 1000;
     if (unit === "chars" || unit === "characters") return value >= 3000;
     return false;
@@ -74844,7 +75287,7 @@ ${user}:`]
       if (session.actionRegistry.get("workspace_publish_candidate")) return true;
     }
     return (Array.isArray(session && session.availableActions) ? session.availableActions : [])
-      .some((action) => action && readString$1O(action.name) === "workspace_publish_candidate");
+      .some((action) => action && readString$1P(action.name) === "workspace_publish_candidate");
   }
 
   function readWorkspaceCandidate(workspace) {
@@ -74853,10 +75296,10 @@ ${user}:`]
       ? workspace.files
       : {};
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const path = readString$1O(quality.finalCandidatePath) || "final_candidate.md";
+    const path = readString$1P(quality.finalCandidatePath) || "final_candidate.md";
     if (path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
     const file = files[path];
-    const content = readString$1O(file && file.content);
+    const content = readString$1P(file && file.content);
     if (!content) return null;
     const stats = quality.finalCandidateStats && typeof quality.finalCandidateStats === "object"
       ? quality.finalCandidateStats
@@ -74879,7 +75322,7 @@ ${user}:`]
       ? workspace.files
       : {};
     const file = files["draft.md"];
-    const content = readString$1O(file && file.content);
+    const content = readString$1P(file && file.content);
     if (content) {
       return {
         path: "draft.md",
@@ -74892,7 +75335,7 @@ ${user}:`]
 
   function readWorkspaceCustomDraft(workspace, files) {
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const finalCandidatePath = readString$1O(quality.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1P(quality.finalCandidatePath) || "final_candidate.md";
     const reserved = new Set([
       finalCandidatePath,
       "final_candidate.md",
@@ -74904,10 +75347,10 @@ ${user}:`]
     const contentActions = new Set(["write", "replace", "append", "insert_after_section"]);
     for (let i = operations.length - 1; i >= 0; i -= 1) {
       const operation = operations[i];
-      if (!operation || !contentActions.has(readString$1O(operation.action))) continue;
-      const path = readString$1O(operation.path);
+      if (!operation || !contentActions.has(readString$1P(operation.action))) continue;
+      const path = readString$1P(operation.path);
       if (!path || reserved.has(path) || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) continue;
-      const content = readString$1O(files[path] && files[path].content);
+      const content = readString$1P(files[path] && files[path].content);
       if (!content) continue;
       return {
         path,
@@ -74918,9 +75361,9 @@ ${user}:`]
 
     let best = null;
     for (const [path, file] of Object.entries(files)) {
-      const safePath = readString$1O(path);
+      const safePath = readString$1P(path);
       if (!safePath || reserved.has(safePath) || safePath.startsWith("/") || safePath.includes("..") || /[\\]/.test(safePath)) continue;
-      const content = readString$1O(file && file.content);
+      const content = readString$1P(file && file.content);
       if (!content) continue;
       if (!best || content.length > best.content.length) {
         best = { content, path: safePath };
@@ -74935,7 +75378,7 @@ ${user}:`]
   }
 
   function summarizeTextForSignal(content) {
-    const text = readString$1O(content);
+    const text = readString$1P(content);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -74951,7 +75394,7 @@ ${user}:`]
   }
 
   function readActionNameForTerminalSource(sourceLabel) {
-    const source = readString$1O(sourceLabel);
+    const source = readString$1P(sourceLabel);
     if (source === "planner_final") return "final";
     if (source === "planner_finalize") return "finalize";
     return source || "finalize";
@@ -75993,7 +76436,7 @@ ${user}:`]
       ...createOrientRecord(observeRecord, session.runtimeConfig),
       ambiguityState: inputResolution.ambiguityState,
       availableActions: cloneValue(session.availableActions.map((action) => action.name)),
-      clarificationStatus: readString$1O(inputResolution && inputResolution.clarificationStatus) || "none",
+      clarificationStatus: readString$1P(inputResolution && inputResolution.clarificationStatus) || "none",
       executionClass: session.runState.executionClass,
       evidenceState: inputResolution.evidenceState,
       intentState: cloneValue(inputResolution.intentState || null),
@@ -76066,7 +76509,7 @@ ${user}:`]
     const intentState = inputResolution && typeof inputResolution.intentState === "object"
       ? inputResolution.intentState
       : null;
-    const activeQuery = readString$1O(inputResolution && inputResolution.activeQuery);
+    const activeQuery = readString$1P(inputResolution && inputResolution.activeQuery);
 
     if (!inquiryContext && !intentState) {
       return createContextSnapshot(snapshot);
@@ -76074,12 +76517,12 @@ ${user}:`]
 
     const nextInquiryContext = normalizeInquiryContext({
       ...snapshot.inquiryContext,
-      activeGoal: readString$1O(inquiryContext && inquiryContext.activeGoal)
-        || readString$1O(intentState && intentState.goal)
+      activeGoal: readString$1P(inquiryContext && inquiryContext.activeGoal)
+        || readString$1P(intentState && intentState.goal)
         || snapshot.inquiryContext.activeGoal,
       activeQuery: activeQuery || snapshot.inquiryContext.activeQuery,
-      activeTopic: readString$1O(inquiryContext && inquiryContext.activeTopic)
-        || readString$1O(intentState && intentState.topic)
+      activeTopic: readString$1P(inquiryContext && inquiryContext.activeTopic)
+        || readString$1P(intentState && intentState.topic)
         || snapshot.inquiryContext.activeTopic,
       lastClarificationResolution: hasOwnValue(inquiryContext, "lastClarificationResolution")
         ? inquiryContext.lastClarificationResolution
@@ -76146,7 +76589,7 @@ ${user}:`]
   function evaluateCycleDrift(session, turnState) {
     const config = session.runtimeConfig && session.runtimeConfig.driftDetection;
     if (!config || config.enabled !== true) return null;
-    const goalAnchorText = readString$1O(turnState && turnState.goalAnchorText);
+    const goalAnchorText = readString$1P(turnState && turnState.goalAnchorText);
     if (!goalAnchorText) return null;
     const trajectoryText = computeTrajectorySignal(session.runState, {
       maxEntries: config.maxTrajectoryEntries
@@ -76192,13 +76635,13 @@ ${user}:`]
       return false;
     }
 
-    const actionName = readString$1O(decision.name);
+    const actionName = readString$1P(decision.name);
     if (!actionName) {
       return false;
     }
 
     return (Array.isArray(availableActions) ? availableActions : []).some(
-      (action) => action && typeof action === "object" && readString$1O(action.name) === actionName
+      (action) => action && typeof action === "object" && readString$1P(action.name) === actionName
     );
   }
 
@@ -76244,7 +76687,7 @@ ${user}:`]
         break;
       }
       if (entry.kind === "action_error") {
-        candidateName = readString$1O(entry.actionName) || null;
+        candidateName = readString$1P(entry.actionName) || null;
         break;
       }
       if (entry.kind === "planner_invalid_action") {
@@ -77305,8 +77748,8 @@ ${user}:`]
     if (!runState || typeof runState !== "object" || runState.todoState) return null;
     if (!isTodoShapedRun(runState)) return null;
 
-    const goal = readString$$(runState.observationSummary && runState.observationSummary.prompt)
-      || readString$$(runState.originalQuery)
+    const goal = readString$10(runState.observationSummary && runState.observationSummary.prompt)
+      || readString$10(runState.originalQuery)
       || "Complete the multi-step task";
     const next = applyTodoPlan(createTodoState({ goal }), {
       activeItemId: TODO_PLANNING_PLACEHOLDER_ID,
@@ -82704,9 +83147,9 @@ ${user}:`]
       return null;
     }
 
-    const kind = readString$1O(record.kind);
-    const slot = readString$1O(record.slot);
-    const text = readString$1O(record.text);
+    const kind = readString$1P(record.kind);
+    const slot = readString$1P(record.slot);
+    const text = readString$1P(record.text);
 
     if (!MEMORY_KINDS$1.has(kind) || !slot || !text) {
       return null;
