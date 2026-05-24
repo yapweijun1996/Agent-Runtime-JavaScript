@@ -166,7 +166,47 @@ Field meaning:
 | `description` | short planner-facing description |
 | `tier` | default policy tier |
 | `planner` | planner metadata or `false` to hide from planner |
+| `permission` | normalized permission metadata exposed to hosts, planner surfaces, and policy decisions |
 | `execute` | perform the action |
+
+### Permission Metadata Contract
+
+Every action returned by `createActionRegistry()` is normalized with
+permission metadata:
+
+```js
+{
+  effect: "external_network",
+  interruptBehavior: "abort_safe",
+  isConcurrencySafe: true,
+  isDestructive: false,
+  isReadOnly: true,
+  needsApproval: true,
+  source: "built_in_metadata"
+}
+```
+
+Rules:
+
+- built-in actions use deterministic registry metadata as the first SSOT
+- host-defined/dynamic actions may provide their own `permission` object before
+  registration; missing fields fall back conservatively
+- `actionRegistry.list()` and `actionRegistry.listForPlanner()` both expose
+  the normalized `permission` object
+- `evaluateActionPolicy()` returns the same permission snapshot with
+  `{ action, actionName, tier, source, reason, permission }`
+- default policy behavior is unchanged: explicit `actionPolicy` wins; otherwise
+  tier `1`/`2` asks, tier `3` denies, and tier `0` allows
+- `actionPolicy` entries may now be strings (`"allow"`, `"ask"`, `"deny"`) or
+  reasoned objects such as `{ action: "allow", reason: "server_proxy_approved" }`
+- optional `actionPermissionJudge` is only for dynamic/untrusted actions that
+  lack trusted metadata; classifier errors or uncertainty fail closed to
+  approval, not hidden execution
+- optional `actionGuardrail` records repeated failure/no-progress facts as
+  action steps and `loopState.actionGuardrail`; preflight blocks are mechanical
+  repeat guards and the AI still owns the next recovery action
+- permission metadata is observational and policy-supporting; it must not make
+  the runtime invent task-specific AI decisions or hidden retries
 
 ### Planner Metadata Contract
 

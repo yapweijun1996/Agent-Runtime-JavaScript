@@ -29,6 +29,8 @@ runtime.openSession(sessionId)
 runtime.getState()
 runtime.getMemory()
 runtime.getRuntimeConfig()
+runtime.getRuntimeConfigState()
+runtime.reloadRuntimeConfig(optionsOrLoader, options?)
 runtime.getAgentSkills()
 runtime.getActionRegistry()
 ```
@@ -64,6 +66,8 @@ const runtime = createRuntime({
 | `maxPlanParallel` | no | stable advanced | Maximum concurrent actions inside one planner `type: "plan"` envelope. Defaults to `8`. |
 | `maxSectionParallel` | no | stable advanced | Maximum concurrent section synthesize calls for `type: "plan"` with `synthesize_per_action: true`. Defaults to `4`. |
 | `actionPolicy` | no | stable advanced | Per-action policy overrides for planner/action execution paths. |
+| `actionPermissionJudge` | no | experimental advanced | Optional classifier for dynamic/untrusted actions that lack trusted permission metadata. Disabled by default. When enabled and uncertain/failing, the decision fails closed to the normal approval flow. |
+| `actionGuardrail` | no | experimental advanced | Optional repeated-action/no-progress guardrail state. Emits observable loop signals and optional preflight blocks for exact repeated failures; it does not write task content or choose recovery actions. |
 | `disabledActions` | no | stable advanced | Array of action names to permanently exclude from the planner surface (e.g., `["read_url"]`). Merged with per-run `disabledActions` from `runtime.run(input, { disabledActions })`. |
 | `agentSkills` | no | stable advanced | Bundled agent instruction packages to expose to planner/action flows. |
 | `agentSkillIndexProvider` | no | stable advanced | Manifest-first agent skill provider with `listManifests()`, `getManifest()`, and `loadSkill()` for lazy full-skill loading. Takes priority over `agentSkills` when provided. |
@@ -82,12 +86,61 @@ const runtime = createRuntime({
 | ~~`singleToolFastPath`~~ | _(removed in ADR-0026)_ | — | Removed in ADR-0026 along with `maybeApplySingleToolFastPath` to satisfy the harness-as-tool-provider invariant. Pre-ADR-0026 default was `true` (skip the 2nd planner cycle after a successful first `execute_skill_tool` call). Now the runtime always lets the AI plan cycle 2 — AI sees the tool result and emits `finalize` (yields `planner_finalize`) or another action. To preserve old behavior, wire `onToolResult` and call your own finalize path. The option is silently ignored if still passed. `resultKind: "final"` direct-emit (with markdown) is unchanged: tool-authored finalize is not push-mode. |
 | `preferFinalizeOnLastResult` | no | stable advanced | Boolean (default `true`). Controls the built-in planner prompt line that tells the planner to prefer `finalize` when `toolContext.lastResult` is populated. Set `false` to drop that line entirely (useful when the caller's `plannerDirectives` provide their own guidance). |
 | `plannerDirectives` | no | stable advanced | `string[]` (default `[]`). Caller-supplied planner system-prompt lines appended **after** all built-in lines. Because LLMs give more weight to recent instructions, these override earlier built-in directives without editing runtime source. Per-run `plannerDirectives` append after runtime-level lines by default, or replace them with `plannerDirectivesMode: "replace"`. |
-| `defaultRunOptions` | no | stable advanced | Default run options merged into every `runtime.run()` and `session.run()` call. Supports `onStep`, `onToken`, `onInvalidPlannerOutput`, `onPlannerDecision`, `onToolResult`, `onBeforeFinalize`, `disabledActions`, `plannerDirectives`, `plannerDirectivesMode`, and `abortSignal`. Per-run options are merged on top; hooks compose rather than replacing each other. |
+| `defaultRunOptions` | no | stable advanced | Default run options merged into every `runtime.run()` and `session.run()` call. Supports `onStep`, `onToken`, `onStreamEvent`, `onInvalidPlannerOutput`, `onPlannerDecision`, `onToolResult`, `onBeforeFinalize`, `disabledActions`, `plannerDirectives`, `plannerDirectivesMode`, and `abortSignal`. Per-run options are merged on top; hooks compose rather than replacing each other. |
 | `researchCoverageGuard` | no | stable advanced | Research/source coverage guard config. Pass `{ enabled: false }` to disable research coverage vetoes for hosts that use only internal/tool-backed evidence. |
 | `citationCoverageGuard` | no | stable advanced | Direct-source citation coverage guard config. Pass `{ enabled: false }` to disable citation coverage vetoes for hosts that do not require web/source-backed answers. |
 | `threads` | no | stable advanced | Thread routing config. `threads.intentClassifier(payload)` may return `kind: "new_task" \| "follow_up" \| "drill_down" \| "unknown"` plus existing router hints such as `targetThreadId`; `new_task` is authoritative for current-turn goal anchoring and prevents weak token overlap from inheriting the previous goal. |
 | `debug` | no | stable | Debug logging mode. `true` for console output, or `(event) => {}` for custom handler. Zero overhead when disabled. |
 | `role` | no | stable advanced | Agent role/persona. String name for bundled role (`"researcher"`, `"coder"`, `"default"`, `"erp-support"`, `"globe3-erp-support"`), or object `{ name, instructions, description?, priority? }`, or result of `parseRoleMarkdown(text)`. See **Role Configuration** below. |
+
+### Runtime Config Lifecycle
+
+`createRuntime()` now keeps runtime config behind a small lifecycle controller.
+The default path is unchanged: config is normalized once at creation and every
+run uses that ready snapshot.
+
+Advanced hosts may call:
+
+```js
+runtime.getRuntimeConfigState();
+await runtime.reloadRuntimeConfig({ maxSteps: 12 });
+```
+
+`getRuntimeConfigState()` returns:
+
+```js
+{
+  status: "ready" | "reloading" | "error",
+  revision: 1,
+  pendingReloadId: null,
+  lastError: null
+}
+```
+
+`reloadRuntimeConfig()` accepts either a partial options object or an async
+loader function:
+
+```js
+await runtime.reloadRuntimeConfig(async ({ currentOptions, revision, signal }) => {
+  const next = await fetch("/runtime-config.json", { signal }).then((r) => r.json());
+  return {
+    ...next,
+    skills: currentOptions.skills
+  };
+});
+```
+
+Rules:
+
+- partial reloads shallow-merge into the previous creation options, so required
+  options such as `skills` are preserved unless `replace: true` is passed
+- stale or aborted reloads cannot overwrite a newer ready config
+- future `runtime.run()` and newly created/opened session handles read the
+  latest runtime config snapshot
+- existing session handles keep their already-created handle state; use a new
+  session handle when testing a reload-sensitive session flow
+- session-store replacement is intentionally not part of this first lifecycle
+  slice; create a new runtime when the storage backend itself changes
 
 #### Role Configuration
 
@@ -246,14 +299,30 @@ final_candidate.md
 ```
 
 The planner-facing actions are `workspace_list`, `workspace_read`,
-`workspace_write`, `workspace_replace`, and `workspace_finalize_candidate`.
+`workspace_write`, `workspace_replace`, `workspace_insert_after_section`,
+`workspace_remove`, `workspace_move`, `workspace_multi_edit`,
+`workspace_propose_patch`, `workspace_apply_patch`,
+`workspace_finalize_candidate`, and `workspace_publish_candidate`.
 They mutate only `runState.virtualWorkspace`; they do not read or write real
 filesystem paths. Path validation rejects absolute paths, `../`, backslashes,
-and unknown filenames. The final-answer scrubber removes internal virtual
-workspace headings such as `Virtual Workspace`, `Workspace Draft`,
-`Workspace Operations`, `Critique Notes`, and `Final Candidate` from user-facing
-output. Browser Inspector, Debug Report, and Support Bundle expose sanitized
-workspace file summaries, operation summaries, and quality checks for QA.
+and unknown filenames.
+
+**`workspace_move`** — single-step rename: `{from, to, summary?, overwrite?}`.
+Returns `{moved, status, fromFile, toFile}`. Observable failures:
+`source_not_found` (source empty), `target_exists` (destination has content and
+`overwrite` not set), `same_path`.
+
+**`workspace_multi_edit`** — batch `replace` / `insert_after_section` operations
+on one or more files in a single OODAE cycle: `{operations: [{action, path,
+...op-args}], summary?, atomic?: false}`. With `atomic:true` any failure rolls
+back all changes. Returns `{status, results: [{index, status, file,
+contextSnippets?, availableHeadings?}], succeededCount, failedCount}`.
+
+The final-answer scrubber removes internal virtual workspace headings such as
+`Virtual Workspace`, `Workspace Draft`, `Workspace Operations`, `Critique Notes`,
+and `Final Candidate` from user-facing output. Browser Inspector, Debug Report,
+and Support Bundle expose sanitized workspace file summaries, operation
+summaries, and quality checks for QA.
 
 If a host wants the agent to inspect real project files, use `repoFileTools`
 instead of expanding the virtual workspace. `repoFileTools` is disabled unless
@@ -479,6 +548,7 @@ The second argument is an optional options object for callbacks and per-run over
 | --- | --- | --- | --- |
 | `onStep` | no | stable | Callback for discrete phase events (planner, action, observation). Fires on each step boundary. |
 | `onToken` | no | stable | Callback for token-level streaming during finalize. Receives string deltas as the final answer is generated. |
+| `onStreamEvent` | no | experimental advanced | Callback for normalized streaming events from provider and action execution paths. Event types include `provider_stream_start`, `provider_text_delta`, `provider_stream_finish`, `provider_stream_error`, `action_executing`, `action_executed`, and `action_error`. |
 | `onInvalidPlannerOutput` | no | stable advanced | `async (rawText, parseError, runState) => decision \| null \| undefined`. Invoked after parser/soft validation fails and before the repair LLM call. Return a valid planner envelope to use it and skip repair; return `null`/`undefined` to fall through to the normal repair cascade. Hook errors are swallowed like other hooks. |
 | `onPlannerDecision` | no | stable | `async (decision, runState) => decision \| undefined`. Invoked after each planner decision, before execution. Return a replacement object to rewrite the decision, or `undefined` for passthrough. |
 | `onToolResult` | no | stable | `async (output, { actionName, decision, runState }) => output \| undefined`. Invoked after a successful `execute_skill_tool` call, before the output becomes `toolContext.lastResult`. Return a replacement to augment / rewrite, or `undefined` for passthrough. |
