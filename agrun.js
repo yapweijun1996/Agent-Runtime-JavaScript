@@ -4044,7 +4044,7 @@
         "profile",
         "brief"
       ],
-      "instructions": "# Deep Research Writer\n\nUse this skill whenever the user asks for a report, article, analysis,\nbrief, or comparison that should be grounded in public information.\nSingle-shot answers under-deliver on this kind of request because they\nsatisfice without verifying. Use this LOOP instead.\n\nThe process is a LOOP, not a sequence. Re-enter any phase at any time.\nLength is not evidence, but a concrete length request is still a user\nrequirement. Evidence controls what you may safely say; if evidence is\nrich enough, meet the requested depth instead of stopping early.\n\n## Activation\n\nWhen you select this skill, declare `mode: \"long_research\"` on your\nfirst plan envelope so the runtime activates the budget gate.\n\nIf you create a todo plan, keep it synchronized with the work you have\nactually completed. After finishing a phase, call `todo_advance` or\n`todo_run_next` before moving on. Do not leave Phase A active while you\nare already searching, reading, drafting, or finalizing.\n\nUse the workspace as the long-answer memory. A strong run leaves a\ndebuggable packet:\n\n- `questions.md`: what you decomposed.\n- `evidence.json`: usable facts, successful source URLs, failed/thin\n  reads, and remaining gaps.\n- `outline.md`: the report index. Each section has a purpose, planned\n  title, and supporting source URLs.\n- `draft.md`: the full working report.\n- `critique.md`: your self-review, even if the result is \"no blocking\n  gaps\".\n- `final_candidate.md`: the exact answer to publish.\n\nDo not skip these artifacts for a concrete long report unless the user\nexplicitly asked for a shorter direct answer. The runtime will not\ncreate missing artifacts or advance TodoState for you.\n\nIf the planner context exposes\n`loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`,\nread it before any terminal action. When it forbids clean `ready`, do\nnot repeat `finalReadiness.decision=\"ready\"`. Continue with targeted\n`web_search` / `read_url` / workspace revision, or publish only\n`limited` with `evidenceSatisfied: false` and concrete non-empty\n`remainingGaps`.\n\n## Process\n\n### PHASE A — Decompose the question\n\n- Read the user's prompt carefully. Extract every concrete sub-question\n  whose answer (taken with the others) would fully answer the user's\n  request.\n- Write the list to `workspace_write questions.md`. One sub-question\n  per line. No fixed count — some prompts need 3 questions, some need\n  15.\n- If the user's prompt is ambiguous on scope (which entity, which\n  jurisdiction, which time window), ask via `ask_clarification` before\n  proceeding.\n\n### PHASE B — Research each sub-question\n\nFor each open sub-question:\n\n- Run `web_search` with the most direct query you can write.\n- Treat `web_search` as lead generation, not evidence. For deep\n  research, do not use a `web_search`-only plan as the final synthesis\n  when `read_url` is available and search results contain readable\n  candidate URLs. Choose `read_url` in a later step so you can inspect\n  page content before writing the final report.\n- If the first pass returns thin or off-topic snippets, re-query with\n  a different shape (quoted exact phrase, official-website hint,\n  domain-targeted `site:` search, alternate spelling, the entity's\n  native-language form).\n- `read_url` on the strongest 2-3 candidates per question. Prefer:\n  primary sources (official websites, registries, filings, papers,\n  standards), reputable independent media, owner-controlled domains.\n  Avoid: paid profiles, unsourced aggregators, advertorials.\n- A failed or empty `read_url` is not evidence. If a read fails, pick\n  another candidate or change the query shape before drafting from that\n  claim. Do not put failed-read URLs in `evidence.md` as supporting\n  sources.\n- Do not stop after a single failed or thin source when search results\n  still contain plausible alternatives. Try at least two different\n  source types when available: official/product pages, independent\n  analysis, standards/research papers, reputable news, or direct blog /\n  documentation pages.\n- After each search/read batch, update the workspace before doing more\n  research. Write what you learned, which URLs were readable, which\n  reads failed or were thin, and which concrete gaps remain. Do not run\n  long chains of `web_search` / `read_url` while `evidence.json`,\n  `draft.md`, and `final_candidate.md` stay empty.\n- Before starting another search/read batch, name the exact evidence gap\n  it is meant to close. If you cannot name a gap that would materially\n  improve the report, move to drafting with an honest Limitations\n  section instead of continuing research for its own sake.\n- Once `evidence.json` contains usable facts from successful reads or\n  clearly labeled search-summary evidence, your next phase is drafting.\n  Write `draft.md` before doing more broad search. Use Phase E critique\n  to decide whether another targeted research pass is needed; do not keep\n  searching while no draft exists.\n- Write evidence to `workspace_write evidence.json` (or\n  `workspace_replace evidence.json` if it already exists). Use a JSON\n  object with a `facts` array; each fact should include `claim`,\n  `source`, and `answers`. This matches the runtime workspace quality\n  convention and avoids a false \"evidence missing\" warning.\n- If no `read_url` succeeds but search produced useful leads, still\n  write `evidence.json` with `facts: []`, `candidateSources`,\n  `failedReads`, and `remainingGaps`. This makes the limitation visible\n  to Inspector and to your later readiness judgment.\n\n### PHASE C — Cross-reference (fact-check)\n\nBefore writing any claim into your draft:\n\n- Look up the claim in `evidence.json`. If 2+ independent sources back\n  it, mark it \"verified\".\n- If only 1 source: mark \"reported by <source>; not independently\n  verified\".\n- If 0 sources: do NOT write the claim. Either go back to Phase B and\n  search more, or omit the claim.\n\n### PHASE D — Draft\n\n- Decide structure based on what your evidence supports — not a fixed\n  section count. Some topics need 3 sections, some need 8, some need\n  a flat narrative.\n- Before long-form drafting, write `workspace_write outline.md` with the\n  section index: heading, role in the report, source URLs, and any gap.\n  This is your map for the draft. Do not keep broad-searching when you\n  already have enough evidence to create the index.\n- Start drafting as soon as you have enough usable evidence to answer\n  the main request, or when further source work is not producing better\n  evidence. You can revise the draft later; do not wait for perfect\n  evidence while workspace remains empty.\n- Write to `workspace_write draft.md` in the user's language.\n- If the user gave a concrete length and `lengthProgress` says the draft\n  is short, continue section-by-section from `outline.md`. Use\n  `workspace_append` to add complete new sections or\n  `workspace_insert_after_section` to expand a thin section. Avoid\n  repeating small `workspace_write` rewrites that replace the whole draft\n  without materially closing the length gap.\n- If the draft is long enough but structure audit reports duplicate\n  headings or duplicate section numbers, prefer `workspace_propose_patch`\n  before direct replacement. Use exactly one\n  `normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}`\n  operation with line numbers from `duplicate_heading_context`,\n  `duplicate_section_number_context`, or `section_number_repair_context`,\n  inspect `structureBefore` / `structureAfter`, then call\n  `workspace_apply_patch` only when the preview is valid. Do not mix this\n  with `replace` unless exact current `find` text is visible and\n  heading-only repair cannot improve structure.\n- Stop when each evidence line has a place. Do not pad with unsupported\n  filler, but do use all supported section material when the user asked\n  for a long concrete length.\n- Cite inline by pointing at source titles or domain names so the\n  reader can trace back; the explicit Sources list comes later.\n- After writing `draft.md`, read it back with `workspace_read` and\n  inspect `textStats`. If it broadly answers the prompt and is close to\n  the requested depth, move to Phase E then Phase G. Do not keep doing\n  broad search just because budget remains.\n\n### PHASE E — Self-review\n\nRead your own `draft.md`. Write `workspace_write critique.md` listing\nits weak points:\n\n- Claims without source coverage.\n- Sub-questions from `questions.md` that the draft does not answer.\n- Sections that feel thin compared to user expectations.\n- Inconsistencies between sources.\n- Logical gaps a reader would notice.\n\nIf `critique.md` is empty, proceed to Phase G. Otherwise Phase F.\nIf `draft.md` already exists and broadly answers the user's request,\nyour next step is Phase E self-review or Phase G candidate publishing,\nnot another broad `web_search`. Only return to research when critique\nnames a specific blocking evidence gap.\nIf `draft.md` already meets or nearly meets a concrete length/depth\nrequirement and critique has no blocking evidence gap, promote the draft\nto `final_candidate.md` immediately. More search is lower priority than\npublishing the polished workspace candidate.\nIf there are no blocking issues, still write `critique.md` with a short\n\"no blocking gaps\" note plus any non-blocking limitations. This gives\nInspector a concrete checkpoint.\n\n### PHASE F — Iterate\n\nFor each item in `critique.md`:\n\n- If it is a missing source: go back to Phase B for that sub-question.\n- If it is an unverified claim: go back to Phase C.\n- If it is a structural gap: prefer `workspace_propose_patch` /\n  `workspace_apply_patch` with `normalize_headings` for duplicate heading\n  or duplicate section-number repair. If patch tools are unavailable or\n  the structure problem requires more than heading-line repair, revise\n  `draft.md` via `workspace_replace` or rewrite via `workspace_write`.\n- After updating, run Phase E again.\n\nKeep iterating until critique.md has no blocking items, OR evidence\nis genuinely exhausted. Evidence is exhausted by your judgment, not by a\nmagic number. It means additional search/read work is no longer likely\nto materially improve the answer because you already tried meaningfully\ndifferent query/source types, captured which reads failed or were thin,\nand can name the remaining public-information gaps.\n\nWhen evidence is exhausted with gaps, that is OK — you will declare\nthe gaps in Phase G and use a limited readiness decision.\n\n### PHASE G — Finalize\n\nPre-finalize blocking checklist (run through every time; do not skip):\n\n1. **`final_candidate.md` exists with the user-facing report.** If\n   `final_candidate_status=missing` / `empty` / `chars=0`, you must\n   `workspace_write final_candidate.md` first. Never finalize from the\n   `finalize` answer body alone.\n2. **`successfulReadUrlCount=0` is not \"evidence exhausted\" by itself.**\n   If web_search returned candidate URLs and zero `read_url` succeeded,\n   try `read_url` on at least 2 different unread candidates (different\n   domains / source types) before declaring `limited`. A single batch of\n   502/404/network errors does not count as exhaustion. Only declare\n   exhaustion after meaningfully different attempts.\n3. **TodoState items reflect what you actually did.** If `todo_progress`\n   is `stale_after_work` (you finished work but the active item still\n   shows `active` / `pending`), call `todo_run_next` or `todo_advance`\n   before any terminal action. Do not let the runtime annotate\n   unfinished items with `terminatedAt` because you skipped progress\n   updates.\n4. **Prefer `workspace_publish_candidate` over `finalize`.** When\n   `final_candidate.md` is the answer, use publish; reserve `finalize`\n   for the fallback path described below.\n\nIf any of #1–#3 is violated, do not finalize. Go back to the relevant\nphase first.\n\nThen make an explicit AI-owned readiness decision:\n\n- If `readSources` has no successful `read_url` result and web search\n  returned candidate pages, prefer `read_url` on the strongest unread\n  candidate. If that read fails, try a different domain or source type\n  before finalizing.\n- If `readSources` has zero successful reads and you choose to stop,\n  write a normal user-facing answer with an explicit Limitations section.\n  Say that the answer is based on search summaries / failed read attempts\n  only, and do not present unsupported market figures as verified facts.\n- If the only sources are thin, failed, or single-source, you may still\n  finalize only with `finalReadiness.decision=\"limited\"` and a\n  Limitations section that names the exact evidence limit.\n- If the evidence is enough for the requested depth, finalize with\n  `finalReadiness.decision=\"ready\"`.\n- If you decide not to read more, say why in the report's Limitations\n  section (for example: search-result-only evidence, public source access\n  limits, repeated `read_url` service failures, or time/budget tradeoff).\n- If workspace files exist, use `workspace_list` or `workspace_read` when\n  you need to review your own outline, evidence, draft, critique, or final\n  candidate before deciding.\n- If the draft is not ready, continue with `web_search`, `read_url`,\n  `workspace_write`, or `workspace_replace`.\n- If the draft is ready, write `final_candidate.md`, mark it ready with\n  `workspace_finalize_candidate`, read it back, inspect its text stats,\n  then publish it with `workspace_publish_candidate`.\n- If a TodoState plan exists, update it before the terminal publish:\n  mark completed phases done with `todo_run_next` / `todo_advance`; mark\n  skipped phases blocked or abandoned only when you truly stopped because\n  evidence was exhausted or the user constraint cannot be met. Do not\n  publish while Phase A is still active unless Phase A is genuinely the\n  only completed work.\n- If `draft.md` is already the full user-facing report, use\n  `workspace_write final_candidate.md` with the polished draft content\n  instead of asking the finalizer to rewrite it. The publish path should\n  send workspace content, not a newly compressed answer.\n- Never treat the `finalize` answer body as a substitute for\n  `final_candidate.md`. The final candidate must exist in the virtual\n  workspace, contain the user-facing report, be marked ready, and be\n  read back before publishing.\n\n- `workspace_write final_candidate.md` with:\n  - Direct answer to the user's request, in their language, structured\n    by what evidence supports.\n  - Inline references to sources where claims rest.\n  - A \"Limitations\" section if any sub-question stayed unanswered or\n    if any claim was single-source.\n  - A \"Sources\" list with every URL you actually read in Phase B.\n- `workspace_finalize_candidate path=final_candidate.md`.\n- `workspace_read path=final_candidate.md` and check `textStats`:\n  - For Chinese/Japanese/Korean `字` requests, use `cjkChars` and\n    `nonWhitespaceChars`.\n  - For English-style word-count requests, use `words`.\n  - Compare the stats against the user's concrete requirement yourself.\n    This comparison belongs to you, not runtime.\n  - If the candidate is much shorter than the requested length but\n    evidence supports more, revise instead of finalizing.\n  - If it is shorter because evidence is thin, finalize only as\n    `limited` and state the length/evidence limitation.\n  - If `requirementsAssessment.requirementSatisfied` would be false and\n    evidence is not exhausted, do not finalize. Continue with\n    `web_search`, `read_url`, `workspace_write`, or `workspace_replace`.\n  - If evidence is exhausted, finalize as `limited` and make\n    `requirementsAssessment` honestly explain what is unmet.\n- If the runtime returns a `readiness_continuation_signal` observation\n  after you tried to finalize, treat it as a request to continue the\n  OODAE loop, not as permission to repeat the same final answer:\n  - Immediately `workspace_read final_candidate.md` again and inspect\n    `textStats`.\n  - If `declaredUnsatisfied` includes `length` or `requirement` and\n    evidence supports more detail, revise/expand `final_candidate.md`\n    with `workspace_append`, `workspace_insert_after_section`, or\n    `workspace_replace` before any next terminal action.\n  - If `declaredUnsatisfied` includes structure and the observation shows\n    `duplicate_heading_context`, `duplicate_section_number_context`, or\n    `section_number_repair_context`, use `workspace_propose_patch` with\n    one `normalize_headings` operation, then `workspace_apply_patch` only\n    for a valid preview before trying another terminal action.\n  - If source and length are satisfied but the remaining deficits include\n    both structure and TodoState, use the listed structure patch action\n    and sync TodoState with `todo_advance` / `todo_run_next`, or\n    `todo_cancel` for stale plan items. Do not append, insert, write,\n    replace, search, or read unless `allowedActions` explicitly requires\n    it.\n  - If `declaredUnsatisfied` includes `evidence`, continue searching or\n    reading unless evidence is genuinely exhausted by the Phase F rules.\n  - If you still finalize as `limited`, explicitly state why no more\n    useful expansion or evidence gathering is possible.\n  - Do not leave `requestedLength`, `observedLength`, or\n    `observedLengthUnit` null when the user gave a concrete length and\n    `workspace_read` returned usable `textStats`.\n  - If `final_candidate.md` is missing or empty, write it first; do not\n    publish or finalize from memory or from a prose instruction field.\n- Preferred terminal step: call\n  `workspace_publish_candidate path=final_candidate.md`. This sends the\n  selected workspace candidate directly to the user without a second\n  finalizer LLM rewrite. The candidate content itself must include any\n  needed Limitations and Sources sections.\n- If `workspace_publish_candidate` is blocked for readiness, length, or\n  TodoState sync, do not switch to direct `finalize` to escape the block.\n  Treat the block as the next observation: expand the workspace candidate,\n  gather the named missing evidence, correct `requirementsAssessment`, or\n  call `todo_run_next` / `todo_advance` before trying publish again.\n- If an acceptance convergence signal says `forbiddenReadiness=ready`,\n  the next terminal attempt cannot be clean `ready`. You must either do\n  more evidence/workspace work, or explicitly publish `limited` with\n  `evidenceSatisfied: false` and non-empty `remainingGaps`.\n- For research/report publish, include `finalReadiness` on\n  `workspace_publish_candidate` with `requirementsAssessment` populated\n  from the latest `workspace_read final_candidate.md` stats. If the\n  candidate is below the user's concrete length/depth requirement and\n  evidence supports expansion, revise before publish. Do not publish a\n  limited answer while also declaring `evidenceSatisfied: true` and\n  `remainingGaps: []`; that means you have enough material to expand. If\n  evidence is exhausted, publish only with `decision: \"limited\"`,\n  `evidenceSatisfied: false`, concrete `remainingGaps`, and\n  `lengthSatisfied: false` / `requirementSatisfied: false`.\n- Do not choose `finalize` after `workspace_finalize_candidate` when\n  `workspace_publish_candidate` is available and `final_candidate.md`\n  already contains the exact answer. `finalize` is only the fallback path\n  when publish is unavailable or the workspace candidate is not the\n  answer.\n- Fallback only if `workspace_publish_candidate` is unavailable: use\n  `finalize` with the body of final_candidate.md as the answer and an\n  explicit readiness declaration:\n  - Ready: `finalReadiness: { \"decision\": \"ready\", \"evidenceMode\":\n    \"read_sources\", \"limitations\": \"\", \"requirementsAssessment\": {\n    \"userRequirementSummary\": \"summarize the user's concrete output\n    requirements\", \"requirementSatisfied\": true, \"lengthSatisfied\":\n    true, \"evidenceSatisfied\": true, \"requestedLength\": null,\n    \"observedLength\": null, \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"summary\": \"why this is ready\" } }`\n  - Limited: `finalReadiness: { \"decision\": \"limited\", \"evidenceMode\":\n    \"search_summary_only\" | \"mixed\" | \"read_sources\", \"limitations\":\n    \"Only search summaries / failed read_url attempts / one readable\n    source were available; the report names these limits.\",\n    \"requirementsAssessment\": { \"userRequirementSummary\": \"summarize\n    the user's concrete output requirements\", \"requirementSatisfied\":\n    false, \"lengthSatisfied\": false, \"evidenceSatisfied\": false,\n    \"requestedLength\": null, \"observedLength\": null,\n    \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"remainingGaps\": [\"state the real\n    gaps\"], \"summary\": \"why this is limited\" } }`\n\n## Rules\n\n- Length follows evidence. Rich evidence → long report. Thin\n  evidence → short report + disclosed limitations. If the user asked\n  for a long concrete length and your evidence supports only a shorter\n  report, write the shorter evidence-backed report and say so. Do not\n  invent sections to hit length.\n- In the readiness JSON examples above, `requestedLength` and\n  `observedLength` are shown as `null` only as placeholders. Replace\n  them with numbers whenever the user gave a concrete length and\n  `workspace_read` gave you `textStats`.\n- You, the AI, decide `requirementsAssessment`. Runtime only records and\n  displays it with raw `textStats` / `read_url` counts. Do not rely on\n  runtime to decide whether the answer meets length, evidence, or depth\n  requirements.\n- Never invent citations. Every source URL must come from a successful\n  `read_url` you ran in this run.\n- Search-result URLs may appear only in a clearly labeled \"candidate\n  sources not fully read\" note. Do not list them as verified Sources\n  unless `read_url` succeeded.\n- Never claim a single-source fact as verified. Mark it \"reported by\n  <source>; not independently verified\".\n- Use the user's language throughout.\n- The runtime no longer back-fills workspace files. If you do not\n  write final_candidate.md, the user gets nothing.\n- If 2+ sources contradict each other on the same fact, present both\n  and disclose the contradiction; do not pick a winner without\n  evidence.\n- Workspace tools are filename-free-form (any safe path). Reserved\n  conventions (questions.md, evidence.json, draft.md, critique.md,\n  final_candidate.md) are convention-only; pick clearer names if your\n  topic needs them.\n- Quality (`workspace.quality`) is advisory; runtime never blocks\n  finalize. Decide for yourself when the report is ready.",
+      "instructions": "# Deep Research Writer\n\nUse this skill whenever the user asks for a report, article, analysis,\nbrief, or comparison that should be grounded in public information.\nSingle-shot answers under-deliver on this kind of request because they\nsatisfice without verifying. Use this LOOP instead.\n\nThe process is a LOOP, not a sequence. Re-enter any phase at any time.\nLength is not evidence, but a concrete length request is still a user\nrequirement. Evidence controls what you may safely say; if evidence is\nrich enough, meet the requested depth instead of stopping early.\n\n## Activation\n\nWhen you select this skill, declare `mode: \"long_research\"` on your\nfirst plan envelope so the runtime activates the budget gate.\n\nIf you create a todo plan, keep it synchronized with the work you have\nactually completed. After finishing a phase, call `todo_advance` or\n`todo_run_next` before moving on. Do not leave Phase A active while you\nare already searching, reading, drafting, or finalizing.\n\nUse the workspace as the long-answer memory. A strong run leaves a\ndebuggable packet:\n\n- `questions.md`: what you decomposed.\n- `evidence.json`: usable facts, successful source URLs, failed/thin\n  reads, and remaining gaps.\n- `outline.md`: the report index. Each section has a purpose, planned\n  title, and supporting source URLs.\n- `draft.md`: the full working report.\n- `critique.md`: your self-review, even if the result is \"no blocking\n  gaps\".\n- `final_candidate.md`: the exact answer to publish.\n\nDo not skip these artifacts for a concrete long report unless the user\nexplicitly asked for a shorter direct answer. The runtime will not\ncreate missing artifacts or advance TodoState for you.\n\nIf the planner context exposes\n`loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`,\nread it before any terminal action. When it forbids clean `ready`, do\nnot repeat `finalReadiness.decision=\"ready\"`. Continue with targeted\n`web_search` / `read_url` / workspace revision, or publish only\n`limited` with `evidenceSatisfied: false` and concrete non-empty\n`remainingGaps`.\n\n## Process\n\n### PHASE A — Decompose the question\n\n- Read the user's prompt carefully. Extract every concrete sub-question\n  whose answer (taken with the others) would fully answer the user's\n  request.\n- Write the list to `workspace_write questions.md`. One sub-question\n  per line. No fixed count — some prompts need 3 questions, some need\n  15.\n- If the user's prompt is ambiguous on scope (which entity, which\n  jurisdiction, which time window), ask via `ask_clarification` before\n  proceeding.\n\n### PHASE B — Research each sub-question\n\nFor each open sub-question:\n\n- Run `web_search` with the most direct query you can write.\n- Treat `web_search` as lead generation, not evidence. For deep\n  research, do not use a `web_search`-only plan as the final synthesis\n  when `read_url` is available and search results contain readable\n  candidate URLs. Choose `read_url` in a later step so you can inspect\n  page content before writing the final report.\n- If the first pass returns thin or off-topic snippets, re-query with\n  a different shape (quoted exact phrase, official-website hint,\n  domain-targeted `site:` search, alternate spelling, the entity's\n  native-language form).\n- `read_url` on the strongest 2-3 candidates per question. Prefer:\n  primary sources (official websites, registries, filings, papers,\n  standards), reputable independent media, owner-controlled domains.\n  Avoid: paid profiles, unsourced aggregators, advertorials.\n- A failed or empty `read_url` is not evidence. If a read fails, pick\n  another candidate or change the query shape before drafting from that\n  claim. Do not put failed-read URLs in `evidence.md` as supporting\n  sources.\n- Do not stop after a single failed or thin source when search results\n  still contain plausible alternatives. Try at least two different\n  source types when available: official/product pages, independent\n  analysis, standards/research papers, reputable news, or direct blog /\n  documentation pages.\n- After each search/read batch, update the workspace before doing more\n  research. Write what you learned, which URLs were readable, which\n  reads failed or were thin, and which concrete gaps remain. Do not run\n  long chains of `web_search` / `read_url` while `evidence.json`,\n  `draft.md`, and `final_candidate.md` stay empty.\n- Before starting another search/read batch, name the exact evidence gap\n  it is meant to close. If you cannot name a gap that would materially\n  improve the report, move to drafting with an honest Limitations\n  section instead of continuing research for its own sake.\n- Once `evidence.json` contains usable facts from successful reads or\n  clearly labeled search-summary evidence, your next phase is drafting.\n  Write `draft.md` before doing more broad search. Use Phase E critique\n  to decide whether another targeted research pass is needed; do not keep\n  searching while no draft exists.\n- Write evidence to `workspace_write evidence.json` (or\n  `workspace_replace evidence.json` if it already exists). Use a JSON\n  object with a `facts` array; each fact should include `claim`,\n  `source`, and `answers`. This matches the runtime workspace quality\n  convention and avoids a false \"evidence missing\" warning.\n- If no `read_url` succeeds but search produced useful leads, still\n  write `evidence.json` with `facts: []`, `candidateSources`,\n  `failedReads`, and `remainingGaps`. This makes the limitation visible\n  to Inspector and to your later readiness judgment.\n\n### PHASE C — Cross-reference (fact-check)\n\nBefore writing any claim into your draft:\n\n- Look up the claim in `evidence.json`. If 2+ independent sources back\n  it, mark it \"verified\".\n- If only 1 source: mark \"reported by <source>; not independently\n  verified\".\n- If 0 sources: do NOT write the claim. Either go back to Phase B and\n  search more, or omit the claim.\n\n### PHASE D — Draft\n\n- Decide structure based on what your evidence supports — not a fixed\n  section count. Some topics need 3 sections, some need 8, some need\n  a flat narrative.\n- Before long-form drafting, write `workspace_write outline.md` with the\n  section index: heading, role in the report, source URLs, and any gap.\n  This is your map for the draft. Do not keep broad-searching when you\n  already have enough evidence to create the index.\n- Start drafting as soon as you have enough usable evidence to answer\n  the main request, or when further source work is not producing better\n  evidence. You can revise the draft later; do not wait for perfect\n  evidence while workspace remains empty.\n- Write to `workspace_write draft.md` in the user's language.\n- If the user gave a concrete length and `lengthProgress` says the draft\n  is short, continue section-by-section from `outline.md`. Use\n  `workspace_append` to add complete new sections or\n  `workspace_insert_after_section` to expand a thin section. Avoid\n  repeating small `workspace_write` rewrites that replace the whole draft\n  without materially closing the length gap.\n- If the draft is long enough but structure audit reports duplicate\n  headings or duplicate section numbers, prefer `workspace_propose_patch`\n  before direct replacement. Use exactly one\n  `normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}`\n  operation with line numbers from `duplicate_heading_context`,\n  `duplicate_section_number_context`, or `section_number_repair_context`,\n  set `applyIfValid:true`, and inspect `structureBefore` /\n  `structureAfter`. Call `workspace_apply_patch` only when the preview is\n  valid but was not already applied. Do not mix this with `replace`\n  unless exact current `find` text is visible and\n  heading-only repair cannot improve structure.\n- Stop when each evidence line has a place. Do not pad with unsupported\n  filler, but do use all supported section material when the user asked\n  for a long concrete length.\n- Cite inline by pointing at source titles or domain names so the\n  reader can trace back; the explicit Sources list comes later.\n- After writing `draft.md`, read it back with `workspace_read` and\n  inspect `textStats`. If it broadly answers the prompt and is close to\n  the requested depth, move to Phase E then Phase G. Do not keep doing\n  broad search just because budget remains.\n\n### PHASE E — Self-review\n\nRead your own `draft.md`. Write `workspace_write critique.md` listing\nits weak points:\n\n- Claims without source coverage.\n- Sub-questions from `questions.md` that the draft does not answer.\n- Sections that feel thin compared to user expectations.\n- Inconsistencies between sources.\n- Logical gaps a reader would notice.\n\nIf `critique.md` is empty, proceed to Phase G. Otherwise Phase F.\nIf `draft.md` already exists and broadly answers the user's request,\nyour next step is Phase E self-review or Phase G candidate publishing,\nnot another broad `web_search`. Only return to research when critique\nnames a specific blocking evidence gap.\nIf `draft.md` already meets or nearly meets a concrete length/depth\nrequirement and critique has no blocking evidence gap, promote the draft\nto `final_candidate.md` immediately. More search is lower priority than\npublishing the polished workspace candidate.\nIf there are no blocking issues, still write `critique.md` with a short\n\"no blocking gaps\" note plus any non-blocking limitations. This gives\nInspector a concrete checkpoint.\n\n### PHASE F — Iterate\n\nFor each item in `critique.md`:\n\n- If it is a missing source: go back to Phase B for that sub-question.\n- If it is an unverified claim: go back to Phase C.\n- If it is a structural gap: prefer `workspace_propose_patch` /\n  `workspace_apply_patch` with `normalize_headings` for duplicate heading\n  or duplicate section-number repair. For heading-only repair, include\n  `applyIfValid:true` in `workspace_propose_patch` and call\n  `workspace_apply_patch` only if the valid preview was not already\n  applied. If patch tools are unavailable or the structure problem\n  requires more than heading-line repair, revise `draft.md` via\n  `workspace_replace` or rewrite via `workspace_write`.\n- After updating, run Phase E again.\n\nKeep iterating until critique.md has no blocking items, OR evidence\nis genuinely exhausted. Evidence is exhausted by your judgment, not by a\nmagic number. It means additional search/read work is no longer likely\nto materially improve the answer because you already tried meaningfully\ndifferent query/source types, captured which reads failed or were thin,\nand can name the remaining public-information gaps.\n\nWhen evidence is exhausted with gaps, that is OK — you will declare\nthe gaps in Phase G and use a limited readiness decision.\n\n### PHASE G — Finalize\n\nPre-finalize blocking checklist (run through every time; do not skip):\n\n1. **`final_candidate.md` exists with the user-facing report.** If\n   `final_candidate_status=missing` / `empty` / `chars=0`, you must\n   `workspace_write final_candidate.md` first. Never finalize from the\n   `finalize` answer body alone.\n2. **`successfulReadUrlCount=0` is not \"evidence exhausted\" by itself.**\n   If web_search returned candidate URLs and zero `read_url` succeeded,\n   try `read_url` on at least 2 different unread candidates (different\n   domains / source types) before declaring `limited`. A single batch of\n   502/404/network errors does not count as exhaustion. Only declare\n   exhaustion after meaningfully different attempts.\n3. **TodoState items reflect what you actually did.** If `todo_progress`\n   is `stale_after_work` (you finished work but the active item still\n   shows `active` / `pending`), call `todo_run_next` or `todo_advance`\n   before any terminal action. Do not let the runtime annotate\n   unfinished items with `terminatedAt` because you skipped progress\n   updates.\n4. **Prefer `workspace_publish_candidate` over `finalize`.** When\n   `final_candidate.md` is the answer, use publish; reserve `finalize`\n   for the fallback path described below.\n\nIf any of #1–#3 is violated, do not finalize. Go back to the relevant\nphase first.\n\nThen make an explicit AI-owned readiness decision:\n\n- If `readSources` has no successful `read_url` result and web search\n  returned candidate pages, prefer `read_url` on the strongest unread\n  candidate. If that read fails, try a different domain or source type\n  before finalizing.\n- If `readSources` has zero successful reads and you choose to stop,\n  write a normal user-facing answer with an explicit Limitations section.\n  Say that the answer is based on search summaries / failed read attempts\n  only, and do not present unsupported market figures as verified facts.\n- If the only sources are thin, failed, or single-source, you may still\n  finalize only with `finalReadiness.decision=\"limited\"` and a\n  Limitations section that names the exact evidence limit.\n- If the evidence is enough for the requested depth, finalize with\n  `finalReadiness.decision=\"ready\"`.\n- If you decide not to read more, say why in the report's Limitations\n  section (for example: search-result-only evidence, public source access\n  limits, repeated `read_url` service failures, or time/budget tradeoff).\n- If workspace files exist, use `workspace_list` or `workspace_read` when\n  you need to review your own outline, evidence, draft, critique, or final\n  candidate before deciding.\n- If the draft is not ready, continue with `web_search`, `read_url`,\n  `workspace_write`, or `workspace_replace`.\n- If the draft is ready, write `final_candidate.md`, mark it ready with\n  `workspace_finalize_candidate`, read it back, inspect its text stats,\n  then publish it with `workspace_publish_candidate`.\n- If a TodoState plan exists, update it before the terminal publish:\n  mark completed phases done with `todo_run_next` / `todo_advance`; mark\n  skipped phases blocked or abandoned only when you truly stopped because\n  evidence was exhausted or the user constraint cannot be met. Do not\n  publish while Phase A is still active unless Phase A is genuinely the\n  only completed work.\n- If `draft.md` is already the full user-facing report, use\n  `workspace_write final_candidate.md` with the polished draft content\n  instead of asking the finalizer to rewrite it. The publish path should\n  send workspace content, not a newly compressed answer.\n- Never treat the `finalize` answer body as a substitute for\n  `final_candidate.md`. The final candidate must exist in the virtual\n  workspace, contain the user-facing report, be marked ready, and be\n  read back before publishing.\n\n- `workspace_write final_candidate.md` with:\n  - Direct answer to the user's request, in their language, structured\n    by what evidence supports.\n  - Inline references to sources where claims rest.\n  - A \"Limitations\" section if any sub-question stayed unanswered or\n    if any claim was single-source.\n  - A \"Sources\" list with every URL you actually read in Phase B.\n- `workspace_finalize_candidate path=final_candidate.md`.\n- `workspace_read path=final_candidate.md` and check `textStats`:\n  - For Chinese/Japanese/Korean `字` requests, use `cjkChars` and\n    `nonWhitespaceChars`.\n  - For English-style word-count requests, use `words`.\n  - Compare the stats against the user's concrete requirement yourself.\n    This comparison belongs to you, not runtime.\n  - If the candidate is much shorter than the requested length but\n    evidence supports more, revise instead of finalizing.\n  - If it is shorter because evidence is thin, finalize only as\n    `limited` and state the length/evidence limitation.\n  - If `requirementsAssessment.requirementSatisfied` would be false and\n    evidence is not exhausted, do not finalize. Continue with\n    `web_search`, `read_url`, `workspace_write`, or `workspace_replace`.\n  - If evidence is exhausted, finalize as `limited` and make\n    `requirementsAssessment` honestly explain what is unmet.\n- If the runtime returns a `readiness_continuation_signal` observation\n  after you tried to finalize, treat it as a request to continue the\n  OODAE loop, not as permission to repeat the same final answer:\n  - Immediately `workspace_read final_candidate.md` again and inspect\n    `textStats`.\n  - If `declaredUnsatisfied` includes `length` or `requirement` and\n    evidence supports more detail, revise/expand `final_candidate.md`\n    with `workspace_append`, `workspace_insert_after_section`, or\n    `workspace_replace` before any next terminal action.\n  - If `declaredUnsatisfied` includes structure and the observation shows\n    `duplicate_heading_context`, `duplicate_section_number_context`, or\n    `section_number_repair_context`, use `workspace_propose_patch` with\n    `applyIfValid:true` and one `normalize_headings` operation. Call\n    `workspace_apply_patch` only for a valid preview that was not already\n    applied before trying another terminal action.\n  - If source and length are satisfied but the remaining deficits include\n    both structure and TodoState, use the listed structure patch action\n    and sync TodoState with `todo_advance` / `todo_run_next`, or\n    `todo_cancel` for stale plan items. Do not append, insert, write,\n    replace, search, or read unless `allowedActions` explicitly requires\n    it.\n  - If `declaredUnsatisfied` includes `evidence`, continue searching or\n    reading unless evidence is genuinely exhausted by the Phase F rules.\n  - If you still finalize as `limited`, explicitly state why no more\n    useful expansion or evidence gathering is possible.\n  - Do not leave `requestedLength`, `observedLength`, or\n    `observedLengthUnit` null when the user gave a concrete length and\n    `workspace_read` returned usable `textStats`.\n  - If `final_candidate.md` is missing or empty, write it first; do not\n    publish or finalize from memory or from a prose instruction field.\n- Preferred terminal step: call\n  `workspace_publish_candidate path=final_candidate.md`. This sends the\n  selected workspace candidate directly to the user without a second\n  finalizer LLM rewrite. The candidate content itself must include any\n  needed Limitations and Sources sections.\n- If `workspace_publish_candidate` is blocked for readiness, length, or\n  TodoState sync, do not switch to direct `finalize` to escape the block.\n  Treat the block as the next observation: expand the workspace candidate,\n  gather the named missing evidence, correct `requirementsAssessment`, or\n  call `todo_run_next` / `todo_advance` before trying publish again.\n- If an acceptance convergence signal says `forbiddenReadiness=ready`,\n  the next terminal attempt cannot be clean `ready`. You must either do\n  more evidence/workspace work, or explicitly publish `limited` with\n  `evidenceSatisfied: false` and non-empty `remainingGaps`.\n- For research/report publish, include `finalReadiness` on\n  `workspace_publish_candidate` with `requirementsAssessment` populated\n  from the latest `workspace_read final_candidate.md` stats. If the\n  candidate is below the user's concrete length/depth requirement and\n  evidence supports expansion, revise before publish. Do not publish a\n  limited answer while also declaring `evidenceSatisfied: true` and\n  `remainingGaps: []`; that means you have enough material to expand. If\n  evidence is exhausted, publish only with `decision: \"limited\"`,\n  `evidenceSatisfied: false`, concrete `remainingGaps`, and\n  `lengthSatisfied: false` / `requirementSatisfied: false`.\n- Do not choose `finalize` after `workspace_finalize_candidate` when\n  `workspace_publish_candidate` is available and `final_candidate.md`\n  already contains the exact answer. `finalize` is only the fallback path\n  when publish is unavailable or the workspace candidate is not the\n  answer.\n- Fallback only if `workspace_publish_candidate` is unavailable: use\n  `finalize` with the body of final_candidate.md as the answer and an\n  explicit readiness declaration:\n  - Ready: `finalReadiness: { \"decision\": \"ready\", \"evidenceMode\":\n    \"read_sources\", \"limitations\": \"\", \"requirementsAssessment\": {\n    \"userRequirementSummary\": \"summarize the user's concrete output\n    requirements\", \"requirementSatisfied\": true, \"lengthSatisfied\":\n    true, \"evidenceSatisfied\": true, \"requestedLength\": null,\n    \"observedLength\": null, \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"summary\": \"why this is ready\" } }`\n  - Limited: `finalReadiness: { \"decision\": \"limited\", \"evidenceMode\":\n    \"search_summary_only\" | \"mixed\" | \"read_sources\", \"limitations\":\n    \"Only search summaries / failed read_url attempts / one readable\n    source were available; the report names these limits.\",\n    \"requirementsAssessment\": { \"userRequirementSummary\": \"summarize\n    the user's concrete output requirements\", \"requirementSatisfied\":\n    false, \"lengthSatisfied\": false, \"evidenceSatisfied\": false,\n    \"requestedLength\": null, \"observedLength\": null,\n    \"observedLengthUnit\": \"cjk_chars|words|chars\",\n    \"successfulReadUrlCount\": 0, \"remainingGaps\": [\"state the real\n    gaps\"], \"summary\": \"why this is limited\" } }`\n\n## Rules\n\n- Length follows evidence. Rich evidence → long report. Thin\n  evidence → short report + disclosed limitations. If the user asked\n  for a long concrete length and your evidence supports only a shorter\n  report, write the shorter evidence-backed report and say so. Do not\n  invent sections to hit length.\n- In the readiness JSON examples above, `requestedLength` and\n  `observedLength` are shown as `null` only as placeholders. Replace\n  them with numbers whenever the user gave a concrete length and\n  `workspace_read` gave you `textStats`.\n- You, the AI, decide `requirementsAssessment`. Runtime only records and\n  displays it with raw `textStats` / `read_url` counts. Do not rely on\n  runtime to decide whether the answer meets length, evidence, or depth\n  requirements.\n- Never invent citations. Every source URL must come from a successful\n  `read_url` you ran in this run.\n- Search-result URLs may appear only in a clearly labeled \"candidate\n  sources not fully read\" note. Do not list them as verified Sources\n  unless `read_url` succeeded.\n- Never claim a single-source fact as verified. Mark it \"reported by\n  <source>; not independently verified\".\n- Use the user's language throughout.\n- The runtime no longer back-fills workspace files. If you do not\n  write final_candidate.md, the user gets nothing.\n- If 2+ sources contradict each other on the same fact, present both\n  and disclose the contradiction; do not pick a winner without\n  evidence.\n- Workspace tools are filename-free-form (any safe path). Reserved\n  conventions (questions.md, evidence.json, draft.md, critique.md,\n  final_candidate.md) are convention-only; pick clearer names if your\n  topic needs them.\n- Quality (`workspace.quality`) is advisory; runtime never blocks\n  finalize. Decide for yourself when the report is ready.",
       "name": "deep-research-writer",
       "sourcePath": "skills/deep-research-writer/SKILL.md",
       "tags": [
@@ -4079,7 +4079,7 @@
         "article",
         "documentation"
       ],
-      "instructions": "# Long Web Research\n\nUse this skill when the user asks for deep research, a final report, a market\nscan, a literature-style review, a multi-source comparison, or an investigation\nthat cannot be answered well from one quick search.\n\nThis skill is a long-run research harness. Do not treat it as a single\n`web_search` call.\n\nHard top rules (read before any action):\n\n- Every run MUST end with `workspace_publish_candidate`. If you ever observe\n  `terminalRepairState.budgetState === \"exhausted\"`, your single next action\n  must be `workspace_publish_candidate` — `decision=\"ready\"` only if all\n  observable deficits are satisfied, otherwise `decision=\"limited\"` with a\n  non-empty `remainingGaps` array naming each deficit. Letting the run hit\n  `max_steps_continuation` is always a failure even if the candidate is good.\n- Treat `plan` and `web_search` as expensive. Do not call `plan` twice in\n  a row without a writing / reading / publishing action in between. Do not\n  call `web_search` more than 5 times before calling `read_url` and writing\n  the first draft section. If your action history shows ≥3 `plan` calls and\n  zero `workspace_write`, switch to drafting immediately.\n- Mirror the runtime contract verbatim. `terminalRepairState.requiredRepair`\n  and `validPublishContract.validTerminalException` tell you exactly what\n  terminal action is valid; use them rather than inventing your own.\n\nActivation:\n\n- When you select this skill, declare `mode: \"long_research\"` on your first\n  plan envelope so the runtime activates the budget gate and gate-signal\n  envelope. This replaces lexical-prompt detection: the runtime will not\n  guess long-research mode from your prompt text.\n- The runtime returns a structured gate signal back to you on each cycle,\n  shaped roughly:\n  `{ sourceMinimum, authorityCoverage, claimGraph, evidenceGaps,\n     budgetStatus, finalMode }`. Read it before deciding the next action.\n- The runtime may also expose\n  `loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`.\n  If it says `forbiddenReadiness: \"ready\"`, you must not emit a clean\n  `finalReadiness.decision=\"ready\"` on the next terminal attempt. Either\n  continue with targeted `web_search` / `read_url` / workspace expansion,\n  or publish `limited` with `evidenceSatisfied: false` and concrete\n  `remainingGaps`.\n- The runtime owns mechanism (authority scoring, duplicate detection,\n  loop budget) and never writes prose. You own workflow, queries, action\n  choice, and the final report text.\n\nWorkspace (ADR-0015):\n\n- The virtual workspace is your scratchpad for long-form drafting. Use\n  `workspace_write`, `workspace_read`, `workspace_append`,\n  `workspace_insert_after_section`, `workspace_replace`,\n  `workspace_propose_patch`, `workspace_apply_patch`,\n  `workspace_remove`, `workspace_list`, `workspace_finalize_candidate`,\n  and `workspace_publish_candidate`.\n- Filenames are free-form (any safe path; no `..`, no absolute, no\n  backslash). The runtime suggests these conventions when the response\n  is a research report: `outline.md`, `evidence.json`, `draft.md`,\n  `critique.md`, `final_candidate.md`. Use them or pick your own, but\n  if you pick a custom user-facing report path such as `report.md`, you\n  must pass that same path to `workspace_finalize_candidate` and\n  `workspace_publish_candidate`, or copy/promote it into\n  `final_candidate.md` before publishing.\n- The runtime no longer back-fills empty workspace files from your\n  final answer. If you don't author the artifact, it stays empty.\n- Quality (`workspace.quality`) is advisory: it reports which\n  conventional files are present; it does not block finalize. You\n  decide when to call `workspace_finalize_candidate` and finalize.\n- Long reports do not need to be generated in one model response. Build\n  `evidence.json`, `draft.md`, `critique.md`, and `final_candidate.md`\n  over multiple OODAE turns, then publish the selected candidate with\n  `workspace_publish_candidate` so the final answer is the workspace\n  artifact rather than a shorter finalizer rewrite.\n- Direct `finalize` is not a publish substitute for long workspace\n  reports. It asks another model pass to answer from context and may\n  compress, shorten, or omit the workspace artifact. Use\n  `workspace_publish_candidate` when the workspace file itself is the\n  answer.\n- Before terminal publish, read the selected candidate and compare\n  `textStats` against the user's concrete requirements (length, language,\n  sections, source count). Runtime reports the stats; you decide whether\n  to revise, publish ready, or publish limited.\n- When a workspace action returns `lengthProgress`, treat it as the\n  current length contract. If `lengthProgress.status` is\n  `below_requested`, calculate the remaining gap from\n  `remainingLength` and expand the report with enough complete,\n  source-grounded paragraphs to materially close that gap. A short note,\n  placeholder, or 50-word patch is not useful when the remaining gap is\n  hundreds or thousands of words.\n- For long reports, use an index-first writing protocol:\n  1. After the first useful reads, write `outline.md` with the exact\n     section headings and the source URLs that support each section.\n  2. Write `draft.md` from that outline. The first draft may cover only\n     the first sections, but it must be real user-facing prose, not a\n     promise to write later.\n  3. Once a draft exists, do not repeat small `workspace_write` rewrites.\n     Use `workspace_append` for new sections or\n     `workspace_insert_after_section` for targeted expansion.\n  4. Size each writing action from `lengthProgress.remainingLength`.\n     If 2000+ words remain, add a full section-sized chunk, not a short\n     paragraph.\n  5. Keep section headings unique. A long report should grow by adding\n     planned sections under the outline, not by duplicating headings.\n- For risky structure repair, prefer the two-step patch contract when\n  available: call `workspace_propose_patch`, inspect `status`,\n  `deltaWords`, `riskFlags`, `structureBefore`, and `structureAfter`,\n  then call `workspace_apply_patch` only for a latest `preview_ready`\n  patch with no blocking risk flags. Valid operations are\n  `append{content}`, `insert_after_section{heading,content}`,\n  `replace{find,replace,replace_all?}`, and\n  `normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}`.\n  For duplicate headings or duplicate section numbers shown in\n  `duplicate_heading_context`, `duplicate_section_number_context`, or\n  `section_number_repair_context`, use exactly one `normalize_headings`\n  operation first when length is already satisfied. Do not mix it with\n  `replace` unless exact current `find` text is visible and heading-only\n  repair cannot improve structure.\n\nProcess:\n\n1. Restate the research topic and define the final report shape.\n2. Create a short research plan with 3 to 7 questions or sections.\n3. Use `web_search` to discover sources for each section.\n4. Use `read_url` for the strongest sources before making source-backed claims.\n5. Track evidence by source URL, title, relevance, and what claim it supports.\n6. Write `outline.md` as a section index once at least one useful source has\n   been read. Include the planned section title, target purpose, and supporting\n   URLs for each section.\n7. Start `draft.md` from the outline before doing more broad search. If an\n   important section has weak evidence, mark that section's evidence gap in\n   `outline.md` and do targeted search/read for that gap.\n8. Continue searching if important sections have weak or missing evidence.\n9. Prefer primary sources, official docs, papers, filings, standards, or direct\n   product pages when available.\n10. For handle, username, brand, or personal-profile topics, first try direct\n   first-party/owned sources such as the official website, GitHub profile,\n   project documentation, and professional profile pages before relying on\n   social mirrors or generic directories.\n11. If the first search/read pass only finds thin or weak sources, change the\n   next query shape instead of repeating it. Try quoted topic, official website,\n   GitHub, documentation, LinkedIn/profile, and `site:` targeted searches.\n12. If a source cannot be read, say so and either use a better source or mark the\n   claim as lower confidence.\n13. Keep progress visible during long runs: plan, sources read, gaps, and next\n   research step.\n14. After `draft.md` exists, read it back and write `critique.md`.\n    If critique has no blocking evidence gap, promote the draft into\n    `final_candidate.md`, call `workspace_finalize_candidate`, read\n    the candidate stats, and publish it with `workspace_publish_candidate`.\n    If your main draft is a custom path such as `report.md`, either use\n    that exact path for finalize/read/publish or copy it into\n    `final_candidate.md`; do not leave the completed report in a custom\n    path and then use direct `finalize`.\n    Include `finalReadiness.requirementsAssessment` on publish using the\n    latest `workspace_read` stats. If a concrete requested length is unmet\n    and evidence can support expansion, revise the workspace candidate instead\n    of publishing. Prefer `workspace_append` for new sections or\n    `workspace_insert_after_section` for targeted section expansion when\n    `workspace_replace` would require fragile exact-match text. Use the\n    latest `lengthProgress.remainingLength` to size the expansion across\n    the requested sections; distribute the missing words into real\n    analysis, examples, pattern details, and caveats backed by the sources\n    already read. If evidence is exhausted, publish limited only with\n    `evidenceSatisfied: false` and concrete `remainingGaps`.\n    Do not keep doing broad search once the draft is substantive and\n    ready to be promoted.\n13. If `workspace_publish_candidate` is blocked, read the returned\n    `status`, `message`, and any workspace advisory facts before the\n    next action:\n    - `missing_finalize_after_latest_write`: call\n      `workspace_finalize_candidate` on the selected candidate after the\n      latest write/replace.\n    - `missing_latest_workspace_read`: call `workspace_read` on the same\n      candidate before writing again or publishing.\n    - `readiness_audit_failed`: fix the `finalReadiness` self-audit so it\n      matches latest `workspace_read` stats, or revise the candidate. If the\n      audit says the candidate is shorter than a requested length and more\n      user-facing material is available, continue with `workspace_append` or\n      `workspace_insert_after_section` before trying publish again. The\n      next workspace mutation should be sized from the observable\n      remaining length, not from a generic \"add more detail\" note.\n    - `acceptanceConvergenceSignal` / `forbiddenReadiness=ready`: your\n      repeated `ready` decision conflicts with observable acceptance facts\n      such as source minimum or Research Gate. Do not retry clean `ready`.\n      Continue evidence work, or publish only `limited` with\n      `evidenceSatisfied: false` and non-empty `remainingGaps`.\n    - `todo_state_not_synced`: call `todo_run_next` or `todo_advance`\n      to mark completed work before any terminal action. Do not switch to\n      direct `finalize` to escape an unfinished TodoState.\n    If `publish_attempts_blocked` reaches 3 or more, change the action\n    sequence instead of repeating the same write -> finalize -> publish\n    loop.\n    If publish is blocked for readiness, length, or TodoState reasons, do\n    not replace the publish path with direct `finalize`. Use the blocker\n    status as the next OODAE observation: expand with `workspace_append` /\n    `workspace_insert_after_section`, gather a named missing source with\n    `web_search` / `read_url`, or synchronize TodoState. Only publish\n    limited when the remaining blockers are concrete and recorded in\n    `requirementsAssessment.remainingGaps`.\n14. Use this `finalReadiness` shape for limited publish when the answer is\n    short or evidence-thin. Adapt values from the latest `workspace_read`\n    and read source facts; do not invent numbers:\n\n    ```json\n    {\n      \"decision\": \"limited\",\n      \"evidenceMode\": \"mixed\",\n      \"limitations\": \"One sentence naming the concrete blocker.\",\n      \"requirementsAssessment\": {\n        \"checkedReadinessAgainstUserRequest\": true,\n        \"checkedReadUrlEvidence\": true,\n        \"checkedWorkspaceStats\": true,\n        \"evidenceSatisfied\": false,\n        \"lengthSatisfied\": false,\n        \"observedLength\": 1200,\n        \"observedLengthUnit\": \"words\",\n        \"requestedLength\": 3000,\n        \"requirementSatisfied\": false,\n        \"successfulReadUrlCount\": 2,\n        \"userRequirementSummary\": \"One-line user request summary\",\n        \"remainingGaps\": [\n          \"Could not read primary source after repeated failures\",\n          \"Need more detail for section X but no usable source was available\"\n        ]\n      }\n    }\n    ```\n\n    Use the same length unit the user requested (`words` for word-count\n    requests, `chars`/`cjk_chars` for character-count requests).\n    `remainingGaps` is required when `observedLength < requestedLength`\n    and you publish as `limited`. If evidence is truly exhausted, set\n    `evidenceSatisfied: false` and list concrete blockers. Do not set\n    `evidenceSatisfied: true` while the candidate is short and\n    `remainingGaps` is empty.\n15. End with a structured report you author yourself, in the user's\n    language: executive summary, findings, evidence table, risks or\n    caveats, and recommended next steps. The runtime no longer compiles\n    a fallback report; if you do not write one, the user gets nothing.\n    Use the gate signal's `finalMode` to decide depth:\n    `full_report` means produce the full report;\n    `final_with_limitations` means produce the best answer possible and\n    clearly disclose evidence limits; `needs_more` means continue\n    researching unless budget is exhausted.\n\nBudget-exhaustion exit (mandatory):\n\n- Every workspace mutation observation includes\n  `terminalRepairState.budgetState`. When that value becomes `low` or\n  `exhausted`, treat the next OODAE cycle as your last productive turn.\n- When `terminalRepairState.budgetState === \"exhausted\"`, do NOT continue\n  `plan` / `workspace_read` loops and do NOT keep rewriting the same\n  candidate. Issue exactly one terminal action that matches the observable\n  deficits:\n  - If `activeDeficits` contains only `length` (or `length` + `todo` /\n    `readiness`) and source + structure are satisfied, issue\n    `workspace_publish_candidate` with\n    `finalReadiness.decision=\"limited\"`, `lengthSatisfied: false`,\n    `requirementSatisfied: false`, and a non-empty\n    `remainingGaps=[\"length deficit: observed X / requested Y words\"]`.\n    A short-but-honest limited publish is the correct exit, not silent\n    timeout.\n  - If `activeDeficits` contains `structure`, do ONE coherent\n    `workspace_propose_patch` with `normalize_headings` using the exact\n    line numbers in `duplicate_heading_context`,\n    `duplicate_section_number_context`, or\n    `section_number_repair_context`, then\n    `workspace_apply_patch` only if the preview is valid. If patch tools\n    are unavailable, do one coherent `workspace_write` or\n    `workspace_replace` that rewrites the candidate with explicit unique\n    heading text and unique section numbers. Do not append more sections,\n    do not run more searches, and do not loop on `workspace_read`. Treat\n    this as your single repair attempt; if the structure audit still\n    fails after one repair, publish limited with\n    `remainingGaps=[\"structure audit failed: <issueCodes>\"]` instead of\n    burning more cycles on another rewrite.\n  - If source and length are already satisfied and the remaining deficits\n    are structure plus TodoState, use only the listed structure patch\n    action and TodoState sync actions. Do not append, insert, rewrite,\n    replace, search, or read unless `allowedActions` explicitly requires\n    it. Use `todo_advance` / `todo_run_next`, or `todo_cancel` for stale\n    plan items, before the publish attempt.\n  - If `activeDeficits` contains only `source`, the run already exhausted\n    budget without enough sources; publish limited with\n    `evidenceSatisfied: false` and `remainingGaps=[\"source minimum unmet:\n    readSources=X, relevantSources=Y\"]`.\n- Use `terminalRepairState.requiredRepair` and\n  `validPublishContract.validTerminalException` verbatim as the\n  contract for your terminal action. The runtime already lists what\n  terminal action is valid; mirror it instead of inventing one.\n- A `terminalizedBy: max_steps_continuation` outcome is always a harness\n  failure. If you ever see `budgetState === \"exhausted\"` and you still\n  hold a publish slot, publish limited rather than letting the run hit\n  max steps.\n\nRules:\n\n- Use runtime actions such as `web_search`, `read_url`, and TodoState progress\n  actions when available. Do not hardcode external HTTP calls inside the skill.\n- Do not invent citations. Every source-backed claim needs a source URL that was\n  discovered or read during the run.\n- Do not expose API keys, provider payloads, raw tool arguments, or private\n  runtime traces in the report.\n- If the task needs current information, include the research date in the final\n  report.\n- If the user asks for a short answer, use `web-research` instead of this skill.",
+      "instructions": "# Long Web Research\n\nUse this skill when the user asks for deep research, a final report, a market\nscan, a literature-style review, a multi-source comparison, or an investigation\nthat cannot be answered well from one quick search.\n\nThis skill is a long-run research harness. Do not treat it as a single\n`web_search` call.\n\nHard top rules (read before any action):\n\n- Every run MUST end with `workspace_publish_candidate`. If you ever observe\n  `terminalRepairState.budgetState === \"exhausted\"`, your single next action\n  must be `workspace_publish_candidate` — `decision=\"ready\"` only if all\n  observable deficits are satisfied, otherwise `decision=\"limited\"` with a\n  non-empty `remainingGaps` array naming each deficit. Letting the run hit\n  `max_steps_continuation` is always a failure even if the candidate is good.\n- Treat `plan` and `web_search` as expensive. Do not call `plan` twice in\n  a row without a writing / reading / publishing action in between. Do not\n  call `web_search` more than 5 times before calling `read_url` and writing\n  the first draft section. If your action history shows ≥3 `plan` calls and\n  zero `workspace_write`, switch to drafting immediately.\n- Mirror the runtime contract verbatim. `terminalRepairState.requiredRepair`\n  and `validPublishContract.validTerminalException` tell you exactly what\n  terminal action is valid; use them rather than inventing your own.\n\nActivation:\n\n- When you select this skill, declare `mode: \"long_research\"` on your first\n  plan envelope so the runtime activates the budget gate and gate-signal\n  envelope. This replaces lexical-prompt detection: the runtime will not\n  guess long-research mode from your prompt text.\n- The runtime returns a structured gate signal back to you on each cycle,\n  shaped roughly:\n  `{ sourceMinimum, authorityCoverage, claimGraph, evidenceGaps,\n     budgetStatus, finalMode }`. Read it before deciding the next action.\n- The runtime may also expose\n  `loopState.researchAcceptanceEvaluator.acceptanceConvergenceSignal`.\n  If it says `forbiddenReadiness: \"ready\"`, you must not emit a clean\n  `finalReadiness.decision=\"ready\"` on the next terminal attempt. Either\n  continue with targeted `web_search` / `read_url` / workspace expansion,\n  or publish `limited` with `evidenceSatisfied: false` and concrete\n  `remainingGaps`.\n- The runtime owns mechanism (authority scoring, duplicate detection,\n  loop budget) and never writes prose. You own workflow, queries, action\n  choice, and the final report text.\n\nWorkspace (ADR-0015):\n\n- The virtual workspace is your scratchpad for long-form drafting. Use\n  `workspace_write`, `workspace_read`, `workspace_append`,\n  `workspace_insert_after_section`, `workspace_replace`,\n  `workspace_propose_patch`, `workspace_apply_patch`,\n  `workspace_remove`, `workspace_list`, `workspace_finalize_candidate`,\n  and `workspace_publish_candidate`.\n- Filenames are free-form (any safe path; no `..`, no absolute, no\n  backslash). The runtime suggests these conventions when the response\n  is a research report: `outline.md`, `evidence.json`, `draft.md`,\n  `critique.md`, `final_candidate.md`. Use them or pick your own, but\n  if you pick a custom user-facing report path such as `report.md`, you\n  must pass that same path to `workspace_finalize_candidate` and\n  `workspace_publish_candidate`, or copy/promote it into\n  `final_candidate.md` before publishing.\n- The runtime no longer back-fills empty workspace files from your\n  final answer. If you don't author the artifact, it stays empty.\n- Quality (`workspace.quality`) is advisory: it reports which\n  conventional files are present; it does not block finalize. You\n  decide when to call `workspace_finalize_candidate` and finalize.\n- Long reports do not need to be generated in one model response. Build\n  `evidence.json`, `draft.md`, `critique.md`, and `final_candidate.md`\n  over multiple OODAE turns, then publish the selected candidate with\n  `workspace_publish_candidate` so the final answer is the workspace\n  artifact rather than a shorter finalizer rewrite.\n- Direct `finalize` is not a publish substitute for long workspace\n  reports. It asks another model pass to answer from context and may\n  compress, shorten, or omit the workspace artifact. Use\n  `workspace_publish_candidate` when the workspace file itself is the\n  answer.\n- Before terminal publish, read the selected candidate and compare\n  `textStats` against the user's concrete requirements (length, language,\n  sections, source count). Runtime reports the stats; you decide whether\n  to revise, publish ready, or publish limited.\n- When a workspace action returns `lengthProgress`, treat it as the\n  current length contract. If `lengthProgress.status` is\n  `below_requested`, calculate the remaining gap from\n  `remainingLength` and expand the report with enough complete,\n  source-grounded paragraphs to materially close that gap. A short note,\n  placeholder, or 50-word patch is not useful when the remaining gap is\n  hundreds or thousands of words.\n- For long reports, use an index-first writing protocol:\n  1. After the first useful reads, write `outline.md` with the exact\n     section headings and the source URLs that support each section.\n  2. Write `draft.md` from that outline. The first draft may cover only\n     the first sections, but it must be real user-facing prose, not a\n     promise to write later.\n  3. Once a draft exists, do not repeat small `workspace_write` rewrites.\n     Use `workspace_append` for new sections or\n     `workspace_insert_after_section` for targeted expansion.\n  4. Size each writing action from `lengthProgress.remainingLength`.\n     If 2000+ words remain, add a full section-sized chunk, not a short\n     paragraph.\n  5. Keep section headings unique. A long report should grow by adding\n     planned sections under the outline, not by duplicating headings.\n- For risky structure repair, prefer the structured patch contract when\n  available: call `workspace_propose_patch`, inspect `status`,\n  `deltaWords`, `riskFlags`, `structureBefore`, and `structureAfter`.\n  For heading-only `normalize_headings`, set `applyIfValid:true` so the\n  validated patch can apply in the same action; call\n  `workspace_apply_patch` only when the preview remains `preview_ready`\n  and has no blocking risk flags. Valid operations are\n  `append{content}`, `insert_after_section{heading,content}`,\n  `replace{find,replace,replace_all?}`, and\n  `normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}`.\n  For duplicate headings or duplicate section numbers shown in\n  `duplicate_heading_context`, `duplicate_section_number_context`, or\n  `section_number_repair_context`, use exactly one `normalize_headings`\n  operation first when length is already satisfied. Do not mix it with\n  `replace` unless exact current `find` text is visible and heading-only\n  repair cannot improve structure.\n\nProcess:\n\n1. Restate the research topic and define the final report shape.\n2. Create a short research plan with 3 to 7 questions or sections.\n3. Use `web_search` to discover sources for each section.\n4. Use `read_url` for the strongest sources before making source-backed claims.\n5. Track evidence by source URL, title, relevance, and what claim it supports.\n6. Write `outline.md` as a section index once at least one useful source has\n   been read. Include the planned section title, target purpose, and supporting\n   URLs for each section.\n7. Start `draft.md` from the outline before doing more broad search. If an\n   important section has weak evidence, mark that section's evidence gap in\n   `outline.md` and do targeted search/read for that gap.\n8. Continue searching if important sections have weak or missing evidence.\n9. Prefer primary sources, official docs, papers, filings, standards, or direct\n   product pages when available.\n10. For handle, username, brand, or personal-profile topics, first try direct\n   first-party/owned sources such as the official website, GitHub profile,\n   project documentation, and professional profile pages before relying on\n   social mirrors or generic directories.\n11. If the first search/read pass only finds thin or weak sources, change the\n   next query shape instead of repeating it. Try quoted topic, official website,\n   GitHub, documentation, LinkedIn/profile, and `site:` targeted searches.\n12. If a source cannot be read, say so and either use a better source or mark the\n   claim as lower confidence.\n13. Keep progress visible during long runs: plan, sources read, gaps, and next\n   research step.\n14. After `draft.md` exists, read it back and write `critique.md`.\n    If critique has no blocking evidence gap, promote the draft into\n    `final_candidate.md`, call `workspace_finalize_candidate`, read\n    the candidate stats, and publish it with `workspace_publish_candidate`.\n    If your main draft is a custom path such as `report.md`, either use\n    that exact path for finalize/read/publish or copy it into\n    `final_candidate.md`; do not leave the completed report in a custom\n    path and then use direct `finalize`.\n    Include `finalReadiness.requirementsAssessment` on publish using the\n    latest `workspace_read` stats. If a concrete requested length is unmet\n    and evidence can support expansion, revise the workspace candidate instead\n    of publishing. Prefer `workspace_append` for new sections or\n    `workspace_insert_after_section` for targeted section expansion when\n    `workspace_replace` would require fragile exact-match text. Use the\n    latest `lengthProgress.remainingLength` to size the expansion across\n    the requested sections; distribute the missing words into real\n    analysis, examples, pattern details, and caveats backed by the sources\n    already read. If evidence is exhausted, publish limited only with\n    `evidenceSatisfied: false` and concrete `remainingGaps`.\n    Do not keep doing broad search once the draft is substantive and\n    ready to be promoted.\n13. If `workspace_publish_candidate` is blocked, read the returned\n    `status`, `message`, and any workspace advisory facts before the\n    next action:\n    - `missing_finalize_after_latest_write`: call\n      `workspace_finalize_candidate` on the selected candidate after the\n      latest write/replace.\n    - `missing_latest_workspace_read`: call `workspace_read` on the same\n      candidate before writing again or publishing.\n    - `readiness_audit_failed`: fix the `finalReadiness` self-audit so it\n      matches latest `workspace_read` stats, or revise the candidate. If the\n      audit says the candidate is shorter than a requested length and more\n      user-facing material is available, continue with `workspace_append` or\n      `workspace_insert_after_section` before trying publish again. The\n      next workspace mutation should be sized from the observable\n      remaining length, not from a generic \"add more detail\" note.\n    - `acceptanceConvergenceSignal` / `forbiddenReadiness=ready`: your\n      repeated `ready` decision conflicts with observable acceptance facts\n      such as source minimum or Research Gate. Do not retry clean `ready`.\n      Continue evidence work, or publish only `limited` with\n      `evidenceSatisfied: false` and non-empty `remainingGaps`.\n    - `todo_state_not_synced`: call `todo_run_next` or `todo_advance`\n      to mark completed work before any terminal action. Do not switch to\n      direct `finalize` to escape an unfinished TodoState.\n    If `publish_attempts_blocked` reaches 3 or more, change the action\n    sequence instead of repeating the same write -> finalize -> publish\n    loop.\n    If publish is blocked for readiness, length, or TodoState reasons, do\n    not replace the publish path with direct `finalize`. Use the blocker\n    status as the next OODAE observation: expand with `workspace_append` /\n    `workspace_insert_after_section`, gather a named missing source with\n    `web_search` / `read_url`, or synchronize TodoState. Only publish\n    limited when the remaining blockers are concrete and recorded in\n    `requirementsAssessment.remainingGaps`.\n14. Use this `finalReadiness` shape for limited publish when the answer is\n    short or evidence-thin. Adapt values from the latest `workspace_read`\n    and read source facts; do not invent numbers:\n\n    ```json\n    {\n      \"decision\": \"limited\",\n      \"evidenceMode\": \"mixed\",\n      \"limitations\": \"One sentence naming the concrete blocker.\",\n      \"requirementsAssessment\": {\n        \"checkedReadinessAgainstUserRequest\": true,\n        \"checkedReadUrlEvidence\": true,\n        \"checkedWorkspaceStats\": true,\n        \"evidenceSatisfied\": false,\n        \"lengthSatisfied\": false,\n        \"observedLength\": 1200,\n        \"observedLengthUnit\": \"words\",\n        \"requestedLength\": 3000,\n        \"requirementSatisfied\": false,\n        \"successfulReadUrlCount\": 2,\n        \"userRequirementSummary\": \"One-line user request summary\",\n        \"remainingGaps\": [\n          \"Could not read primary source after repeated failures\",\n          \"Need more detail for section X but no usable source was available\"\n        ]\n      }\n    }\n    ```\n\n    Use the same length unit the user requested (`words` for word-count\n    requests, `chars`/`cjk_chars` for character-count requests).\n    `remainingGaps` is required when `observedLength < requestedLength`\n    and you publish as `limited`. If evidence is truly exhausted, set\n    `evidenceSatisfied: false` and list concrete blockers. Do not set\n    `evidenceSatisfied: true` while the candidate is short and\n    `remainingGaps` is empty.\n15. End with a structured report you author yourself, in the user's\n    language: executive summary, findings, evidence table, risks or\n    caveats, and recommended next steps. The runtime no longer compiles\n    a fallback report; if you do not write one, the user gets nothing.\n    Use the gate signal's `finalMode` to decide depth:\n    `full_report` means produce the full report;\n    `final_with_limitations` means produce the best answer possible and\n    clearly disclose evidence limits; `needs_more` means continue\n    researching unless budget is exhausted.\n\nBudget-exhaustion exit (mandatory):\n\n- Every workspace mutation observation includes\n  `terminalRepairState.budgetState`. When that value becomes `low` or\n  `exhausted`, treat the next OODAE cycle as your last productive turn.\n- When `terminalRepairState.budgetState === \"exhausted\"`, do NOT continue\n  `plan` / `workspace_read` loops and do NOT keep rewriting the same\n  candidate. Issue exactly one terminal action that matches the observable\n  deficits:\n  - If `activeDeficits` contains only `length` (or `length` + `todo` /\n    `readiness`) and source + structure are satisfied, issue\n    `workspace_publish_candidate` with\n    `finalReadiness.decision=\"limited\"`, `lengthSatisfied: false`,\n    `requirementSatisfied: false`, and a non-empty\n    `remainingGaps=[\"length deficit: observed X / requested Y words\"]`.\n    A short-but-honest limited publish is the correct exit, not silent\n    timeout.\n  - If `activeDeficits` contains `structure`, do ONE coherent\n    `workspace_propose_patch` with `applyIfValid:true` and\n    `normalize_headings` using the exact line numbers in\n    `duplicate_heading_context`,\n    `duplicate_section_number_context`, or\n    `section_number_repair_context`. Call `workspace_apply_patch` only if\n    the preview is valid but was not already applied. If patch tools are\n    unavailable, do one coherent `workspace_write` or\n    `workspace_replace` that rewrites the candidate with explicit unique\n    heading text and unique section numbers. Do not append more sections,\n    do not run more searches, and do not loop on `workspace_read`. Treat\n    this as your single repair attempt; if the structure audit still\n    fails after one repair, publish limited with\n    `remainingGaps=[\"structure audit failed: <issueCodes>\"]` instead of\n    burning more cycles on another rewrite.\n  - If source and length are already satisfied and the remaining deficits\n    are structure plus TodoState, use only the listed structure patch\n    action and TodoState sync actions. Do not append, insert, rewrite,\n    replace, search, or read unless `allowedActions` explicitly requires\n    it. Use `todo_advance` / `todo_run_next`, or `todo_cancel` for stale\n    plan items, before the publish attempt.\n  - If `activeDeficits` contains only `source`, the run already exhausted\n    budget without enough sources; publish limited with\n    `evidenceSatisfied: false` and `remainingGaps=[\"source minimum unmet:\n    readSources=X, relevantSources=Y\"]`.\n- Use `terminalRepairState.requiredRepair` and\n  `validPublishContract.validTerminalException` verbatim as the\n  contract for your terminal action. The runtime already lists what\n  terminal action is valid; mirror it instead of inventing one.\n- A `terminalizedBy: max_steps_continuation` outcome is always a harness\n  failure. If you ever see `budgetState === \"exhausted\"` and you still\n  hold a publish slot, publish limited rather than letting the run hit\n  max steps.\n\nRules:\n\n- Use runtime actions such as `web_search`, `read_url`, and TodoState progress\n  actions when available. Do not hardcode external HTTP calls inside the skill.\n- Do not invent citations. Every source-backed claim needs a source URL that was\n  discovered or read during the run.\n- Do not expose API keys, provider payloads, raw tool arguments, or private\n  runtime traces in the report.\n- If the task needs current information, include the research date in the final\n  report.\n- If the user asks for a short answer, use `web-research` instead of this skill.",
       "name": "long-web-research",
       "sourcePath": "skills/long-web-research/SKILL.md",
       "tags": [
@@ -4631,7 +4631,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "7c076260f-dirty"
+      "ddd2eca45-dirty"
         
     );
   }
@@ -7476,11 +7476,17 @@
   }
 
   function tokenize$4(value) {
-    return readString$1H(value)
+    return splitMixedScriptBoundaries$1(readString$1H(value))
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/i)
       .filter((token) => token.length >= 3)
       .slice(0, 12);
+  }
+
+  function splitMixedScriptBoundaries$1(value) {
+    return readString$1H(value)
+      .replace(/([\u4e00-\u9fff])([a-z0-9])/gi, "$1 $2")
+      .replace(/([a-z0-9])([\u4e00-\u9fff])/gi, "$1 $2");
   }
 
   function readString$1H(value) {
@@ -7701,7 +7707,7 @@
     };
   }
 
-  function isResearchQualityGateRequired$1(runState, options = {}) {
+  function isResearchQualityGateRequired(runState, options = {}) {
     return isLongResearchRun(runState, options);
   }
 
@@ -10740,14 +10746,14 @@
         .map((observation) => observation.sourceId)
         .filter(Boolean)
     );
-    const relevantSources = sourceArtifacts.filter((source) => (
-      source.sourceType !== "profile_directory" &&
-      (source.quality === "strong" || source.quality === "medium") &&
-      source.authority &&
-      source.authority.authorityTier !== "blocked" &&
-      source.authority.authorityTier !== "non_verifying" &&
-      usefulSourceIds.has(source.id)
-    )).length;
+    const relevantUrls = new Set();
+    for (const source of sourceArtifacts) {
+      if (!isRelevantSourceArtifact(source)) continue;
+      if (!usefulSourceIds.has(source.id) && !isReadableRelevantSourceArtifact(source)) continue;
+      const key = normalizeUrlKey$3(source.url) || source.id;
+      if (key) relevantUrls.add(key);
+    }
+    const relevantSources = relevantUrls.size;
     const readSources = sourceArtifacts.filter((source) => source.ok !== false).length;
     return {
       ...sourceMinimum,
@@ -10756,6 +10762,35 @@
         relevantSources >= sourceMinimum.minRelevantSources,
       relevantSources
     };
+  }
+
+  function isRelevantSourceArtifact(source) {
+    return Boolean(
+      source &&
+      source.sourceType !== "profile_directory" &&
+      (source.quality === "strong" || source.quality === "medium") &&
+      source.authority &&
+      source.authority.authorityTier !== "blocked" &&
+      source.authority.authorityTier !== "non_verifying"
+    );
+  }
+
+  function isReadableRelevantSourceArtifact(source) {
+    return Boolean(
+      source &&
+      source.topicRelevance &&
+      source.topicRelevance.relevant === true &&
+      readNumber$i(source.textLength) >= 480 &&
+      (
+        source.quality === "strong" ||
+        source.quality === "medium" ||
+        source.qualityDetail && (
+        readString$1B(source.qualityDetail.reason).includes("strong") ||
+        readString$1B(source.qualityDetail.reason).includes("usable") ||
+        readString$1B(source.qualityDetail.reason).includes("topic_owned")
+        )
+      )
+    );
   }
 
   function extractSourceObservations(artifact, topic) {
@@ -11491,6 +11526,19 @@
 
   function normalizedKey(value) {
     return readString$1B(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function normalizeUrlKey$3(value) {
+    const url = readString$1B(value);
+    if (!url) return "";
+    try {
+      const parsed = new URL(url);
+      parsed.hash = "";
+      parsed.search = "";
+      return parsed.toString().replace(/\/$/, "");
+    } catch {
+      return url.replace(/\/$/, "");
+    }
   }
 
   function tokenize$3(value) {
@@ -12567,6 +12615,23 @@
     const maxFileChars = readPositiveInteger$f(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
     const nextContent = truncate$2(readString$1x(content), maxFileChars);
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
+    const shrinkRisk = detectDestructiveWriteShrink(workspace, filePath, file, nextContent);
+    if (shrinkRisk) {
+      appendWorkspaceOperation(workspace, {
+        action: "write",
+        path: filePath,
+        status: "destructive_shrink_blocked",
+        summary: options.summary || `blocked shrink write for ${filePath}`,
+        cycle: readPositiveInteger$f(runState && runState.cycleCount) || 0}, options);
+      refreshWorkspaceQuality(workspace);
+      syncRunStateCandidatePathMismatchSignal(runState, workspace);
+      return {
+        ...addWorkspaceFileStats(file),
+        message: "workspace_write refused to replace a substantial final candidate with much shorter content. Use workspace_insert_after_section, workspace_replace, workspace_multi_edit, or workspace_propose_patch for targeted repair.",
+        shrinkRisk,
+        status: "destructive_shrink_blocked"
+      };
+    }
     workspace.files[filePath] = {
       content: nextContent,
       path: filePath,
@@ -12586,6 +12651,28 @@
     syncWorkspaceLastReadToFile(workspace, workspace.files[filePath]);
     syncRunStateCandidatePathMismatchSignal(runState, workspace);
     return workspace.files[filePath];
+  }
+
+  function detectDestructiveWriteShrink(workspace, filePath, file, nextContent) {
+    const quality = workspace && workspace.quality && typeof workspace.quality === "object"
+      ? workspace.quality
+      : {};
+    const finalCandidatePath = readString$1x(quality.finalCandidatePath) || "final_candidate.md";
+    if (filePath !== finalCandidatePath) return null;
+    const current = readString$1x(file && file.content);
+    if (!current) return null;
+    const before = summarizeTextStats$2(current);
+    const after = summarizeTextStats$2(nextContent);
+    const beforeSize = Math.max(before.nonWhitespaceChars, before.cjkChars, before.words);
+    const afterSize = Math.max(after.nonWhitespaceChars, after.cjkChars, after.words);
+    if (beforeSize < 1500) return null;
+    if (afterSize >= beforeSize * 0.75) return null;
+    return {
+      afterSize,
+      beforeSize,
+      ratio: Number((afterSize / beforeSize).toFixed(3)),
+      reason: "final_candidate_destructive_shrink"
+    };
   }
 
   function insertAfterWorkspaceSection(runState, path, heading, content, options = {}) {
@@ -12634,6 +12721,12 @@
     const current = readString$1x(file.content);
     const addition = readString$1x(content);
     const insertResult = insertAfterMarkdownSection(current, targetHeading, addition, options);
+    const beforeStructure = inspectWorkspaceCandidateStructure(current);
+    const afterStructure = inspectWorkspaceCandidateStructure(insertResult.content);
+    const finalCandidatePath = readString$1x(workspace.quality && workspace.quality.finalCandidatePath) || "final_candidate.md";
+    const structureRisk = insertResult.changed && filePath === finalCandidatePath && isStructureMaybeWorse(beforeStructure, afterStructure)
+      ? "structure_maybe_worse"
+      : null;
     const maxFileChars = readPositiveInteger$f(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
     workspace.files[filePath] = {
       content: truncate$2(insertResult.content, maxFileChars),
@@ -12665,7 +12758,10 @@
       availableHeadings: Array.isArray(insertResult.availableHeadings) ? insertResult.availableHeadings : [],
       requestedHeading: targetHeading,
       file: workspace.files[filePath],
-      heading: targetHeading
+      heading: targetHeading,
+      structureRisk,
+      structureAfter: summarizePatchStructure(afterStructure),
+      structureBefore: summarizePatchStructure(beforeStructure)
     };
   }
 
@@ -13786,9 +13882,9 @@
       .map((hint) => {
         const lineNumber = readPositiveInteger$f(hint && hint.lineNumber);
         const currentNumber = readString$1x(hint && hint.currentNumber);
-        const candidateNumber = readPositiveInteger$f(hint && hint.candidateNumber);
+        const candidateNumber = readString$1x(hint && (hint.candidateNumber || hint.suggestedNumber));
         const raw = truncate$2(readString$1x(hint && hint.raw), 160);
-        if (lineNumber == null || !currentNumber || candidateNumber == null || !raw) return null;
+        if (lineNumber == null || !currentNumber || !candidateNumber || !raw) return null;
         return `lineNumber ${lineNumber} currentNumber ${currentNumber} candidateNumber ${candidateNumber} raw "${raw}"`;
       })
       .filter(Boolean)
@@ -14032,24 +14128,52 @@
       .map((entry) => readString$1x(entry && entry.number))
       .filter(Boolean));
     if (repeatedNumbers.size === 0) return [];
-    const levelCounters = new Map();
+    const occupiedNumbers = new Set((Array.isArray(headings) ? headings : [])
+      .map((heading) => readString$1x(heading && heading.number))
+      .filter(Boolean));
+    const repeatedOccurrences = new Map();
     return (Array.isArray(headings) ? headings : [])
       .filter((heading) => heading && heading.number != null && heading.level <= 3)
       .map((heading) => {
-        const level = readPositiveInteger$f(heading.level) || 0;
-        const next = (levelCounters.get(level) || 0) + 1;
-        levelCounters.set(level, next);
-        if (!repeatedNumbers.has(readString$1x(heading.number))) return null;
+        const currentNumber = readString$1x(heading.number);
+        if (!repeatedNumbers.has(currentNumber)) return null;
+        const occurrenceIndex = (repeatedOccurrences.get(currentNumber) || 0) + 1;
+        repeatedOccurrences.set(currentNumber, occurrenceIndex);
+        const suggestedNumber = occurrenceIndex <= 1
+          ? currentNumber
+          : suggestNextSectionNumber(currentNumber, occupiedNumbers);
+        if (suggestedNumber && suggestedNumber !== currentNumber) {
+          occupiedNumbers.add(suggestedNumber);
+        }
         return {
-          candidateNumber: next,
-          currentNumber: readString$1x(heading.number),
-          level,
+          candidateNumber: suggestedNumber,
+          currentNumber,
+          level: readPositiveInteger$f(heading.level) || 0,
           lineNumber: heading.lineNumber,
+          occurrenceIndex,
           raw: truncate$2(heading.raw, 160)
         };
       })
       .filter(Boolean)
       .slice(0, Math.max(1, readPositiveInteger$f(maxSamples) || 5) * 3);
+  }
+
+  function suggestNextSectionNumber(currentNumber, occupiedNumbers) {
+    const value = readString$1x(currentNumber);
+    const parts = value.split(".").map((part) => Number.parseInt(part, 10));
+    if (parts.length === 0 || parts.some((part) => !Number.isInteger(part) || part < 0)) {
+      return value;
+    }
+    const nextParts = parts.slice();
+    const lastIndex = nextParts.length - 1;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      nextParts[lastIndex] += 1;
+      const candidate = nextParts.join(".");
+      if (!occupiedNumbers || !occupiedNumbers.has(candidate)) {
+        return candidate;
+      }
+    }
+    return value;
   }
 
   function readFinalCandidatePath(workspace) {
@@ -14128,16 +14252,21 @@
       if (level == null) continue;
       const raw = readString$1x(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
       const normalized = normalizeHeadingText(lines[index]);
-      const numberMatch = normalized.match(/^(\d{1,3})(?:\s|$)/);
       headings.push({
         level,
         lineNumber: index + 1,
         normalized,
-        number: numberMatch ? numberMatch[1] : null,
+        number: extractMarkdownSectionNumber(raw),
         raw
       });
     }
     return headings;
+  }
+
+  function extractMarkdownSectionNumber(rawHeadingText) {
+    const value = readString$1x(rawHeadingText);
+    const match = value.match(/^(\d{1,3}(?:\.\d{1,3})*)\.?(?=\s|$)/);
+    return match ? match[1] : null;
   }
 
   function createWorkspaceQuality() {
@@ -14309,10 +14438,10 @@
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
         const lineNumber = readPositiveInteger$f(entry.lineNumber);
-        const candidateNumber = readPositiveInteger$f(entry.candidateNumber);
+        const candidateNumber = readString$1x(entry.candidateNumber || entry.suggestedNumber);
         const currentNumber = readString$1x(entry.currentNumber);
         const raw = readString$1x(entry.raw);
-        if (lineNumber == null || candidateNumber == null || !currentNumber || !raw) return null;
+        if (lineNumber == null || !candidateNumber || !currentNumber || !raw) return null;
         return {
           candidateNumber,
           currentNumber,
@@ -16380,7 +16509,7 @@
   }
 
   function countFailedReadAttempts(runState, failedUrl, output) {
-    const url = normalizeUrlKey$1(failedUrl);
+    const url = normalizeUrlKey$2(failedUrl);
     if (!url) return 0;
     const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
       ? runState.researchContext.readSources
@@ -16389,15 +16518,15 @@
       source &&
       typeof source === "object" &&
       source.ok === false &&
-      normalizeUrlKey$1(source.url) === url
+      normalizeUrlKey$2(source.url) === url
     )).length;
-    const currentUrl = normalizeUrlKey$1(output && output.url);
+    const currentUrl = normalizeUrlKey$2(output && output.url);
     const currentAlreadyCounted = readSources.some((source) => (
       source === output || (
         source &&
         output &&
         source.ok === false &&
-        normalizeUrlKey$1(source.url) === currentUrl &&
+        normalizeUrlKey$2(source.url) === currentUrl &&
         readString$1u(source.error) === readString$1u(output.error) &&
         readStatusCode(source.status) === readStatusCode(output.status)
       )
@@ -16407,9 +16536,10 @@
   }
 
   function readAlternateSourceCandidates(runState, failedUrl) {
-    const failedKey = normalizeUrlKey$1(failedUrl);
+    const failedKey = normalizeUrlKey$2(failedUrl);
     const failedUrls = new Set(readFailedUrls(runState));
     if (failedKey) failedUrls.add(failedKey);
+    const readUrls = new Set(readSuccessfulOrAttemptedUrls(runState));
 
     const raw = [];
     const inquiry = runState &&
@@ -16431,13 +16561,22 @@
     for (const item of raw) {
       const candidate = normalizeCandidate$1(item);
       if (!candidate) continue;
-      const key = normalizeUrlKey$1(candidate.url);
-      if (!key || seen.has(key) || failedUrls.has(key)) continue;
+      const key = normalizeUrlKey$2(candidate.url);
+      if (!key || seen.has(key) || failedUrls.has(key) || readUrls.has(key)) continue;
       seen.add(key);
       candidates.push(candidate);
       if (candidates.length >= MAX_ALTERNATE_SOURCE_CANDIDATES) break;
     }
     return candidates;
+  }
+
+  function readSuccessfulOrAttemptedUrls(runState) {
+    const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
+      ? runState.researchContext.readSources
+      : [];
+    return readSources
+      .map((source) => normalizeUrlKey$2(source && source.url))
+      .filter(Boolean);
   }
 
   function readFailedUrls(runState) {
@@ -16446,7 +16585,7 @@
       : [];
     return readSources
       .filter((source) => source && typeof source === "object" && source.ok === false)
-      .map((source) => normalizeUrlKey$1(source.url))
+      .map((source) => normalizeUrlKey$2(source.url))
       .filter(Boolean);
   }
 
@@ -16502,15 +16641,16 @@
     };
   }
 
-  function normalizeUrlKey$1(value) {
+  function normalizeUrlKey$2(value) {
     const url = readString$1u(value);
     if (!url) return "";
     try {
       const parsed = new URL(url);
       parsed.hash = "";
-      return parsed.toString();
+      parsed.search = "";
+      return parsed.toString().replace(/\/$/, "");
     } catch {
-      return url;
+      return url.replace(/\/$/, "");
     }
   }
 
@@ -17945,7 +18085,7 @@
       hasLengthDeficit: hasLength || hasObservableLengthDeficit,
       workspaceMutationGrowthHardVeto
     });
-    const workspacePatchSurface = getWorkspacePatchRepairSurface(runState);
+    const workspacePatchSurface = resolveWorkspacePatchRepairSurface(runState, reason);
     const sourceHasUnreadCandidates = hasUnreadSourceCandidates(runState);
     const publishProtocolContract = resolvePublishProtocolActionContract(runState);
     const protocolRecoveryAction = readString$1s(publishProtocolContract && publishProtocolContract.requiredAction);
@@ -17986,9 +18126,7 @@
         ).slice(0, 16);
       }
         if (hasStructureRepairSignal && !hasSource && !hasLength && hasTodo) {
-          addWorkspacePatchRepairActions(actions, workspacePatchSurface, {
-            allowBlockedRetry: true
-          });
+          addWorkspacePatchRepairActions(actions, workspacePatchSurface);
           actions.add("todo_advance");
           actions.add("todo_run_next");
           actions.add("todo_cancel");
@@ -18008,6 +18146,12 @@
             actions.add("web_search");
           }
           actions.add("read_url");
+        }
+        if (hasStructureRepairSignal && !hasLength && !hasObservableLengthDeficit) {
+          addWorkspacePatchRepairActions(actions, workspacePatchSurface);
+          if (workspacePatchSurface === "blocked_preview") {
+            actions.add("workspace_replace");
+          }
         }
         if (hasLength || hasObservableLengthDeficit) {
           if (workspaceMutationGrowthHardVeto) {
@@ -18089,6 +18233,13 @@
         actions.add("web_search");
       }
       actions.add("read_url");
+      if (hasObservableLengthDeficit && isSourceReadQuotaSatisfied(observableDeficits)) {
+        actions.add("workspace_insert_after_section");
+        if (!lowBudget) {
+          actions.add("workspace_write");
+          actions.add("workspace_replace");
+        }
+      }
     }
       if (hasStructureRepairSignal) {
         const structureOnly = !hasSource && !hasLength && !hasObservableLengthDeficit;
@@ -18252,6 +18403,10 @@
 
   function addWorkspacePatchRepairActions(actions, surface, options = {}) {
     if (!actions || typeof actions.add !== "function") return;
+    if (surface === "stale_preview") {
+      actions.add("workspace_propose_patch");
+      return;
+    }
     if (surface === "blocked_preview") {
       if (options.allowBlockedRetry === true) {
         actions.add("workspace_propose_patch");
@@ -18270,6 +18425,12 @@
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const pendingPatch = readRecord(workspace && workspace.pendingPatch);
     if (!pendingPatch) return "fresh";
+    const file = readRecord(workspace && workspace.files && workspace.files[pendingPatch.path]);
+    const currentVersion = readNumber$b(file && file.version);
+    const baseVersion = readNumber$b(pendingPatch && pendingPatch.baseVersion);
+    if (file && currentVersion !== baseVersion) {
+      return "stale_preview";
+    }
     const status = readString$1s(pendingPatch.status);
     if (pendingPatch.valid === true && status === "preview_ready") {
       return "apply_ready";
@@ -18278,6 +18439,12 @@
       return "blocked_preview";
     }
     return "fresh";
+  }
+
+  function resolveWorkspacePatchRepairSurface(runState, reason) {
+    const surface = getWorkspacePatchRepairSurface(runState);
+    if (surface !== "fresh") return surface;
+    return readString$1s(reason) === "preview_blocked" ? "blocked_preview" : surface;
   }
 
   function readOnlyPlanningHardVetoForbiddenActions(runState) {
@@ -18291,7 +18458,7 @@
   function hasUnreadSourceCandidates(runState) {
     const context = readRecord(runState && runState.researchContext);
     const readSources = Array.isArray(context && context.readSources) ? context.readSources : [];
-    const readUrls = new Set(readSources.map(readCandidateUrl).filter(Boolean));
+    const readUrls = new Set(readSources.map((source) => normalizeUrlKey$1(readCandidateUrl(source))).filter(Boolean));
     const candidates = [
       ...(Array.isArray(runState && runState.readUrlRecoverySignal && runState.readUrlRecoverySignal.alternateSourceCandidates)
         ? runState.readUrlRecoverySignal.alternateSourceCandidates
@@ -18301,9 +18468,17 @@
       ...readSearchPassItems(context && context.searchPasses)
     ];
     return candidates.some((candidate) => {
-      const url = readCandidateUrl(candidate);
+      const url = normalizeUrlKey$1(readCandidateUrl(candidate));
       return Boolean(url && !readUrls.has(url));
     });
+  }
+
+  function isSourceReadQuotaSatisfied(observableDeficits) {
+    const source = observableDeficitsRecord(observableDeficits, "source");
+    if (!source) return false;
+    const minReadSources = readNumber$b(source.minReadSources);
+    if (!minReadSources) return false;
+    return readNumber$b(source.readSources) >= minReadSources;
   }
 
   function readSearchPassItems(searchPasses) {
@@ -18320,6 +18495,19 @@
     const source = readRecord(candidate);
     if (!source) return "";
     return readString$1s(source.url) || readString$1s(source.link) || readString$1s(source.href);
+  }
+
+  function normalizeUrlKey$1(value) {
+    const url = readString$1s(value);
+    if (!url) return "";
+    try {
+      const parsed = new URL(url);
+      parsed.hash = "";
+      parsed.search = "";
+      return parsed.toString().replace(/\/$/, "");
+    } catch {
+      return url.replace(/\/$/, "");
+    }
   }
 
   function filterReadOnlyPlanningChurnActions(actions, options = {}) {
@@ -19162,141 +19350,6 @@
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
   }
 
-  // SSOT for read-only TodoState queries shared across the autopilot,
-  // action handlers, and lifecycle projection. Keeping these in one
-  // place prevents the cascading-fallback semantics (id-match preferred,
-  // then any "active" item) from drifting between callers.
-  //
-  // All functions are null-safe: they tolerate `null`/missing
-  // `todoState`, missing `items`, and non-array shapes.
-
-  function getTodoItems(todoState) {
-    return todoState && Array.isArray(todoState.items) ? todoState.items : [];
-  }
-
-  function findActiveTodoItem$2(todoState) {
-    const items = getTodoItems(todoState);
-    if (items.length === 0) return null;
-    const activeItemId = todoState && typeof todoState.activeItemId === "string" && todoState.activeItemId
-      ? todoState.activeItemId
-      : null;
-    if (activeItemId) {
-      const byId = items.find((item) => item && item.id === activeItemId && item.status === "active");
-      if (byId) return byId;
-    }
-    return items.find((item) => item && item.status === "active") || null;
-  }
-
-  function findFirstPendingItem(todoState) {
-    const items = getTodoItems(todoState);
-    return items.find((item) => item && item.status === "pending") || null;
-  }
-
-  function findItemsByStatus(todoState, status) {
-    return getTodoItems(todoState).filter((item) => item && item.status === status);
-  }
-
-  function countItemsByStatus(todoState, status) {
-    return findItemsByStatus(todoState, status).length;
-  }
-
-  function findItemIndexById(todoState, itemId) {
-    const items = getTodoItems(todoState);
-    if (!itemId) return -1;
-    return items.findIndex((item) => item && item.id === itemId);
-  }
-
-  const TODO_TASK_LIFECYCLE_STATUSES = Object.freeze([
-    "running",
-    "paused",
-    "blocked",
-    "completed",
-    "abandoned"
-  ]);
-
-  const CONTINUATION_FINAL_SOURCE = "continuation_required";
-  const CONTINUATION_TERMINALIZER = "max_steps_continuation";
-
-  function readString$1r(value) {
-    return typeof value === "string" && value.trim() ? value.trim() : "";
-  }
-
-  function readNumber$a(value, fallback) {
-    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  }
-
-  function hasContinuationSignal(runState) {
-    return runState?.finalAnswerSource === CONTINUATION_FINAL_SOURCE
-      || runState?.terminalizedBy === CONTINUATION_TERMINALIZER;
-  }
-
-  function deriveLifecycleStatus(todoState, runState, counts) {
-    if (todoState.status === "completed") return "completed";
-    if (todoState.status === "abandoned") return "abandoned";
-    if (hasContinuationSignal(runState)) return "paused";
-    if (runState?.pendingApproval) return "blocked";
-    if (counts.blocked > 0 && counts.active === 0) return "blocked";
-    return "running";
-  }
-
-  function readActivePosition(todoState, activeItemId) {
-    if (!activeItemId) return null;
-    const index = findItemIndexById(todoState, activeItemId);
-    return index >= 0 ? index + 1 : null;
-  }
-
-  /**
-   * Project TodoState into a host-facing task lifecycle snapshot.
-   *
-   * This is deliberately read-only: no auto-advance, no auto-continue,
-   * no UI-only mutation. Hosts can use the snapshot for progress panels,
-   * stop/cancel affordances, reload recovery, and audit logs while the
-   * planner remains the only owner of TodoState transitions.
-   */
-  function projectTodoTaskLifecycle(runState) {
-    const state = runState && typeof runState === "object" ? runState : {};
-    const todoState = state.todoState && typeof state.todoState === "object"
-      ? state.todoState
-      : null;
-    const items = Array.isArray(todoState?.items) ? todoState.items.filter(Boolean) : [];
-    if (!todoState || items.length === 0) return null;
-
-    const activeItem = findActiveTodoItem$2(todoState);
-    const counts = {
-      abandoned: countItemsByStatus(todoState, "abandoned"),
-      active: countItemsByStatus(todoState, "active"),
-      blocked: countItemsByStatus(todoState, "blocked"),
-      done: countItemsByStatus(todoState, "done"),
-      pending: countItemsByStatus(todoState, "pending"),
-      total: items.length
-    };
-    const status = deriveLifecycleStatus(todoState, state, counts);
-    const threadId = readString$1r(state.threadId) || "default";
-    const todoId = readString$1r(todoState.id) || "todo";
-    const activeItemId = readString$1r(activeItem?.id) || null;
-    const hasUnfinishedWork = counts.active > 0 || counts.pending > 0;
-
-    return {
-      activeItemId,
-      activeItemLabel: readString$1r(activeItem?.label) || null,
-      activePosition: readActivePosition(todoState, activeItemId),
-      canCancel: status === "running" || status === "paused" || status === "blocked",
-      canContinue: status === "paused" && hasUnfinishedWork && !state.pendingApproval,
-      counts,
-      goal: readString$1r(todoState.goal) || null,
-      reason: status === "paused"
-        ? CONTINUATION_FINAL_SOURCE
-        : (state.pendingApproval ? "pending_approval" : null),
-      runId: readString$1r(state.runId) || null,
-      status,
-      taskId: `todo-task:${threadId}:${todoId}`,
-      threadId,
-      todoStateId: todoId,
-      updatedAt: readNumber$a(todoState.updatedAt, null),
-      version: Number.isInteger(todoState.version) ? todoState.version : 0
-    };
-  }
-
   // AGRUN-248-C — Pure classifier mapping `(type, mode)` → `{ visibility, phase }`.
   //
   // 104 step types do NOT get a per-type enum. Rules are prefix/suffix based so
@@ -19326,7 +19379,7 @@
   }
 
   function classifyVisibility(type, _mode) {
-    const value = readString$1q(type);
+    const value = readString$1r(type);
     if (!value) return "debug";
 
     // Explicit agent allowlist wins first — action-execute-error matches the
@@ -19348,7 +19401,7 @@
   }
 
   function classifyPhase(type) {
-    const value = readString$1q(type);
+    const value = readString$1r(type);
     if (!value) return null;
 
     const phaseMatch = PHASE_FROM_PHASE_PREFIX_RE.exec(value);
@@ -19365,7 +19418,7 @@
     return null;
   }
 
-  function readString$1q(value) {
+  function readString$1r(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -19389,7 +19442,7 @@
 
     return {
       appendEvent({ type, detail, mode } = {}) {
-        const eventType = readString$1p(type);
+        const eventType = readString$1q(type);
         if (!eventType) return null;
         const normalizedMode = normalizeMode(mode);
         const classification = classifyEvent({ type: eventType, mode: normalizedMode });
@@ -19485,12 +19538,147 @@
     return `evt_${runId}_${sequence}`;
   }
 
-  function readString$1p(value) {
+  function readString$1q(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function createRunState(runId, maxSteps) {
-    const runState = {
+  // SSOT for read-only TodoState queries shared across the autopilot,
+  // action handlers, and lifecycle projection. Keeping these in one
+  // place prevents the cascading-fallback semantics (id-match preferred,
+  // then any "active" item) from drifting between callers.
+  //
+  // All functions are null-safe: they tolerate `null`/missing
+  // `todoState`, missing `items`, and non-array shapes.
+
+  function getTodoItems(todoState) {
+    return todoState && Array.isArray(todoState.items) ? todoState.items : [];
+  }
+
+  function findActiveTodoItem$2(todoState) {
+    const items = getTodoItems(todoState);
+    if (items.length === 0) return null;
+    const activeItemId = todoState && typeof todoState.activeItemId === "string" && todoState.activeItemId
+      ? todoState.activeItemId
+      : null;
+    if (activeItemId) {
+      const byId = items.find((item) => item && item.id === activeItemId && item.status === "active");
+      if (byId) return byId;
+    }
+    return items.find((item) => item && item.status === "active") || null;
+  }
+
+  function findFirstPendingItem(todoState) {
+    const items = getTodoItems(todoState);
+    return items.find((item) => item && item.status === "pending") || null;
+  }
+
+  function findItemsByStatus(todoState, status) {
+    return getTodoItems(todoState).filter((item) => item && item.status === status);
+  }
+
+  function countItemsByStatus(todoState, status) {
+    return findItemsByStatus(todoState, status).length;
+  }
+
+  function findItemIndexById(todoState, itemId) {
+    const items = getTodoItems(todoState);
+    if (!itemId) return -1;
+    return items.findIndex((item) => item && item.id === itemId);
+  }
+
+  const TODO_TASK_LIFECYCLE_STATUSES = Object.freeze([
+    "running",
+    "paused",
+    "blocked",
+    "completed",
+    "abandoned"
+  ]);
+
+  const CONTINUATION_FINAL_SOURCE = "continuation_required";
+  const CONTINUATION_TERMINALIZER = "max_steps_continuation";
+
+  function readString$1p(value) {
+    return typeof value === "string" && value.trim() ? value.trim() : "";
+  }
+
+  function readNumber$a(value, fallback) {
+    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  }
+
+  function hasContinuationSignal(runState) {
+    return runState?.finalAnswerSource === CONTINUATION_FINAL_SOURCE
+      || runState?.terminalizedBy === CONTINUATION_TERMINALIZER;
+  }
+
+  function deriveLifecycleStatus(todoState, runState, counts) {
+    if (todoState.status === "completed") return "completed";
+    if (todoState.status === "abandoned") return "abandoned";
+    if (hasContinuationSignal(runState)) return "paused";
+    if (runState?.pendingApproval) return "blocked";
+    if (counts.blocked > 0 && counts.active === 0) return "blocked";
+    return "running";
+  }
+
+  function readActivePosition(todoState, activeItemId) {
+    if (!activeItemId) return null;
+    const index = findItemIndexById(todoState, activeItemId);
+    return index >= 0 ? index + 1 : null;
+  }
+
+  /**
+   * Project TodoState into a host-facing task lifecycle snapshot.
+   *
+   * This is deliberately read-only: no auto-advance, no auto-continue,
+   * no UI-only mutation. Hosts can use the snapshot for progress panels,
+   * stop/cancel affordances, reload recovery, and audit logs while the
+   * planner remains the only owner of TodoState transitions.
+   */
+  function projectTodoTaskLifecycle(runState) {
+    const state = runState && typeof runState === "object" ? runState : {};
+    const todoState = state.todoState && typeof state.todoState === "object"
+      ? state.todoState
+      : null;
+    const items = Array.isArray(todoState?.items) ? todoState.items.filter(Boolean) : [];
+    if (!todoState || items.length === 0) return null;
+
+    const activeItem = findActiveTodoItem$2(todoState);
+    const counts = {
+      abandoned: countItemsByStatus(todoState, "abandoned"),
+      active: countItemsByStatus(todoState, "active"),
+      blocked: countItemsByStatus(todoState, "blocked"),
+      done: countItemsByStatus(todoState, "done"),
+      pending: countItemsByStatus(todoState, "pending"),
+      total: items.length
+    };
+    const status = deriveLifecycleStatus(todoState, state, counts);
+    const threadId = readString$1p(state.threadId) || "default";
+    const todoId = readString$1p(todoState.id) || "todo";
+    const activeItemId = readString$1p(activeItem?.id) || null;
+    const hasUnfinishedWork = counts.active > 0 || counts.pending > 0;
+
+    return {
+      activeItemId,
+      activeItemLabel: readString$1p(activeItem?.label) || null,
+      activePosition: readActivePosition(todoState, activeItemId),
+      canCancel: status === "running" || status === "paused" || status === "blocked",
+      canContinue: status === "paused" && hasUnfinishedWork && !state.pendingApproval,
+      counts,
+      goal: readString$1p(todoState.goal) || null,
+      reason: status === "paused"
+        ? CONTINUATION_FINAL_SOURCE
+        : (state.pendingApproval ? "pending_approval" : null),
+      runId: readString$1p(state.runId) || null,
+      status,
+      taskId: `todo-task:${threadId}:${todoId}`,
+      threadId,
+      todoStateId: todoId,
+      updatedAt: readNumber$a(todoState.updatedAt, null),
+      version: Number.isInteger(todoState.version) ? todoState.version : 0
+    };
+  }
+
+  function createRunKernelState(runId, maxSteps) {
+    return {
       runId,
       status: "running",
       mode: "skill_loop",
@@ -19501,6 +19689,119 @@
       turnCount: 0,
       maxSteps,
       phase: null,
+      executionClass: null,
+      terminalizedBy: null,
+      usedRuntimeFinalize: false,
+      finalAnswerSource: null,
+      lastPlannerFinalText: null,
+      error: null
+    };
+  }
+
+  function projectRunKernelState(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    return {
+      runId: source.runId,
+      status: source.status,
+      stepCount: source.stepCount,
+      cycleCount: source.cycleCount,
+      mode: source.mode,
+      turnCount: source.turnCount,
+      maxSteps: source.maxSteps,
+      phase: source.phase,
+      executionClass: cloneValue(source.executionClass),
+      terminalizedBy: cloneValue(source.terminalizedBy),
+      usedRuntimeFinalize: source.usedRuntimeFinalize === true,
+      finalAnswerSource: source.finalAnswerSource,
+      runtimeBuildId: source.runtimeBuildId,
+      error: cloneValue(source.error)
+    };
+  }
+
+  function projectApprovalRunState(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    return {
+      pendingApproval: cloneValue(source.pendingApproval),
+      controlEnvelopeKind: cloneValue(source.controlEnvelopeKind),
+      controlEnvelopeConsumed: source.controlEnvelopeConsumed === true,
+      requestTypeAfterApproval: cloneValue(source.requestTypeAfterApproval),
+      approvalResumeFallbackUsed: source.approvalResumeFallbackUsed === true
+    };
+  }
+
+  function projectResearchRunState(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    return {
+      researchState: cloneValue(source.researchState),
+      researchContext: cloneValue(source.researchContext),
+      readinessContinuationSignal: cloneValue(source.readinessContinuationSignal || null),
+      readinessConflictContinuationSignal: cloneValue(source.readinessConflictContinuationSignal || null),
+      researchFinalizeContract: cloneValue(source.researchFinalizeContract || null),
+      terminalFinalContract: cloneValue(source.terminalFinalContract || null),
+      terminalFinalContractAudits: cloneValue(source.terminalFinalContractAudits || []),
+      researchEvidenceGraph: cloneValue(source.researchEvidenceGraph),
+      researchWorkspace: cloneValue(source.researchWorkspace),
+      researchReportLoop: cloneValue(source.researchReportLoop),
+      researchAcceptanceEvaluator: cloneValue(source.researchAcceptanceEvaluator || null),
+      requirementRecoveryEvaluator: cloneValue(source.requirementRecoveryEvaluator || null),
+      candidatePathMismatchSignal: cloneValue(source.candidatePathMismatchSignal || null)
+    };
+  }
+
+  function projectWorkspaceRunState(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    return {
+      virtualWorkspace: cloneValue(source.virtualWorkspace)
+    };
+  }
+
+  function projectTodoRunState(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    return {
+      todoState: cloneValue(source.todoState || null),
+      todoTerminalObservation: cloneValue(source.todoTerminalObservation || null),
+      todoTask: projectTodoTaskLifecycle(source)
+    };
+  }
+
+  function projectTerminalRunState(runState) {
+    const researchProjection = projectResearchRunState(runState);
+    const workspaceProjection = projectWorkspaceRunState(runState);
+    const todoProjection = projectTodoRunState(runState);
+    return {
+      researchContext: researchProjection.researchContext,
+      researchEvidenceGraph: researchProjection.researchEvidenceGraph,
+      researchReportLoop: researchProjection.researchReportLoop,
+      researchState: researchProjection.researchState,
+      researchWorkspace: researchProjection.researchWorkspace,
+      todoState: todoProjection.todoState,
+      virtualWorkspace: workspaceProjection.virtualWorkspace
+    };
+  }
+
+  function projectMetricsRunState(runState) {
+    const source = runState && typeof runState === "object" ? runState : {};
+    const costLedger = source.costLedger
+      && typeof source.costLedger === "object"
+      && Array.isArray(source.costLedger.entries)
+      ? source.costLedger
+      : null;
+    return {
+      usableReadSourceCount: source.usableReadSourceCount,
+      strongReadSourceCount: source.strongReadSourceCount,
+      readAttemptSignal: cloneValue(source.readAttemptSignal || null),
+      readUrlRecoverySignal: cloneValue(source.readUrlRecoverySignal || null),
+      metrics: cloneValue(source.metrics),
+      costLedger: projectCostLedger(costLedger),
+      actionGuardrail: cloneValue(source.actionGuardrail || null),
+      actionPatternConvergence: cloneValue(source.actionPatternConvergence || null),
+      terminalRepairState: cloneValue(source.terminalRepairState || null)
+    };
+  }
+
+  function createRunState(runId, maxSteps) {
+    const runState = {
+      ...createRunKernelState(runId, maxSteps),
       selectedSkill: null,
       lastAction: null,
       availableActions: [],
@@ -19512,9 +19813,6 @@
       plannerInvalidCount: 0,
       plannerInvalidSignal: null,
       semanticState: null,
-      executionClass: null,
-      terminalizedBy: null,
-      usedRuntimeFinalize: false,
       // ADR-0028 — `usedSummarizeLimits`, `autoReadAttemptCount`,
       // `autoReadStoppedReason`, `continuityResolution` deleted.
       // Replacement: `readAttemptSignal` (read-only signal exposed to AI).
@@ -19551,8 +19849,6 @@
       sessionContextView: null,
       blockedPageEvidenceCount: 0,
       approvalResumeFallbackUsed: false,
-      finalAnswerSource: null,
-      lastPlannerFinalText: null,
       runtimeBuildId: getRuntimeBuildId(),
       agentSkillContext: {
         activeSkill: null,
@@ -19610,7 +19906,6 @@
       actState: null,
       evaluationState: null,
       observation: null,
-      error: null,
       oodae: createOodaeState()
     };
     // AGRUN-248-C — typed event ledger is created up front so pushStep can
@@ -19624,7 +19919,7 @@
     const snapshot = cloneValue(runState);
     snapshot.agentSkillContext = sanitizeAgentSkillContext(runState.agentSkillContext);
     snapshot.recoveryState = sanitizeRecoveryState(runState && runState.recoveryState);
-    snapshot.costLedger = projectCostLedgerSnapshot(runState && runState.costLedger);
+    snapshot.costLedger = projectMetricsRunState(runState).costLedger;
     // AGRUN-248-C — eventLedger is a live object (closures + methods); strip
     // from the snapshot so the snapshot stays plain-data cloneable. Host reads
     // it directly via runState.eventLedger.getEvents().
@@ -19647,42 +19942,49 @@
   }
 
   function createLastRunSummary(runState, memoryEntriesAdded) {
+    const kernelState = projectRunKernelState(runState);
+    const approvalState = projectApprovalRunState(runState);
+    const researchState = projectResearchRunState(runState);
+    const workspaceState = projectWorkspaceRunState(runState);
+    const todoState = projectTodoRunState(runState);
+    const metricsState = projectMetricsRunState(runState);
+
     return {
-      runId: runState.runId,
-      status: runState.status,
-      stepCount: runState.stepCount,
-      cycleCount: runState.cycleCount,
-      mode: runState.mode,
-      turnCount: runState.turnCount,
-      maxSteps: runState.maxSteps,
-      phase: runState.phase,
+      runId: kernelState.runId,
+      status: kernelState.status,
+      stepCount: kernelState.stepCount,
+      cycleCount: kernelState.cycleCount,
+      mode: kernelState.mode,
+      turnCount: kernelState.turnCount,
+      maxSteps: kernelState.maxSteps,
+      phase: kernelState.phase,
       selectedSkill: runState.selectedSkill,
       lastAction: cloneValue(runState.lastAction),
       availableActions: cloneValue(runState.availableActions),
       availableAgentSkills: cloneValue(runState.availableAgentSkills),
       skillCatalogManifests: cloneValue(runState.skillCatalogManifests),
-      pendingApproval: cloneValue(runState.pendingApproval),
+      pendingApproval: approvalState.pendingApproval,
       planner: cloneValue(runState.planner),
       plannerState: cloneValue(runState.plannerState),
       plannerInvalidSignal: cloneValue(runState.plannerInvalidSignal || null),
       semanticState: cloneValue(runState.semanticState),
       failedTools: cloneValue(runState.failedTools),
-      metrics: cloneValue(runState.metrics),
-      costLedger: projectCostLedgerSnapshot(runState.costLedger),
-      actionGuardrail: cloneValue(runState.actionGuardrail || null),
-      actionPatternConvergence: cloneValue(runState.actionPatternConvergence || null),
-      terminalRepairState: cloneValue(runState.terminalRepairState || null),
-      executionClass: cloneValue(runState.executionClass),
-      terminalizedBy: cloneValue(runState.terminalizedBy),
-      usedRuntimeFinalize: runState.usedRuntimeFinalize === true,
+      metrics: metricsState.metrics,
+      costLedger: metricsState.costLedger,
+      actionGuardrail: metricsState.actionGuardrail,
+      actionPatternConvergence: metricsState.actionPatternConvergence,
+      terminalRepairState: metricsState.terminalRepairState,
+      executionClass: kernelState.executionClass,
+      terminalizedBy: kernelState.terminalizedBy,
+      usedRuntimeFinalize: kernelState.usedRuntimeFinalize,
       // ADR-0028 — `usedSummarizeLimits`, `autoReadAttemptCount`,
       // `autoReadStoppedReason` removed from snapshot. Hosts that depended
       // on these for telemetry must read `readAttemptSignal.attemptCount`
       // and infer terminal sources from `terminalizedBy === "planner_finalize"`.
-      usableReadSourceCount: runState.usableReadSourceCount,
-      strongReadSourceCount: runState.strongReadSourceCount,
-      readAttemptSignal: cloneValue(runState.readAttemptSignal || null),
-      readUrlRecoverySignal: cloneValue(runState.readUrlRecoverySignal || null),
+      usableReadSourceCount: metricsState.usableReadSourceCount,
+      strongReadSourceCount: metricsState.strongReadSourceCount,
+      readAttemptSignal: metricsState.readAttemptSignal,
+      readUrlRecoverySignal: metricsState.readUrlRecoverySignal,
       inputResolution: cloneValue(runState.inputResolution),
       intentState: cloneValue(runState.intentState),
       turnState: cloneValue(runState.turnState),
@@ -19691,44 +19993,40 @@
       observationSummary: cloneValue(runState.observationSummary),
       contextSnapshot: cloneValue(runState.contextSnapshot),
       // ADR-0028 — `continuityResolution` removed from snapshot.
-      controlEnvelopeKind: cloneValue(runState.controlEnvelopeKind),
-      controlEnvelopeConsumed: runState.controlEnvelopeConsumed === true,
-      requestTypeAfterApproval: cloneValue(runState.requestTypeAfterApproval),
+      controlEnvelopeKind: approvalState.controlEnvelopeKind,
+      controlEnvelopeConsumed: approvalState.controlEnvelopeConsumed,
+      requestTypeAfterApproval: approvalState.requestTypeAfterApproval,
       sessionContextMeta: cloneValue(runState.sessionContextMeta),
       sessionContextSource: cloneValue(runState.sessionContextSource),
       sessionContextView: cloneValue(runState.sessionContextView),
       blockedPageEvidenceCount: runState.blockedPageEvidenceCount,
-      approvalResumeFallbackUsed: runState.approvalResumeFallbackUsed === true,
-      finalAnswerSource: runState.finalAnswerSource,
-      runtimeBuildId: runState.runtimeBuildId,
+      approvalResumeFallbackUsed: approvalState.approvalResumeFallbackUsed,
+      finalAnswerSource: kernelState.finalAnswerSource,
+      runtimeBuildId: kernelState.runtimeBuildId,
       agentSkillContext: sanitizeAgentSkillContext(runState.agentSkillContext),
       recoveryState: sanitizeRecoveryState(runState.recoveryState),
-      researchState: cloneValue(runState.researchState),
-      readinessContinuationSignal: cloneValue(runState.readinessContinuationSignal || null),
-      readinessConflictContinuationSignal: cloneValue(runState.readinessConflictContinuationSignal || null),
-      terminalFinalContract: cloneValue(runState.terminalFinalContract || null),
-      terminalFinalContractAudits: cloneValue(runState.terminalFinalContractAudits || []),
-      researchEvidenceGraph: cloneValue(runState.researchEvidenceGraph),
-      researchWorkspace: cloneValue(runState.researchWorkspace),
-      researchReportLoop: cloneValue(runState.researchReportLoop),
-      researchAcceptanceEvaluator: cloneValue(runState.researchAcceptanceEvaluator || null),
-      requirementRecoveryEvaluator: cloneValue(runState.requirementRecoveryEvaluator || null),
-      candidatePathMismatchSignal: cloneValue(runState.candidatePathMismatchSignal || null),
-      virtualWorkspace: cloneValue(runState.virtualWorkspace),
+      researchState: researchState.researchState,
+      readinessContinuationSignal: researchState.readinessContinuationSignal,
+      readinessConflictContinuationSignal: researchState.readinessConflictContinuationSignal,
+      terminalFinalContract: researchState.terminalFinalContract,
+      terminalFinalContractAudits: researchState.terminalFinalContractAudits,
+      researchEvidenceGraph: researchState.researchEvidenceGraph,
+      researchWorkspace: researchState.researchWorkspace,
+      researchReportLoop: researchState.researchReportLoop,
+      researchAcceptanceEvaluator: researchState.researchAcceptanceEvaluator,
+      requirementRecoveryEvaluator: researchState.requirementRecoveryEvaluator,
+      candidatePathMismatchSignal: researchState.candidatePathMismatchSignal,
+      virtualWorkspace: workspaceState.virtualWorkspace,
       toolContext: cloneValue(runState.toolContext),
-      todoTerminalObservation: cloneValue(runState.todoTerminalObservation || null),
-      todoTask: projectTodoTaskLifecycle(runState),
+      todoTerminalObservation: todoState.todoTerminalObservation,
+      todoTask: todoState.todoTask,
       actState: cloneValue(runState.actState),
       evaluationState: cloneValue(runState.evaluationState),
       observation: cloneValue(runState.observation),
-      error: cloneValue(runState.error),
+      error: kernelState.error,
       memoryEntriesAdded: memoryEntriesAdded.length,
       oodaeCycles: runState.oodae.cycles.length
     };
-  }
-
-  function projectCostLedgerSnapshot(ledger) {
-    return projectCostLedger(ledger);
   }
 
   function sanitizeAgentSkillContext(context) {
@@ -20666,9 +20964,12 @@
         title,
         url
       });
+      const queryOverlap = countTokenOverlap$1(baseQuery, `${title} ${snippet} ${url}`);
+      const exactPhraseMatches = countExactQueryPhraseMatches(baseQuery, `${title} ${snippet} ${url}`);
       const sourceScore = scoreSearchResult({
         domain,
-        query: baseQuery,
+        exactPhraseMatches,
+        queryOverlap,
         snippet,
         sourceCategory,
         title,
@@ -20684,6 +20985,8 @@
         source: domain || engine,
         sourceCategory,
         sourceScore,
+        queryOverlap,
+        exactPhraseMatches,
         title,
         url
       };
@@ -20767,6 +21070,7 @@
         readString$1j(item.sourceCategory) !== "community" &&
         readString$1j(item.sourceCategory) !== "marketplace" &&
         typeof item.sourceScore === "number" &&
+        (typeof item.queryOverlap !== "number" || readNumber$7(item.queryOverlap) >= 2) &&
         item.sourceScore >= 3;
     });
   }
@@ -20775,12 +21079,14 @@
     const domain = readString$1j(options.domain);
     const title = readString$1j(options.title);
     const snippet = readString$1j(options.snippet);
-    const url = readString$1j(options.url);
+    readString$1j(options.url);
     const category = readString$1j(options.sourceCategory) || "unknown";
-    const overlap = countTokenOverlap$1(options.query, `${title} ${snippet} ${url}`);
+    const overlap = readNumber$7(options.queryOverlap);
+    const exactPhraseMatches = readNumber$7(options.exactPhraseMatches);
     let score = CATEGORY_WEIGHTS[category] || CATEGORY_WEIGHTS.unknown;
 
     score += overlap * 2;
+    score += exactPhraseMatches * 4;
 
     if (/\b(leadership|company profile|executive|managing director|ceo|founder|owner)\b/i.test(`${title} ${snippet}`)) {
       score += 2;
@@ -20886,10 +21192,53 @@
   }
 
   function tokenize$2(value) {
-    return readString$1j(value)
+    return splitMixedScriptBoundaries(readString$1j(value))
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/i)
       .filter((token) => token.length >= 2);
+  }
+
+  function countExactQueryPhraseMatches(query, haystack) {
+    const phrases = extractQueryPhrases(query);
+    if (phrases.length === 0) return 0;
+    const normalizedHaystack = splitMixedScriptBoundaries(readString$1j(haystack))
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff]+/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return phrases.filter((phrase) => normalizedHaystack.includes(phrase)).length;
+  }
+
+  function extractQueryPhrases(query) {
+    const tokens = tokenize$2(query)
+      .filter((token) => !GENERIC_QUERY_PHRASE_TOKENS.has(token));
+    const phrases = [];
+    for (let index = 0; index < tokens.length - 1; index += 1) {
+      phrases.push(`${tokens[index]} ${tokens[index + 1]}`);
+    }
+    return Array.from(new Set(phrases)).slice(0, 6);
+  }
+
+  const GENERIC_QUERY_PHRASE_TOKENS = new Set([
+    "about",
+    "agent",
+    "agents",
+    "ai",
+    "and",
+    "design",
+    "for",
+    "framework",
+    "frameworks",
+    "of",
+    "system",
+    "systems",
+    "the"
+  ]);
+
+  function splitMixedScriptBoundaries(value) {
+    return readString$1j(value)
+      .replace(/([\u4e00-\u9fff])([a-z0-9])/gi, "$1 $2")
+      .replace(/([a-z0-9])([\u4e00-\u9fff])/gi, "$1 $2");
   }
 
   function normalizeLimit(value, fallback) {
@@ -22329,7 +22678,7 @@
       normalizedInput: cloneValue(normalizedInput),
       selectedSkill: runState.selectedSkill,
       output: runState.status === "failed" ? null : cloneValue(output),
-      runState: snapshotRunState(runState),
+      runState: createResultRunStateSnapshot(runState),
       memoryEntriesAdded: cloneValue(memoryEntriesAdded),
       steps: cloneValue(steps),
       error: runState.error ? cloneValue(runState.error) : null,
@@ -22340,6 +22689,23 @@
     return result;
   }
 
+  function createResultRunStateSnapshot(runState) {
+    const snapshot = snapshotRunState(runState);
+    const events = readEventLedgerSnapshot$1(runState);
+    if (events) snapshot.eventLedger = events;
+    return snapshot;
+  }
+
+  function readEventLedgerSnapshot$1(runState) {
+    const ledger = runState && runState.eventLedger;
+    if (!ledger || typeof ledger.getEvents !== "function") return null;
+    try {
+      return cloneValue(ledger.getEvents());
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function normalizeTerminalOutputText(runState, output) {
     if (!output || typeof output !== "object" || typeof output.text !== "string") return;
     if (runState && runState.finalAnswerSource === "workspace_publish_candidate") return;
@@ -22348,10 +22714,12 @@
 
     const prompt = readFinalSourcePrompt(runState, null);
     const sourceText = output.text;
-    const scopedEvidenceUrls = readScopedEvidenceUrls$2(runState);
+    const terminalProjection = projectTerminalRunState(runState);
+    const scopedEvidenceUrls = readScopedEvidenceUrls$2(runState, terminalProjection);
     const sourceLimit = Array.isArray(scopedEvidenceUrls) ? Math.max(3, scopedEvidenceUrls.length) : undefined;
     const sourcePayload = collectTerminalOutputSources(runState, {
       prompt,
+      terminalProjection,
       scopedEvidenceUrls,
       sourceLimit
     });
@@ -22359,12 +22727,12 @@
       normalizeFinalResponseStructure(sourceText, { prompt }),
       {
         prompt,
-        researchEvidenceGraph: runState && runState.researchEvidenceGraph,
-        researchState: runState && runState.researchState,
-        researchWorkspace: runState && runState.researchWorkspace,
-        researchReportLoop: runState && runState.researchReportLoop,
-        virtualWorkspace: runState && runState.virtualWorkspace,
-        todoState: runState && runState.todoState
+        researchEvidenceGraph: terminalProjection.researchEvidenceGraph,
+        researchState: terminalProjection.researchState,
+        researchWorkspace: terminalProjection.researchWorkspace,
+        researchReportLoop: terminalProjection.researchReportLoop,
+        virtualWorkspace: terminalProjection.virtualWorkspace,
+        todoState: terminalProjection.todoState
       }
     );
     const sources = sourcePayload.sources;
@@ -22397,32 +22765,34 @@
   }
 
   function collectTerminalOutputSources(runState, options = {}) {
-    if (shouldSuppressResearchLoopSources$1(runState)) {
+    const terminalProjection = options.terminalProjection || projectTerminalRunState(runState);
+    if (shouldSuppressResearchLoopSources$1(terminalProjection)) {
       return { citations: [], sources: [] };
     }
-    if (runState && runState.researchEvidenceGraph) {
-      const graphSources = createCompiledReportSourcePayload$1(runState.researchEvidenceGraph);
+    if (terminalProjection.researchEvidenceGraph) {
+      const graphSources = createCompiledReportSourcePayload$1(terminalProjection.researchEvidenceGraph);
       if (graphSources.sources.length > 0) return graphSources;
     }
     return filterSourcesByEvidence(
-      collectFinalResponseSources(runState && runState.researchContext, options.sourceLimit, {
+      collectFinalResponseSources(terminalProjection.researchContext, options.sourceLimit, {
         prompt: options.prompt
       }),
       options.scopedEvidenceUrls
     );
   }
 
-  function shouldSuppressResearchLoopSources$1(runState) {
-    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-      ? runState.researchReportLoop
+  function shouldSuppressResearchLoopSources$1(terminalProjection) {
+    const projection = terminalProjection && typeof terminalProjection === "object" ? terminalProjection : {};
+    const loop = projection.researchReportLoop && typeof projection.researchReportLoop === "object"
+      ? projection.researchReportLoop
       : null;
     if (!loop || loop.finalMode !== "final_with_limitations") return false;
-    const graph = runState && runState.researchEvidenceGraph && typeof runState.researchEvidenceGraph === "object"
-      ? runState.researchEvidenceGraph
+    const graph = projection.researchEvidenceGraph && typeof projection.researchEvidenceGraph === "object"
+      ? projection.researchEvidenceGraph
       : null;
     const observations = Array.isArray(graph && graph.observations) ? graph.observations : [];
     const sourceArtifacts = Array.isArray(graph && graph.sourceArtifacts) ? graph.sourceArtifacts : [];
-    const evidenceUrls = collectResearchEvidenceUrls(runState && runState.researchContext);
+    const evidenceUrls = collectResearchEvidenceUrls(projection.researchContext);
     return observations.length === 0 && sourceArtifacts.length === 0 && evidenceUrls.length === 0;
   }
 
@@ -22447,12 +22817,12 @@
     };
   }
 
-  function readScopedEvidenceUrls$2(runState) {
+  function readScopedEvidenceUrls$2(runState, terminalProjection = projectTerminalRunState(runState)) {
     if (!runState || typeof runState !== "object") return null;
     const scopedUrls = Array.isArray(runState.scopedEvidenceUrls) ? runState.scopedEvidenceUrls : null;
-    const researchUrls = collectResearchEvidenceUrls(runState.researchContext);
+    const researchUrls = collectResearchEvidenceUrls(terminalProjection.researchContext);
 
-    if (scopedUrls && scopedUrls.length === 0 && !isResearchEvidenceLoopActive$2(runState)) {
+    if (scopedUrls && scopedUrls.length === 0 && !isResearchEvidenceLoopActive$2(terminalProjection)) {
       return researchUrls.length > 0 ? researchUrls : null;
     }
     if (!scopedUrls) {
@@ -22562,9 +22932,10 @@
     };
   }
 
-  function isResearchEvidenceLoopActive$2(runState) {
-    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-      ? runState.researchReportLoop
+  function isResearchEvidenceLoopActive$2(terminalProjection) {
+    const projection = terminalProjection && typeof terminalProjection === "object" ? terminalProjection : {};
+    const loop = projection.researchReportLoop && typeof projection.researchReportLoop === "object"
+      ? projection.researchReportLoop
       : null;
     if (!loop) return false;
     const status = readString$1e(loop.status);
@@ -24384,13 +24755,13 @@
     "done"
   ];
 
-  function readScopedEvidenceUrls$1(runState) {
+  function readScopedEvidenceUrls$1(runState, terminalProjection = projectTerminalRunState(runState)) {
     if (!runState || typeof runState !== "object") return null;
     const list = runState.scopedEvidenceUrls;
     const scopedUrls = Array.isArray(list) ? list : null;
-    const researchUrls = collectResearchEvidenceUrls(runState.researchContext);
+    const researchUrls = collectResearchEvidenceUrls(terminalProjection.researchContext);
 
-    if (scopedUrls && scopedUrls.length === 0 && !isResearchEvidenceLoopActive$1(runState)) {
+    if (scopedUrls && scopedUrls.length === 0 && !isResearchEvidenceLoopActive$1(terminalProjection)) {
       return researchUrls.length > 0 ? researchUrls : null;
     }
     if (!scopedUrls) {
@@ -24400,35 +24771,37 @@
     return scopedUrls;
   }
 
-  function collectScopedFinalResponseSources$1(runState, request) {
-    if (shouldSuppressResearchLoopSources(runState)) {
+  function collectScopedFinalResponseSources$1(runState, request, terminalProjection = projectTerminalRunState(runState)) {
+    if (shouldSuppressResearchLoopSources(terminalProjection)) {
       return { citations: [], sources: [] };
     }
-    const scopedUrls = readScopedEvidenceUrls$1(runState);
+    const scopedUrls = readScopedEvidenceUrls$1(runState, terminalProjection);
     const sourceLimit = Array.isArray(scopedUrls) ? Math.max(3, scopedUrls.length) : undefined;
-    const raw = collectFinalResponseSources(runState && runState.researchContext, sourceLimit, {
+    const raw = collectFinalResponseSources(terminalProjection.researchContext, sourceLimit, {
       prompt: readFinalSourcePrompt(runState, request)
     });
     return filterSourcesByEvidence(raw, scopedUrls);
   }
 
-  function shouldSuppressResearchLoopSources(runState) {
-    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-      ? runState.researchReportLoop
+  function shouldSuppressResearchLoopSources(terminalProjection) {
+    const projection = terminalProjection && typeof terminalProjection === "object" ? terminalProjection : {};
+    const loop = projection.researchReportLoop && typeof projection.researchReportLoop === "object"
+      ? projection.researchReportLoop
       : null;
     if (!loop || loop.finalMode !== "final_with_limitations") return false;
-    const graph = runState && runState.researchEvidenceGraph && typeof runState.researchEvidenceGraph === "object"
-      ? runState.researchEvidenceGraph
+    const graph = projection.researchEvidenceGraph && typeof projection.researchEvidenceGraph === "object"
+      ? projection.researchEvidenceGraph
       : null;
     const observations = Array.isArray(graph && graph.observations) ? graph.observations : [];
     const sourceArtifacts = Array.isArray(graph && graph.sourceArtifacts) ? graph.sourceArtifacts : [];
-    const evidenceUrls = collectResearchEvidenceUrls(runState && runState.researchContext);
+    const evidenceUrls = collectResearchEvidenceUrls(projection.researchContext);
     return observations.length === 0 && sourceArtifacts.length === 0 && evidenceUrls.length === 0;
   }
 
-  function isResearchEvidenceLoopActive$1(runState) {
-    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-      ? runState.researchReportLoop
+  function isResearchEvidenceLoopActive$1(terminalProjection) {
+    const projection = terminalProjection && typeof terminalProjection === "object" ? terminalProjection : {};
+    const loop = projection.researchReportLoop && typeof projection.researchReportLoop === "object"
+      ? projection.researchReportLoop
       : null;
     if (!loop) return false;
     const status = readString$13(loop.status);
@@ -24438,18 +24811,19 @@
   function normalizeTerminalFinalText(rawText, runState, request, options = {}) {
     const prompt = readFinalSourcePrompt(runState, request);
     const sourceText = rawText;
-    const evidenceSources = collectTerminalFinalSources(runState, request);
+    const terminalProjection = projectTerminalRunState(runState);
+    const evidenceSources = collectTerminalFinalSources(runState, request, terminalProjection);
     const normalizedTextBeforeContract = appendSourcesSection(
       normalizeFinalAnswerInternalProgress(
         normalizeFinalResponseStructure(sourceText, { prompt }),
         {
           prompt,
-          researchEvidenceGraph: runState.researchEvidenceGraph,
-          researchState: runState.researchState,
-          researchWorkspace: runState.researchWorkspace,
-          researchReportLoop: runState.researchReportLoop,
-          virtualWorkspace: runState.virtualWorkspace,
-          todoState: runState.todoState
+          researchEvidenceGraph: terminalProjection.researchEvidenceGraph,
+          researchState: terminalProjection.researchState,
+          researchWorkspace: terminalProjection.researchWorkspace,
+          researchReportLoop: terminalProjection.researchReportLoop,
+          virtualWorkspace: terminalProjection.virtualWorkspace,
+          todoState: terminalProjection.todoState
         }
       ),
       evidenceSources.sources
@@ -24473,15 +24847,15 @@
     };
   }
 
-  function collectTerminalFinalSources(runState, request) {
-    if (shouldSuppressResearchLoopSources(runState)) {
+  function collectTerminalFinalSources(runState, request, terminalProjection = projectTerminalRunState(runState)) {
+    if (shouldSuppressResearchLoopSources(terminalProjection)) {
       return { citations: [], sources: [] };
     }
-    if (runState && runState.researchEvidenceGraph) {
-      const graphSources = createCompiledReportSourcePayload(runState.researchEvidenceGraph);
+    if (terminalProjection.researchEvidenceGraph) {
+      const graphSources = createCompiledReportSourcePayload(terminalProjection.researchEvidenceGraph);
       if (graphSources.sources.length > 0) return graphSources;
     }
-    return collectScopedFinalResponseSources$1(runState, request);
+    return collectScopedFinalResponseSources$1(runState, request, terminalProjection);
   }
 
   function createCompiledReportSourcePayload(graph) {
@@ -24550,9 +24924,10 @@
     runState.usedRuntimeFinalize = false;
     runState.terminalizedBy = "planner_final";
     if (observeTodoStateOnTerminal(runState, { source: "planner_final" })) {
+      const todoProjection = projectTodoRunState(runState);
       pushStep("todo-state-terminal-observed", {
         cycle: runState.cycleCount,
-        observation: cloneValue(runState.todoTerminalObservation || null),
+        observation: todoProjection.todoTerminalObservation,
         source: "planner_final"
       });
     }
@@ -24635,24 +25010,28 @@
     // (planner_finalize) and runtime-pushed (runtime_finalize) sources
     // surface as their literal label without runtime override.
     runState.terminalizedBy = terminalSource;
-    const beforeStatuses = runState.todoState && Array.isArray(runState.todoState.items)
-      ? runState.todoState.items.map((i) => i && i.status)
+    const beforeTodoProjection = projectTodoRunState(runState);
+    const beforeTodoState = beforeTodoProjection.todoState;
+    const beforeStatuses = beforeTodoState && Array.isArray(beforeTodoState.items)
+      ? beforeTodoState.items.map((i) => i && i.status)
       : null;
-    const beforeStatus = runState.todoState && runState.todoState.status;
+    const beforeStatus = beforeTodoState && beforeTodoState.status;
     const observed = observeTodoStateOnTerminal(runState, { source: terminalSource });
+    const afterTodoProjection = projectTodoRunState(runState);
+    const afterTodoState = afterTodoProjection.todoState;
     pushStep("todo-state-terminal-observed", {
-      afterStatus: runState.todoState && runState.todoState.status,
-      afterItemStatuses: runState.todoState && Array.isArray(runState.todoState.items)
-        ? runState.todoState.items.map((i) => i && i.status)
+      afterStatus: afterTodoState && afterTodoState.status,
+      afterItemStatuses: afterTodoState && Array.isArray(afterTodoState.items)
+        ? afterTodoState.items.map((i) => i && i.status)
         : null,
       beforeItemStatuses: beforeStatuses,
       beforeStatus,
       cycle: runState.cycleCount,
       fired: observed,
-      observation: cloneValue(runState.todoTerminalObservation || null),
+      observation: afterTodoProjection.todoTerminalObservation,
       source: terminalSource,
       threadId: runState.threadId || null,
-      todoStateExists: Boolean(runState.todoState)
+      todoStateExists: Boolean(afterTodoState)
     });
     completeTerminalAction({
       cycleRecord,
@@ -24735,9 +25114,10 @@
     runState.usedRuntimeFinalize = false;
     runState.terminalizedBy = "direct_final";
     if (observeTodoStateOnTerminal(runState, { source: "direct_final" })) {
+      const todoProjection = projectTodoRunState(runState);
       pushStep("todo-state-terminal-observed", {
         cycle: runState.cycleCount,
-        observation: cloneValue(runState.todoTerminalObservation || null),
+        observation: todoProjection.todoTerminalObservation,
         source: "direct_final"
       });
     }
@@ -24856,7 +25236,6 @@
       nextState: "await_approval",
       outcome: "blocked",
       plannerState: runState.plannerState,
-      researchContext: runState.researchContext,
       sessionContext: request && request.sessionContext,
       turnState: runState.turnState,
       toolContext: runState.toolContext
@@ -24921,7 +25300,6 @@
       nextState: "stop",
       outcome: "complete",
       plannerState: runState.plannerState,
-      researchContext: runState.researchContext,
       sessionContext: options.request && options.request.sessionContext,
       turnState: runState.turnState,
       toolContext: runState.toolContext
@@ -25521,6 +25899,7 @@
       resultCount: Number.isFinite(source.resultCount) ? source.resultCount : undefined,
       sequence: Number.isInteger(source.sequence) && source.sequence > 0 ? source.sequence : null,
       skillName: readString$10(source.skillName) || undefined,
+      source: readString$10(source.source) || readString$10(context.source) || undefined,
       status: readString$10(source.status) || undefined,
       timestamp: Number.isFinite(source.timestamp) ? source.timestamp : Date.now(),
       toolName: readString$10(source.toolName) || undefined,
@@ -27400,6 +27779,29 @@
     });
   }
 
+  function envelopeToObservation(envelope) {
+    if (!envelope || typeof envelope !== "object") return null;
+    if (envelope.status === "protocol_error") {
+      const message = readString$X(envelope.summary)
+        || readString$X(envelope.body && envelope.body.error)
+        || `${envelope.actionName} protocol_error`;
+      const stage = readString$X(envelope.body && envelope.body.errorStage)
+        || (envelope.reason === "execute_threw" ? "execute" : "envelope");
+      return {
+        actionName: envelope.actionName,
+        kind: "error",
+        message,
+        output: envelope.body,
+        stage
+      };
+    }
+    return {
+      actionName: envelope.actionName,
+      kind: envelope.control === "continue" ? "continue" : "success",
+      output: envelope.body
+    };
+  }
+
   function finalizeEnvelope({ actionName, control, kind, schema, body, summary, durationMs }) {
     const status = deriveStatusFromBody(body);
     const metrics = buildMetrics(schema, body, durationMs);
@@ -28136,6 +28538,7 @@
         stage: "execute",
         actionName,
         decision,
+        envelope: errorEnvelope,
         errorMessage,
         actionHistory,
         pushStep,
@@ -28845,7 +29248,7 @@
   }
 
   function isLongResearchHarnessActive(runState, options = {}) {
-    if (isResearchQualityGateRequired$1(runState, options)) return true;
+    if (isResearchQualityGateRequired(runState, options)) return true;
     const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
       ? runState.researchReportLoop
       : null;
@@ -29865,6 +30268,8 @@
       "workspace_read",
       "workspace_finalize_candidate",
       "workspace_publish_candidate",
+      "workspace_apply_patch",
+      "workspace_propose_patch",
       "workspace_write",
       "workspace_insert_after_section",
       "workspace_replace"
@@ -29918,6 +30323,7 @@
     stage,
     actionName,
     decision,
+    envelope,
     errorMessage,
     validationReason,
     validationKey,
@@ -29946,12 +30352,27 @@
       runState.lastAction = actionName;
     }
 
-    runState.observation = {
-      actionName,
-      kind: "error",
-      message: errorMessage,
-      stage
-    };
+    const resultEnvelope = envelope && typeof envelope === "object"
+      ? { ...envelope, summary: summary || envelope.summary }
+      : createProtocolErrorEnvelope({
+          actionName,
+          durationMs: 0,
+          reason: stage === "validation"
+            ? validationReason || "validation_error"
+            : stage === "preflight"
+              ? "preflight_error"
+              : "action_error",
+          summary,
+          body: {
+            error: errorMessage,
+            errorStage: stage,
+            ok: false,
+            status: "failed",
+            validationKey: validationKey || null,
+            validationReason: validationReason || null
+          }
+        });
+    runState.observation = envelopeToObservation(resultEnvelope);
 
     const refreshStatus = stage === "validation"
       ? "validation_error_self_correct"
@@ -33133,7 +33554,7 @@
   });
 
   const workspaceProposePatchAction = Object.freeze({
-    description: "Preview a structured patch against one virtual workspace file without changing file content. Operation shapes: append{content}, insert_after_section{heading,content}, replace{find,replace,replace_all?}, normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}; replace does not accept full-document content.",
+    description: "Preview a structured patch against one virtual workspace file. For heading-only normalize_headings repair, applyIfValid:true previews and applies the validated patch in one action. Operation shapes: append{content}, insert_after_section{heading,content}, replace{find,replace,replace_all?}, normalize_headings{headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}; replace does not accept full-document content.",
     name: "workspace_propose_patch",
     plan: STANDALONE_PLAN_ACTION,
     planner: {
@@ -33147,16 +33568,18 @@
             ]
           }
         ],
+        applyIfValid: true,
         path: "final_candidate.md",
         summary: "preview heading normalization patch"
       },
       argsSchema: {
+        applyIfValid: { type: "boolean" },
         operations: { type: "array", required: true },
         path: { type: "string", required: true },
         summary: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_propose_patch before risky report repair. Valid operations are exactly: {type:\"append\",content:\"...\"}, {type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}, {type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}, or {type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate headings/section numbers shown in duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context; runtime changes only those Markdown heading lines and validates structure. If length is already satisfied and the visible issue is duplicate heading/section-number context, send exactly one normalize_headings operation. Do not mix normalize_headings with replace unless the exact current find text is visible in the prompt and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not send {type:\"replace\",content:\"full document\"}; replace needs find+replace and will be blocked without a non-empty find. It returns deltaWords/riskFlags and does not mutate the file. If riskFlags include no_growth, not_found, ambiguous, or structure_maybe_worse, revise the patch or use workspace_insert_after_section/workspace_replace only when those actions are currently allowed instead of finalizing."
+      guidance: "Use workspace_propose_patch before risky report repair. Valid operations are exactly: {type:\"append\",content:\"...\"}, {type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}, {type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}, or {type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate headings/section numbers shown in duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context; runtime changes only those Markdown heading lines and validates structure. For heading-only normalize_headings repair, set applyIfValid:true to avoid a separate workspace_apply_patch cycle; if the preview has blocking riskFlags it will not apply. If length is already satisfied and the visible issue is duplicate heading/section-number context, send exactly one normalize_headings operation. Do not mix normalize_headings with replace unless the exact current find text is visible in the prompt and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not send {type:\"replace\",content:\"full document\"}; replace needs find+replace and will be blocked without a non-empty find. If riskFlags include no_growth, not_found, ambiguous, or structure_maybe_worse, revise the patch or use workspace_insert_after_section/workspace_replace only when those actions are currently allowed instead of finalizing."
     },
     tier: 0,
     execute: executeWorkspaceProposePatchAction,
@@ -33513,8 +33936,11 @@
         file: summarizeFile(file),
         kind: "virtual_workspace_write",
         lengthProgress: summarizeLengthProgress(context, file),
+        message: file && file.message || null,
         mutationStats: summarizeMutationStats(beforeFile, file, args && args.content),
-        quality: context.runState.virtualWorkspace.quality
+        quality: context.runState.virtualWorkspace.quality,
+        shrinkRisk: file && file.shrinkRisk || null,
+        status: file && file.status || "ok"
       },
       summary: summarizeWorkspaceMutation("workspace_write", file, context)
     };
@@ -33571,9 +33997,26 @@
       prompt: context.request && context.request.prompt,
       summary: args && args.summary
     });
+    const autoApply = args && args.applyIfValid === true;
+    const autoApplyEligible = autoApply && canAutoApplyWorkspacePatch(result);
+    const applied = autoApplyEligible && result.valid === true
+      ? applyWorkspacePatch(context.runState, result.patchId, {
+          config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
+          maxOperations: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxOperations,
+          prompt: context.request && context.request.prompt,
+          summary: args && args.summary
+        })
+      : null;
+    const appliedFile = applied && applied.file && typeof applied.file === "object" ? applied.file : null;
     return {
       control: "continue",
       output: {
+        applied: Boolean(applied && applied.changed === true),
+        applyStatus: applied ? applied.status : autoApply
+          ? autoApplyEligible
+            ? "not_applied"
+            : "skipped_requires_heading_only_patch"
+          : null,
         afterWords: result.afterWords,
         baseVersion: result.baseVersion,
         beforeWords: result.beforeWords,
@@ -33586,17 +34029,31 @@
         path: result.path,
         previewSummary: result.previewSummary,
         riskFlags: Array.isArray(result.riskFlags) ? result.riskFlags : [],
-        status: result.status,
+        file: appliedFile ? summarizeFile(appliedFile) : summarizeFile(beforeFile),
+        lengthProgress: appliedFile ? summarizeLengthProgress(context, appliedFile) : null,
+        quality: context.runState.virtualWorkspace && context.runState.virtualWorkspace.quality,
+        status: applied && applied.changed === true ? "applied" : result.status,
         structureAfter: result.structureAfter || null,
         structureBefore: result.structureBefore || null,
-        suggestion: suggestWorkspacePatchNextStep(result),
+        suggestion: suggestWorkspacePatchNextStep(result, { applied, autoApply, autoApplyEligible }),
         valid: result.valid === true
       },
-      summary: `workspace_propose_patch(${result.path || "<invalid>"}, status=${result.status}, deltaWords=${result.deltaWords}, riskFlags=${Array.isArray(result.riskFlags) && result.riskFlags.length ? result.riskFlags.join("|") : "none"})`
+      summary: `workspace_propose_patch(${result.path || "<invalid>"}, status=${applied && applied.changed === true ? "applied" : result.status}, deltaWords=${result.deltaWords}, riskFlags=${Array.isArray(result.riskFlags) && result.riskFlags.length ? result.riskFlags.join("|") : "none"})`
     };
   }
 
-  function suggestWorkspacePatchNextStep(result) {
+  function canAutoApplyWorkspacePatch(result) {
+    const operations = Array.isArray(result && result.operations) ? result.operations : [];
+    return operations.length > 0 && operations.every((operation) => operation && operation.type === "normalize_headings");
+  }
+
+  function suggestWorkspacePatchNextStep(result, options = {}) {
+    if (options.applied && options.applied.changed === true) {
+      return "Heading-only patch was validated and applied in this action. Continue from the updated workspace content; do not call workspace_apply_patch for this patchId.";
+    }
+    if (options.autoApply === true && options.autoApplyEligible !== true) {
+      return "applyIfValid only auto-applies heading-only normalize_headings patches. This preview was not auto-applied; inspect the preview and call workspace_apply_patch only if appropriate.";
+    }
     const status = result && result.status;
     const operations = Array.isArray(result && result.operations) ? result.operations : [];
     const riskFlags = Array.isArray(result && result.riskFlags) ? result.riskFlags : [];
@@ -33680,13 +34137,18 @@
         quality: context.runState.virtualWorkspace.quality,
         requestedHeading: result.requestedHeading || result.heading,
         status,
+        structureRisk: result.structureRisk || null,
         suggestion: status === "heading_not_found"
           ? availableHeadings.length > 0
             ? `Heading "${result.requestedHeading || result.heading}" not found. Available headings: ${availableHeadings.map((entry) => entry.text).join(" | ")}. Pick one of these (case/punctuation will be normalized) to expand an existing section.`
             : `Heading "${result.requestedHeading || result.heading}" not found and the file has no Markdown headings yet. Write the file with workspace_write first so it has section headings to anchor to.`
           : status === "invalid_args"
             ? "Provide a non-empty heading and a valid workspace path (no absolute, no '..', no backslash), then retry."
-            : null,
+            : result.structureRisk === "structure_maybe_worse"
+              ? "Insertion succeeded but worsened final candidate structure. Continue length growth if needed, then use workspace_propose_patch normalize_headings with section_number_repair_context before publishing ready."
+              : null,
+        structureAfter: result.structureAfter || null,
+        structureBefore: result.structureBefore || null,
         error: result.error || null,
         message: result.message || null
       },
@@ -34571,7 +35033,7 @@
   function isResearchPublishReadinessRequired(context) {
     const runState = context && context.runState;
     if (!runState || typeof runState !== "object") return false;
-    if (isResearchQualityGateRequired$1(runState, { prompt: context.request && context.request.prompt })) return true;
+    if (isResearchQualityGateRequired(runState, { prompt: context.request && context.request.prompt })) return true;
     const activeSkill = runState.agentSkillContext && runState.agentSkillContext.activeSkill;
     const skillName = readString$M(activeSkill && activeSkill.name);
     return skillName === "deep-research-writer" || skillName === "long-web-research";
@@ -36029,6 +36491,17 @@
     "who",
     "with"
   ]);
+  const GENERIC_EXACT_PHRASE_TOKENS = new Set([
+    "agent",
+    "agents",
+    "ai",
+    "and",
+    "design",
+    "framework",
+    "frameworks",
+    "system",
+    "systems"
+  ]);
 
   function normalizeWebSearchStrategy(value) {
     const normalized = readString$I(value).toLowerCase();
@@ -36171,7 +36644,15 @@
 
   function buildGeneralLookupPasses(options) {
     const passes = [{ kind: "compression", query: options.baseQuery }];
+    const exactPhraseQuery = createExactPhraseQuery(options.baseQuery);
     const fallbackSite = options.siteHints[0] || "";
+
+    if (exactPhraseQuery && exactPhraseQuery !== options.baseQuery) {
+      passes.push({
+        kind: "exact_phrase",
+        query: exactPhraseQuery
+      });
+    }
 
     if (fallbackSite) {
       passes.push({
@@ -36181,6 +36662,17 @@
     }
 
     return passes;
+  }
+
+  function createExactPhraseQuery(query) {
+    const tokens = tokenize(query).filter((token) => !QUESTION_FILLERS.has(token));
+    if (tokens.length < 2) return "";
+    const phraseTokens = tokens
+      .filter((token) => !GENERIC_EXACT_PHRASE_TOKENS.has(token))
+      .slice(0, 3);
+    if (phraseTokens.length < 2) return "";
+    const phrase = phraseTokens.slice(0, 2).join(" ");
+    return `"${phrase}" ${tokens.slice(0, 6).join(" ")}`;
   }
 
   function resolveSearchStrategy(query, explicitStrategy) {
@@ -36740,6 +37232,15 @@
 
     if (searchPasses.length === searchPlan.passes.length) {
       return true;
+    }
+
+    if (
+      searchPlan.strategy === "general_lookup" &&
+      searchPasses.length === 1 &&
+      searchPlan.passes.some((pass) => pass && pass.kind === "exact_phrase")
+    ) {
+      return readString$G(verification && verification.state) === "official_plus_secondary"
+        || hasUsableSearchEvidence(rankedItems);
     }
 
     if (searchPlan.strategy === "entity_lookup" && searchPasses.length < 2) {
@@ -37443,8 +37944,20 @@
     if (Object.prototype.hasOwnProperty.call(options, "todoState")) {
       snapshot.todoState = options.todoState === undefined ? undefined : cloneValue(options.todoState);
     }
+    const events = readEventLedgerSnapshot(state);
+    if (events) snapshot.eventLedger = events;
 
     return snapshot;
+  }
+
+  function readEventLedgerSnapshot(state) {
+    const ledger = state && state.eventLedger;
+    if (!ledger || typeof ledger.getEvents !== "function") return null;
+    try {
+      return cloneValue(ledger.getEvents());
+    } catch (_error) {
+      return null;
+    }
   }
 
   function normalizeInput(raw) {
@@ -67097,10 +67610,11 @@ ${user}:`]
     }
   }
 
-  async function requestProviderCompletionStreaming(request, overrides, onToken, onStreamEvent) {
+  async function requestProviderCompletionStreaming(request, overrides, onToken, onStreamEvent, streamContext = {}) {
     const options = createRequestOptions(request, overrides);
     const providerKey = options.provider;
     const streamEmitter = createProviderStreamEmitter(onStreamEvent, {
+      ...(streamContext && typeof streamContext === "object" ? streamContext : {}),
       model: options.model,
       provider: providerKey
     });
@@ -74681,7 +75195,7 @@ ${user}:`]
 
   function observeAiFirstResearchFinalizeContract(session, sourceLabel, decision) {
     const runState = session && session.runState;
-    if (!runState || !isResearchQualityGateRequired$1(runState, {
+    if (!runState || !isResearchQualityGateRequired(runState, {
       prompt: session.request && session.request.prompt
     })) {
       return null;
@@ -77444,6 +77958,7 @@ ${user}:`]
         onToken,
         pushStep,
         request,
+        runState,
         source: terminalSource
       });
       response.text = scrubFinalResponseText(response.text);
@@ -77571,11 +78086,17 @@ ${user}:`]
       onToken,
       pushStep,
       request,
+      runState,
       source
     } = options;
 
     try {
-      return await requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent);
+      return await requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent, {
+        callId: finalizeCallId,
+        ledger: runState && runState.eventLedger,
+        runId: runState && runState.runId,
+        source: readTerminalSource(source)
+      });
     } catch (error) {
       if (!shouldRetryEmptyFinalizerResponse(error)) {
         throw error;
@@ -77595,7 +78116,12 @@ ${user}:`]
           finalizeOverrides.systemPrompt,
           "Finalizer retry: return non-empty plain text only. Do not call tools and do not return an empty response."
         ].filter(Boolean).join("\n\n")
-      }, onToken, onStreamEvent);
+      }, onToken, onStreamEvent, {
+        callId: finalizeCallId,
+        ledger: runState && runState.eventLedger,
+        runId: runState && runState.runId,
+        source: readTerminalSource(source)
+      });
     }
   }
 
@@ -77605,10 +78131,16 @@ ${user}:`]
       : "runtime_finalize";
   }
 
-  async function requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent) {
+  async function requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent, streamContext) {
     if (onToken || onStreamEvent) {
       const fence = createStreamFence(onToken);
-      const response = await requestProviderCompletionStreaming(request, finalizeOverrides, fence.wrappedOnToken, onStreamEvent);
+      const response = await requestProviderCompletionStreaming(
+        request,
+        finalizeOverrides,
+        fence.wrappedOnToken,
+        onStreamEvent,
+        streamContext
+      );
       fence.flush();
       return response;
     }
@@ -83280,9 +83812,7 @@ ${user}:`]
     if (typeof runState.runId === "string" && runState.runId.trim()) {
       provenance.turnId = runState.runId.trim();
     }
-    const research = runState.researchContext && typeof runState.researchContext === "object"
-      ? runState.researchContext
-      : null;
+    const research = projectResearchRunState(runState).researchContext;
     if (research && Array.isArray(research.readSources)) {
       provenance.readSources = research.readSources.slice();
     }
@@ -83672,10 +84202,10 @@ ${user}:`]
       ) {
         const activeThread = sessionRecord.threads.find((t) => t && t.id === result.runState.threadId);
         if (activeThread) {
-          activeThread.todoState = result.runState.todoState
-            ? cloneValue(result.runState.todoState)
-            : null;
-          activeThread.researchContext = cloneThreadResearchContext(result.runState.researchContext);
+          const todoProjection = projectTodoRunState(result.runState);
+          const researchProjection = projectResearchRunState(result.runState);
+          activeThread.todoState = todoProjection.todoState || null;
+          activeThread.researchContext = cloneThreadResearchContext(researchProjection.researchContext);
           // AGRUN-214m — persist the durable research slice (topic,
           // evidenceGraph, reportLoop status, finalEnvelope) so the next
           // turn can finalize from existing evidence instead of treating

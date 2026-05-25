@@ -1,7 +1,7 @@
 # AGRUN-248-B — Action Output Schema + Result Envelope SSOT Design
 
 Date: 2026-05-24
-Status: DESIGN FROZEN (no code yet)
+Status: IMPLEMENTED; 2026-05-25 carry-over cleanup complete
 
 Builds on:
 - `agrun_docs/audits/sample-study-runtime-reverse-audit-2026-05-24.md` §3
@@ -158,3 +158,36 @@ outputSchema: null
   Inspector must still parse defensively for body fields.
 - AGRUN-246-J long-form quality is **not addressed** by this slice. Action
   envelopes are visibility/contract work, not content work.
+
+## 11. 2026-05-25 carry-over cleanup
+
+The original implementation shipped the v1 envelope path but left one
+follow-up in `recordRecoverableActionError`: validation/preflight/execute
+recoverable errors still handwrote `runState.observation`. That is now closed.
+
+Implementation:
+- `recordRecoverableActionError` builds a protocol-error envelope for
+  validation/preflight failures and receives the existing
+  `createExecuteErrorEnvelope()` result for execute throws.
+- `envelopeToObservation(resultEnvelope)` is the only projection used for the
+  AI-visible recoverable error observation.
+- `envelopeToObservation` preserves `body.errorStage`, so validation,
+  preflight, and execute remain visible as mechanical stages without a custom
+  observation path.
+- The repeated execute-failure summary is merged into the envelope summary
+  before projection, so the planner still sees the stronger "failed again"
+  recovery signal.
+
+Verification:
+- `node --import ./test/helpers/virtual-stubs-loader.mjs test/unit/action-result-envelope.test.js`
+- `node --import ./test/helpers/virtual-stubs-loader.mjs test/unit/recoverable-action-error-observation.test.js`
+- `npm test`
+- `npm run build`
+- `npm run dist:check`
+- `git diff --check`
+- `task.jsonl` parse
+
+HBR:
+- No live browser/gateway QA was run for this cleanup because it is a
+  mechanical projection refactor and does not change provider behavior or UI
+  rendering.
