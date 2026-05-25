@@ -4633,7 +4633,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "54c5c1a5-dirty"
+      "f6100301"
         
     );
   }
@@ -19405,19 +19405,11 @@
   // of looping until step budget. Runtime does NOT hard-kill the loop;
   // it surfaces facts and lets the AI choose a different action.
   //
-  // The only hardcoded list in this module is SUGGESTED_NEXT_MOVE_CANDIDATES
-  // below — a set of GENERIC action categories (skill execution, finalize,
-  // clarify) that name PROGRESS, not domain actions. There is no
-  // hardcoded fallback array of specific domain action names; AGRUN-249
-  // regrowth guard policy is preserved.
-
-  const SUGGESTED_NEXT_MOVE_CANDIDATES = [
-    "execute_skill_tool",
-    "use_agent_skill",
-    "finalize",
-    "final",
-    "ask_clarification"
-  ];
+  // AI-first invariant (AGRUN-249, ADR-0012): runtime exposes
+  // `availableActions` and `availableAgentSkillIds` directly to the AI
+  // via the planner-prompt observation block. There is NO runtime-side
+  // curated subset (no "suggestedNextMoves" hardcoded category list).
+  // The AI sees the full set the host actually allows and picks itself.
 
   const ESCALATION_THRESHOLD = 4;
   const ACTIVE_THRESHOLD = 2;
@@ -19433,7 +19425,6 @@
       disabledActionsEncountered: [],
       availableActions: [],
       availableAgentSkillIds: [],
-      suggestedNextMoves: [],
       firstObservedAtCycle: null,
       lastObservedAtCycle: null,
       escalation: "advisory",
@@ -19474,7 +19465,6 @@
       disabledActionsEncountered: state.disabledActionsEncountered.slice(),
       availableActions: state.availableActions.slice(),
       availableAgentSkillIds: state.availableAgentSkillIds.slice(),
-      suggestedNextMoves: state.suggestedNextMoves.slice(),
       firstObservedAtCycle: state.firstObservedAtCycle,
       lastObservedAtCycle: state.lastObservedAtCycle,
       status: state.status,
@@ -19494,7 +19484,6 @@
       disabledActionsEncounteredCount: normalized.disabledActionsEncountered.length,
       availableActionsCount: normalized.availableActions.length,
       availableAgentSkillIdsCount: normalized.availableAgentSkillIds.length,
-      suggestedNextMovesCount: normalized.suggestedNextMoves.length,
       status: normalized.status,
       clearedReason: normalized.clearedReason,
       cycle: normalized.lastObservedAtCycle
@@ -19527,8 +19516,6 @@
       options
     );
 
-    const suggestedNextMoves = computeSuggestedNextMoves(availableActions);
-
     return {
       kind: "invalid_action_convergence",
       active,
@@ -19539,7 +19526,6 @@
       disabledActionsEncountered,
       availableActions,
       availableAgentSkillIds,
-      suggestedNextMoves,
       firstObservedAtCycle: active && previous.firstObservedAtCycle == null
         ? (cycle != null ? cycle : previous.firstObservedAtCycle)
         : previous.firstObservedAtCycle,
@@ -19574,12 +19560,6 @@
     return available.length > 0 && !available.includes(actionName);
   }
 
-  function computeSuggestedNextMoves(availableActions) {
-    const available = new Set(readStringArray$4(availableActions));
-    if (available.size === 0) return [];
-    return SUGGESTED_NEXT_MOVE_CANDIDATES.filter((name) => available.has(name));
-  }
-
   function normalizeState(value) {
     const initial = createInvalidActionConvergenceState();
     if (!value || typeof value !== "object" || Array.isArray(value)) return initial;
@@ -19594,7 +19574,6 @@
       disabledActionsEncountered: readStringArray$4(value.disabledActionsEncountered).slice(0, 12),
       availableActions: readStringArray$4(value.availableActions).slice(0, 24),
       availableAgentSkillIds: readStringArray$4(value.availableAgentSkillIds).slice(0, 32),
-      suggestedNextMoves: readStringArray$4(value.suggestedNextMoves).slice(0, 12),
       firstObservedAtCycle: readNullableNumber$1(value.firstObservedAtCycle),
       lastObservedAtCycle: readNullableNumber$1(value.lastObservedAtCycle),
       escalation: value.escalation === "hard_signal" ? "hard_signal" : "advisory",
@@ -69363,9 +69342,8 @@ ${user}:`]
       consecutiveInvalidCount: readNonNegativeInteger$1(convergence.consecutiveInvalidCount),
       consecutiveRepairFailureCount: readNonNegativeInteger$1(convergence.consecutiveRepairFailureCount),
       escalation: convergence.escalation === "hard_signal" ? "hard_signal" : "advisory",
-      availableActions: trimArray(convergence.availableActions, 16),
-      availableAgentSkillIds: trimArray(convergence.availableAgentSkillIds, 24),
-      suggestedNextMoves: trimArray(convergence.suggestedNextMoves, 8)
+      availableActions: trimArray(convergence.availableActions, 24),
+      availableAgentSkillIds: trimArray(convergence.availableAgentSkillIds, 32)
     };
     return ["Invalid action observation:", JSON.stringify(payload)].join("\n");
   }
