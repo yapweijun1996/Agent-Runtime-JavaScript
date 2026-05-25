@@ -4631,7 +4631,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "8abb8c19c-dirty"
+      "54c5c1a5"
         
     );
   }
@@ -69325,16 +69325,16 @@ ${user}:`]
     "User-visible text inside `final.answer` and `finalize.instruction` must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
     "Treat clarification as a last resort.",
     "Use clarify only when the request is genuinely ambiguous after checking visible session evidence.",
-    "Use web_search for current/factual lookup requests; use read_url when a URL or search result needs page content.",
-    "Treat web_search results as candidate leads until read_url succeeds. If you answer from snippets only, say the evidence is search-summary-only.",
-    "Treat web_search results as candidate leads until read_url succeeds when page content matters.",
+    // 2026-05-25 — web_search / read_url advisory lines moved out of the static array into
+    // conditional pushes in buildSystemPromptLines so hosts that put web_search/read_url in
+    // disabledActions do not see "Use web_search ..." directives the runtime cannot honour.
+    // ADR-0034 follow-up — closes the lite-tier loop where the model emitted web_search,
+    // got planner-invalid-action, and repaired with another web_search 30+ times.
     "Use type:\"plan\" only for independent non-mutating actions whose policy is allow; standalone-only or approval-gated actions must be direct type:\"action\" envelopes.",
     "After each tool result, decide whether toolContext.lastResult/readSources contains the requested data. If not, choose another action instead of finalize.",
     "Use final only when no tool, loaded skill, workspace, or read_url evidence workflow is needed.",
     "Use finalize only when YOU judge the current tool evidence, readSources, skill instructions, and any virtual workspace draft are enough for a user-facing answer.",
     "Use finalize when YOU judge the current evidence is enough.",
-    "When a readSource has textRange.hasAfter=true and the missing answer may be later in the page, call read_url again with the same url and textStart=nextTextStart instead of assuming the unseen text is irrelevant.",
-    "If loopState.readUrlRecoverySignal tells you the last URL is blocked/non-retryable, do not loop on that same URL; use alternate candidates, refined web_search, or honest limited with concrete remainingGaps.",
     "If loopState.requirementRecoveryEvaluator says validLimitedAllowed=false, continue the listed recovery work before publishing limited.",
     "If loopState.requirementRecoveryEvaluator.convergence shows repeated terminal attempts without progress, stop repeating the same publish/finalize payload; perform recovery work or correct finalReadiness to a valid limited contract.",
     "If loopState.actionPatternConvergence shows repeated_no_progress, do not repeat the same action+args. Change args, choose a different action, continue recovery, or publish a valid limited result with concrete remainingGaps.",
@@ -69467,6 +69467,20 @@ ${user}:`]
       lines.push("read_url supports optional textStart and textLength. If a readSource textRange shows hasAfter=true and the missing answer may be later in that same page, call read_url again with the same url and textStart=nextTextStart instead of assuming the unseen text is irrelevant.");
       lines.push("If loopState.readUrlRecoverySignal is present, use it as read-only recovery facts. For needs_alternate_source/source_blocked, do not retry the same non-retryable failed URL; use read_url on an alternate candidate, run refined web_search, or publish limited with evidenceSatisfied=false and concrete remainingGaps. Search snippets are leads only and do not count as successful read_url evidence.");
       lines.push("If the user explicitly asks the visible answer to include finalReadiness.decision, include one plain-text line with that exact field in your finalize instruction, and keep it consistent with finalReadiness.decision. Do not include readiness JSON.");
+    }
+
+    // 2026-05-25 ADR-0034 follow-up — compact-mode counterpart of the block
+    // above. Previously these five lines lived in COMPACT_SYSTEM_LINES
+    // unconditionally, telling lite-tier models to "use web_search" even
+    // when the host put web_search in disabledActions. With both in
+    // disabledActions, the lines no longer push the model toward an
+    // emit-reject loop.
+    if (compactSystemPrompt && (hasAction("read_url") || hasAction("web_search"))) {
+      lines.push("Use web_search for current/factual lookup requests; use read_url when a URL or search result needs page content.");
+      lines.push("Treat web_search results as candidate leads until read_url succeeds. If you answer from snippets only, say the evidence is search-summary-only.");
+      lines.push("Treat web_search results as candidate leads until read_url succeeds when page content matters.");
+      lines.push("When a readSource has textRange.hasAfter=true and the missing answer may be later in the page, call read_url again with the same url and textStart=nextTextStart instead of assuming the unseen text is irrelevant.");
+      lines.push("If loopState.readUrlRecoverySignal tells you the last URL is blocked/non-retryable, do not loop on that same URL; use alternate candidates, refined web_search, or honest limited with concrete remainingGaps.");
     }
 
     if (!compactSystemPrompt && preferFinalizeOnLastResult && hasAction("execute_skill_tool")) {

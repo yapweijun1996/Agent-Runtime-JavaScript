@@ -19,6 +19,7 @@ If a feature is not in this document, it is not a supported toggle. Open an issu
 - [Action Policy (approval gates)](#action-policy-approval-gates)
 - [Loop & Plan Limits](#loop--plan-limits)
 - [Session Budget (Loop Convergence)](#session-budget-loop-convergence)
+- [Research Report Loop & Acceptance Gate](#research-report-loop--acceptance-gate)
 - [Resilience](#resilience)
 - [Approval Token Signing](#approval-token-signing)
 - [Persistence](#persistence)
@@ -296,6 +297,86 @@ runtime.run(input, {
 - `maxSteps` remains the outer hard ceiling; the budget fires first whenever the agent is demonstrably stuck, so users do not wait `maxSteps` cycles for a trivially broken run.
 - When `budget: false`, only the legacy per-`actionName` guard is active (full back-compat path).
 
+## Research Report Loop & Acceptance Gate
+
+Long-form research runs use three cooperating subsystems to surface evidence
+quality to the planner without authoring content in runtime:
+
+| Subsystem | Purpose | runState slot |
+|-----------|---------|---------------|
+| `researchReportLoop` | Long-form OODAE loop state, source minimum, evidence graph, gate signal | `runState.researchReportLoop` |
+| `researchAcceptanceEvaluator` | Acceptance convergence signal (forbids clean `ready` when evidence gaps exist) | `runState.researchAcceptanceEvaluator` |
+| `terminalRepairState` | Observable-deficit projection used to shape planner's allowed-action surface near terminal moves | `runState.terminalRepairState` |
+
+### Activation contract — when does the gate actually fire?
+
+The gate commits ONLY when at least one of these is true
+(see `src/runtime/research-report-loop.js` → `shouldCommitResearchReportLoopGate`):
+
+1. `evaluation.required === true` — i.e. `isLongResearchRun(runState) === true`. This is true only when:
+   - host/envelope sets `runState.researchActivation = "long_research"`, OR
+   - a long-research skill (`deep-research-writer`, `long-web-research`, etc.) is the active/selected skill via `agentSkillContext`.
+   - **There is NO lexical-prompt path.** Mandarin/English/any prompt text is ignored; activation is skill-driven (ADR-0012).
+2. The gate was already committed on a previous step (`previous.enabled === true`).
+3. The model has emitted a publish attempt (`runState.publishBlockSignal`).
+4. A length contract was extracted from the prompt AND a workspace candidate exists.
+5. `workspace.quality.finalCandidateReady === true`.
+
+For hosts that register **only data/ORM skills** and never declare long-research, none of these should fire and `runState.researchReportLoop` stays at its idle default. `terminalRepairState.active` should remain `false`.
+
+### Toggles
+
+| Option | Default | Values |
+|--------|---------|--------|
+| `researchReportLoop` | `{ enabled: true, ... }` | `false` \| `{ enabled, minReadSources, minRelevantSources, limit, maxPasses, maxIndependentSearchAttempts, maxResearchLoopVetoes }` |
+| `researchReportLoop.enabled` | `true` | `false` to short-circuit `refreshResearchReportLoopGate` — gate never commits, no source minimum, no acceptance signal, no `terminalRepairState` source/length deficits |
+| `researchReportLoop.minReadSources` | `3` | Positive integer. Number of distinct `read_url` successes counted as "enough" |
+| `researchReportLoop.minRelevantSources` | `2` | Positive integer. Number of strong/medium relevance sources required |
+| `researchCoverageGuard` | `{ enabled: true }` | `{ enabled: false }` to drop research coverage vetoes (separate from the report loop) |
+| `citationCoverageGuard` | `{ enabled: true }` | `{ enabled: false }` to drop direct-source citation vetoes |
+
+### When to disable
+
+- **ERP / data-query hosts** that ground answers in registered tool skills (ORM, SQL, internal APIs) and never consume `web_search` / `read_url`:
+
+  ```js
+  createRuntime({
+    skills: [...erpSkills],
+    researchReportLoop: { enabled: false },
+    researchCoverageGuard: { enabled: false },
+    citationCoverageGuard: { enabled: false }
+  });
+  ```
+
+- **Hosts that ship their own evidence/quality contract** via `onBeforeFinalize` and want runtime to stay quiet on source counting.
+
+### When to keep enabled (default)
+
+- Hosts that expose `web_search` / `read_url` and want runtime to surface evidence-gap signals to the planner.
+- Hosts that declare long-research skills — required for the OODAE gate to populate `gateSignal.acceptancePacket`.
+
+### Verifying the toggle landed
+
+After construction:
+
+```js
+console.log(runtime.getRuntimeConfig().researchReportLoop);
+// → { enabled: false, ... } when disabled
+```
+
+At runtime, inspect via `onStep` / debug bundle:
+
+```js
+runState.researchReportLoop // → idle defaults when gate never commits
+runState.terminalRepairState.active // → false on healthy non-research runs
+```
+
+If `terminalRepairState.active === true` on a run that never declared long-research and never wrote a workspace candidate, that is a runtime bug — capture the JSON dump and report.
+
+### Diagnosing model-imagined repair mode
+
+Lite-tier planner models sometimes write reasoning like *"I am in terminal repair mode"* even when `runState.terminalRepairState.active === false`. Always confirm against the actual runState dump before treating it as a gate-firing bug — the model may be hallucinating the contract from planner-prompt teaching text.
+
 ## Resilience
 
 | Option | Default | Values |
@@ -555,6 +636,8 @@ createRuntime({
 | "Let the agent take more steps." | `maxSteps: 20, maxPlanActions: 15` |
 | "Tolerate more failed retries before giving up." | `budget: { totalFailures: 8 }` |
 | "Disable the composite loop-convergence budget." | `budget: false` (leaves legacy per-action guard only) |
+| "Disable the long-research source-minimum / acceptance gate for non-research hosts." | `researchReportLoop: { enabled: false }` — see [Research Report Loop & Acceptance Gate](#research-report-loop--acceptance-gate) |
+| "Loosen the default 3 read sources / 2 relevant sources requirement." | `researchReportLoop: { minReadSources: 1, minRelevantSources: 1 }` |
 | "Detect when the agent is spinning without progress." | Listen for `onStep` events with `step.type === "session-budget-breach"` |
 | "Throttle parallel actions." | `maxPlanParallel: 2` |
 | "Add a custom planner rule." | `plannerDirectives: ["Never mention pricing."]` |
