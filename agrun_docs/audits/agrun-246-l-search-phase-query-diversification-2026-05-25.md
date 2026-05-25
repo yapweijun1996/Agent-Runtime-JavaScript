@@ -1,4 +1,23 @@
-# AGRUN-246-L — Search-Phase Query Diversification (research)
+# AGRUN-246-L — Search-Phase Query Diversification (REJECTED 2026-05-25)
+
+> **Status: REJECTED — wrong-shape signal.** Implementation was built,
+> unit-tested (8/8 PASS), simulator-verified (3/3 PASS on the
+> `same-angle-repeat` variant), and live-verified across two batches.
+>
+> - v1 (optional `queryAngle`): 1/3 strict pass; AI skipped optional
+>   field in 4 of 5 production web_search calls; signal stayed dormant.
+> - v2 (`required: true`): 0/3 strict pass; AI declared narrow
+>   single-token angles (`definition`, `technical`) that matched the
+>   topic name, locking the misinterpretation faster. Score 0 was the
+>   worst trace in the entire AGRUN-246 series.
+>
+> Rolled back via `git reset --hard af6f105ba`; both commits unpushed.
+> See
+> `agrun_docs/live-tests/agrun-246-l-verify-rejected-2026-05-25.md`
+> for the rejection evidence + the lesson that **required structured
+> fields with no semantic-orthogonality constraint can amplify the bias
+> they were meant to catch**. Replacement ticket AGRUN-246-N (research)
+> needs orthogonality, not just diversity-count.
 
 ## Scope
 

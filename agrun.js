@@ -4631,7 +4631,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "ddd2eca45-dirty"
+      "8abb8c19c-dirty"
         
     );
   }
@@ -7283,9 +7283,54 @@
       return createQualityDetail("strong", "read_url_service_relevant_strong", ["read_url_service", `overlap:${overlap}`, `text:${text.length}`], metrics);
     }
 
-    return overlap >= 2 && text.length >= 240
-      ? createQualityDetail("usable", "overlap_usable", [`overlap:${overlap}`, `text:${text.length}`], metrics)
-      : createQualityDetail("weak", "weak_overlap_or_short", [`overlap:${overlap}`, `text:${text.length}`], metrics);
+    // AGRUN-246-M: distinctive-token density gate. The body-overlap path
+    // alone treats a 118 kB Wikipedia general-topic page (with two trivial
+    // substring matches like "test" + "evaluation") the same as a focused
+    // 1 kB blog post with the same hit count. The density gate requires
+    // that AT LEAST one distinctive query token appears in the body AND
+    // that the density of distinctive matches per kB clears a small floor.
+    // If the query produced zero distinctive tokens (all stop/generic),
+    // fall back to the original overlap-only gate.
+    const distinctiveTokensForBody = extractDistinctiveTokens(query);
+    let distinctiveBodyHits = 0;
+    if (distinctiveTokensForBody.length > 0) {
+      const haystackLower = readString$1H(text).toLowerCase();
+      for (const token of distinctiveTokensForBody) {
+        if (haystackLower.includes(token)) distinctiveBodyHits += 1;
+      }
+    }
+    const textKb = Math.max(1, text.length / 1000);
+    const distinctiveDensity = distinctiveBodyHits / textKb;
+    const passDistinctive =
+      distinctiveTokensForBody.length === 0 ||
+      (distinctiveBodyHits >= 1 && distinctiveDensity >= 0.1);
+
+    if (overlap >= 2 && text.length >= 240 && passDistinctive) {
+      return createQualityDetail(
+        "usable",
+        "overlap_usable",
+        [
+          `overlap:${overlap}`,
+          `text:${text.length}`,
+          `distinctive:${distinctiveBodyHits}`,
+          `density:${distinctiveDensity.toFixed(3)}`
+        ],
+        metrics
+      );
+    }
+    return createQualityDetail(
+      "weak",
+      overlap >= 2 && text.length >= 240
+        ? "overlap_low_distinctive_density"
+        : "weak_overlap_or_short",
+      [
+        `overlap:${overlap}`,
+        `text:${text.length}`,
+        `distinctive:${distinctiveBodyHits}`,
+        `density:${distinctiveDensity.toFixed(3)}`
+      ],
+      metrics
+    );
   }
 
   function countBlockedReadSources(value) {
