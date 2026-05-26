@@ -4633,7 +4633,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "b6bc7c1d8-dirty"
+      "d3b8c19b3-dirty"
         
     );
   }
@@ -69021,6 +69021,33 @@ ${user}:`]
   const DIRECT_TOOL_ACTION_NAME = "execute_skill_tool";
   const SKILL_ACTION_NAMES = new Set([...SKILL_SETUP_ACTION_NAMES, DIRECT_TOOL_ACTION_NAME]);
 
+  // AGRUN-256 — workspace_publish_candidate is a terminal action designed for
+  // long_research workflows. In tool_loop mode without any long_research skill,
+  // envelope-mode planners (verified Gemini Flash-Lite) treat it as a generic
+  // "give up" escape, publishing fabricated workspace content with
+  // usedRuntimeFinalize=false (tokens=0, audit blind spot). Host integrators
+  // (Globe3 ERP 2026-05-26) shipped a runtime workaround disabling the action
+  // in disabledActions; that fix belongs in the runtime so every host doesn't
+  // independently rediscover the trap.
+  //
+  // Gate rule: hide workspace_publish_candidate from the planner action surface
+  // unless one of the following is true:
+  //   1. The run is a long_research run (skill activation or
+  //      `researchActivation === "long_research"`). isLongResearchRun() is the
+  //      shared signal used by the research report loop, provider timeout, and
+  //      planner prompt.
+  //   2. terminalRepairState.active === true AND publish is explicitly listed
+  //      in allowedActions. The repair surface has its own contract (publish
+  //      limited with concrete remainingGaps) that we must not break.
+  //   3. Host opts out via runtimeConfig.publishCandidateGate.enabled = false.
+  //      For hosts that intentionally want publish-direct in tool_loop mode.
+  //
+  // This is a structural gate, not a mode flag. It only affects the planner
+  // catalog and the per-decision runtime guard; the action handler itself
+  // (executeWorkspacePublishCandidateAction) is unchanged and remains usable
+  // when explicitly authorized.
+  const WORKSPACE_PUBLISH_CANDIDATE = "workspace_publish_candidate";
+
   function selectPlannerActions(actions, options = {}) {
     const source = Array.isArray(actions) ? actions : [];
     const terminalRepair = resolveTerminalRepairState(options);
@@ -69032,6 +69059,7 @@ ${user}:`]
     const readOnlyPlanningForbiddenActions = resolveReadOnlyPlanningForbiddenActions(actionPatternConvergence);
     const structureRepairForbiddenActions = resolveStructureRepairForbiddenActions(actionPatternConvergence);
     const workspaceMutationGrowthForbiddenActions = resolveWorkspaceMutationGrowthForbiddenActions(actionPatternConvergence);
+    const hideWorkspacePublishCandidate = shouldHideWorkspacePublishCandidateForMode(options);
 
     return source.filter((action) => {
       const name = readString$z(action && action.name);
@@ -69061,8 +69089,34 @@ ${user}:`]
         return false;
       }
 
+      if (hideWorkspacePublishCandidate && name === WORKSPACE_PUBLISH_CANDIDATE) {
+        return false;
+      }
+
       return true;
     });
+  }
+
+  function shouldHideWorkspacePublishCandidateForMode(options) {
+    const runState = options && options.runState && typeof options.runState === "object"
+      ? options.runState
+      : null;
+    if (!runState) return false;
+    if (isPublishCandidateGateDisabled(options && options.runtimeConfig)) return false;
+    const terminalRepair = resolveTerminalRepairState(options);
+    if (terminalRepair && terminalRepair.active === true) {
+      const allowed = readStringArray$1(terminalRepair.allowedActions);
+      if (allowed.indexOf(WORKSPACE_PUBLISH_CANDIDATE) !== -1) return false;
+    }
+    if (isLongResearchRun(runState)) return false;
+    return true;
+  }
+
+  function isPublishCandidateGateDisabled(runtimeConfig) {
+    if (!runtimeConfig || typeof runtimeConfig !== "object") return false;
+    const config = runtimeConfig.publishCandidateGate;
+    if (!config || typeof config !== "object") return false;
+    return config.enabled === false;
   }
 
   function shouldShowSkillSurface(actions) {

@@ -25,6 +25,7 @@ Ask "how do I X?"; scan the list.
 - [Long Task Lab Demo Design](long-task-lab-demo.md) — PRD and implementation plan for a long-running task demo websystem.
 - [Long Task Lab Record JSONL Plan](long-task-lab-record-jsonl-plan.md) — IndexedDB record ledger and JSONL export/import plan for Long Task Lab.
 - [Long Task Lab Demo Checklist](long-task-lab-demo-checklist.md) — one-command Records demo and manual PWA/E2E checklist for Long Task Lab.
+- [Host Deployment Profiles](host-deployment-profiles.md) — host pattern for composing createRuntime options by deployment shape (demo/trusted/readonly) plus per-run disable.
 
 ### Reference — exact contracts
 
