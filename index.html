@@ -2,8 +2,55 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>agrun.js — JavaScript Agent Runtime</title>
+
+    <meta name="description" content="A browser-first JavaScript agent runtime. Build conversational and long-running AI agents with traces, records, and replay — no backend required." />
+    <meta name="application-name" content="agrun.js" />
+    <meta name="generator" content="agrun.js" />
+    <meta name="author" content="agrun.js" />
+    <meta name="keywords" content="agrun, agent runtime, JavaScript agent, AI agent, browser AI, LLM runtime, long running tasks, PWA" />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#ee7a2f" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#b8460e" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+    <link rel="alternate icon" type="image/png" sizes="192x192" href="/long-task-lab/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/long-task-lab/icons/icon-192.png" />
+    <link rel="mask-icon" href="/icons/icon.svg" color="#ee7a2f" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="agrun.js" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <link rel="canonical" href="/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="agrun.js — JavaScript Agent Runtime" />
+    <meta property="og:description" content="A browser-first JavaScript agent runtime. Build conversational and long-running AI agents with traces, records, and replay — no backend required." />
+    <meta property="og:image" content="/icons/icon.svg" />
+    <meta property="og:site_name" content="agrun.js" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="agrun.js — JavaScript Agent Runtime" />
+    <meta name="twitter:description" content="Build browser-first AI agents with traces, records, and replay." />
+    <meta name="twitter:image" content="/icons/icon.svg" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "agrun.js",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Any (Web Browser)",
+      "description": "A browser-first JavaScript agent runtime for conversational and long-running AI agents.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
+
     <style>
       :root {
         color-scheme: light dark;
@@ -412,6 +459,70 @@
           transition-duration: 0.001ms !important;
         }
       }
+
+      /* ---------- Install prompt ---------- */
+      .install-toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%) translateY(120%);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px 12px 18px;
+        border-radius: var(--radius-pill);
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        box-shadow: var(--shadow-md);
+        color: var(--text);
+        font-size: 0.92rem;
+        max-width: calc(100% - 32px);
+        z-index: 50;
+        transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 220ms ease;
+        opacity: 0;
+      }
+      .install-toast[data-visible="true"] {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+      .install-toast button {
+        appearance: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .install-toast .install-btn {
+        padding: 8px 16px;
+        border-radius: var(--radius-pill);
+        background: var(--accent);
+        color: oklch(99% 0.005 60);
+        font-weight: 600;
+        font-size: 0.88rem;
+      }
+      .install-toast .install-dismiss {
+        background: transparent;
+        color: var(--text-soft);
+        padding: 6px 8px;
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+
+      .offline-banner {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        padding: 8px 16px;
+        background: oklch(85% 0.12 50);
+        color: oklch(28% 0.08 45);
+        font-size: 0.86rem;
+        font-weight: 500;
+        z-index: 60;
+        transform: translateY(-100%);
+        transition: transform 240ms ease;
+      }
+      .offline-banner[data-visible="true"] { transform: translateY(0); }
     </style>
   </head>
   <body>
@@ -488,5 +599,93 @@
         </nav>
       </footer>
     </main>
+
+    <div id="offline-banner" class="offline-banner" role="status" aria-live="polite">
+      You're offline — showing the cached version.
+    </div>
+
+    <div id="install-toast" class="install-toast" role="dialog" aria-label="Install agrun.js">
+      <span>Install agrun.js as an app</span>
+      <button type="button" class="install-btn" id="install-accept">Install</button>
+      <button type="button" class="install-dismiss" id="install-dismiss" aria-label="Dismiss">×</button>
+    </div>
+
+    <script>
+      (function () {
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+              .then(function (reg) {
+                reg.addEventListener('updatefound', function () {
+                  var sw = reg.installing;
+                  if (!sw) return;
+                  sw.addEventListener('statechange', function () {
+                    if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                      sw.postMessage('SKIP_WAITING');
+                    }
+                  });
+                });
+              })
+              .catch(function (err) {
+                console.warn('SW registration failed:', err);
+              });
+
+            var refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+              if (refreshing) return;
+              refreshing = true;
+              window.location.reload();
+            });
+          });
+        }
+
+        var banner = document.getElementById('offline-banner');
+        function syncOnline() {
+          banner.setAttribute('data-visible', navigator.onLine ? 'false' : 'true');
+        }
+        window.addEventListener('online', syncOnline);
+        window.addEventListener('offline', syncOnline);
+        syncOnline();
+
+        var deferredPrompt = null;
+        var toast = document.getElementById('install-toast');
+        var accept = document.getElementById('install-accept');
+        var dismiss = document.getElementById('install-dismiss');
+        var DISMISS_KEY = 'agrun-install-dismissed';
+
+        function showToast() {
+          if (localStorage.getItem(DISMISS_KEY) === '1') return;
+          toast.setAttribute('data-visible', 'true');
+        }
+        function hideToast() {
+          toast.setAttribute('data-visible', 'false');
+        }
+
+        window.addEventListener('beforeinstallprompt', function (event) {
+          event.preventDefault();
+          deferredPrompt = event;
+          showToast();
+        });
+
+        accept.addEventListener('click', function () {
+          if (!deferredPrompt) { hideToast(); return; }
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function () {
+            deferredPrompt = null;
+            hideToast();
+          });
+        });
+
+        dismiss.addEventListener('click', function () {
+          localStorage.setItem(DISMISS_KEY, '1');
+          hideToast();
+        });
+
+        window.addEventListener('appinstalled', function () {
+          deferredPrompt = null;
+          hideToast();
+        });
+      })();
+    </script>
   </body>
 </html>
