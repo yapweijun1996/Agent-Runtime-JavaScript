@@ -69097,17 +69097,25 @@ ${user}:`]
     });
   }
 
+  // Exposed so the per-decision runtime guard in the action loop can report
+  // the same gate reason that selectPlannerActions used to hide the action.
+  function isWorkspacePublishCandidateGatedForMode(options = {}) {
+    return shouldHideWorkspacePublishCandidateForMode(options);
+  }
+
   function shouldHideWorkspacePublishCandidateForMode(options) {
     const runState = options && options.runState && typeof options.runState === "object"
       ? options.runState
       : null;
     if (!runState) return false;
     if (isPublishCandidateGateDisabled(options && options.runtimeConfig)) return false;
+    // terminalRepair owns the action surface when active: defer to its
+    // allowedActions list regardless of whether publish_candidate is on
+    // it. The repair-driven block (or expose) is the authoritative signal,
+    // and its detail message in buildRuntimeActionSurfaceDetail is what
+    // the planner should see — not the mode-gate hint.
     const terminalRepair = resolveTerminalRepairState(options);
-    if (terminalRepair && terminalRepair.active === true) {
-      const allowed = readStringArray$1(terminalRepair.allowedActions);
-      if (allowed.indexOf(WORKSPACE_PUBLISH_CANDIDATE) !== -1) return false;
-    }
+    if (terminalRepair && terminalRepair.active === true) return false;
     if (isLongResearchRun(runState)) return false;
     return true;
   }
@@ -74083,6 +74091,7 @@ ${user}:`]
         lastReadAgentSkill: runState.agentSkillContext.lastReadSkill,
         prompt: request.prompt,
         runState,
+        runtimeConfig: options.runtimeConfig,
         terminalRepairState: plannerTerminalRepairState || runState.terminalRepairState
       });
       const plannerPrompt = buildPlannerPrompt({
@@ -75001,13 +75010,14 @@ ${user}:`]
         : null,
       prompt: session.request && session.request.prompt,
       runState: session.runState,
+      runtimeConfig: session.runtimeConfig,
       terminalRepairState: session.runState && session.runState.terminalRepairState
     });
     if (isActionAvailable(actionName, selectedActions)) {
       return { ok: true };
     }
     const selectedActionNames = selectedActions.map((action) => readString$o(action && action.name)).filter(Boolean);
-    const detail = buildRuntimeActionSurfaceDetail(session, selectedActionNames);
+    const detail = buildRuntimeActionSurfaceDetail(session, selectedActionNames, actionName);
     return createPlanValidationError(
       `Plan action ${index} "${actionName}" is currently hidden by the runtime action surface.`,
       {
@@ -75017,10 +75027,27 @@ ${user}:`]
     );
   }
 
-  function buildRuntimeActionSurfaceDetail(session, allowedActionNames) {
+  function buildRuntimeActionSurfaceDetail(session, allowedActionNames, blockedActionName) {
     const runState = session && session.runState && typeof session.runState === "object"
       ? session.runState
       : {};
+    if (
+      blockedActionName === "workspace_publish_candidate" &&
+      isWorkspacePublishCandidateGatedForMode({
+        runState,
+        runtimeConfig: session && session.runtimeConfig,
+        terminalRepairState: runState && runState.terminalRepairState
+      })
+    ) {
+      // AGRUN-256 — publish-candidate mode gate. Tell the planner the
+      // structural reason and the concrete next move, plus the host opt-out
+      // path so an operator reading logs can disable the gate if needed.
+      return [
+        "workspace_publish_candidate is reserved for long_research mode (skill activation such as deep-research-writer / long-web-research, or `mode: \"long_research\"` declared on the plan envelope).",
+        "End this turn with a finalize envelope to deliver the answer through the runtime finalizer.",
+        "If your host intentionally needs publish-direct outside long_research, set runtimeConfig.publishCandidateGate.enabled=false."
+      ].join(" ");
+    }
     const terminalRepairState = runState.terminalRepairState && typeof runState.terminalRepairState === "object"
       ? runState.terminalRepairState
       : null;
@@ -79706,6 +79733,64 @@ ${user}:`]
         session.actionHistory.push({
           kind: "action_disabled",
           summary: `${actionName} is disabled and cannot be executed`
+        });
+        continue;
+      }
+
+      // AGRUN-256 — runtime guard against hallucinated workspace_publish_candidate
+      // emissions in non-long_research mode. selectPlannerActions already hides
+      // the action from the planner catalog, but envelope/native_tools planners
+      // can still emit it by name. Reject here AND route through the standard
+      // planner-invalid-action signal pipeline so the next planner cycle sees
+      // a recoverable observation ("use finalize instead") rather than re-emitting
+      // the same action until maxSteps — the 884-step loop Globe3 reproduced
+      // when a host disabled the action without a paired planner directive.
+      if (
+        resolvedAction &&
+        actionName === "workspace_publish_candidate" &&
+        isWorkspacePublishCandidateGatedForMode({
+          runState: session.runState,
+          runtimeConfig: session.runtimeConfig,
+          terminalRepairState: session.runState && session.runState.terminalRepairState
+        })
+      ) {
+        const gateDetail = [
+          "workspace_publish_candidate is reserved for long_research mode (skill activation such as deep-research-writer / long-web-research, or `mode: \"long_research\"` declared on the plan envelope).",
+          "End this turn with a finalize envelope to deliver the answer through the runtime finalizer.",
+          "If your host intentionally needs publish-direct outside long_research, set runtimeConfig.publishCandidateGate.enabled=false."
+        ].join(" ");
+        session.pushStep("workspace-publish-candidate-gated", {
+          actionName,
+          cycle: session.runState.cycleCount,
+          detail: gateDetail,
+          reason: "mode_gate_not_long_research"
+        });
+        const invalidResult = handleInvalidPlannerDecision({
+          cycleRecord,
+          memoryEntriesAdded: session.memoryEntriesAdded,
+          normalizedInput: session.normalizedInput,
+          plannerResult: {
+            ...plannerResult,
+            invalidKind: "workspace_publish_candidate_gated",
+            rejectedActionName: actionName,
+            repairAttempted: false,
+            response: {
+              ...(plannerResult && plannerResult.response),
+              text: gateDetail
+            }
+          },
+          pushStep: session.pushStep,
+          rawInput: session.rawInput,
+          runState: session.runState,
+          runtimeState: session.runtimeState,
+          steps: session.steps
+        });
+        if (invalidResult.done) {
+          return invalidResult.result;
+        }
+        session.actionHistory.push({
+          kind: "planner_invalid_action",
+          summary: `${actionName} is gated for non-long_research mode; use finalize instead`
         });
         continue;
       }
@@ -86090,6 +86175,13 @@ ${user}:`]
         skillPolicy: normalizeSkillPolicy(config.skillPolicy),
         preferFinalizeOnLastResult: config.preferFinalizeOnLastResult !== false,
         plannerDirectives: normalizePlannerDirectives(config.plannerDirectives),
+        // AGRUN-256 — publish-candidate mode gate. Default behavior hides
+        // workspace_publish_candidate from the planner action surface unless
+        // the run is long_research-mode (skill activation or researchActivation),
+        // unless the terminal repair surface explicitly authorizes it.
+        // Hosts that intentionally need publish-direct in tool_loop mode
+        // can pass `{ enabled: false }` to opt out.
+        publishCandidateGate: normalizePublishCandidateGate(config.publishCandidateGate),
         researchCoverageGuard: config.researchCoverageGuard,
         repoFileTools: normalizeRepoFileToolsConfig(config.repoFileTools),
         threads: normalizeThreadsConfig(config.threads),
@@ -86249,6 +86341,18 @@ ${user}:`]
   function normalizeDisabledActions(value) {
     if (!Array.isArray(value)) return [];
     return value.filter((name) => typeof name === "string" && name.trim()).map((name) => name.trim());
+  }
+
+  function normalizePublishCandidateGate(value) {
+    if (value == null) {
+      return { enabled: true };
+    }
+    if (typeof value !== "object" || Array.isArray(value)) {
+      return { enabled: true };
+    }
+    return {
+      enabled: value.enabled !== false
+    };
   }
 
   function normalizeToolCallExamples(value) {

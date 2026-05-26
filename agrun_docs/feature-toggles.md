@@ -20,6 +20,7 @@ If a feature is not in this document, it is not a supported toggle. Open an issu
 - [Loop & Plan Limits](#loop--plan-limits)
 - [Session Budget (Loop Convergence)](#session-budget-loop-convergence)
 - [Research Report Loop & Acceptance Gate](#research-report-loop--acceptance-gate)
+- [Publish Candidate Mode Gate](#publish-candidate-mode-gate)
 - [Resilience](#resilience)
 - [Approval Token Signing](#approval-token-signing)
 - [Persistence](#persistence)
@@ -377,6 +378,56 @@ If `terminalRepairState.active === true` on a run that never declared long-resea
 
 Lite-tier planner models sometimes write reasoning like *"I am in terminal repair mode"* even when `runState.terminalRepairState.active === false`. Always confirm against the actual runState dump before treating it as a gate-firing bug — the model may be hallucinating the contract from planner-prompt teaching text.
 
+## Publish Candidate Mode Gate
+
+`workspace_publish_candidate` is a terminal action that publishes a virtual-workspace file directly as the final answer **without calling the runtime finalizer LLM** (`usedRuntimeFinalize=false`, tokens=0 on that step). It is designed for long-form `long_research` workflows where the AI has drafted, finalized, and read-back a candidate before publishing.
+
+In `tool_loop` mode without a long-research skill, envelope-mode planners — verified Gemini Flash-Lite, reported by Globe3 ERP 2026-05-26 — can treat the action as a generic "give up" escape. They write fabricated reasoning into the workspace then publish it, producing user-visible "I could not access X" messages with no LLM finalize call (audit blind spot, tokens=0 reading breaks billing aggregators).
+
+The gate **hides `workspace_publish_candidate` from the planner action surface** unless the run structurally belongs in long-research mode.
+
+### Gate rule
+
+The gate hides the action when ALL of the following hold:
+
+1. `runtimeConfig.publishCandidateGate.enabled !== false` (default on).
+2. `runState.terminalRepairState.active` is NOT `true`. When terminal repair owns the surface, its `allowedActions` list is the authoritative signal and the gate defers to it.
+3. `isLongResearchRun(runState)` is `false` — i.e. no `researchActivation === "long_research"` on the runState, and no long-research skill (`deep-research-writer`, `long-web-research`) is the active/selected/last-read skill.
+
+If the gate hides the action and the planner emits it anyway (hallucinated by name, not from the catalog), the runtime guard at the per-decision check rejects the emission through `handleInvalidPlannerDecision` — the next planner cycle sees a `plannerInvalidSignal` carrying "use finalize instead", so the planner converges instead of looping until `maxSteps`.
+
+### Toggles
+
+| Option | Default | Values |
+|--------|---------|--------|
+| `publishCandidateGate` | `{ enabled: true }` | `false` \| `{ enabled }` |
+| `publishCandidateGate.enabled` | `true` | `false` to opt out of the gate. Restores the pre-2026-05-26 behavior — `workspace_publish_candidate` is reachable in any mode. Use only when your host intentionally publishes-direct outside long_research. |
+
+### When to disable
+
+- **Custom publish-direct flows.** Hosts that intentionally surface `workspace_publish_candidate` outside long_research (e.g. a tool-authored fast-path that writes a virtual-workspace candidate, finalizes, reads back, and publishes — without ever activating a long_research skill).
+
+  ```js
+  createRuntime({
+    skills: [...],
+    publishCandidateGate: { enabled: false }
+  });
+  ```
+
+### When to keep enabled (default)
+
+- **ERP / data-query hosts** (Globe3-shaped). No long_research skills, planner emits one tool call then finalizes. The gate prevents lite-tier planners from using `workspace_publish_candidate` as a fabrication-and-publish escape hatch.
+- **Hosts that mix tool_loop and long_research.** Default behavior. When a long_research skill activates, the gate defers automatically.
+
+### Diagnostics
+
+When the runtime guard fires, look for:
+
+- A step with `type === "workspace-publish-candidate-gated"` in the step ledger, carrying a `detail.detail` string that names the gate reason.
+- `runState.plannerInvalidSignal.reason === "workspace_publish_candidate_gated"` on the next planner cycle.
+
+If you see the gated step but `finalAnswerSource` is `continuation_required` instead of `planner_finalize`, the planner failed to converge to finalize within the budget — investigate whether the planner prompt is correctly receiving the `plannerInvalidSignal.requiredEnvelope` field.
+
 ## Resilience
 
 | Option | Default | Values |
@@ -637,6 +688,7 @@ createRuntime({
 | "Tolerate more failed retries before giving up." | `budget: { totalFailures: 8 }` |
 | "Disable the composite loop-convergence budget." | `budget: false` (leaves legacy per-action guard only) |
 | "Disable the long-research source-minimum / acceptance gate for non-research hosts." | `researchReportLoop: { enabled: false }` — see [Research Report Loop & Acceptance Gate](#research-report-loop--acceptance-gate) |
+| "Allow `workspace_publish_candidate` outside long_research mode (host has its own publish-direct flow)." | `publishCandidateGate: { enabled: false }` — see [Publish Candidate Mode Gate](#publish-candidate-mode-gate) |
 | "Loosen the default 3 read sources / 2 relevant sources requirement." | `researchReportLoop: { minReadSources: 1, minRelevantSources: 1 }` |
 | "Detect when the agent is spinning without progress." | Listen for `onStep` events with `step.type === "session-budget-breach"` |
 | "Throttle parallel actions." | `maxPlanParallel: 2` |
