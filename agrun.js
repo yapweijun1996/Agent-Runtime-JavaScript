@@ -4633,7 +4633,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "d3b8c19b3-dirty"
+      "e7024b2e1-dirty"
         
     );
   }
@@ -6846,7 +6846,21 @@
     return typeof value === "string" ? value.trim() : "";
   }
 
-  const PRODUCTIVE_PROGRESS_DIMENSIONS = ["workspace", "source"];
+  // AGRUN-263 — built-in default. Tool-loop hosts (e.g. ERP) can REPLACE
+  // this list via `runtimeConfig.productiveProgressDimensions`, e.g.
+  // `["workspace","source","tool_result"]`. Replacement (not merge) is
+  // intentional so misconfiguration is loud rather than silently additive.
+  const DEFAULT_PRODUCTIVE_PROGRESS_DIMENSIONS = ["workspace", "source"];
+
+  function resolveProductiveProgressDimensions(runtimeConfig) {
+    const configured = runtimeConfig && Array.isArray(runtimeConfig.productiveProgressDimensions)
+      ? runtimeConfig.productiveProgressDimensions
+          .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+          .filter(Boolean)
+      : null;
+    if (configured && configured.length > 0) return configured.slice();
+    return DEFAULT_PRODUCTIVE_PROGRESS_DIMENSIONS.slice();
+  }
 
   function createProgressSnapshot$1(runState) {
     const source = runState && typeof runState === "object" ? runState : {};
@@ -6881,9 +6895,15 @@
     };
   }
 
-  function diffProgress$1(previous, next) {
+  function diffProgress$1(previous, next, options = {}) {
     const before = normalizeProgressSnapshot$1(previous);
     const after = normalizeProgressSnapshot$1(next);
+    const productiveWhitelist = Array.isArray(options.productiveDimensions) && options.productiveDimensions.length > 0
+      ? options.productiveDimensions
+      : DEFAULT_PRODUCTIVE_PROGRESS_DIMENSIONS;
+    const extraDimensions = Array.isArray(options.extraDimensions)
+      ? options.extraDimensions.filter((d) => typeof d === "string" && d)
+      : [];
     const dimensions = [];
     if (after.successfulReadUrlCount > before.successfulReadUrlCount ||
         after.readSourceUrlCount > before.readSourceUrlCount ||
@@ -6915,9 +6935,10 @@
         readNumber$k(after.skill.loadedCount) > readNumber$k(before.skill.loadedCount)) {
       dimensions.push("memory_or_skill");
     }
+    for (const extra of extraDimensions) dimensions.push(extra);
     const uniqueDimensions = Array.from(new Set(dimensions));
-    const productiveDimensions = uniqueDimensions.filter((d) => PRODUCTIVE_PROGRESS_DIMENSIONS.includes(d));
-    const transitionalDimensions = uniqueDimensions.filter((d) => !PRODUCTIVE_PROGRESS_DIMENSIONS.includes(d));
+    const productiveDimensions = uniqueDimensions.filter((d) => productiveWhitelist.includes(d));
+    const transitionalDimensions = uniqueDimensions.filter((d) => !productiveWhitelist.includes(d));
     return {
       dimensions: uniqueDimensions,
       productiveDimensions,
@@ -8245,6 +8266,7 @@
       stepsWithoutObservableProgress: 0,
       progressSnapshot: createProgressSnapshot$1(null),
       recentPatterns: [],
+      recentToolFingerprints: [],
       convergenceSignal: null,
       readOnlyPlanningState: createReadOnlyPlanningState(),
       structureRepairConvergence: createStructureRepairConvergenceState(),
@@ -8281,7 +8303,32 @@
     const semanticFingerprint = readString$1H(context.semanticFingerprint) ||
       createSemanticTerminalFingerprint(runState, context, actionName);
     const snapshot = createProgressSnapshot$1(runState);
-    const progress = diffProgress$1(previous.progressSnapshot, snapshot);
+    // AGRUN-263 — `tool_result` dimension: when configured productive
+    // whitelist includes `tool_result`, AND the new toolHistory entry is a
+    // genuinely NEW (action+args) call vs. last N, count it as productive.
+    // Dedup window prevents the planner from gaming the detector by
+    // re-issuing identical tool calls.
+    const productiveWhitelist = resolveProductiveProgressDimensions(context.runtimeConfig);
+    const toolFingerprint = buildToolCallFingerprint(actionName, context.decision);
+    const toolHistoryGrew = readNumber$j(snapshot.toolHistoryCount) > readNumber$j(previous.progressSnapshot && previous.progressSnapshot.toolHistoryCount);
+    const isDuplicateToolCall = Boolean(
+      toolFingerprint && Array.isArray(previous.recentToolFingerprints) &&
+      previous.recentToolFingerprints.includes(toolFingerprint)
+    );
+    const toolResultProductive = productiveWhitelist.includes("tool_result")
+      && toolHistoryGrew
+      && Boolean(toolFingerprint)
+      && !isDuplicateToolCall;
+    const extraDimensions = toolResultProductive ? ["tool_result"] : [];
+    const progress = diffProgress$1(previous.progressSnapshot, snapshot, {
+      productiveDimensions: productiveWhitelist,
+      extraDimensions
+    });
+    const recentToolFingerprints = updateRecentToolFingerprints(
+      previous.recentToolFingerprints,
+      toolFingerprint,
+      toolHistoryGrew
+    );
     const longFormMode = isLongResearchRun(runState);
     const productiveOnlyMode = longFormMode || isStructuredReadOnlyPlanningLoop(runState, actionName);
     const effectiveHasProgress = productiveOnlyMode ? progress.hasProductiveProgress : progress.hasProgress;
@@ -8414,6 +8461,7 @@
       stepsWithoutObservableProgress,
       progressSnapshot: snapshot,
       recentPatterns,
+      recentToolFingerprints,
       convergenceSignal: signal,
       readOnlyPlanningState,
       structureRepairConvergence,
@@ -9668,6 +9716,9 @@
       recentPatterns: Array.isArray(source.recentPatterns)
         ? source.recentPatterns.filter((entry) => entry && typeof entry === "object").slice(-12)
         : [],
+      recentToolFingerprints: Array.isArray(source.recentToolFingerprints)
+        ? source.recentToolFingerprints.filter((entry) => typeof entry === "string" && entry).slice(-5)
+        : [],
       convergenceSignal: source.convergenceSignal && typeof source.convergenceSignal === "object"
         ? cloneValue(source.convergenceSignal)
         : null,
@@ -9873,6 +9924,26 @@
 
   function isReadOnlyPlanningAction(actionName) {
     return DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS.includes(readString$1H(actionName));
+  }
+
+  // AGRUN-263 helpers — fingerprint for tool-result dedup. The `decision`
+  // carries `args`; `toolContext.history` does not preserve them (it stores
+  // only the action output envelope body). We therefore derive the
+  // fingerprint from `decision` at refresh time and persist a small ring
+  // on convergence state. Missing args fold to empty so action-name-only
+  // repeats still register as duplicates.
+  function buildToolCallFingerprint(actionName, decision) {
+    const name = readString$1H(actionName) || readString$1H(decision && decision.name);
+    if (!name) return null;
+    const args = decision && decision.args && typeof decision.args === "object" ? decision.args : {};
+    return name + ":" + stableStringify(args);
+  }
+
+  function updateRecentToolFingerprints(previousList, fingerprint, toolHistoryGrew) {
+    const base = Array.isArray(previousList) ? previousList.slice() : [];
+    if (!toolHistoryGrew || !fingerprint) return base.slice(-5);
+    base.push(fingerprint);
+    return base.slice(-5);
   }
 
   function readStatus$1(value) {
@@ -16774,6 +16845,14 @@
     };
   }
 
+  // AGRUN-264 — Pattern B canonical opt-out: when the loop is not active
+  // (enabled !== true, the default), `sourceMinimum` is `null` ("no minimum
+  // declared / not evaluated"), NOT a poisoned `{ passed: false, ... }`
+  // default. Consumers (terminal-repair-state source-deficit branch,
+  // action-pattern-progress.readSourceMinimum, requirement-recovery-evaluator,
+  // terminal-final-contract) already null-check `sourceMinimum` before
+  // applying deficit semantics, so `null` cleanly means "do not gate."
+  // The producer-side guard mirrors research-coverage-guard.js:59.
   function createResearchReportLoopState() {
     return {
       authorityCoverage: null,
@@ -16787,13 +16866,7 @@
       lastTopic: null,
       recentQueries: [],
       recoveryMode: null,
-      sourceMinimum: {
-        minReadSources: DEFAULT_MIN_READ_SOURCES,
-        minRelevantSources: DEFAULT_MIN_RELEVANT_SOURCES,
-        passed: false,
-        readSources: 0,
-        relevantSources: 0
-      },
+      sourceMinimum: null,
       status: "idle",
       vetoCount: 0,
       version: 2
@@ -17202,28 +17275,36 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return createResearchReportLoopState();
     }
-    const sourceMinimum = value.sourceMinimum && typeof value.sourceMinimum === "object"
+    const enabled = value.enabled === true;
+    const sourceMinimumRaw = value.sourceMinimum && typeof value.sourceMinimum === "object"
       ? value.sourceMinimum
-      : {};
+      : null;
+    // AGRUN-264 — when the loop is not active, preserve `sourceMinimum: null`
+    // (or restore it to null if a stale enabled-true shape leaked in). When
+    // enabled, normalize to numeric defaults so evaluation paths can rely on
+    // the shape.
+    const sourceMinimum = enabled
+      ? {
+          minReadSources: readPositiveInteger$f(sourceMinimumRaw && sourceMinimumRaw.minReadSources) || DEFAULT_MIN_READ_SOURCES,
+          minRelevantSources: readPositiveInteger$f(sourceMinimumRaw && sourceMinimumRaw.minRelevantSources) || DEFAULT_MIN_RELEVANT_SOURCES,
+          passed: Boolean(sourceMinimumRaw && sourceMinimumRaw.passed === true),
+          readSources: readNumber$c(sourceMinimumRaw && sourceMinimumRaw.readSources),
+          relevantSources: readNumber$c(sourceMinimumRaw && sourceMinimumRaw.relevantSources)
+        }
+      : null;
     return {
       authorityCoverage: value.authorityCoverage && typeof value.authorityCoverage === "object" ? cloneValue(value.authorityCoverage) : null,
       claimEvidence: Array.isArray(value.claimEvidence) ? cloneValue(value.claimEvidence) : [],
       claimGraph: Array.isArray(value.claimGraph) ? cloneValue(value.claimGraph) : [],
       cycles: Array.isArray(value.cycles) ? cloneValue(value.cycles) : [],
-      enabled: value.enabled === true,
+      enabled,
       finalMode: readString$1v(value.finalMode) || null,
       gateSignal: value.gateSignal && typeof value.gateSignal === "object" ? cloneValue(value.gateSignal) : null,
       lastSearchAttempt: value.lastSearchAttempt && typeof value.lastSearchAttempt === "object" ? cloneValue(value.lastSearchAttempt) : null,
       lastTopic: readString$1v(value.lastTopic) || null,
       recentQueries: Array.isArray(value.recentQueries) ? cloneValue(value.recentQueries) : [],
       recoveryMode: readString$1v(value.recoveryMode) || null,
-      sourceMinimum: {
-        minReadSources: readPositiveInteger$f(sourceMinimum.minReadSources) || DEFAULT_MIN_READ_SOURCES,
-        minRelevantSources: readPositiveInteger$f(sourceMinimum.minRelevantSources) || DEFAULT_MIN_RELEVANT_SOURCES,
-        passed: sourceMinimum.passed === true,
-        readSources: readNumber$c(sourceMinimum.readSources),
-        relevantSources: readNumber$c(sourceMinimum.relevantSources)
-      },
+      sourceMinimum,
       status: readString$1v(value.status) || "idle",
       vetoCount: readPositiveInteger$f(value.vetoCount) || 0,
       version: readPositiveInteger$f(value.version) || 2
@@ -28352,7 +28433,8 @@
         validationKey: validation.key,
         actionHistory,
         pushStep,
-        runState
+        runState,
+        runtimeConfig
       });
     }
 
@@ -28387,7 +28469,8 @@
           errorMessage: preflightError,
           actionHistory,
           pushStep,
-          runState
+          runState,
+          runtimeConfig
         });
       }
     }
@@ -28419,6 +28502,7 @@
         output: actionPatternBlock.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "action_pattern_preflight_block"
       });
       refreshTerminalRepair({
@@ -28467,6 +28551,7 @@
         output: terminalRepairBlock.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "terminal_repair_preflight_block"
       });
       refreshTerminalRepair({
@@ -28506,6 +28591,7 @@
         output: terminalCorrectionBlock.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "terminal_correction_preflight_block"
       });
       refreshTerminalRepair({
@@ -28546,6 +28632,7 @@
         output: guardrailBlock.result.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "action_guardrail_preflight_block"
       });
       return { done: false };
@@ -28821,6 +28908,7 @@
         output: actionResult.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: `after_${actionName}`
       });
       refreshTerminalRepair({
@@ -28908,7 +28996,8 @@
         errorMessage,
         actionHistory,
         pushStep,
-        runState
+        runState,
+        runtimeConfig
       });
     }
   }
@@ -29117,6 +29206,7 @@
       actionName: options.actionName,
       decision: options.decision,
       output: options.output,
+      runtimeConfig: options.runtimeConfig,
       status: options.status
     });
     if (evaluator && typeof options.pushStep === "function") {
@@ -30695,7 +30785,8 @@
     validationKey,
     actionHistory,
     pushStep,
-    runState
+    runState,
+    runtimeConfig
   }) {
     runState.selfCorrectionCount = (runState.selfCorrectionCount || 0) + 1;
 
@@ -30752,6 +30843,7 @@
       output: { error: errorMessage, ok: false, errorStage: stage },
       pushStep,
       runState,
+      runtimeConfig,
       status: refreshStatus
     });
 
@@ -75043,9 +75135,9 @@ ${user}:`]
       // structural reason and the concrete next move, plus the host opt-out
       // path so an operator reading logs can disable the gate if needed.
       return [
-        "workspace_publish_candidate is reserved for long_research mode (skill activation such as deep-research-writer / long-web-research, or `mode: \"long_research\"` declared on the plan envelope).",
-        "End this turn with a finalize envelope to deliver the answer through the runtime finalizer.",
-        "If your host intentionally needs publish-direct outside long_research, set runtimeConfig.publishCandidateGate.enabled=false."
+        "workspace_publish_candidate is a publish-direct terminal (skips the runtime finalize LLM; usedRuntimeFinalize=false, tokens=0 audit blind spot) and is gated by default.",
+        "To deliver the answer this turn, end with a finalize envelope so the runtime finalizer can produce the response.",
+        "Hosts can legitimately enable publish-direct through ONE of three explicit opt-in paths: (a) set runtimeConfig.publishCandidateGate.enabled=false to allow publish-direct in any mode; (b) activate a long_research skill on the run (deep-research-writer / long-web-research) so the catalog exposes the action; (c) route through terminalRepairState.allowedActions during runtime recovery."
       ].join(" ");
     }
     const terminalRepairState = runState.terminalRepairState && typeof runState.terminalRepairState === "object"
@@ -75342,6 +75434,7 @@ ${user}:`]
       actionName: item && item.name,
       decision: item && item.decision,
       output,
+      runtimeConfig: session && session.runtimeConfig,
       status
     });
     if (evaluator && typeof session.pushStep === "function") {
@@ -76617,6 +76710,7 @@ ${user}:`]
       conflictIssues: context.conflictIssues,
       finalReadiness: context.finalReadiness,
       output: context.output,
+      runtimeConfig: session && session.runtimeConfig,
       sourceLabel: context.sourceLabel,
       status: context.status
     });
@@ -79755,9 +79849,9 @@ ${user}:`]
         })
       ) {
         const gateDetail = [
-          "workspace_publish_candidate is reserved for long_research mode (skill activation such as deep-research-writer / long-web-research, or `mode: \"long_research\"` declared on the plan envelope).",
-          "End this turn with a finalize envelope to deliver the answer through the runtime finalizer.",
-          "If your host intentionally needs publish-direct outside long_research, set runtimeConfig.publishCandidateGate.enabled=false."
+          "workspace_publish_candidate is a publish-direct terminal (skips the runtime finalize LLM; usedRuntimeFinalize=false, tokens=0 audit blind spot) and is gated by default.",
+          "To deliver the answer this turn, end with a finalize envelope so the runtime finalizer can produce the response.",
+          "Hosts can legitimately enable publish-direct through ONE of three explicit opt-in paths: (a) set runtimeConfig.publishCandidateGate.enabled=false to allow publish-direct in any mode; (b) activate a long_research skill on the run (deep-research-writer / long-web-research) so the catalog exposes the action; (c) route through terminalRepairState.allowedActions during runtime recovery."
         ].join(" ");
         session.pushStep("workspace-publish-candidate-gated", {
           actionName,
@@ -80021,6 +80115,7 @@ ${user}:`]
       actionName,
       decision,
       output: { blocked: true, kind: "web_search_repeat_blocked", reason },
+      runtimeConfig: session && session.runtimeConfig,
       status: "web_search_repeat_blocked"
     });
     if (evaluator) {

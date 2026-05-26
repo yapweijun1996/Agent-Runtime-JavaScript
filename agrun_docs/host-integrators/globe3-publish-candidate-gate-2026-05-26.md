@@ -6,6 +6,20 @@ Subject: Re: Feature Request — Mode-Gate workspace_publish_candidate (your 202
 
 Thanks for the detailed write-up — runState dump + before/after job IDs + line references made this trivial to diagnose and ship the same day. The diagnosis is exactly right: `workspace_publish_candidate` was a designed terminal action for `mode: 'long_research'`, and without a mode gate any envelope-mode planner could treat it as a generic "give up" escape. Your `disabledActions` + paired planner-directive workaround caught both halves of the trap (host catalog AND the resulting planner-invalid loop).
 
+## Important clarification up front — the gate is "explicit opt-in, three equal paths," NOT "long_research only"
+
+We caught a wording problem in our first cut of this email (and in the runtime message) that is worth surfacing because it changes how you reason about the gate.
+
+Our first draft said the action was "reserved for long_research mode." Read fast, that sounds like a hard binding: "you must register a long-research skill to use publish-direct." That is **not** the design.
+
+The correct framing: `workspace_publish_candidate` is a publish-direct terminal that **skips the runtime finalize LLM** (the actual source of the audit blind spot you reported — `usedRuntimeFinalize=false`, `tokens=0`). Because skipping the finalizer is unsafe by default, the runtime requires an **explicit opt-in**, and there are **three equal paths** to provide one:
+
+1. **Host config opt-out** — `runtimeConfig.publishCandidateGate.enabled = false` — for hosts with a custom publish-direct flow that does not activate any long-research skill.
+2. **Long-research skill activation** — `deep-research-writer` / `long-web-research` (or `researchActivation === "long_research"` on `runState`) — the bundled, most-common path.
+3. **Runtime recovery** — `terminalRepairState.active === true` with the action in `allowedActions` — the runtime's own recovery surface owns the action when this is set.
+
+For Globe3 specifically: you do not need to register a long-research skill to "unlock" anything. You should stay on the **default gate (paths 2 and 3 do their job)**. If you ever build a custom non-long-research publish-direct flow in the future, you pick path 1 explicitly. The gate is a contract, not a binding.
+
 ## What shipped
 
 We took your Option 2 (structural invariant), with a small refinement after auditing the code path:
@@ -18,9 +32,11 @@ We took your Option 2 (structural invariant), with a small refinement after audi
 - A **per-decision runtime guard** in `action-loop-session-loop.js` catches hallucinated emissions (planner names the action despite the catalog hiding it). It routes through the existing `handleInvalidPlannerDecision` pipeline so `runState.plannerInvalidSignal` is set with a helpful detail — your "use finalize instead" directive is now the runtime default rather than a host concern. This is the half your post-workaround note flagged ("disabling alone causes the planner to loop on planner-invalid-action until maxSteps").
 - `runtimeConfig.publishCandidateGate.enabled = false` is the host opt-out for any deployment that intentionally publishes-direct outside `long_research`.
 
-The gate detail string the planner sees on rejection is:
+The gate detail string the planner sees on rejection (updated 2026-05-26 after a clarity pass — earlier wording put `long_research` first and made the host opt-out look like a footnote, which read like a hard binding to the skill; the rewrite lists all three opt-in paths as equal peers):
 
-> workspace_publish_candidate is reserved for long_research mode (skill activation such as deep-research-writer / long-web-research, or `mode: "long_research"` declared on the plan envelope). End this turn with a finalize envelope to deliver the answer through the runtime finalizer. If your host intentionally needs publish-direct outside long_research, set runtimeConfig.publishCandidateGate.enabled=false.
+> workspace_publish_candidate is a publish-direct terminal (skips the runtime finalize LLM; usedRuntimeFinalize=false, tokens=0 audit blind spot) and is gated by default. To deliver the answer this turn, end with a finalize envelope so the runtime finalizer can produce the response. Hosts can legitimately enable publish-direct through ONE of three explicit opt-in paths: (a) set runtimeConfig.publishCandidateGate.enabled=false to allow publish-direct in any mode; (b) activate a long_research skill on the run (deep-research-writer / long-web-research) so the catalog exposes the action; (c) route through terminalRepairState.allowedActions during runtime recovery.
+
+To re-state the design intent in one line: **the gate is not "long_research only" — it is "explicit opt-in required, with three equal paths."** Long_research is the most common path because it is bundled, but a host with a custom publish-direct flow is a first-class citizen via the config opt-out.
 
 ## Migration for Globe3
 

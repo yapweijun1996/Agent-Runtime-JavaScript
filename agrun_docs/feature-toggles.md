@@ -380,53 +380,76 @@ Lite-tier planner models sometimes write reasoning like *"I am in terminal repai
 
 ## Publish Candidate Mode Gate
 
-`workspace_publish_candidate` is a terminal action that publishes a virtual-workspace file directly as the final answer **without calling the runtime finalizer LLM** (`usedRuntimeFinalize=false`, tokens=0 on that step). It is designed for long-form `long_research` workflows where the AI has drafted, finalized, and read-back a candidate before publishing.
+> **TL;DR.** `workspace_publish_candidate` is a publish-direct terminal — it skips the runtime finalize LLM (`usedRuntimeFinalize=false`, `tokens=0` on that step). Because skipping the finalizer is unsafe by default, the action is **gated by default**. **Three equal opt-in paths** unhide it. The gate is *not* "long_research only" — it is "explicit opt-in required."
 
-In `tool_loop` mode without a long-research skill, envelope-mode planners — verified Gemini Flash-Lite, reported by Globe3 ERP 2026-05-26 — can treat the action as a generic "give up" escape. They write fabricated reasoning into the workspace then publish it, producing user-visible "I could not access X" messages with no LLM finalize call (audit blind spot, tokens=0 reading breaks billing aggregators).
+### Pick your path
 
-The gate **hides `workspace_publish_candidate` from the planner action surface** unless the run structurally belongs in long-research mode.
+| Your host scenario | Opt-in path | Action needed |
+|---|---|---|
+| ERP / data-query host (Globe3-shaped) — no long-form drafting | none | **Keep default.** Deliver answers via `finalize`. |
+| Bundles a long-research skill (`deep-research-writer` / `long-web-research`) | **(b) skill activation** | None — gate defers automatically when the skill is active. |
+| Custom publish-direct flow with **no** long-research skill | **(a) host config opt-out** | `publishCandidateGate: { enabled: false }` |
+| Runtime in terminal-repair recovery | **(c) runtime recovery** | None — repair surface owns the action when its `allowedActions` includes it. |
 
-### Gate rule
+### Path (a) — Host config opt-out
 
-The gate hides the action when ALL of the following hold:
+For hosts with a custom publish-direct flow that does not activate any long-research skill (e.g. a tool-authored fast-path that writes a virtual-workspace candidate, finalizes, reads back, and publishes):
 
-1. `runtimeConfig.publishCandidateGate.enabled !== false` (default on).
-2. `runState.terminalRepairState.active` is NOT `true`. When terminal repair owns the surface, its `allowedActions` list is the authoritative signal and the gate defers to it.
-3. `isLongResearchRun(runState)` is `false` — i.e. no `researchActivation === "long_research"` on the runState, and no long-research skill (`deep-research-writer`, `long-web-research`) is the active/selected/last-read skill.
+```js
+createRuntime({
+  skills: [...],
+  publishCandidateGate: { enabled: false }
+});
+```
 
-If the gate hides the action and the planner emits it anyway (hallucinated by name, not from the catalog), the runtime guard at the per-decision check rejects the emission through `handleInvalidPlannerDecision` — the next planner cycle sees a `plannerInvalidSignal` carrying "use finalize instead", so the planner converges instead of looping until `maxSteps`.
+### Path (b) — Long-research skill activation
 
-### Toggles
+For hosts that bundle long-form research workflows. The gate defers automatically when any of these are true on `runState`:
+
+- `researchActivation === "long_research"` (set by the planner or the skill), OR
+- the active / selected / last-read skill is `deep-research-writer` or `long-web-research`.
+
+No config change required — registering the skill is enough:
+
+```js
+createRuntime({
+  skills: [deepResearchWriter, ...]  // bundled, activates isLongResearchRun(runState)
+});
+```
+
+### Path (c) — Runtime recovery (automatic)
+
+When `runState.terminalRepairState.active === true`, the repair surface's `allowedActions` list is authoritative. The gate defers — if `allowedActions` contains `workspace_publish_candidate`, the planner sees it. No host action required.
+
+### Toggles reference
 
 | Option | Default | Values |
-|--------|---------|--------|
+|---|---|---|
 | `publishCandidateGate` | `{ enabled: true }` | `false` \| `{ enabled }` |
-| `publishCandidateGate.enabled` | `true` | `false` to opt out of the gate. Restores the pre-2026-05-26 behavior — `workspace_publish_candidate` is reachable in any mode. Use only when your host intentionally publishes-direct outside long_research. |
+| `publishCandidateGate.enabled` | `true` | `false` restores pre-2026-05-26 behavior — `workspace_publish_candidate` reachable in any mode. |
 
-### When to disable
+### Two enforcement layers
 
-- **Custom publish-direct flows.** Hosts that intentionally surface `workspace_publish_candidate` outside long_research (e.g. a tool-authored fast-path that writes a virtual-workspace candidate, finalizes, reads back, and publishes — without ever activating a long_research skill).
-
-  ```js
-  createRuntime({
-    skills: [...],
-    publishCandidateGate: { enabled: false }
-  });
-  ```
-
-### When to keep enabled (default)
-
-- **ERP / data-query hosts** (Globe3-shaped). No long_research skills, planner emits one tool call then finalizes. The gate prevents lite-tier planners from using `workspace_publish_candidate` as a fabrication-and-publish escape hatch.
-- **Hosts that mix tool_loop and long_research.** Default behavior. When a long_research skill activates, the gate defers automatically.
+1. **Catalog filter (cooperative planners).** `selectPlannerActions` hides the action from the planner's allowedActions, so well-behaved planners never see the name in the first place.
+2. **Per-decision runtime guard (hallucinated emissions).** If a lite-tier planner emits the name from memory despite it being hidden, the guard in `action-loop-session-loop.js` rejects through `handleInvalidPlannerDecision`. The next planner cycle receives a `plannerInvalidSignal` carrying "use finalize instead" — the planner converges in the next cycle instead of looping until `maxSteps`.
 
 ### Diagnostics
 
-When the runtime guard fires, look for:
+| Signal | Meaning |
+|---|---|
+| Step `type === "workspace-publish-candidate-gated"` in ledger | Runtime guard fired — planner emitted the name despite the catalog hiding it. Inspect `detail.detail` for the gate message. |
+| `runState.plannerInvalidSignal.reason === "workspace_publish_candidate_gated"` | Next planner cycle will receive the gate detail and a `requiredEnvelope: "finalize"` directive. |
+| `finalAnswerSource === "planner_finalize"` after gated step | ✅ Convergence succeeded — gate worked as designed. |
+| `finalAnswerSource === "continuation_required"` after gated step | ❌ Planner failed to converge within budget. Investigate whether the planner prompt is correctly receiving `plannerInvalidSignal.requiredEnvelope`. |
 
-- A step with `type === "workspace-publish-candidate-gated"` in the step ledger, carrying a `detail.detail` string that names the gate reason.
-- `runState.plannerInvalidSignal.reason === "workspace_publish_candidate_gated"` on the next planner cycle.
+### Why this gate exists
 
-If you see the gated step but `finalAnswerSource` is `continuation_required` instead of `planner_finalize`, the planner failed to converge to finalize within the budget — investigate whether the planner prompt is correctly receiving the `plannerInvalidSignal.requiredEnvelope` field.
+`workspace_publish_candidate` was designed for the long-form `long_research` flow where the AI drafts, finalizes, and reads-back a candidate before publishing it directly as the final answer. Because that publish path bypasses the runtime finalize LLM, it has two side effects:
+
+- `usedRuntimeFinalize=false`, `tokens=0` on the terminal step → **audit blind spot** for token-cost aggregators that key on `tokens > 0`.
+- A fabricated workspace draft is published verbatim → **fabrication risk** if the planner uses the action as a "give up" escape.
+
+Globe3 ERP (integrator email 2026-05-26) reported 6 runs across 3 days where lite-tier envelope-mode planners (Gemini Flash-Lite) treated the action as a generic escape, producing fabricated "I could not access ERP" answers with `tokens=0`. Their `disabledActions: [..., 'workspace_publish_candidate']` workaround verified working, but every host would have had to rediscover this independently. The gate ports that fix into the runtime as a default-on contract.
 
 ## Resilience
 
@@ -709,6 +732,92 @@ createRuntime({
 - "Disable planner entirely." → The planner is the runtime. ADR-0026 removed the single-tool fast path; every cycle goes through the planner. To skip the second planner round-trip, wire `onToolResult` and call your own finalize path.
 
 If an engineer needs something that is not here and is not in the "no" list, route it through triage: bug vs config vs feature request.
+
+## Pattern B canonical opt-out shape (AGRUN-264)
+
+When a runtime subsystem ships an `enabled: false` opt-out, the producer
+must guard state assignment BEFORE writing a default. The absence of
+state IS the disabled signal — never a poisoned numeric default that
+consumers must learn to ignore.
+
+**Canonical example:** [src/runtime/research-coverage-guard.js:59](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/research-coverage-guard.js#L59).
+
+```js
+const normalized = normalizeResearchCoverageConfig(config);
+if (!normalized.enabled) return null;          // ← guard BEFORE assignment
+// ... only on enabled path:
+runState.researchCoverageGuard = { ... };
+```
+
+**AGRUN-264 fix applied this to `researchReportLoop`:**
+`createResearchReportLoopState()` now returns `sourceMinimum: null` when
+the loop is disabled. `normalizeLoopState()` likewise drops sourceMinimum
+to null whenever `enabled !== true`. Every consumer
+(`terminal-repair-state.js`, `action-pattern-progress.readSourceMinimum`,
+`requirement-recovery-evaluator`, `terminal-final-contract`,
+`research-acceptance-evaluator`) already null-checks before applying
+deficit semantics, so `null` cleanly means "no minimum declared, do not
+gate."
+
+The anti-pattern (and why AGRUN-264 happened): shipping a default
+`{ passed: false, minReadSources: 3, ... }` that says "evaluated and
+failed" when the truth is "never evaluated because the loop is off."
+Downstream consumers cannot distinguish the two without reading
+`loop.enabled === true` themselves at every site — and at least one of
+them inevitably forgets.
+
+When you add a new `*Gate.enabled` / `*Loop.enabled` / `*Guard.enabled`
+flag, audit:
+
+1. The state-creator: does it ship a "poisoned" default that downstream
+   gating reads without checking `enabled`?
+2. The normalizer / hydrator: same question; does it re-poison on every
+   read?
+3. Every consumer of the gated field: is the read site null-safe AND
+   semantically aware ("null means no gate")?
+
+## `productiveProgressDimensions` (AGRUN-263)
+
+Runtime config knob for tool-loop hosts where the default productive
+dimensions (`["workspace", "source"]`) are too narrow.
+
+```js
+runtimeConfig: {
+  productiveProgressDimensions: ["workspace", "source", "tool_result"]
+}
+```
+
+**Semantics:** explicit REPLACEMENT (not merge) of the default
+whitelist. Misconfiguration is loud rather than silently additive — a
+host who writes `["tool_result"]` alone has explicitly opted out of
+treating workspace / source growth as productive.
+
+**`tool_result` dimension** — fires when `toolContext.history` grew this
+step AND the current decision's `actionName + ":" + stableStringify(args)`
+fingerprint is NOT in the last 5 recorded fingerprints. The dedup window
+prevents the planner from gaming the detector by re-issuing identical
+tool calls (the AGRUN-256 trap, applied defensively).
+
+**Who needs this:** tool-loop ERP hosts (Globe3, etc.) whose normal
+flow `list_agent_skills → use_agent_skill → execute_skill_tool` is all
+classified as read-only planning per
+`DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS`. Without this knob, the
+detector trips at threshold 3 even on successful tool calls returning
+real data.
+
+**Who must NOT enable `tool_result`:** long-form research / drafting
+hosts. Adding `tool_result` to their whitelist would mask genuine
+read-only loops where the planner keeps fetching without writing.
+
+## Snapshot vs planner-request projection
+
+`runtime.snapshot.runState.terminalRepairState` is a stripped view (e.g.
+`actionPatternConvergence.readOnlyPlanning` may be pruned from the
+projection); the canonical state is `loopState.terminalRepairState` in
+the planner request body. When two views of "the same" state disagree,
+the planner request body is the load-bearing surface. Use
+`terminalRepairState.reason === "read_only_planning_with_observable_deficits"`
+as the authoritative signal for that activation path.
 
 ## See Also
 
