@@ -84,5 +84,6 @@ Status legend: **Accepted** = active decision; **Superseded** = replaced by a la
 | [0027](./0027-live-e2e-closure-adr-0023-0026.md) | 2026-05-08 | Accepted | Live e2e closure for ADR-0023 / ADR-0026 |
 | [0028](./0028-simple-research-no-runtime-auto-read.md) | 2026-05-08 | Accepted (resolves 0016) | Simple research belongs to AI — delete `resolveResearchContinuation` |
 | [0029](./0029-cost-ledger-as-observability.md) | 2026-05-11 | Accepted | Cost Ledger as observability, not governance |
+| [0044](./0044-turn-state-ssot.md) | 2026-05-27 | Accepted | TurnState SSOT and NextStep signals for future HITL resume |
 
 **Current architecture SSOT:** When ADRs conflict, prefer the later number. [ADR-0023](./0023-harness-as-tool-provider-only.md) is the controlling decision for the runtime/AI ownership boundary; [ADR-0012](./0012-long-research-belongs-to-skill.md) is the controlling decision for long-research. See [`../architecture-ssot.md`](../architecture-ssot.md) for the full authority order.

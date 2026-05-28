@@ -50,8 +50,30 @@ Affected modules / contracts:
 
 ## Decision
 
-Add `src/runtime/session-compaction.js` exposing three pure-ish
-functions:
+Implemented 2026-05-28 as a conservative production slice over the
+existing session summary compaction path:
+
+- [src/session/compaction.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/compaction.js) now
+  exports `isOverflow()` and `selectCompactionTargets()` helpers for
+  opencode-style overflow/target reasoning.
+- When existing summary compaction writes a fresh summary, the session
+  layer records a hidden real compaction turn pair through
+  [src/session/messages.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/messages.js).
+- [src/session/handle.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/session/handle.js) emits
+  `compaction.started` and `compaction.completed` through the typed
+  runtime event bus and persists the hidden pair.
+- [src/runtime/session-message-store.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/session-message-store.js)
+  writes the pair as v1 message/part JSON with `variant: "compaction"`,
+  `agent: "agrun.compaction"`, and `summary.kind: "compaction"`.
+- Provider prompt construction filters old compaction pairs out and
+  keeps the summary store as the compacted-context SSOT. Browser
+  Inspector and existing `onStep("compaction-completed")` behavior stay
+  unchanged.
+
+The original target shape remains:
+
+Add `src/runtime/session-compaction.js` or the existing session
+compaction module exposing three pure-ish functions:
 
 ```js
 isOverflow({ tokenUsage, modelLimit })
@@ -231,31 +253,41 @@ inspectors see compaction as a first-class lifecycle event.
   consumer should crash on their absence (they're discoverable, not
   required).
 
-## Verification (when implemented)
+## Verification
 
-- **Unit (isOverflow)**: `test/unit/session-compaction-is-overflow.test.js`
-  — input/output/cache combinations × provider limits; assert
+- **Unit (isOverflow)**: `test/unit/session-compaction-turn.test.js`
+  — input/output/cache combinations × provider limits; asserts
   `overflow: true` only when `input + cache.read + output > usable`.
 
-- **Unit (selectCompactionTargets)**: synthetic 20-message session;
-  assert tail messages are preserved; assert workspace + source ledger
-  + terminal-repair refs survive; assert older tool outputs are flagged
-  compactable.
+- **Unit (selectCompactionTargets)**:
+  `test/unit/session-compaction-turn.test.js` asserts tail messages are
+  preserved and older text/tool/reasoning parts are flagged compactable.
 
-- **Unit (runCompactionTurn)**: mock provider returning a fixed
-  summary; assert summary message is persisted; assert
-  `compaction.started/completed` events fire via mock event ledger.
+- **Unit (real compaction turn)**:
+  `test/unit/session-compaction-turn.test.js` uses the existing mock
+  provider compaction trigger. It asserts hidden session messages,
+  `compaction.started/completed` typed events, monotonic sequence order,
+  per-message JSON `variant: "compaction"` records, eventRange, and no
+  pending storage run leak.
 
-- **Smoke**: long-form 60-cycle run with compaction enabled; assert
-  no provider context overflow; assert at least one compaction event
-  fires; assert final readinessAudit gates still pass.
+- **Regression**: `test/concerns/compaction.test.js` and
+  `test/unit/compaction-cost-ledger.test.js` assert existing summary
+  compaction, `onStep("compaction-completed")`, cumulative usage, and
+  cost ledger behavior still work.
 
-- **Live e2e**: extend
-  [test/node-agrun-3000-live.mjs](https://github.com/yapweijun1996/agrun/blob/main/0_development/test/node-agrun-3000-live.mjs)
-  with `--simulate-overflow` flag that artificially shrinks the
-  provider context to force compaction; assert run reaches 3000
-  words anyway.
+- **Live e2e target**:
+  `node test/node-agrun-3000-live.mjs --simulate-overflow` (or
+  `npm run test:live:node-overflow`) creates a real provider-backed
+  session, sets the live run cycle budget to at least 60, shrinks
+  `sessionPolicy.compactAtTokens`, writes per-message records through
+  the Node FS adapter, and runs the existing 3000-word report prompt.
+  The harness asserts at least one `compaction.started` and
+  `compaction.completed` event, monotonic runtime sequences, zero
+  pending storage runs, and persisted `variant: "compaction"` messages.
+  This verifies agrun's session-boundary compaction path; it does not
+  imply direct `runtime.run()` cycle-internal overflow compaction.
 
-- **Replay smoke**: with ADR-0038 storage enabled, replay a compacted
-  session and assert the per-message reconstruction includes the
-  compaction summary correctly.
+- **Replay smoke**: with ADR-0038 storage enabled,
+  `test/unit/session-compaction-turn.test.js` reads the filesystem
+  storage adapter and asserts the per-message reconstruction includes
+  the compaction summary correctly.

@@ -10,6 +10,94 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Active work on `main` that has not shipped to a version tag.
 
+## [1.0.0] — 2026-05-27 (AGRUN-274 final — ADR-0040)
+
+Major version bump. The legacy `canHandle` skill-loop router and its 6
+deprecated Set A skill exports are removed. agrun is now action-loop-only:
+`runtime.run()` requires a tool-loop provider request (`{prompt, provider,
+apiKey, model, …}`) or an approval resolution; any other input returns an
+`INVALID_RUN_INPUT` failed result.
+
+### Breaking
+- **`runtime.run("string")` no longer routes** through a `canHandle()`
+  skill router. Returns `INVALID_RUN_INPUT`. Migrate to a tool-loop
+  provider request, or register a `customAction` via `defineAction`.
+- **`{type:"web_search",…}` (or any typed object without
+  `prompt + provider + apiKey + model`)** is similarly rejected. Use
+  the action-loop's built-in `web_search` action via a planner-driven
+  tool-loop input.
+- **6 Set A skill exports removed** from `src/index.js`: `echoSkill`,
+  `fallbackSkill`, `memorySkill`, `newsBriefSkill`, `timeSkill`,
+  `webSearchSkill`. `geminiBrowserSkill` and `openaiBrowserSkill` are
+  retained (they are provider-adapter wrappers, not Set A skills per
+  ADR-0040 §"Disposition per Set A skill").
+- **`legacySkillLoop` createRuntime option removed**. The 1-minor
+  deprecation window through AGRUN-274d-1/2/3 has closed. Hosts that
+  still pass `legacySkillLoop:"silent"` see the option silently
+  ignored; `runtime.run("string")` now always rejects.
+- **`fallbackSkill` createRuntime option removed**. Skills marked
+  `isFallback:true` in the `skills:` array are no longer treated
+  specially.
+- **`skills:` createRuntime option is now backwards-compat only**. The
+  skill-loop router that consumed it is deleted; the array is still
+  validated for shape (each entry must be an object with non-empty
+  `name`) but its `canHandle` / `orient` / `evaluate` / `execute` are
+  never invoked. The array may be empty or omitted.
+
+### Added
+- New `ERROR_CODES.INVALID_RUN_INPUT` for the rejection path; new
+  `invalid-run-input` step type emitted alongside the failed result.
+
+### Removed
+- `src/runtime/run-skill-loop.js` (skill-loop driver)
+- `src/runtime/router.js` (`selectSkill` first-match router)
+- `src/runtime/skill-probe.js` (`findDirectSkillMatch`)
+- `src/runtime/cycle-outcome.js` (orphan after run-skill-loop)
+- `src/runtime/skill-hooks.js` (orphan after run-skill-loop)
+- `src/skills/echo-skill.js` / `fallback-skill.js` / `memory-skill.js`
+  / `news-brief-skill.js` / `news-brief-utils.js` / `time-skill.js`
+  / `web-search-skill.js`
+- `extractFallbackSkill` and `normalizeLegacySkillLoopConfig` helpers
+  in `config.js`; `fallbackSkill` plumbing in `runtime.js` /
+  `session/handle.js` / `oodae.js`.
+- `test/concerns/runtime-basic.test.js` and
+  `test/concerns/skills-hooks-limits.test.js` (entire concerns —
+  they tested the deleted OODAE / canHandle machinery).
+- `test/concerns/session.test.js` first sub-test (the `remember:`
+  skill-loop flow); `test/concerns/providers.test.js` custom-skill
+  short-circuit sub-test.
+- `legacy-skill-loop-used` step type (was a 274d-1 deprecation marker
+  that no longer applies).
+
+### Fixed
+- `test/unit/skill-loader.test.js` no longer runs its async tests
+  fire-and-forget at module load. The chain mutated `global.fetch`
+  and could leak into later in-process tests' `withMockedFetch`
+  windows, manifesting as compaction.test failing with `401 auth`
+  errors from real openai. Now exports `run()` and `smoke.test.js`
+  awaits it up-front.
+
+### Migration
+- Replace any `runtime.run("plain string")` or
+  `runtime.run({type:"web_search",…})` call with a tool-loop provider
+  request: `runtime.run({prompt, provider:"openai", apiKey, model})`
+  (or `"gemini"`).
+- For host-specific routing previously expressed as a `skills:` entry
+  with `canHandle`, register it as a `customAction` via
+  `defineAction(...)` + `createRuntime({customActions})`. See
+  `agrun_docs/authoring-skills.md`.
+- The 5-sub-test `web_search` skill-loop coverage moved fully into
+  `test/concerns/research-flows.test.js` (planner-driven action-loop
+  `cycles[N].decide.actionName === "web_search"`) and the
+  `test/unit/web-search-endpoint.test.js` provider helper unit.
+
+Reference: [ADR-0040](./agrun_docs/adr/0040-unify-skill-loaders.md) +
+[ADR-0042](./agrun_docs/adr/0042-collapse-run-skill-loop.md). Ticket
+chain: AGRUN-269 (RFC) → 270 (defineSkill) → 271 (customActions) →
+272 (host plugin) → 273 (@deprecated) → 274a (provider-adapter
+canHandle) → 274b-1/2 (test migration) → 274d-1/2/3/4 (gate +
+deletion) → 274e (this commit).
+
 ### Added
 - Native tools default switch (AGRUN-213k, 2026-04-29): `plannerMode` now defaults to `"native_tools"` for runtimes that do not explicitly configure a planner mode. Existing hosts can opt out with `createRuntime({ plannerMode: "envelope" })`. `nativeToolsFailurePolicy` still defaults to `"fallback_to_envelope"` so native planner/provider/tool-call failures retry through envelope mode for compatibility; `"hard_fail"` remains opt-in.
 - Native tools default-readiness gate (AGRUN-213j, 2026-04-29): new strict live suite via `npm run test:live -- --suite native-readiness` covers OpenAI/Gemini native action, clarify, finalize, approval, search, and TodoState. The gate now passes 12/12 with `.env.local`. Gemini native finalize is hardened by a runtime-finalizer empty-response retry: when the planner selects native `finalize` but the provider returns no text/tool output, agrun emits `runtime-finalize-empty-response-retry` and retries once with a non-empty final-answer instruction.

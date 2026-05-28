@@ -34,8 +34,10 @@ Look up an option, flag, schema, or API signature.
 - [Feature Toggles](feature-toggles.md) — every enable/disable flag in one place.
 - [Public Runtime API](public-runtime-api.md) — `createRuntime` / `runtime.run` / options / events.
 - [Result Schema](result-schema.md) — result object shape emitted by `runtime.run`.
+- [Trace JSON Contract](trace-json-contract.md) — live E2E trace contract for CLI and browser Inspector with OpenTelemetry-compatible spans.
 - [TodoState Integration](todo-state-integration.md) — enable, configure, observe, and override the TodoState subsystem (5 actions, 7 config knobs, onStep events, debug helper).
 - [Action Contract](action-contract.md) — action schema and execution envelope.
+- [AGRUN-274 Release/Export Audit](audits/agrun-274-release-export-audit-2026-05-27.md) — AGRUN-274 release/export audit proving deleted Set A names are absent from src/dist public exports while provider adapters remain.
 - [AGRUN-248-A Workspace Candidate Lifecycle](audits/agrun-248-a-workspace-candidate-lifecycle.md) — AGRUN-248-A workspace candidate lifecycle state machine and candidate-path mismatch signal evidence.
 - [Runtime Config + Permission Lifecycle Audit](audits/runtime-config-permission-lifecycle-2026-05-24.md) — audit and first implementation slice for runtime config lifecycle and action permission metadata.
 - [OpenAI Responses Empty Text Repair](audits/openai-empty-response-repair-2026-05-25.md) — OpenAI Responses empty output repair lowers reasoning effort on retry without runtime-authored content.

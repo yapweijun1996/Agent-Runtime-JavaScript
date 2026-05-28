@@ -65,31 +65,30 @@ runtime.run(input, {
 
 Disabled actions are filtered out of the planner surface, hidden from native-tools schemas, and skipped in research continuation.
 
-## Skills (provider layer)
+## Provider Adapters and Host Tools
 
-Skills are registered by passing them in the `skills` array. **Not passing a skill = feature off.** There is no global "disable skill X" flag; you simply omit it.
+Provider adapters are registered by passing them in the `skills` array.
+Host executable behavior should use `customActions` and/or `agentSkills`.
+Deleted Set A skill-loop exports are no longer available in v1.0.0.
 
-Bundled skills exported from `agrun`:
+Bundled provider adapters exported from `agrun`:
 
-| Skill | Purpose |
+| Adapter | Purpose |
 |-------|---------|
 | `openaiBrowserSkill` | OpenAI Chat Completions by default; opt-in Responses API via `apiVariant: "responses"` |
 | `geminiBrowserSkill` | Gemini generate content |
-| `webSearchSkill` | Web search (SearxNG by default) |
-| `timeSkill` | Current time / timezone |
-| `memorySkill` | Explicit memory read/write tool |
-| `newsBriefSkill` | News aggregation |
-| `echoSkill` | Testing / harness verification |
-| `fallbackSkill` | Safety net when no skill matches |
 
 ```js
 createRuntime({
-  skills: [openaiBrowserSkill, webSearchSkill, fallbackSkill]
+  skills: [openaiBrowserSkill]
   // geminiBrowserSkill omitted → Gemini not available this runtime
 });
 ```
 
-A skill marked `isFallback: true` is auto-extracted as the fallback. Pass `fallbackSkill:` explicitly to override.
+For web search and URL reading, configure runtime-owned actions with
+`actionPolicy`, `webSearchEndpoint`, and provider request fields. For app tools,
+register `customActions: [defineAction(...)]` or expose executable agent skill
+tools through `agentSkillIndexProvider`.
 
 OpenAI defaults to the Chat Completions-compatible path. Hosts that need
 Responses API features can opt in per request:
@@ -654,7 +653,7 @@ See `src/runtime/debug.js` for shape. Produces extra structured step events; tur
 
 ```js
 createRuntime({
-  skills: [openaiBrowserSkill, fallbackSkill],
+  skills: [openaiBrowserSkill],
   disabledActions: ["web_search", "read_url", "ask_clarification"],
   globalMemory: { enabled: false },
   circuitBreaker: false,
@@ -666,7 +665,8 @@ createRuntime({
 
 ```js
 createRuntime({
-  skills: [geminiBrowserSkill, webSearchSkill, newsBriefSkill, fallbackSkill],
+  skills: [geminiBrowserSkill],
+  actionPolicy: { web_search: "allow", read_url: "allow" },
   plannerMode: "auto",
   maxSteps: 15,
   maxPlanActions: 15,
@@ -678,7 +678,8 @@ createRuntime({
 
 ```js
 createRuntime({
-  skills: [openaiBrowserSkill, writeSkill, fallbackSkill],
+  skills: [openaiBrowserSkill],
+  customActions: [writeAction],
   actionPolicy: {
     execute_skill_tool: "ask"
   }
@@ -689,7 +690,7 @@ createRuntime({
 
 ```js
 createRuntime({
-  skills: [openaiBrowserSkill, fallbackSkill],
+  skills: [openaiBrowserSkill],
   globalMemory: { enabled: false }
   // no sessionStore → in-memory only, evaporates on refresh
 });

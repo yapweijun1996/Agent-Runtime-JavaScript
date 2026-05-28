@@ -347,7 +347,7 @@ const skills = await Agrun.loadAgentSkills('./skills/manifest.json');
 
 Agrun.createRuntime({
   agentSkills: skills,  // replaces bundled skills
-  skills: [echoSkill, memorySkill, fallbackSkill]
+  skills: [Agrun.openaiBrowserSkill]
 });
 ```
 
@@ -426,7 +426,7 @@ bundledAgentSkills
 getBundledAgentSkill(name)
 normalizeSkillManifest(value)
 createInMemorySkillIndexProvider(skills)
-normalizeSkillIndexProvider(provider, fallbackSkills)
+normalizeSkillIndexProvider(provider, defaultSkills)
 parseSkillMarkdown(text)
 loadAgentSkills(manifestUrl)
 loadSkillIndexProvider(manifestUrl)
@@ -503,7 +503,7 @@ const runtime = Agrun.createRuntime({
       return fetchAndParseFullSkill(skillIdOrName);
     }
   },
-  skills: [echoSkill, memorySkill, fallbackSkill]
+  skills: [Agrun.openaiBrowserSkill]
 });
 ```
 

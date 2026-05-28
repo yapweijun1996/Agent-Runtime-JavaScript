@@ -32,7 +32,7 @@ Affected modules / contracts:
   adapter implementation.
 - [src/host/](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/host) — new optional storage adapter package
   (browser IndexedDB, Node FS).
-- [agrun_debug_runs/](agrun_debug_runs) — existing pretty-printed
+- [agrun_debug_runs/](https://github.com/yapweijun1996/agrun/tree/main/0_development/agrun_debug_runs) — existing pretty-printed
   trace remains for human readability; per-message JSON is the
   machine-friendly complement.
 
@@ -227,27 +227,30 @@ and wires it to the ledger. When absent, runtime behavior is unchanged
 - No data migration — existing `agrun_debug_runs/*` traces unchanged.
 - Purely additive; rollback deletes new code only.
 
-## Verification (when implemented)
+## Verification
+
+Implemented on 2026-05-27 as AGRUN-256.
 
 - **Unit (storage adapter contract)**:
   `test/unit/storage-fs-adapter.test.js`,
-  `test/unit/storage-indexeddb-adapter.test.js` — round-trip a session
-  with 3 messages and 8 parts; assert disk layout matches the spec;
-  assert `listSessions / getMessages / getParts` return correct shape.
+  `test/unit/storage-indexeddb-adapter.test.js` — round-trip sessions,
+  messages, parts, diffs, and redaction hooks; assert adapter reads
+  return the expected shape.
 
 - **Unit (event-to-message rollup)**:
-  `test/unit/session-message-store.test.js` — feed synthetic ledger
-  events through the store; assert message/part boundaries and part
-  type mapping.
+  `test/unit/session-message-store.test.js` — feed synthetic runtime
+  events through the store; assert message/part boundaries, event
+  range, tool/text/reasoning mapping, and workspace diff append.
 
 - **Smoke (Node E2E)**: extend `test/smoke.test.js` to run a turn
-  with FS storage configured; assert message + part files exist and
-  parse; assert the per-message reconstruction matches the
-  `agrun_debug_runs/*.md` trace it accompanies.
+  with FS storage configured via `test/unit/runtime-message-storage.test.js`;
+  assert user + assistant message files exist, parts parse, and storage
+  errors stay empty.
 
 - **Browser regression**: existing Inspector path unchanged; runs
   without storage still work; runs with IndexedDB adapter produce
-  retrievable sessions.
+  retrievable sessions and parts.
 
 - **Performance**: write latency per cycle should add <5 ms on Node
-  FS / <20 ms on IndexedDB. Measure with a 30-cycle run.
+  FS / <20 ms on IndexedDB. Not measured in this slice; adapter writes
+  remain opt-in and are batched at message close.

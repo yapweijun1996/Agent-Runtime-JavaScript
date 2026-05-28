@@ -73,8 +73,9 @@ Direction note:
    - `runtime.getState()`
    - `runtime.getMemory()`
    - `runtime.getAgentSkills()`
-   - required `skills`
-   - optional `memory`, `fallbackSkill`, `sessionStore`, `sessionPolicy`
+   - optional provider adapter `skills`
+   - optional `memory`, `sessionStore`, `sessionPolicy`
+   - host tools through `customActions` and agent skill providers
    - advanced runtime config such as `maxSteps`, `actionPolicy`, and bundled `agentSkills`
 
 2. Unified run entry
@@ -149,10 +150,15 @@ At a high level:
 
 ```js
 const runtime = createRuntime({
-  skills: [echoSkill, memorySkill, fallbackSkill]
+  skills: [openaiBrowserSkill]
 });
 
-const result = await runtime.run("remember: ship the MVP");
+const result = await runtime.run({
+  provider: "openai",
+  apiKey: "sk-test",
+  model: "gpt-4.1-mini",
+  prompt: "Remember that we should ship the MVP."
+});
 ```
 
 Baseline result shape:
@@ -207,16 +213,19 @@ That command builds `dist/agrun.js` and runs the smoke suite.
 ```js
 import {
   createRuntime,
-  echoSkill,
-  fallbackSkill,
-  memorySkill
+  openaiBrowserSkill
 } from "../dist/agrun.js";
 
 const runtime = createRuntime({
-  skills: [echoSkill, memorySkill, fallbackSkill]
+  skills: [openaiBrowserSkill]
 });
 
-const result = await runtime.run("hello agrun");
+const result = await runtime.run({
+  provider: "openai",
+  apiKey: "sk-test",
+  model: "gpt-4.1-mini",
+  prompt: "hello agrun"
+});
 
 console.log(result.output);
 console.log(runtime.getState().lastRun);

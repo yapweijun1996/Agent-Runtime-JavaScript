@@ -60,7 +60,7 @@ Affected modules / contracts:
 - [src/index.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/index.js) — `createRuntime` exports the
   runtime object that hosts use; would gain an optional event-subscribe
   API.
-- [node/](node/) — current Node-mode entrypoints; this is where
+- [node/](https://github.com/yapweijun1996/agrun/tree/main/0_development/node) — current Node-mode entrypoints; this is where
   an optional SSE adapter would live (NOT in core).
 - [agrun_docs/audits/sample-study-runtime-reverse-audit-2026-05-24.md](../audits/sample-study-runtime-reverse-audit-2026-05-24.md)
   — listed typed event stream as P1 for inspector consumers; SSE is

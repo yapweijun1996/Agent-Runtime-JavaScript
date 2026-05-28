@@ -225,17 +225,17 @@ The evidence state flows into:
 - Guardrail evaluation (prevents premature finalization)
 - Continuity resolution (decides whether to continue research)
 
-## Evidence Banner (Display-Layer SSOT)
+## Evidence Banner (Inspector-Layer SSOT)
 
 When `read_url` calls fail in bulk (e.g. 502 from the read_url service)
-or all reads land on blocked challenge pages, both the end-user chat
-and the developer inspector must surface the degraded state without
-the runtime silently substituting search snippets for failed reads.
+or all reads land on blocked challenge pages, the developer Inspector
+must surface the degraded state without the runtime silently substituting
+search snippets for failed reads.
 
-**Single helper, two surfaces.** `summarizeEvidenceBanner(readSources, evidenceState)`
+**Single helper, Inspector surface.** `summarizeEvidenceBanner(readSources, evidenceState)`
 in `examples/browser/src/components/inspector-debug-report.ts` is the
-sole computer of this banner. It returns `null` for healthy reads or a
-typed `EvidenceBanner` for one of three regression kinds:
+sole computer of this Inspector banner. It returns `null` for healthy
+reads or a typed `EvidenceBanner` for one of three regression kinds:
 
 | Kind | Trigger | Tone |
 |------|---------|------|
@@ -245,12 +245,16 @@ typed `EvidenceBanner` for one of three regression kinds:
 
 **Surfaces:**
 
-- `AssistantMessageCard` renders the banner inline above the assistant
-  reply. It is visible to non-debug end users so they understand why a
-  long-research turn returned a limited summary.
 - `InspectorEvidenceSection` renders the same banner as a top chip card
   with `evidence:<state>`, `read_url_failed:N/M`, and `kind:<kind>` chips
   for QA and AGENT debugging.
+- The banner wording must explain impact and next check. Partial failures mean
+  some page bodies were unavailable while other reads may still be usable; next
+  checks should point to failed URL/status rows, read windows, and Live Trace
+  `read_url` action outcomes.
+- Normal assistant chat cards do not render this diagnostic banner.
+  If a limitation should be user-visible, it must be written into the
+  assistant answer itself instead of injected as debug UI chrome.
 
 **Push-mode invariant.** The runtime never injects synthetic snippet
 content into `researchContext.readSources`. Failed reads stay as
@@ -290,6 +294,21 @@ stricter than simple file presence. It blocks finalization when `evidence.json`,
 only the outline. The browser Inspector projects the same runtime checks as
 Workspace Quality Warnings so QA can see why the turn is still drafting instead
 of finalizing.
+
+Inspector workspace wording should translate raw chips into engineering next
+checks:
+
+- `candidate:missing` means no final candidate artifact is ready; inspect
+  candidate lifecycle paths, latest operations, and Raw `virtualWorkspace`.
+- `needs_repair` means a candidate exists but failed a quality gate; inspect
+  Workspace Quality Warnings, Pending Patch, and the last workspace action.
+- `structure:fail` means the candidate has missing, duplicated, or incorrectly
+  numbered sections; inspect Structure Repair Context and section hints.
+- `candidate is empty` means the selected final candidate has no publishable
+  body; inspect file previews, finalCandidateStats, and active candidate path.
+
+These messages are Inspector-only diagnostics and must not be injected into
+normal assistant chat cards.
 
 The final answer has an additional claim-coverage boundary. When the research
 state still has evidence gaps or too few relevant sources, agrun records

@@ -265,9 +265,6 @@ const runtime = createRuntime({
   skills: [
     openaiBrowserSkill,
     geminiBrowserSkill,
-    webSearchSkill,
-    newsBriefSkill,
-    fallbackSkill,
   ],
   actionPolicy,
   defaultRunOptions: {

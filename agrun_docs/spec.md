@@ -248,7 +248,7 @@ The client layer may call the runtime, but it does not own runtime internals.
 For the MVP, the public execution surface should stay narrow:
 
 ```js
-const runtime = createRuntime({ skills, fallbackSkill });
+const runtime = createRuntime({ skills, customActions, agentSkills });
 const result = await runtime.run(input);
 ```
 

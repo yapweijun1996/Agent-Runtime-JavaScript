@@ -72,7 +72,12 @@ When an action's policy evaluates to `ask`, the runtime returns a result with a 
 ```text
 RunResult
  ├ output: null
- ├ runState.status: "pending"
+ ├ runState.status: "blocked"
+ ├ runState.turnControl:
+ │  ├ signal         — "interruption"
+ │  ├ source         — "policy"
+ │  ├ actionName     — the action requiring approval
+ │  └ pendingApproval — token-free approval summary for planner/inspector reads
  ├ runState.pendingApproval:
  │  ├ actionName    — the action requiring approval
  │  ├ policy        — "ask"
@@ -94,6 +99,8 @@ ResumeToken
  ├ policy             — "ask"
  ├ reason             — policy reason
  ├ resumable          — true
+ ├ turnCount          — turn counter at interruption time
+ ├ turnControl        — interruption signal snapshot
  ├ researchContext     — search results and read sources gathered so far
  ├ toolContext         — tool execution history
  ├ agentSkillContext   — active skill state
@@ -163,6 +170,8 @@ For Gemini `authMode: "server"`, the resume token preserves proxy transport fiel
    - Tool context from resume token
    - Agent skill context
    - Action history
+   - Cycle/turn counters
+   - `turnControl` interruption metadata
    - Pending approval state
    - Context snapshot from the request
 4. **Begin Cycle**: Start a new OODAE cycle with `strategy: "policy"`
@@ -184,9 +193,10 @@ This prevents the action loop from re-entering approval state after the action e
 When the user denies:
 
 1. A `{ kind: "denied", actionName }` entry is pushed to `actionHistory`
-2. An observation is recorded: `{ kind: "action_denied", resolution: "denied" }`
+2. An observation is recorded: `{ kind: "tool_rejection", resolution: "denied", message }`
 3. `pendingApproval` is cleared
-4. The action loop continues — the planner sees the denied action in `loopState.deniedActions` and picks an alternative (e.g., `final`, `finalize`, or a different action)
+4. `runState.turnControl.signal` becomes `"run_again"` with the `tool_rejection` observation
+5. The action loop continues — the planner sees the denied action in `loopState.deniedActions`, `loopState.lastObservation`, and `loopState.turnControl`, then picks an alternative (e.g., `final`, `finalize`, or a different action)
 
 The system prompt instructs the planner: *"Never re-select an action listed in deniedActions."*
 

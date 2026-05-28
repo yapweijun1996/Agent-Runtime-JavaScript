@@ -19,7 +19,7 @@ For a visual end-user flow map of the runtime, see [FLOWCHART.md](../FLOWCHART.m
 
 ## Public Surface
 
-The host-facing runtime standard is centered on seven APIs:
+The host-facing runtime standard is centered on these APIs:
 
 ```js
 createRuntime(options)
@@ -30,13 +30,17 @@ runtime.getState()
 runtime.getMemory()
 runtime.getRuntimeConfig()
 runtime.getRuntimeConfigState()
+runtime.getMessageStorageState()
 runtime.reloadRuntimeConfig(optionsOrLoader, options?)
 runtime.getAgentSkills()
 runtime.getActionRegistry()
+runtime.subscribeEvents(callback, options?)
 ```
 
-The bundle also exports built-in skills and browser adapters.
-Those exports are valid public symbols, but they are not the primary Web UI integration contract.
+The bundle also exports browser provider adapters such as `openaiBrowserSkill`
+and `geminiBrowserSkill`. Deleted Set A skill-loop exports (`echoSkill`,
+`fallbackSkill`, `memorySkill`, `newsBriefSkill`, `timeSkill`,
+`webSearchSkill`) are not part of the v1.0.0 public surface.
 
 ## Runtime Creation
 
@@ -48,7 +52,7 @@ Minimal shape:
 
 ```js
 const runtime = createRuntime({
-  skills: [echoSkill, memorySkill, fallbackSkill]
+  skills: [openaiBrowserSkill]
 });
 ```
 
@@ -56,11 +60,14 @@ const runtime = createRuntime({
 
 | Option | Required | Stability | Meaning |
 | --- | --- | --- | --- |
-| `skills` | yes | stable | Registered executable skills for the runtime instance. |
+| `skills` | no | stable compatibility | Provider adapter skills for the runtime instance, such as `openaiBrowserSkill` or `geminiBrowserSkill`. Hosts may omit this when they only use runtime-owned actions, custom actions, or agent skill providers. |
 | `memory` | no | stable | Custom append-only memory store with `readAll()` and `append()`. |
 | `sessionStore` | no | stable | Async session persistence adapter for session history, summaries, and session-scoped memory. |
+| `storage` | no | stable advanced | Optional per-message JSON storage adapter. When present, session turns are written as message records plus per-part records using the typed runtime event stream. Omit it to preserve current in-memory/browser Inspector behavior. |
+| `onStorageError` | no | stable advanced | Optional callback for per-message storage write failures. Storage errors are recorded on `runtime.getMessageStorageState()` and do not crash the runtime. |
 | `sessionPolicy` | no | stable | Session prompt-window and compaction policy such as `contextWindowTokens`, `compactAtTokens`, and `recentMessages`. |
-| `fallbackSkill` | no | stable | Skill used when no other skill matches. |
+| `compactionPolicy` | no | stable advanced | Host hook for in-flight provider history trimming: `{ maxTurns?, onCompact? }`. It does not rewrite persisted session messages. |
+| ~~`fallbackSkill`~~ | no | removed in v1.0.0 | Legacy Set A skill-loop fallback. The option is ignored; register host behavior through `customActions` / `agentSkills` instead. |
 | `maxSteps` | no | stable advanced | Upper bound for multi-cycle runtime execution. |
 | `maxPlanActions` | no | stable advanced | Maximum number of actions allowed in one planner `type: "plan"` envelope. Defaults to `10`; hard ceiling is `20`. |
 | `maxPlanParallel` | no | stable advanced | Maximum concurrent actions inside one planner `type: "plan"` envelope. Defaults to `8`. |
@@ -522,6 +529,43 @@ Role object shape: `{ name: string, instructions: string, description?: string, 
 Legacy note:
 - `sessionPolicy.maxPromptTokens` is still accepted as a compatibility alias for `compactAtTokens`.
 
+### `compactionPolicy`
+
+`compactionPolicy` customizes the history window that `session.run()` sends to provider-backed turns.
+
+```js
+const runtime = createRuntime({
+  compactionPolicy: {
+    maxTurns: 20,
+    onCompact: async (history, context) => history.slice(-10)
+  }
+});
+```
+
+Rules:
+
+- `maxTurns` keeps the most recent turn-id groups before provider prompt construction.
+- `onCompact(history, context)` receives a cloned history array and may return a replacement array.
+- Returned history affects only the current prompt/session-context view; durable session messages stay unchanged.
+- Existing summary compaction and `filterByThreadWindow` still protect run-state evidence windows.
+
+When built-in summary compaction refreshes a summary, agrun also records a hidden real session turn:
+
+- A hidden user message marks the compaction boundary.
+- A hidden assistant message stores the compacted summary text.
+- The pair has `kind: "compaction"`, `hidden: true`, and shares one synthetic compaction `runId` / `turnId`.
+- Provider prompt construction ignores prior compaction pairs and keeps using the summary store as the prompt prefix.
+- Existing `onStep({ type: "compaction-completed" })` compatibility remains unchanged.
+- Typed event subscribers receive `compaction.started` and `compaction.completed` events for the same runtime sequence stream.
+
+Live-provider verification can use
+`node test/node-agrun-3000-live.mjs --simulate-overflow` (or
+`npm run test:live:node-overflow`). That harness creates a real
+provider-backed session, forces session summary compaction before the
+long report turn, and asserts monotonic compaction events plus persisted
+Node FS storage records. It verifies the session compaction boundary; it
+does not change direct `runtime.run()` semantics or Browser Inspector.
+
 ### Runtime Instance Guarantees
 
 - A runtime instance owns its own `lastRun` summary.
@@ -529,6 +573,8 @@ Legacy note:
 - A runtime instance may own many persistent sessions.
 - `getState()` and `getMemory()` are read-only host access points.
 - The host should treat one runtime instance as one conversational engine context.
+- `runtime.subscribeEvents()` observes the runtime instance's typed event stream across direct runs, sessions, and subagent runs that share the same runtime.
+- `runtime.getMessageStorageState()` reports whether optional per-message storage is enabled plus recent storage errors.
 
 ## Run Entry Contract
 
@@ -734,7 +780,100 @@ Hosts that apply markdown post-processing, UI extension block stripping, table-m
 
 ### Structured Runtime Events
 
-`onStep(step, snapshot)` is the stable runtime event sink. `agrun.js` does not add a second `onEvent` callback; hosts should treat `step.type` as the event name and `step.detail` as the event payload.
+`onStep(step, snapshot)` remains the stable compatibility sink for browser hosts and existing Inspector code. For typed real-time tooling, use `runtime.subscribeEvents(callback, options?)`.
+
+```js
+const unsubscribe = runtime.subscribeEvents((event) => {
+  console.log(event.sequence, event.type, event.visibility, event.phase);
+}, {
+  since: lastSeenSequence,
+  type: ["planner-*", "action-executed"],
+  visibility: ["agent", "user"],
+  phase: "act"
+});
+
+// Later:
+unsubscribe();
+```
+
+Contract:
+
+- The callback receives the same v1 typed event record stored in `runState.eventLedger`.
+- `sequence` is monotonic for the runtime instance and is stable for resume.
+- `since` replays stored events with `event.sequence > since` before live follow-up events.
+- Omitting `since` subscribes to future events only.
+- Filters are optional and can use `type`/`types`, `visibility`, `phase`, and `mode`. `type` supports exact strings, arrays, and `*` globs such as `"planner-*"`.
+- The return value is an idempotent unsubscribe function. A throwing subscriber is isolated and does not break the runtime or other subscribers.
+
+`onStep` and `onStreamEvent` are unchanged. Browser Inspector still consumes the compatibility path unless a host explicitly migrates it to the typed event stream.
+
+### Per-Message JSON Storage
+
+Per-message storage is opt-in and uses the typed event stream from `runtime.subscribeEvents()` as its source for assistant parts. When omitted, runtime behavior is unchanged.
+
+Node filesystem storage:
+
+```js
+const { createRuntime } = require("./dist/agrun.js");
+const { createFsStorage } = require("./node/storage-fs.js");
+
+const runtime = createRuntime({
+  storage: createFsStorage({ baseDir: "./.agrun/storage" })
+});
+
+const session = await runtime.createSession();
+await session.run("hello");
+```
+
+Browser IndexedDB storage:
+
+```js
+import { createRuntime, createIndexedDBMessageStorage } from "agrun";
+
+const runtime = createRuntime({
+  storage: createIndexedDBMessageStorage({ dbName: "my-app-agrun-storage" })
+});
+```
+
+Storage layout / adapter contract:
+
+| Adapter method | Meaning |
+| --- | --- |
+| `createSession(session)` | Optional session metadata write. |
+| `writeMessage(sessionID, message)` | Upsert one user/assistant message JSON record. |
+| `writePart(sessionID, messageID, part)` | Upsert one part JSON record for text, tool, reasoning, step-start, or step-finish. |
+| `listSessions({ limit?, since? })` | List stored session summaries. |
+| `getMessages(sessionID)` | Read message records for one session. |
+| `getParts(sessionID, messageID)` | Read part records for one message. |
+| `appendSessionDiff(sessionID, fileDiff)` | Optional workspace candidate diff append. |
+| `getSessionDiff(sessionID)` | Read appended workspace candidate diffs. |
+
+Message records use `schemaVersion: "agrun.message.v1"` and include `id`, `sessionID`, `runID`, `role`, `time.created`, `status`, `threadID`, `turnID`, `model`, and `partIDs`.
+
+Compaction turns use the same schema with `variant: "compaction"`, `agent: "agrun.compaction"`, and `summary.kind: "compaction"`. The assistant compaction message stores the summary as a normal `text` part so replay tools can reconstruct the compacted context without scraping runtime logs.
+
+Part records use `schemaVersion: "agrun.part.v1"` and include `id`, `sessionID`, `messageID`, `runID`, `type`, `index`, `time.created`, and type-specific fields:
+
+| Part type | Fields |
+| --- | --- |
+| `text` | `text` |
+| `tool` | `tool`, `state.status`, `state.input?`, `state.output?`, `state.error?`, `state.time?` |
+| `reasoning` | `text` |
+| `step-start` / `step-finish` | event marker metadata |
+
+Both bundled adapters accept `redactor(record, { kind })` so hosts can remove secrets from stored message/part records before persistence. The runtime never embeds provider credentials in the storage layer.
+
+`runtime.getMessageStorageState()` returns:
+
+```js
+{
+  enabled: true,
+  pendingRunCount: 0,
+  errors: []
+}
+```
+
+Storage errors are isolated from runtime execution and reported through `errors` plus optional `onStorageError`.
 
 All object-shaped step details include:
 
@@ -756,6 +895,45 @@ Key event families:
 | finalize | `provider-requested`, `provider-responded`, `final-response-quality-repair`, `final-response-quality-repaired` |
 | continuation | `continuation-*`, `todo-autopilot-action-progress`, plan/synthesize steps |
 | abort | caller abort rejects with `AbortError`; after abort, no further `onStep` / `onToken` callbacks are delivered |
+
+### Node SSE Adapter
+
+Node hosts can expose the same typed stream through an opt-in Server-Sent Events adapter. The runtime core does not start an HTTP server.
+
+```js
+const http = require("node:http");
+const { createRuntime } = require("./dist/agrun.js");
+const { createSseHandler } = require("./node/runtime-sse-adapter.js");
+
+const runtime = createRuntime({ /* host config */ });
+const sseHandler = createSseHandler(runtime, {
+  heartbeatMs: 15000,
+  headers: { "Access-Control-Allow-Origin": "*" }
+});
+
+http.createServer((req, res) => {
+  if (req.url.startsWith("/event")) return sseHandler(req, res);
+  res.writeHead(404).end();
+}).listen(3000);
+```
+
+Each runtime event is written as:
+
+```text
+data: {"schemaVersion":"v1","sequence":1,"type":"run-started",...}
+
+```
+
+The adapter sends periodic heartbeat comments, accepts query filters such as `?since=42&type=planner-*`, and unsubscribes automatically when the client disconnects.
+
+Runnable local example:
+
+```bash
+npm run build
+node examples/node-runtime-sse-server.cjs
+curl -N "http://127.0.0.1:3000/event?since=0"
+curl -X POST "http://127.0.0.1:3000/run-invalid"
+```
 
 Stable detail fields:
 
@@ -1192,7 +1370,7 @@ const runtime = createRuntime({
     read_url: "allow",
     web_search: "ask"
   },
-  skills: [fallbackSkill]
+  skills: [openaiBrowserSkill]
 });
 ```
 
@@ -1232,16 +1410,20 @@ Host expectations:
 ```js
 import {
   createRuntime,
-  echoSkill,
-  fallbackSkill,
-  memorySkill
+  openaiBrowserSkill
 } from "../dist/agrun.js";
 
 const runtime = createRuntime({
-  skills: [echoSkill, memorySkill, fallbackSkill]
+  skills: [openaiBrowserSkill],
+  globalMemory: { enabled: true }
 });
 
-const result = await runtime.run("remember: ship the MVP");
+const result = await runtime.run({
+  provider: "openai",
+  apiKey: "sk-test",
+  model: "gpt-4.1-mini",
+  prompt: "Remember that we should ship the MVP."
+});
 
 console.log(result.output);
 console.log(runtime.getState().lastRun);

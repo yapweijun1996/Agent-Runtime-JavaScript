@@ -19,8 +19,9 @@ Use it when you want an agent loop, planner, tool calling, sessions, memory, and
 
 | Term | Meaning | Where defined |
 |------|---------|---------------|
-| **Runtime** | One agent engine instance. Owns skills, sessions, memory, last-run state. | `createRuntime(options)` |
-| **Skill** | A function the agent can call. You write these. Must define `name`, `canHandle(context)`, `execute(context)`. | `options.skills` |
+| **Runtime** | One agent engine instance. Owns provider adapters, actions, sessions, memory, last-run state. | `createRuntime(options)` |
+| **Provider adapter skill** | Browser-safe wrapper that lets agrun call an LLM provider. `openaiBrowserSkill` and `geminiBrowserSkill` are still public exports. Deleted Set A skills are not. | `options.skills` |
+| **Custom action** | A host-defined tool built with `defineAction(spec)`. Use this for app-specific executable behavior instead of legacy Set A skills. | `options.customActions` |
 | **Action** | A built-in primitive the planner can choose. Seven exist: `web_search`, `read_url`, `ask_clarification`, `execute_skill_tool`, `list_agent_skills`, `read_agent_skill`, `use_agent_skill`. | runtime-owned, not user-defined |
 | **Agent skill** | An instruction package (markdown ROLE.md style) the planner reads to decide what tools to call. Different from `skill`. | `options.agentSkills` |
 | **Planner** | The LLM that decides which skill or action to run. Default `auto` lets agrun choose between `native_tools` (provider tool calling) and `envelope` (JSON parsing opt-out). | `options.plannerMode` |
@@ -36,32 +37,25 @@ agrun.js is a single browser-targeted UMD bundle. There is no npm publish today;
 ```html
 <script src="dist/agrun.js"></script>
 <script>
-  const { createRuntime, openaiBrowserSkill, fallbackSkill } = Agrun;
+  const { createRuntime, openaiBrowserSkill } = Agrun;
 </script>
 ```
 
 For ES module / bundler use:
 
 ```js
-import { createRuntime, openaiBrowserSkill, fallbackSkill } from "./dist/agrun.js";
+import { createRuntime, openaiBrowserSkill } from "./dist/agrun.js";
 ```
 
 API keys: enter them at runtime via `runtime.run({ provider, apiKey, ... })`. The runtime never reads `process.env`. The host application is responsible for not leaking the key — see [agrun_docs/spec.md](./spec.md) "Production Deployment Model."
 
-## Hello World (Custom Skill, No LLM)
+## Minimal Runtime Shell
 
-The smallest possible agrun runtime. No provider, no network. Useful for testing the harness itself.
+The smallest possible agrun runtime. No provider, no network. Useful for checking the bundle and built-in action registry.
 
 ```js
-const echoSkill = {
-  name: "echo",
-  canHandle: (ctx) => ctx.input.type === "string",
-  execute: (ctx) => ({ text: ctx.input.text })
-};
-
-const runtime = createRuntime({ skills: [echoSkill] });
-const result = await runtime.run("hello");
-console.log(result.output.text); // "hello"
+const runtime = createRuntime();
+console.log(runtime.getActionRegistry().map((action) => action.name));
 ```
 
 ## Real Chatbot (OpenAI, ~25 lines)
@@ -70,12 +64,11 @@ console.log(result.output.text); // "hello"
 import {
   createRuntime,
   openaiBrowserSkill,
-  fallbackSkill,
   createIndexedDBSessionStore
 } from "./dist/agrun.js";
 
 const runtime = createRuntime({
-  skills: [openaiBrowserSkill, fallbackSkill],
+  skills: [openaiBrowserSkill],
   sessionStore: createIndexedDBSessionStore({ dbName: "my-app" })
 });
 
@@ -141,14 +134,22 @@ Rules:
 ## Add Web Search
 
 ```js
-import { webSearchSkill } from "./dist/agrun.js";
-
 const runtime = createRuntime({
-  skills: [openaiBrowserSkill, webSearchSkill, fallbackSkill]
+  skills: [openaiBrowserSkill],
+  actionPolicy: { web_search: "allow", read_url: "ask" }
+});
+
+await session.run({
+  provider: "openai",
+  apiKey: window.OPENAI_KEY,
+  model: "gpt-4.1-mini",
+  prompt: "Find current release notes and summarize them.",
+  webSearchEndpoint: "https://search.example.test",
+  fetch
 });
 ```
 
-The planner now has the `web_search` action available and will use it autonomously when the prompt requires fresh information. Search results may auto-trigger `read_url` to fetch top pages — see [agrun_docs/research-and-evidence-model.md](./research-and-evidence-model.md).
+The planner has the runtime-owned `web_search` action available and will use it autonomously when the prompt requires fresh information. Hosts must provide a SearXNG endpoint or Gemini grounding proxy; agrun no longer ships a default endpoint. Search results may trigger `read_url` to fetch top pages — see [agrun_docs/research-and-evidence-model.md](./research-and-evidence-model.md).
 
 ## Disable Cross-Session Memory
 
@@ -156,7 +157,7 @@ Stop the per-turn semantic-extraction LLM call and skip all writes to the `globa
 
 ```js
 createRuntime({
-  skills: [openaiBrowserSkill, fallbackSkill],
+  skills: [openaiBrowserSkill],
   globalMemory: { enabled: false }
 });
 ```
@@ -167,7 +168,7 @@ Per-session memory and `helpers.appendMemory()` keep working. Existing rows in I
 
 ```js
 const runtime = createRuntime({
-  skills: [openaiBrowserSkill, webSearchSkill, fallbackSkill],
+  skills: [openaiBrowserSkill],
   actionPolicy: { web_search: "ask", read_url: "ask" }
 });
 ```
@@ -194,8 +195,8 @@ When the planner picks an `ask`-policy action, `runtime.run()` resolves with `ou
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `createRuntime requires a non-empty "skills" array` | Forgot to pass `skills`. | Add at least one skill (e.g. `[fallbackSkill]`). |
-| `Skill "X" must define canHandle() and execute()` | Skill object missing required methods. | Add both functions; see Concepts. |
+| A deleted Set A export such as `fallbackSkill` is `undefined` | The v1.0.0 public bundle removed Set A exports. | Use provider adapters, `customActions`, and `agentSkills` instead. |
+| SearXNG search fails before fetch | No `webSearchEndpoint` was supplied. | Pass a host-owned endpoint or use Gemini grounding proxy fields. |
 | `result.output.kind === "approval_required"` | An `ask` policy action wants to run. | Show approval UI; resume with `session.run(approvalDecision)`. |
 | `result.error?.code === "INVALID_PROVIDER_REQUEST"` | Bad request shape (missing `provider` / `apiKey` / `model` / `prompt`). | Inspect `result.error.details`; full code list in [src/runtime/errors.js](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/errors.js). |
 | `result.error` is set after a turn that called the LLM | Provider rejected the call (wrong key, bad model id, network failure, rate limit). | Inspect `result.error.message` and `result.error.details`; consider `circuitBreaker: true` to fail-fast after repeated failures. |

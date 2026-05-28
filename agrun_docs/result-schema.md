@@ -524,6 +524,74 @@ Recommended `runtime` block:
 - Current values may include `tool_loop` and `skill_loop`.
 - `mode` is a compatibility/debug field and is not the recommended primary feature switch for rendering or control flow.
 
+## Per-Message Storage Records
+
+The optional per-message storage layer writes records outside the normal result envelope. The schemas are stable v1 JSON shapes so debug tools and future compaction code can read them without scraping markdown traces.
+
+### Message
+
+```json
+{
+  "schemaVersion": "agrun.message.v1",
+  "id": "msg-...",
+  "sessionID": "session-...",
+  "runID": "run-1",
+  "role": "user | assistant",
+  "status": "completed | failed",
+  "time": { "created": 1779890000000 },
+  "threadID": "default",
+  "turnID": "run-1",
+  "model": { "providerID": "openai", "modelID": "gpt-4.1-mini" },
+  "partIDs": ["prt-msg-0001"],
+  "eventRange": { "firstSequence": 1, "lastSequence": 12 },
+  "summary": null,
+  "variant": null,
+  "agent": null
+}
+```
+
+Compaction records are normal message records with:
+
+- `variant: "compaction"`
+- `agent: "agrun.compaction"`
+- `summary.kind: "compaction"`
+- one hidden user boundary message plus one hidden assistant summary message sharing the same compaction `runID` / `turnID`
+
+The assistant compaction message stores the compacted summary in a `text` part. Replay/debug tools should use that part as the compacted context boundary and skip rendering `hidden: true` compaction messages in end-user chat surfaces.
+
+### Part
+
+```json
+{
+  "schemaVersion": "agrun.part.v1",
+  "id": "prt-msg-0001",
+  "sessionID": "session-...",
+  "messageID": "msg-...",
+  "runID": "run-1",
+  "index": 0,
+  "type": "text | tool | reasoning | step-start | step-finish",
+  "time": { "created": 1779890000000 },
+  "text": "visible text or serialized reasoning",
+  "tool": "web_search",
+  "state": {
+    "status": "pending | running | completed | error",
+    "input": {},
+    "output": {},
+    "error": null,
+    "time": { "start": 1779890000000, "end": 1779890000100 }
+  },
+  "event": {
+    "id": "evt_run-1_1",
+    "sequence": 1,
+    "type": "planner-responded",
+    "visibility": "agent",
+    "phase": "decide"
+  }
+}
+```
+
+Only fields relevant to a part type are present. Host adapters may redact records before persistence.
+
 ## JSON Examples
 
 ### Completed Run
@@ -571,6 +639,11 @@ Recommended `runtime` block:
     "agentSkillContext": {
       "activeSkill": null,
       "catalogListed": false,
+      "handoffChain": [],
+      "handoffContext": null,
+      "handoffCycle": null,
+      "handoffInputFilter": null,
+      "handoffInputFilterReport": null,
       "lastReadSkill": null
     },
     "researchContext": {

@@ -50,6 +50,7 @@ When bundled agent skills exist, the planner/action path may work through:
 - `list_agent_skills`
 - `read_agent_skill`
 - `use_agent_skill`
+- `handoff_to_skill`
 - `execute_skill_tool`
 - `web_search`
 - `read_url`
@@ -80,6 +81,7 @@ Supported envelopes:
 {"type":"action","name":"list_agent_skills","args":{},"reasoning":"..."}
 {"type":"action","name":"read_agent_skill","args":{"skillName":"expert-coder"},"reasoning":"..."}
 {"type":"action","name":"use_agent_skill","args":{"skillName":"expert-coder"},"reasoning":"..."}
+{"type":"action","name":"handoff_to_skill","args":{"skillName":"expert-coder","handoffContext":"Research complete. Implement the fix.","inputFilter":{"actionHistory":{"keepLast":3},"toolHistory":{"keepLast":0}}},"reasoning":"..."}
 {"type":"action","name":"execute_skill_tool","args":{"toolName":"worldtime_now","args":{"timezone":"Asia/Tokyo"}},"reasoning":"..."}
 {"type":"action","name":"web_search","args":{"query":"...","limit":5},"reasoning":"..."}
 {"type":"action","name":"read_url","args":{"url":"https://example.com/article","mode":"html_text"},"reasoning":"..."}
@@ -98,6 +100,7 @@ Rules:
 - `list_agent_skills` exposes the bundled skill catalog
 - `read_agent_skill` loads one bundled skill document into run state
 - `use_agent_skill` activates the last-read bundled skill for the current run
+- `handoff_to_skill` transfers phase ownership to another bundled skill, may trim history through `inputFilter`, and halts with `agent_handoff_cycle_detected` if the requested target already appears in `agentSkillContext.handoffChain`
 - `execute_skill_tool` executes one browser-safe tool from the active bundled skill
 - `web_search` gathers search summaries from the configured web search endpoint
 - `read_url` reads one public `http/https` page directly when search summaries are not enough or the user provided a URL
@@ -110,7 +113,7 @@ Rules:
 
 - `actions[]` must be non-empty and may contain only `type: "action"` envelopes
 - nested plans, `final`, `finalize`, and `clarify` are not valid inside a plan
-- `list_agent_skills`, `read_agent_skill`, and `use_agent_skill` are planner-state mutators and are not valid inside a plan; run them as standalone actions before planning
+- `list_agent_skills`, `read_agent_skill`, `use_agent_skill`, and `handoff_to_skill` are planner-state mutators and are not valid inside a plan; run them as standalone actions before planning
 - every action is validated up front against the same registry, disabled-action, policy, and action preflight checks used for single actions
 - `execute_skill_tool` actions are preflighted against bundled skill/tool resolution and required tool args before any plan action runs
 - any non-`allow` action policy rejects the whole plan; v1 does not support plan-level approval/resume

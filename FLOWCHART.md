@@ -60,7 +60,7 @@ flowchart TD
   subgraph RuntimeSetup["Runtime Creation And Config"]
     CreateRuntime["createRuntime(options)"]
     NormalizeConfig["normalizeRuntimeConfig"]
-    SkillSet["skills + fallbackSkill"]
+    SkillSet["legacy skills array validation"]
     AgentSkillIndex["agentSkillIndexProvider + manifests + Top-K ranking"]
     RoleConfig["agent role / system prompt"]
     Stores["memory store + session store"]

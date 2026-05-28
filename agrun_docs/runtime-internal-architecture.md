@@ -363,19 +363,20 @@ Current public runtime config includes:
 RuntimeConfig
  ├ skills
  ├ memory
- ├ fallbackSkill
  ├ sessionStore
  ├ sessionPolicy
  ├ maxSteps
  ├ actionPolicy
- └ agentSkills
+ ├ agentSkills
+ ├ agentSkillIndexProvider
+ └ customActions
 ```
 
 Notes:
 
-- `skills` is required
+- `skills` is optional and now primarily carries provider adapter wrappers
 - `memory` is optional and defaults to the in-memory implementation
-- `fallbackSkill` is optional but recommended
+- Set A fallback skill-loop exports were removed in v1.0.0; host tools belong in `customActions` / `agentSkills`
 - `maxSteps` is part of the current multi-cycle runtime behavior
 - `actionPolicy` and `agentSkills` support planner/action-capable turns without creating a second public runtime API
 

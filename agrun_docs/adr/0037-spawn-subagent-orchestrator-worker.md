@@ -102,6 +102,13 @@ export const spawnSubagentAction = {
 }
 ```
 
+If the child loop reports a successful terminal status (`success` or
+`completed`) but returns no non-empty `finalResponse`, the parent receives
+the same `subagent_result` envelope with `status: "failed"` and
+`error.code: "SUBAGENT_EMPTY_RESPONSE"`. Runtime does not invent a child
+summary; the parent AI sees the failure envelope and decides whether to
+retry, use another tool, or explain the gap.
+
 ### Capability injection
 
 `runLoop` constructs a `spawnSubagent` callable bound to the active
