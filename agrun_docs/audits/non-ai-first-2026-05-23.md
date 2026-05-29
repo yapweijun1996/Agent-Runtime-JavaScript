@@ -247,7 +247,7 @@ Static re-scan after AGRUN-246-A through G implementation. Method: grep `src/run
 
 | # | Sub-issue | File | Category | Priority | Notes |
 |---|---|---|---|---|---|
-| 1 | C2.2 isQuestionLikeText / isActionLikeText | `topic-like-task.js:29-41` | C2 | P1 | Full fix requires planner-envelope `turnKind` field; deferred |
+| ~~1~~ | ~~C2.2 isQuestionLikeText / isActionLikeText~~ | `topic-like-task.js` | C2 | ~~P1~~ | **FULLY CLOSED AGRUN-246-K / ADR-0047** (after ADR-0046 closed A1/A2/C + planner-path). The last lexicon `isActionLikeText` (B1/B2) is DELETED: `looksLikeTopicPrompt` → short + non-question only; inquiry-context `follow_up_command` → preserve-by-default (AI owns reset via `turnIntent.kind==="new_task"`). Continuity is now language-neutral (Mandarin follow-up preserves; live-verified). **Allowlist 2 → 0.** |
 | 2 | research/investigate intent regex | `research-state.js:579` | C2 | defer | Not in A-E scope; single regex in a narrow topic-drift check |
 | 3 | long-run prompt regex | `final-answer-internal-progress.js:143` | C2 | defer | Not in A-E scope; guards internal-progress suppression |
 | 4 | research-source-authority scoring engine | `research-source-authority.js:22-148` | C3 | P1 | Observational-only metadata; not directly excluding from AI context; defer until audit confirms impact |
@@ -258,7 +258,7 @@ Static re-scan after AGRUN-246-A through G implementation. Method: grep `src/run
 | 9 | C6.3 createTargetSearchQuery regex | `research-coverage-guard.js:278-281` | C6 | P3 | Harness composes search query from prompt regex match; deferred |
 | 10 | C6.4 stopword list for skill matching | `skill-catalog-ranking.js:15-41` | C6 | P3 | 24-word English stopword list; deferred |
 
-**Total active violations remaining: 10 ≤ 10 — acceptance criterion 5 PASSED.**
+**Total active violations remaining: 9 (row 1 / C2.2 closed by AGRUN-246-K / ADR-0047) — acceptance criterion 5 still PASSED.**
 
 #### Structural / irreducible (justifiably kept)
 

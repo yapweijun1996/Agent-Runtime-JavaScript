@@ -6,23 +6,28 @@ without forking agrun.js.
 
 ## Why this exists
 
-agrun's [`createActionRegistry`](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/action-registry.js) ships a
-fixed core action list (web_search, read_url, workspace_*, todo_*,
-spawn_subagent, etc.) and the built-in `BUILT_IN_PERMISSION_METADATA`
-table. The list is intentionally closed so the runtime contract stays
-auditable; hosts cannot inject new action types from outside.
+agrun's [`createActionRegistry`](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/action-registry.js) ships
+browser-safe bundled actions (`web_search`, `read_url`, `workspace_*`,
+`todo_*`, `spawn_subagent`, etc.) and built-in permission metadata. Hosts can
+also append namespaced `customActions` through `createRuntime({ customActions })`
+when they need domain-specific tools. Bundled web actions are a default
+web-research profile, not the generic evidence contract.
 
-Three extension paths remain open to the host:
+Four extension paths remain open to the host:
 
 1. **`disabledActions: string[]`** (runtime + per-run) — opt out of any
    built-in action. Documented in [feature-toggles.md](./feature-toggles.md).
 2. **`agentSkills` / `agentSkillIndexProvider`** — inject skills, each of
    which may carry browser-safe `tools` reachable through the
    `execute_skill_tool` action.
-3. **`actionPolicy`** — flip per-action approval modes
+3. **`customActions`** — append host-owned actions such as `orders.query` or
+   `customer.lookup` to the planner catalog.
+4. **`actionPolicy`** — flip per-action approval modes
    (`ask` / `allow` / `deny`).
+5. **`evidencePolicy`** — tell recovery/readiness surfaces which host-owned
+   evidence actions to name, instead of assuming `web_search` / `read_url`.
 
-These three knobs are enough to express every deployment shape we have
+These knobs are enough to express every deployment shape we have
 seen. The pattern below packages them into a typed helper so a host does
 not duplicate the same config logic across files.
 
@@ -73,6 +78,33 @@ Override inline (skip the helper, pass options directly to `createRuntime`)
 when the config is **one-shot** — a single experiment script or live
 test you do not plan to run again.
 
+## No-web host-data profile
+
+For chatboxes that ground answers in host-owned actions, make the deployment shape
+explicit:
+
+```ts
+createRuntime({
+  customActions: [ordersQueryAction],
+  actionPolicy: {
+    host_data_query: "allow"
+  },
+  disabledActions: ["web_search", "read_url"],
+  evidencePolicy: {
+    profile: "host",
+    recoveryActions: ["host_data_query"]
+  },
+  researchReportLoop: { enabled: false },
+  researchCoverageGuard: { enabled: false },
+  citationCoverageGuard: { enabled: false }
+});
+```
+
+In this shape, structured host action results count toward
+`finalReadiness.requirementsAssessment.successfulEvidenceCount`. The runtime
+does not need to know what the host records mean; the host action provides
+evidence, and the AI decides how to use it.
+
 ## Anti-patterns
 
 - **Do not** add a runtime config flag for "model tier" or
@@ -97,6 +129,8 @@ When changing a profile or the helper:
    which pins the 3 profile shapes.
 3. `npm --prefix examples/browser run build` — Vite build clean.
 4. Preview-server snapshot + console errors — no regression in UI.
+5. `node test/concerns/host-evidence-policy.test.js` — no-web host-data
+   publish path stays independent from `web_search` / `read_url`.
 
 The agrun-config smoke test snapshots `actionPolicy`, `maxSteps`,
 `selfCorrection`, `todoAutopilot`, and `disabledActions` for each profile

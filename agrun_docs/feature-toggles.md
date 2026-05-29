@@ -322,26 +322,40 @@ The gate commits ONLY when at least one of these is true
 4. A length contract was extracted from the prompt AND a workspace candidate exists.
 5. `workspace.quality.finalCandidateReady === true`.
 
-For hosts that register **only data/ORM skills** and never declare long-research, none of these should fire and `runState.researchReportLoop` stays at its idle default. `terminalRepairState.active` should remain `false`.
+For hosts that register **only host-owned data/tool skills** and never declare long-research, none of these should fire and `runState.researchReportLoop` stays at its idle default. `terminalRepairState.active` should remain `false`.
 
 ### Toggles
 
 | Option | Default | Values |
 |--------|---------|--------|
 | `researchReportLoop` | `{ enabled: true, ... }` | `false` \| `{ enabled, minReadSources, minRelevantSources, limit, maxPasses, maxIndependentSearchAttempts, maxResearchLoopVetoes }` |
-| `researchReportLoop.enabled` | `true` | `false` to short-circuit `refreshResearchReportLoopGate` — gate never commits, no source minimum, no acceptance signal, no `terminalRepairState` source/length deficits |
-| `researchReportLoop.minReadSources` | `3` | Positive integer. Number of distinct `read_url` successes counted as "enough" |
-| `researchReportLoop.minRelevantSources` | `2` | Positive integer. Number of strong/medium relevance sources required |
+| `researchReportLoop.enabled` | `true` | `false` to short-circuit `refreshResearchReportLoopGate` — gate never commits, no evidence/source minimum, no acceptance signal, no `terminalRepairState` evidence/length deficits |
+| `researchReportLoop.minEvidenceArtifacts` | `3` | Generic alias for the minimum evidence artifacts required by the loop. |
+| `researchReportLoop.minRelevantEvidenceArtifacts` | `2` | Generic alias for the minimum relevant evidence artifacts required by the loop. |
+| `researchReportLoop.minReadSources` | `3` | Web-research profile threshold. Legacy name for minimum evidence artifacts from successful page reads. |
+| `researchReportLoop.minRelevantSources` | `2` | Web-research profile threshold. Legacy name for minimum relevant evidence artifacts. |
+| `evidencePolicy` | `{ profile: "web_research", recoveryActions: ["web_search", "read_url"] }` | Configures which actions the runtime names when evidence recovery is needed. Use `{ profile: "host", recoveryActions: ["host_data_query"] }` for hosts with their own evidence actions. |
+| `evidencePolicy.structuredToolEvidence` | `true` | Counts successful structured host/tool results and host `customActions` as generic evidence for `successfulEvidenceCount`. |
 | `researchCoverageGuard` | `{ enabled: true }` | `{ enabled: false }` to drop research coverage vetoes (separate from the report loop) |
 | `citationCoverageGuard` | `{ enabled: true }` | `{ enabled: false }` to drop direct-source citation vetoes |
 
 ### When to disable
 
-- **ERP / data-query hosts** that ground answers in registered tool skills (ORM, SQL, internal APIs) and never consume `web_search` / `read_url`:
+- **Host-data / tool-backed chatboxes** that ground answers in registered host actions and never consume `web_search` / `read_url`:
 
   ```js
   createRuntime({
     skills: [...erpSkills],
+    customActions: [ordersQueryAction, customersLookupAction],
+    actionPolicy: {
+      "orders.query": "allow",
+      "customers.lookup": "allow"
+    },
+    disabledActions: ["web_search", "read_url"],
+    evidencePolicy: {
+      profile: "host",
+      recoveryActions: ["orders.query", "customers.lookup"]
+    },
     researchReportLoop: { enabled: false },
     researchCoverageGuard: { enabled: false },
     citationCoverageGuard: { enabled: false }
@@ -349,6 +363,23 @@ For hosts that register **only data/ORM skills** and never declare long-research
   ```
 
 - **Hosts that ship their own evidence/quality contract** via `onBeforeFinalize` and want runtime to stay quiet on source counting.
+- Hosts that still use workspace publish self-audit can report generic
+  `requirementsAssessment.successfulEvidenceCount` instead of the legacy
+  web-research-only `successfulReadUrlCount`.
+- `gateSignal.acceptancePacket.evidence.evidenceMinimum` is the generic
+  projection for new host integrations. `sourceMinimum` remains as a legacy
+  web-research alias so existing Inspector/tests do not break.
+- `runState.researchReportLoop.evidenceMinimum` mirrors the same generic
+  status. `sourceMinimum` remains for backward-compatible web-research
+  consumers.
+- Browser Inspector and support/debug packets prefer generic
+  `evidenceMinimum` / `successfulEvidenceCount` labels and keep legacy
+  read-url/source fields under compatibility names such as
+  `source_minimum_legacy` or `successful_read_url_count_legacy`.
+- Long-form workspace publish debug packets expose
+  `candidateQualitySignal`. Node live output uses `acceptanceGateScore`
+  as the mechanical gate score and keeps `qualityScore` as a compatibility
+  alias. See [Candidate Quality Signal](./candidate-quality-signal.md).
 
 ### When to keep enabled (default)
 
@@ -371,6 +402,21 @@ runState.researchReportLoop // → idle defaults when gate never commits
 runState.terminalRepairState.active // → false on healthy non-research runs
 ```
 
+Focused no-web host verification:
+
+```bash
+node test/concerns/host-evidence-policy.test.js
+npm run test:live:host-evidence -- --provider openai --reasoning-effort high
+npm run test:live:host-evidence -- --provider gemini --gemini-thinking-level high
+```
+
+This fixture disables `web_search` / `read_url`, runs a host `customAction`
+named `host_data_query`, publishes via `workspace_publish_candidate`, and
+asserts `successfulEvidenceCount=1` while `successfulReadUrlCount=0`.
+The live runner uses real provider credentials from `.env.local`, writes
+reviewable JSON/Markdown artifacts under ignored `agrun_debug_runs/`, and
+asserts the same no-web evidence contract against real planner behavior.
+
 If `terminalRepairState.active === true` on a run that never declared long-research and never wrote a workspace candidate, that is a runtime bug — capture the JSON dump and report.
 
 ### Diagnosing model-imagined repair mode
@@ -385,7 +431,7 @@ Lite-tier planner models sometimes write reasoning like *"I am in terminal repai
 
 | Your host scenario | Opt-in path | Action needed |
 |---|---|---|
-| ERP / data-query host (Globe3-shaped) — no long-form drafting | none | **Keep default.** Deliver answers via `finalize`. |
+| Host data/tool chatbox — no long-form drafting | none | **Keep default.** Deliver answers via `finalize`. |
 | Bundles a long-research skill (`deep-research-writer` / `long-web-research`) | **(b) skill activation** | None — gate defers automatically when the skill is active. |
 | Custom publish-direct flow with **no** long-research skill | **(a) host config opt-out** | `publishCandidateGate: { enabled: false }` |
 | Runtime in terminal-repair recovery | **(c) runtime recovery** | None — repair surface owns the action when its `allowedActions` includes it. |
@@ -419,6 +465,28 @@ createRuntime({
 ### Path (c) — Runtime recovery (automatic)
 
 When `runState.terminalRepairState.active === true`, the repair surface's `allowedActions` list is authoritative. The gate defers — if `allowedActions` contains `workspace_publish_candidate`, the planner sees it. No host action required.
+
+### AI self-review for long-form candidates
+
+When a long-form or research answer uses the workspace publish path, the AI
+must read and self-review the latest candidate before direct publish:
+
+```text
+workspace_read -> workspace_review_candidate -> workspace_publish_candidate
+```
+
+The self-review action records the AI's summary, issues, repair plan,
+optional final section title, and ready-to-publish judgment. The runtime does
+not grade prose or write the report. It only computes `candidateQualitySignal`
+from objective facts: read/review freshness, word-count consistency, cited URL
+readability, and reusable workspace structure inspection.
+
+If the candidate is changed after review, publish is blocked with
+`missing_latest_candidate_review` until the AI reads and reviews the new
+candidate. `decision: "limited"` remains available for honest partial results
+when objective blockers are cleared or the AI names concrete remaining gaps.
+
+Full contract: [Candidate Quality Signal](./candidate-quality-signal.md).
 
 ### Toggles reference
 
@@ -780,7 +848,8 @@ flag, audit:
 ## `productiveProgressDimensions` (AGRUN-263)
 
 Runtime config knob for tool-loop hosts where the default productive
-dimensions (`["workspace", "source"]`) are too narrow.
+dimensions (`["workspace", "source"]`, plus `evidence` when
+`evidencePolicy.profile` is host-owned) are too narrow.
 
 ```js
 runtimeConfig: {
@@ -799,7 +868,12 @@ fingerprint is NOT in the last 5 recorded fingerprints. The dedup window
 prevents the planner from gaming the detector by re-issuing identical
 tool calls (the AGRUN-256 trap, applied defensively).
 
-**Who needs this:** tool-loop ERP hosts (Globe3, etc.) whose normal
+**`evidence` dimension** — generic host evidence progress. It is included
+automatically when `evidencePolicy.profile` is not `web_research`, so
+successful host-owned evidence can clear read-only-planning loops without
+pretending to be `read_url` source progress.
+
+**Who needs `tool_result`:** tool-loop hosts whose normal
 flow `list_agent_skills → use_agent_skill → execute_skill_tool` is all
 classified as read-only planning per
 `DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS`. Without this knob, the

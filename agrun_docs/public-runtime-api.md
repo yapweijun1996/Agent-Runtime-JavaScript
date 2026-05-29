@@ -632,7 +632,7 @@ Hook errors are swallowed (logged in debug mode) — a throwing hook will never 
 | `prompt_payload` | `promptChars`, `actionsChars`, `historyChars`, `loopStateChars`, `planChars`, `workspaceChars`, `loopFields` (fires on every `planner-requested` step) |
 | `hard_veto_fired` | `actionName`, `escalation`, `ignoredCount`, `candidateWords`, `cycleCount`, `stepType` |
 | `convergence_block` | `actionName`, `reason`, `ignoredCount`, `stepType` |
-| `node_agrun_live_summary` | full run summary including `candidateWords`, `structureOk`, `sourceMinimumPassed`, `terminalRepairState`, `actionPatternConvergence`, `workspaceDiagnostics`, `issueHints` |
+| `node_agrun_live_summary` | full run summary including `candidateWords`, `structureOk`, `sourceMinimumPassed`, `terminalRepairState`, `terminalRepairState.workspaceRepairSignal`, `actionPatternConvergence`, `workspaceDiagnostics`, `issueHints` |
 | `tool_result` | `actionName`, `status` (`"success"` / `"error"`), `message` (full when error, ≤200 chars when success), `summary` (≤200 chars) — emitted after every tool execution |
 | `node_agrun_live_debug_artifact` | paths to `.jsonl` and `.md` files (only when debug enabled) |
 
@@ -895,6 +895,34 @@ Key event families:
 | finalize | `provider-requested`, `provider-responded`, `final-response-quality-repair`, `final-response-quality-repaired` |
 | continuation | `continuation-*`, `todo-autopilot-action-progress`, plan/synthesize steps |
 | abort | caller abort rejects with `AbortError`; after abort, no further `onStep` / `onToken` callbacks are delivered |
+
+`planner-repair-failed` step details include a `rejection` object when the
+runtime can classify why the repaired envelope was still unusable. Debug tools
+should treat this as diagnosis, not control flow. Common reasons include
+`unknown_action_name`, `missing_action_name`, `plan_has_no_valid_actions`,
+`terminal_finalize_not_allowed`, and `deterministic_guard_rejected`. The same
+compact object is also mirrored at
+`agent-workflow-packet.parse.rejection` so trace readers can correlate the
+provider response with the validation failure.
+
+When terminal repair is active for long-form workspace output,
+`terminalRepairState.workspaceRepairSignal` is an AI-visible diagnostic and
+action-ordering hint. It contains the selected candidate path, latest
+write/finalize/read indexes, whether the candidate has been read after the
+latest content change, candidate text stats, requested length / remaining
+deficit when known, heading outline with line numbers, duplicate heading or
+section-number samples/contexts, source summary counts, and
+`recommendedActionOrder`. If `mustInspectCandidate=true`, the planner should
+choose `workspace_read` before destructive repair actions such as
+`workspace_replace`, `workspace_write`, `workspace_multi_edit`, or patch
+preview/apply. This is still read-only harness guidance: the runtime surfaces
+facts and valid tools, while the AI authors every targeted repair, rewrite, or
+honest limited publish.
+
+Top-level duplicate heading diagnostics compare the heading label after
+removing leading section numbers. For example, `## 5. Real-World Examples` and
+`## 13. Real-World Examples` are treated as duplicate structure even though the
+section numbers differ.
 
 ### Node SSE Adapter
 

@@ -115,7 +115,7 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
-    const topic = readString$25(value.topic);
+    const topic = readString$27(value.topic);
     const evidenceGraph = trimEvidenceGraph(value.evidenceGraph);
     const reportLoop = trimReportLoop(value.reportLoop);
     const finalEnvelope = value.finalEnvelope && typeof value.finalEnvelope === "object"
@@ -129,10 +129,10 @@
       || researchActivation;
     if (!hasContent) return null;
     return {
-      entityKey: readString$25(value.entityKey),
+      entityKey: readString$27(value.entityKey),
       evidenceGraph,
       finalEnvelope,
-      lastTurnId: readString$25(value.lastTurnId) || null,
+      lastTurnId: readString$27(value.lastTurnId) || null,
       researchActivation,
       reportLoop,
       topic,
@@ -149,8 +149,8 @@
   function serializeResearchSlice(runState, options) {
     if (!runState || typeof runState !== "object") return null;
     const opts = options && typeof options === "object" ? options : {};
-    const topic = readString$25(runState.researchState && runState.researchState.topic)
-      || readString$25(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
+    const topic = readString$27(runState.researchState && runState.researchState.topic)
+      || readString$27(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
     const graph = runState.researchEvidenceGraph;
     const loop = runState.researchReportLoop;
     const envelope = runState.researchFinalEnvelope;
@@ -161,16 +161,16 @@
     const hasLoop = loop && typeof loop === "object"
       && (loop.enabled === true
         || (typeof loop.status === "string" && loop.status && loop.status !== "idle")
-        || readString$25(loop.finalMode));
+        || readString$27(loop.finalMode));
     const hasEnvelope = envelope && typeof envelope === "object";
     if (!topic && !hasGraph && !hasLoop && !hasEnvelope) {
       return null;
     }
     return normalizeResearchSlice({
-      entityKey: readString$25(graph && graph.entity && graph.entity.key),
+      entityKey: readString$27(graph && graph.entity && graph.entity.key),
       evidenceGraph: hasGraph ? graph : null,
       finalEnvelope: hasEnvelope ? envelope : null,
-      lastTurnId: readString$25(opts.turnId) || readString$25(runState.runId) || null,
+      lastTurnId: readString$27(opts.turnId) || readString$27(runState.runId) || null,
       researchActivation: readResearchActivation$3(runState),
       reportLoop: hasLoop ? loop : null,
       topic,
@@ -203,7 +203,7 @@
       if (!runState.researchState || typeof runState.researchState !== "object") {
         runState.researchState = {};
       }
-      if (!readString$25(runState.researchState.topic)) {
+      if (!readString$27(runState.researchState.topic)) {
         runState.researchState.topic = normalized.topic;
       }
     }
@@ -250,25 +250,25 @@
         ? cloneValue$1(value.authorityCoverage)
         : null,
       enabled: value.enabled === true,
-      finalMode: readString$25(value.finalMode) || null,
+      finalMode: readString$27(value.finalMode) || null,
       gateSignal: value.gateSignal && typeof value.gateSignal === "object"
         ? cloneValue$1(value.gateSignal)
         : null,
-      lastTopic: readString$25(value.lastTopic) || null,
+      lastTopic: readString$27(value.lastTopic) || null,
       recentQueries: Array.isArray(value.recentQueries)
         ? cloneValue$1(value.recentQueries).slice(-20)
         : [],
       sourceMinimum: value.sourceMinimum && typeof value.sourceMinimum === "object"
         ? cloneValue$1(value.sourceMinimum)
         : null,
-      status: readString$25(value.status) || "idle",
+      status: readString$27(value.status) || "idle",
       vetoCount: typeof value.vetoCount === "number" ? value.vetoCount : 0,
       version: typeof value.version === "number" ? value.version : 2
     };
   }
 
   function readResearchActivation$3(value) {
-    const explicit = readString$25(value && value.researchActivation).toLowerCase();
+    const explicit = readString$27(value && value.researchActivation).toLowerCase();
     if (explicit === "long_research" || explicit === "long-web-research" || explicit === "deep-research-writer") {
       return "long_research";
     }
@@ -280,7 +280,7 @@
     return "";
   }
 
-  function readString$25(value) {
+  function readString$27(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -771,7 +771,7 @@
   function createThread(options) {
     const source = options && typeof options === "object" ? options : {};
     const now = typeof source.now === "number" ? source.now : Date.now();
-    const id = readString$24(source.id) || generateThreadId(now);
+    const id = readString$26(source.id) || generateThreadId(now);
     return {
       budget: source.budget && typeof source.budget === "object" ? { ...source.budget } : null,
       createdAt: now,
@@ -789,7 +789,7 @@
       // 212a) hydrate cleanly without a migration step.
       todoState: normalizeTodoState(source.todoState),
       toolContext: normalizeToolContext$1(source.toolContext),
-      topic: readString$24(source.topic)
+      topic: readString$26(source.topic)
     };
   }
 
@@ -837,7 +837,7 @@
    */
   function findThreadById(threads, threadId) {
     const list = Array.isArray(threads) ? threads : [];
-    const target = readString$24(threadId);
+    const target = readString$26(threadId);
     if (!target) return null;
     return list.find((thread) => thread && thread.id === target) || null;
   }
@@ -848,7 +848,7 @@
    */
   function appendRecentUserText(thread, text) {
     const existing = Array.isArray(thread && thread.recentUserTexts) ? thread.recentUserTexts : [];
-    const trimmed = readString$24(text);
+    const trimmed = readString$26(text);
     if (!trimmed) return existing.slice();
     const updated = existing.concat([trimmed]);
     if (updated.length <= MAX_RECENT_USER_TEXTS) return updated;
@@ -868,7 +868,7 @@
     const record = sessionRecord && typeof sessionRecord === "object" ? sessionRecord : {};
     const normalizedList = normalizeThreadList(record.threads);
     const threads = normalizedList.length > 0 ? normalizedList : [createDefaultThread()];
-    const requestedActive = readString$24(record.activeThreadId);
+    const requestedActive = readString$26(record.activeThreadId);
     const activeThreadId = findThreadById(threads, requestedActive)
       ? requestedActive
       : threads[0].id;
@@ -893,8 +893,8 @@
     const source = options && typeof options === "object" ? options : {};
     const state = readThreadsState(source.sessionRecord);
     const verdict = source.verdict && typeof source.verdict === "object" ? source.verdict : null;
-    const userText = readString$24(source.userText);
-    const turnId = readString$24(source.turnId) || null;
+    const userText = readString$26(source.userText);
+    const turnId = readString$26(source.turnId) || null;
     const now = typeof source.now === "number" ? source.now : Date.now();
     const maxThreads = Number.isInteger(source.maxThreads) && source.maxThreads > 0
       ? source.maxThreads
@@ -914,7 +914,7 @@
       const newThread = createThread({
         lastActiveAt: now,
         recentUserTexts: userText ? [userText] : [],
-        topic: readString$24(verdict.topic),
+        topic: readString$26(verdict.topic),
         goalAnchor: userText
           ? { createdAt: now, text: userText, turnId }
           : undefined
@@ -922,13 +922,13 @@
       threads.push(newThread);
       activeThreadId = newThread.id;
     } else if (verdict.action === "pivot_back") {
-      const target = readString$24(verdict.threadId);
+      const target = readString$26(verdict.threadId);
       if (target && findThreadById(threads, target)) {
         activeThreadId = target;
       }
       threads = bumpThread(threads, activeThreadId, userText, now, turnId);
     } else if (verdict.action === "continue_thread") {
-      const target = readString$24(verdict.threadId);
+      const target = readString$26(verdict.threadId);
       if (target && findThreadById(threads, target)) {
         activeThreadId = target;
       }
@@ -994,7 +994,7 @@
       const existingAnchor = thread.goalAnchor && typeof thread.goalAnchor === "object"
         ? thread.goalAnchor
         : null;
-      const hasText = Boolean(existingAnchor && readString$24(existingAnchor.text));
+      const hasText = Boolean(existingAnchor && readString$26(existingAnchor.text));
       const nextGoalAnchor = !hasText && userText
         ? { createdAt: now, text: userText, turnId: turnId || null }
         : existingAnchor;
@@ -1025,7 +1025,7 @@
    * words and short noise. Exposed for topic-router scoring + tests.
    */
   function tokenizeTopicText(value) {
-    const text = readString$24(value).toLowerCase();
+    const text = readString$26(value).toLowerCase();
     if (!text) return [];
     const raw = text.split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean);
     const filtered = [];
@@ -1043,8 +1043,8 @@
     }
     return {
       createdAt: typeof value.createdAt === "number" ? value.createdAt : null,
-      text: readString$24(value.text),
-      turnId: readString$24(value.turnId) || null
+      text: readString$26(value.text),
+      turnId: readString$26(value.turnId) || null
     };
   }
 
@@ -1069,7 +1069,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       aggregatedSearchResults: Array.isArray(source.aggregatedSearchResults) ? source.aggregatedSearchResults.slice() : [],
-      lastQuery: readString$24(source.lastQuery) || null,
+      lastQuery: readString$26(source.lastQuery) || null,
       readSources: Array.isArray(source.readSources) ? source.readSources.slice() : [],
       searchPasses: Array.isArray(source.searchPasses) ? source.searchPasses.slice() : [],
       searchResults: Array.isArray(source.searchResults) ? source.searchResults.slice() : []
@@ -1078,13 +1078,13 @@
 
   function normalizeRecentUserTexts(value) {
     if (!Array.isArray(value)) return [];
-    const cleaned = value.map((item) => readString$24(item)).filter(Boolean);
+    const cleaned = value.map((item) => readString$26(item)).filter(Boolean);
     if (cleaned.length <= MAX_RECENT_USER_TEXTS) return cleaned;
     return cleaned.slice(-MAX_RECENT_USER_TEXTS);
   }
 
   function normalizeThreadStatus(value) {
-    const candidate = readString$24(value).toLowerCase();
+    const candidate = readString$26(value).toLowerCase();
     return THREAD_STATUSES.includes(candidate) ? candidate : "active";
   }
 
@@ -1094,7 +1094,7 @@
     return `t-${seedPart.slice(-4)}${randomPart.slice(-4)}`;
   }
 
-  function readString$24(value) {
+  function readString$26(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -1359,7 +1359,7 @@
   });
 
   function createIndexedDBSessionStore(options) {
-    const dbName = readString$23(options && options.dbName) || DEFAULT_DB_NAME$1;
+    const dbName = readString$25(options && options.dbName) || DEFAULT_DB_NAME$1;
     const openTimeoutMs = readPositiveNumber$4(options && options.openTimeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
     let dbPromise = null;
 
@@ -1428,7 +1428,7 @@
       async appendMemory(sessionId, entry) {
         const nextEntry = {
           ...cloneValue$1(entry),
-          key: `${sessionId}:${readString$23(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
+          key: `${sessionId}:${readString$25(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
           sessionId
         };
         await putRecord$1(await getDb(), "memoryEntries", nextEntry);
@@ -1700,14 +1700,14 @@
       return leftTime - rightTime;
     }
 
-    return readString$23(left.id || left.key).localeCompare(readString$23(right.id || right.key));
+    return readString$25(left.id || left.key).localeCompare(readString$25(right.id || right.key));
   }
 
   function cloneNullable$2(value) {
     return value == null ? null : cloneValue$1(value);
   }
 
-  function readString$23(value) {
+  function readString$25(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -1874,7 +1874,7 @@
   });
 
   function createIndexedDBMessageStorage(options = {}) {
-    const dbName = readString$22(options.dbName) || DEFAULT_DB_NAME;
+    const dbName = readString$24(options.dbName) || DEFAULT_DB_NAME;
     const redactor = typeof options.redactor === "function" ? options.redactor : null;
     let dbPromise = null;
 
@@ -1898,10 +1898,10 @@
       },
 
       async listSessions(query = {}) {
-        const since = readNumber$o(query.since);
+        const since = readNumber$p(query.since);
         const limit = readPositiveInteger$o(query.limit);
         const records = (await getAll(await getDb(), "sessions"))
-          .filter((record) => since == null || readNumber$o(record.time && record.time.created) > since)
+          .filter((record) => since == null || readNumber$p(record.time && record.time.created) > since)
           .sort(compareCreated);
         return (limit ? records.slice(0, limit) : records).map((record) => ({
           sessionID: record.sessionID,
@@ -1918,16 +1918,16 @@
 
       async getParts(_sessionID, messageID) {
         return (await getAllByIndex(await getDb(), "parts", "messageID", messageID))
-          .sort((a, b) => (readNumber$o(a.index) || 0) - (readNumber$o(b.index) || 0))
+          .sort((a, b) => (readNumber$p(a.index) || 0) - (readNumber$p(b.index) || 0))
           .map(cloneValue);
       },
 
       async appendSessionDiff(sessionID, fileDiff) {
         const record = {
           ...cloneValue(fileDiff || {}),
-          id: readString$22(fileDiff && fileDiff.id) || `diff-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-          sessionID: readString$22(sessionID) || readString$22(fileDiff && fileDiff.sessionID),
-          ts: readNumber$o(fileDiff && fileDiff.ts) || Date.now()
+          id: readString$24(fileDiff && fileDiff.id) || `diff-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          sessionID: readString$24(sessionID) || readString$24(fileDiff && fileDiff.sessionID),
+          ts: readNumber$p(fileDiff && fileDiff.ts) || Date.now()
         };
         await putRecord(await getDb(), "diffs", record);
         return cloneValue(record);
@@ -1935,7 +1935,7 @@
 
       async getSessionDiff(sessionID) {
         return (await getAllByIndex(await getDb(), "diffs", "sessionID", sessionID))
-          .sort((a, b) => (readNumber$o(a.ts) || 0) - (readNumber$o(b.ts) || 0))
+          .sort((a, b) => (readNumber$p(a.ts) || 0) - (readNumber$p(b.ts) || 0))
           .map(cloneValue);
       }
     };
@@ -2013,11 +2013,11 @@
 
   function normalizeSession(session) {
     const record = cloneValue(session || {});
-    const sessionID = readString$22(record.sessionID) || readString$22(record.sessionId);
+    const sessionID = readString$24(record.sessionID) || readString$24(record.sessionId);
     if (!sessionID) throw new TypeError("createSession requires sessionID.");
     return {
       ...record,
-      schemaVersion: readString$22(record.schemaVersion) || "agrun.storage-session.v1",
+      schemaVersion: readString$24(record.schemaVersion) || "agrun.storage-session.v1",
       sessionID,
       time: normalizeTime(record.time)
     };
@@ -2025,8 +2025,8 @@
 
   function normalizeMessage(sessionID, message) {
     const record = cloneValue(message || {});
-    const id = readString$22(record.id);
-    const resolvedSessionID = readString$22(sessionID) || readString$22(record.sessionID);
+    const id = readString$24(record.id);
+    const resolvedSessionID = readString$24(sessionID) || readString$24(record.sessionID);
     if (!resolvedSessionID) throw new TypeError("writeMessage requires sessionID.");
     if (!id) throw new TypeError("writeMessage requires message.id.");
     return {
@@ -2039,9 +2039,9 @@
 
   function normalizePart(sessionID, messageID, part) {
     const record = cloneValue(part || {});
-    const id = readString$22(record.id);
-    const resolvedSessionID = readString$22(sessionID) || readString$22(record.sessionID);
-    const resolvedMessageID = readString$22(messageID) || readString$22(record.messageID);
+    const id = readString$24(record.id);
+    const resolvedSessionID = readString$24(sessionID) || readString$24(record.sessionID);
+    const resolvedMessageID = readString$24(messageID) || readString$24(record.messageID);
     if (!resolvedSessionID) throw new TypeError("writePart requires sessionID.");
     if (!resolvedMessageID) throw new TypeError("writePart requires messageID.");
     if (!id) throw new TypeError("writePart requires part.id.");
@@ -2064,12 +2064,12 @@
     const source = value && typeof value === "object" ? value : {};
     return {
       ...cloneValue(source),
-      created: readNumber$o(source.created) || Date.now()
+      created: readNumber$p(source.created) || Date.now()
     };
   }
 
   function compareCreated(a, b) {
-    return (readNumber$o(a && a.time && a.time.created) || 0) - (readNumber$o(b && b.time && b.time.created) || 0);
+    return (readNumber$p(a && a.time && a.time.created) || 0) - (readNumber$p(b && b.time && b.time.created) || 0);
   }
 
   function cloneValue(value) {
@@ -2083,11 +2083,11 @@
     return number;
   }
 
-  function readNumber$o(value) {
+  function readNumber$p(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
-  function readString$22(value) {
+  function readString$24(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -2178,7 +2178,7 @@
   const RESOLVED_CLARIFICATION_KINDS = new Set(["confirm", "explicit_answer", "option_select"]);
 
   function isResolvedClarificationKind(value) {
-    return RESOLVED_CLARIFICATION_KINDS.has(readString$21(value));
+    return RESOLVED_CLARIFICATION_KINDS.has(readString$23(value));
   }
 
   function normalizeCandidateSource(value) {
@@ -2186,23 +2186,23 @@
       return null;
     }
 
-    const url = readString$21(value.url);
+    const url = readString$23(value.url);
 
     if (!url) {
       return null;
     }
 
     return {
-      domain: readString$21(value.domain),
-      engine: readString$21(value.engine),
+      domain: readString$23(value.domain),
+      engine: readString$23(value.engine),
       passIndex: typeof value.passIndex === "number" ? value.passIndex : null,
-      query: readString$21(value.query),
+      query: readString$23(value.query),
       rank: typeof value.rank === "number" ? value.rank : null,
-      source: readString$21(value.source),
-      sourceCategory: readString$21(value.sourceCategory),
+      source: readString$23(value.source),
+      sourceCategory: readString$23(value.sourceCategory),
       sourceScore: typeof value.sourceScore === "number" ? value.sourceScore : null,
-      snippet: readString$21(value.snippet) || readString$21(value.content),
-      title: readString$21(value.title),
+      snippet: readString$23(value.snippet) || readString$23(value.content),
+      title: readString$23(value.title),
       url
     };
   }
@@ -2212,7 +2212,7 @@
       return null;
     }
 
-    const url = readString$21(value.url);
+    const url = readString$23(value.url);
 
     if (!url) {
       return null;
@@ -2220,19 +2220,19 @@
 
     return {
       bytes: typeof value.bytes === "number" ? value.bytes : 0,
-      contentType: readString$21(value.contentType),
-      error: readString$21(value.error),
-      message: readString$21(value.message),
-      mode: readString$21(value.mode),
+      contentType: readString$23(value.contentType),
+      error: readString$23(value.error),
+      message: readString$23(value.message),
+      mode: readString$23(value.mode),
       ok: value.ok !== false,
       originStatus: typeof value.originStatus === "number" ? value.originStatus : null,
-      platform: readString$21(value.platform),
-      reason: readString$21(value.reason),
+      platform: readString$23(value.platform),
+      reason: readString$23(value.reason),
       status: typeof value.status === "number" ? value.status : null,
-      text: readString$21(value.text),
+      text: readString$23(value.text),
       textRange: normalizeTextRange$4(value.textRange),
-      tier: readString$21(value.tier),
-      title: readString$21(value.title),
+      tier: readString$23(value.tier),
+      title: readString$23(value.title),
       truncated: value.truncated === true,
       url
     };
@@ -2259,7 +2259,7 @@
 
   function normalizePendingClarification(value, fallbackQuestion) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      const fallback = readString$21(fallbackQuestion);
+      const fallback = readString$23(fallbackQuestion);
 
       if (!fallback) {
         return null;
@@ -2275,14 +2275,14 @@
       };
     }
 
-    const question = readString$21(value.question);
+    const question = readString$23(value.question);
 
     if (!question) {
       return null;
     }
 
     return {
-      id: readString$21(value.id) || `clarify:${question.toLowerCase()}`,
+      id: readString$23(value.id) || `clarify:${question.toLowerCase()}`,
       kind: readPendingKind(value.kind) || "clarification",
       options: Array.isArray(value.options)
         ? value.options
@@ -2290,8 +2290,8 @@
           .filter(Boolean)
         : [],
       question,
-      source: readString$21(value.source) || "structured",
-      sourceTurn: readString$21(value.sourceTurn) || "history"
+      source: readString$23(value.source) || "structured",
+      sourceTurn: readString$23(value.sourceTurn) || "history"
     };
   }
 
@@ -2300,7 +2300,7 @@
       return null;
     }
 
-    const kind = readString$21(value.kind);
+    const kind = readString$23(value.kind);
 
     if (!kind) {
       return null;
@@ -2308,7 +2308,7 @@
 
     return {
       kind,
-      sourceTurn: readString$21(value.sourceTurn) || null,
+      sourceTurn: readString$23(value.sourceTurn) || null,
       value: value.value == null ? null : cloneValue$1(value.value)
     };
   }
@@ -2318,8 +2318,8 @@
       return null;
     }
 
-    const key = readString$21(value.key);
-    const text = readString$21(value.text);
+    const key = readString$23(value.key);
+    const text = readString$23(value.text);
 
     if (!key || !text) {
       return null;
@@ -2380,7 +2380,7 @@
 
     let truncated = false;
     const capLong = (value) => {
-      const s = readString$21(value);
+      const s = readString$23(value);
       if (!s) return "";
       if (s.length <= snippetBudget) return s;
       truncated = true;
@@ -2389,22 +2389,22 @@
 
     const projected = {
       bytes: typeof readSource.bytes === "number" ? readSource.bytes : 0,
-      contentType: readString$21(readSource.contentType),
+      contentType: readString$23(readSource.contentType),
       error: capLong(readSource.error),
       message: capLong(readSource.message),
-      mode: readString$21(readSource.mode),
+      mode: readString$23(readSource.mode),
       ok: readSource.ok !== false,
       originStatus: typeof readSource.originStatus === "number" ? readSource.originStatus : null,
-      platform: readString$21(readSource.platform),
-      reason: readString$21(readSource.reason),
+      platform: readString$23(readSource.platform),
+      reason: readString$23(readSource.reason),
       snippet: capLong(readSource.snippet),
       status: typeof readSource.status === "number" ? readSource.status : null,
       text: capLong(readSource.text),
       textRange: normalizeTextRange$4(readSource.textRange),
-      tier: readString$21(readSource.tier),
-      title: readString$21(readSource.title),
+      tier: readString$23(readSource.tier),
+      title: readString$23(readSource.title),
       truncated: readSource.truncated === true || truncated,
-      url: readString$21(readSource.url)
+      url: readString$23(readSource.url)
     };
 
     if (truncated) {
@@ -2413,7 +2413,7 @@
     return projected;
   }
 
-  function readString$21(value) {
+  function readString$23(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -2480,10 +2480,10 @@
 
     return {
       ...context,
-      activeQuery: readString$20(state.activeQuery) || context.activeQuery,
+      activeQuery: readString$22(state.activeQuery) || context.activeQuery,
       clarificationStatus,
-      currentGoal: readString$20(state.currentGoal) || context.currentGoal,
-      currentTopic: readString$20(state.currentTopic) || context.currentTopic,
+      currentGoal: readString$22(state.currentGoal) || context.currentGoal,
+      currentTopic: readString$22(state.currentTopic) || context.currentTopic,
       lastResolution,
       openAmbiguity: pendingClarification && typeof pendingClarification.question === "string"
         ? pendingClarification.question
@@ -2531,12 +2531,12 @@
     return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
   }
 
-  function readString$20(value) {
+  function readString$22(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function capString(value, maxChars) {
-    const text = readString$20(value);
+    const text = readString$22(value);
     if (!text) return "";
     const budget = Number.isInteger(maxChars) && maxChars > 0 ? maxChars : 0;
     if (budget === 0 || text.length <= budget) return text;
@@ -2621,7 +2621,7 @@
 
     return {
       activeGoal: hasOwn$2(source, "activeGoal") ? readAnchorText(source.activeGoal) : legacy.activeGoal,
-      activeQuery: hasOwn$2(source, "activeQuery") ? readString$1$(source.activeQuery) : legacy.activeQuery,
+      activeQuery: hasOwn$2(source, "activeQuery") ? readString$21(source.activeQuery) : legacy.activeQuery,
       activeTopic: hasOwn$2(source, "activeTopic") ? readAnchorText(source.activeTopic) : legacy.activeTopic,
       candidateSources,
       lastClarificationResolution: hasOwn$2(source, "lastClarificationResolution")
@@ -2644,7 +2644,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value)
       ? value
       : null;
-    const fallbackQuestion = readString$1$(source && source.openAmbiguity);
+    const fallbackQuestion = readString$21(source && source.openAmbiguity);
 
     return {
       ...createEmptyInquiryContext(),
@@ -2711,16 +2711,16 @@
     }
 
     return {
-      compactedContext: readString$1$(source.compactedContext),
-      decisions: readString$1$(source.decisions),
+      compactedContext: readString$21(source.compactedContext),
+      decisions: readString$21(source.decisions),
       estimatedTokens: typeof source.estimatedTokens === "number" ? source.estimatedTokens : 0,
-      facts: readString$1$(source.facts),
-      history: readString$1$(source.history),
+      facts: readString$21(source.facts),
+      history: readString$21(source.history),
       items: Array.isArray(source.items) ? cloneValue$1(source.items) : [],
-      memory: readString$1$(source.memory),
-      preferences: readString$1$(source.preferences),
-      recentTurns: readString$1$(source.recentTurns),
-      summary: readString$1$(source.summary) || readString$1$(source.compactedContext)
+      memory: readString$21(source.memory),
+      preferences: readString$21(source.preferences),
+      recentTurns: readString$21(source.recentTurns),
+      summary: readString$21(source.summary) || readString$21(source.compactedContext)
     };
   }
 
@@ -2729,7 +2729,7 @@
       return null;
     }
 
-    const kind = readString$1$(value.kind);
+    const kind = readString$21(value.kind);
 
     if (!kind) {
       return null;
@@ -2738,10 +2738,10 @@
     return {
       clarificationReply: cloneStructuredValue$3(value.clarificationReply),
       followUpTarget: cloneStructuredValue$3(value.followUpTarget),
-      goal: readString$1$(value.goal),
+      goal: readString$21(value.goal),
       kind,
       needsClarification: value.needsClarification === true,
-      topic: readString$1$(value.topic)
+      topic: readString$21(value.topic)
     };
   }
 
@@ -2750,7 +2750,7 @@
       return null;
     }
 
-    const kind = readString$1$(value.kind);
+    const kind = readString$21(value.kind);
 
     if (!kind) {
       return null;
@@ -2761,8 +2761,8 @@
       decision: cloneStructuredValue$3(value.decision),
       kind,
       pendingClarification: cloneStructuredValue$3(value.pendingClarification),
-      selectedUrl: readString$1$(value.selectedUrl) || null,
-      source: readString$1$(value.source) || null
+      selectedUrl: readString$21(value.selectedUrl) || null,
+      source: readString$21(value.source) || null
     };
   }
 
@@ -2776,12 +2776,12 @@
     return Object.prototype.hasOwnProperty.call(value, key);
   }
 
-  function readString$1$(value) {
+  function readString$21(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readAnchorText(value) {
-    return readString$1$(value).replace(/[.?!]+$/g, "").trim();
+    return readString$21(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function projectSessionContextFromSnapshot(snapshot) {
@@ -2840,10 +2840,10 @@
       activeTopic: context.activeTopic || null,
       candidateSourceCount: context.candidateSources.length,
       hasPendingClarification: Boolean(context.pendingClarification),
-      lastClarificationResolutionKind: readString$1_(
+      lastClarificationResolutionKind: readString$20(
         context.lastClarificationResolution && context.lastClarificationResolution.kind
       ) || null,
-      lastReadSourceUrl: readString$1_(context.lastReadSource && context.lastReadSource.url) || null,
+      lastReadSourceUrl: readString$20(context.lastReadSource && context.lastReadSource.url) || null,
       selectedSource: context.selectedSource
         ? {
             title: context.selectedSource.title || null,
@@ -2859,7 +2859,7 @@
       : null;
   }
 
-  function readString$1_(value) {
+  function readString$20(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3141,8 +3141,8 @@
         throw new Error(`Approval resumeToken rejected: ${verification.reason}.`);
       }
       if (enforceSessionBinding) {
-        const claimedSessionId = readString$1Z(rawToken.sessionId);
-        const providedSessionId = readString$1Z(rawInput.agrunSessionId);
+        const claimedSessionId = readString$1$(rawToken.sessionId);
+        const providedSessionId = readString$1$(rawInput.agrunSessionId);
         if (claimedSessionId && providedSessionId && claimedSessionId !== providedSessionId) {
           throw new Error("Approval resumeToken session binding mismatch.");
         }
@@ -3173,7 +3173,7 @@
     } = options;
     const reason = `Action "${actionName}" requires approval.`;
     const resumable = policy === "ask";
-    const sessionId = readString$1Z(rawInput && rawInput.agrunSessionId) || readString$1Z(request && request.agrunSessionId);
+    const sessionId = readString$1$(rawInput && rawInput.agrunSessionId) || readString$1$(request && request.agrunSessionId);
     const projectedContextSnapshot = runState && runState.contextSnapshot
       ? createContextSnapshot(runState.contextSnapshot)
       : request && request.contextSnapshot
@@ -3235,7 +3235,7 @@
       return null;
     }
 
-    const actionName = readString$1Z(value.actionName);
+    const actionName = readString$1$(value.actionName);
     const policy = readPolicy$1(value.policy);
     const resolution = readResolution(value.resolution) || "pending";
     const resumeToken = readResumeToken(value.resumeToken);
@@ -3247,7 +3247,7 @@
     return {
       actionName,
       policy,
-      reason: readString$1Z(value.reason) || `Action "${actionName}" requires approval.`,
+      reason: readString$1$(value.reason) || `Action "${actionName}" requires approval.`,
       resumable: value.resumable === true,
       resolution,
       resumeToken
@@ -3267,13 +3267,13 @@
 
     return {
       ...sourceRequest,
-      agrunSessionId: readString$1Z(overrides.agrunSessionId) || readString$1Z(source.sessionId) || null,
-      apiKey: isServerAuth ? null : readString$1Z(overrides.apiKey) || readString$1Z(sourceRequest.apiKey) || null,
+      agrunSessionId: readString$1$(overrides.agrunSessionId) || readString$1$(source.sessionId) || null,
+      apiKey: isServerAuth ? null : readString$1$(overrides.apiKey) || readString$1$(sourceRequest.apiKey) || null,
       authMode,
       cachedContentMode: readCachedContentMode$1(overrides.cachedContentMode) || readCachedContentMode$1(sourceRequest.cachedContentMode) || (isServerAuth ? "disabled" : "client"),
-      endpoint: readString$1Z(overrides.endpoint) || readString$1Z(sourceRequest.endpoint) || null,
+      endpoint: readString$1$(overrides.endpoint) || readString$1$(sourceRequest.endpoint) || null,
       fetch: typeof overrides.fetch === "function" ? overrides.fetch : null,
-      streamEndpoint: readString$1Z(overrides.streamEndpoint) || readString$1Z(sourceRequest.streamEndpoint) || null
+      streamEndpoint: readString$1$(overrides.streamEndpoint) || readString$1$(sourceRequest.streamEndpoint) || null
     };
   }
 
@@ -3284,7 +3284,7 @@
     const webSearchAuthMode = rawInput && typeof rawInput === "object" && typeof rawInput.webSearchAuthMode === "string"
       ? rawInput.webSearchAuthMode.trim()
       : null;
-    const agrunSessionId = readString$1Z(rawInput && rawInput.agrunSessionId) || readString$1Z(request && request.agrunSessionId);
+    const agrunSessionId = readString$1$(rawInput && rawInput.agrunSessionId) || readString$1$(request && request.agrunSessionId);
     const authMode = readAuthMode$2(request && request.authMode);
     const isServerAuth = authMode === "server";
 
@@ -3310,7 +3310,7 @@
 
   function normalizeResumeDecision(decision, actionName) {
     if (decision && typeof decision === "object" && !Array.isArray(decision)) {
-      if (decision.type === "clarify" && readString$1Z(decision.question)) {
+      if (decision.type === "clarify" && readString$1$(decision.question)) {
         return {
           question: decision.question.trim(),
           type: "clarify"
@@ -3322,7 +3322,7 @@
           args: decision.args && typeof decision.args === "object" && !Array.isArray(decision.args)
             ? cloneValue$1(decision.args)
             : {},
-          name: readString$1Z(decision.name) || actionName,
+          name: readString$1$(decision.name) || actionName,
           type: "action"
         };
       }
@@ -3340,7 +3340,7 @@
       return null;
     }
 
-    const actionName = readString$1Z(value.actionName);
+    const actionName = readString$1$(value.actionName);
     const policy = readPolicy$1(value.policy);
     const request = value.request && typeof value.request === "object" && !Array.isArray(value.request)
       ? cloneValue$1(value.request)
@@ -3362,7 +3362,7 @@
         : null,
       plannerInvalidCount: typeof value.plannerInvalidCount === "number" ? value.plannerInvalidCount : 0,
       policy,
-      reason: readString$1Z(value.reason),
+      reason: readString$1$(value.reason),
       request,
       stepCount: typeof value.stepCount === "number" ? value.stepCount : 0,
       turnControl: cloneRecordOrNull$1(value.turnControl),
@@ -3381,7 +3381,7 @@
       candidatePathMismatchSignal: cloneRecordOrNull$1(value.candidatePathMismatchSignal),
       virtualWorkspace: cloneRecordOrNull$1(value.virtualWorkspace),
       sessionContextMode: readSessionContextMode(value.sessionContextMode),
-      sessionId: readString$1Z(value.sessionId) || null,
+      sessionId: readString$1$(value.sessionId) || null,
       todoState: value.todoState && typeof value.todoState === "object" && !Array.isArray(value.todoState)
         ? cloneValue$1(value.todoState)
         : null,
@@ -3428,7 +3428,7 @@
       : "";
   }
 
-  function readString$1Z(value) {
+  function readString$1$(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3532,7 +3532,7 @@
     return null;
   }
 
-  function readString$1Y(value) {
+  function readString$1_(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -3544,7 +3544,7 @@
     return fallback === true;
   }
 
-  function readNumber$n(value, fallback) {
+  function readNumber$o(value, fallback) {
     return typeof value === "number" && Number.isFinite(value)
       ? value
       : fallback;
@@ -4096,7 +4096,7 @@
   ];
 
   function resolveRequestedTimeZone(value) {
-    const explicit = readString$1X(value);
+    const explicit = readString$1Z(value);
     if (!explicit) {
       return null;
     }
@@ -4121,7 +4121,7 @@
   }
 
   function normalizeQuery(query) {
-    return readString$1X(query)
+    return readString$1Z(query)
       .toLowerCase()
       .replace(/[?.!,]/g, " ")
       .replace(/\s+/g, " ");
@@ -4213,7 +4213,7 @@
     }
   }
 
-  function readString$1X(value) {
+  function readString$1Z(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -4362,9 +4362,9 @@
       return null;
     }
 
-    const skillId = readString$1W(skill.skillId) || readString$1W(skill.id) || readString$1W(skill.name);
-    const name = readString$1W(skill.name);
-    const instructions = readString$1W(skill.instructions);
+    const skillId = readString$1Y(skill.skillId) || readString$1Y(skill.id) || readString$1Y(skill.name);
+    const name = readString$1Y(skill.name);
+    const instructions = readString$1Y(skill.instructions);
 
     if (!name || !instructions) {
       return null;
@@ -4372,25 +4372,25 @@
 
     return {
       availability: normalizeAvailability$1(skill.availability),
-      category: readString$1W(skill.category),
-      checksum: readString$1W(skill.checksum),
-      description: readString$1W(skill.description),
+      category: readString$1Y(skill.category),
+      checksum: readString$1Y(skill.checksum),
+      description: readString$1Y(skill.description),
       instructions,
       inputTypes: normalizeStringArray$2(skill.inputTypes),
       name,
-      namespace: readString$1W(skill.namespace),
+      namespace: readString$1Y(skill.namespace),
       requires: normalizeStringArray$2(skill.requires),
       riskTier: normalizeRiskTier(skill.riskTier),
       skillId,
-      sourcePath: readString$1W(skill.sourcePath),
+      sourcePath: readString$1Y(skill.sourcePath),
       tags: normalizeStringArray$2(skill.tags),
       tools: normalizeAgentTools(skill.tools),
-      version: readString$1W(skill.version)
+      version: readString$1Y(skill.version)
     };
   }
 
   function findAgentSkill(skills, name) {
-    const target = readString$1W(name).toLowerCase();
+    const target = readString$1Y(name).toLowerCase();
 
     if (!target) {
       return null;
@@ -4406,8 +4406,8 @@
       return null;
     }
 
-    const name = readString$1W(skill.name);
-    const skillId = readString$1W(skill.skillId) || readString$1W(skill.id) || name;
+    const name = readString$1Y(skill.name);
+    const skillId = readString$1Y(skill.skillId) || readString$1Y(skill.id) || name;
 
     if (!name || !skillId) {
       return null;
@@ -4415,19 +4415,19 @@
 
     return {
       availability: normalizeAvailability$1(skill.availability),
-      category: readString$1W(skill.category),
-      checksum: readString$1W(skill.checksum),
-      description: readString$1W(skill.description),
+      category: readString$1Y(skill.category),
+      checksum: readString$1Y(skill.checksum),
+      description: readString$1Y(skill.description),
       inputTypes: normalizeStringArray$2(skill.inputTypes),
       name,
-      namespace: readString$1W(skill.namespace),
+      namespace: readString$1Y(skill.namespace),
       requires: normalizeStringArray$2(skill.requires),
       riskTier: normalizeRiskTier(skill.riskTier),
       skillId,
-      sourcePath: readString$1W(skill.sourcePath),
+      sourcePath: readString$1Y(skill.sourcePath),
       tags: normalizeStringArray$2(skill.tags),
       tools: normalizeAgentToolSummaries(skill.tools),
-      version: readString$1W(skill.version)
+      version: readString$1Y(skill.version)
     };
   }
 
@@ -4493,7 +4493,7 @@
 
   function findAgentSkillTool(skill, toolName) {
     const resolvedSkill = normalizeAgentSkill(skill);
-    const target = readString$1W(toolName).toLowerCase();
+    const target = readString$1Y(toolName).toLowerCase();
 
     if (!resolvedSkill || !target) {
       return null;
@@ -4509,7 +4509,7 @@
 
     return Object.freeze({
       getManifest(skillIdOrName) {
-        const target = readString$1W(skillIdOrName).toLowerCase();
+        const target = readString$1Y(skillIdOrName).toLowerCase();
         if (!target) return null;
         const manifest = manifests.find((item) => matchesSkillKey(item, target));
         return manifest ? createAgentSkillSummary(manifest) : null;
@@ -4520,7 +4520,7 @@
       },
 
       loadSkill(skillIdOrName) {
-        const target = readString$1W(skillIdOrName).toLowerCase();
+        const target = readString$1Y(skillIdOrName).toLowerCase();
         if (!target) return null;
         return normalizedSkills.find((skill) => matchesSkillKey(skill, target)) || null;
       }
@@ -4599,8 +4599,8 @@
       return null;
     }
 
-    const name = readString$1W(tool.name);
-    const description = readString$1W(tool.description);
+    const name = readString$1Y(tool.name);
+    const description = readString$1Y(tool.description);
     const func = typeof tool.func === "function" ? tool.func : null;
 
     if (!name || !description || !func) {
@@ -4631,8 +4631,8 @@
       return null;
     }
 
-    const name = readString$1W(tool.name);
-    const description = readString$1W(tool.description);
+    const name = readString$1Y(tool.name);
+    const description = readString$1Y(tool.description);
 
     if (!name || !description) {
       return null;
@@ -4644,8 +4644,8 @@
       parameters: normalizeToolParameters(tool.parameters)
     };
 
-    if (readString$1W(tool.resultKind)) {
-      summary.resultKind = readString$1W(tool.resultKind);
+    if (readString$1Y(tool.resultKind)) {
+      summary.resultKind = readString$1Y(tool.resultKind);
     }
     if (normalizeRiskTier(tool.riskTier) != null) {
       summary.riskTier = normalizeRiskTier(tool.riskTier);
@@ -4669,8 +4669,8 @@
       }
 
       const prop = {
-        description: readString$1W(value.description),
-        type: readString$1W(value.type)
+        description: readString$1Y(value.description),
+        type: readString$1Y(value.type)
       };
       copySchemaEnum(prop, value);
       copySchemaAliases(prop, value);
@@ -4682,8 +4682,8 @@
         for (const [nk, nv] of Object.entries(value.properties)) {
           if (nv && typeof nv === "object" && !Array.isArray(nv)) {
             const nestedProp = copySchemaEnum({
-              description: readString$1W(nv.description),
-              type: readString$1W(nv.type)
+              description: readString$1Y(nv.description),
+              type: readString$1Y(nv.type)
             }, nv);
             copySchemaAliases(nestedProp, nv);
             nested[nk] = nestedProp;
@@ -4702,7 +4702,7 @@
       required: Array.isArray(source.required)
         ? source.required.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
         : [],
-      type: readString$1W(source.type) || "object"
+      type: readString$1Y(source.type) || "object"
     };
   }
 
@@ -4747,7 +4747,7 @@
     return target;
   }
 
-  function readString$1W(value) {
+  function readString$1Y(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -4791,7 +4791,7 @@
     const seen = new Set();
 
     for (const skill of Array.isArray(skills) ? skills : []) {
-      const key = readString$1W(skill && (skill.skillId || skill.name)).toLowerCase();
+      const key = readString$1Y(skill && (skill.skillId || skill.name)).toLowerCase();
       if (!key) continue;
       if (seen.has(key)) {
         throw new Error(`Duplicate agent skill id "${key}".`);
@@ -4802,8 +4802,8 @@
 
   function matchesSkillKey(skill, target) {
     if (!skill || !target) return false;
-    return readString$1W(skill.skillId).toLowerCase() === target ||
-      readString$1W(skill.name).toLowerCase() === target;
+    return readString$1Y(skill.skillId).toLowerCase() === target ||
+      readString$1Y(skill.name).toLowerCase() === target;
   }
 
   function normalizeMaybeAsync(value, normalize) {
@@ -4817,7 +4817,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "5b911e370-dirty"
+      "7c759787e"
         
     );
   }
@@ -5200,7 +5200,7 @@
   }
 
   function buildCurrentTurnParts(prompt, parts) {
-    const normalizedPrompt = readString$1V(prompt);
+    const normalizedPrompt = readString$1X(prompt);
     const normalizedParts = normalizeMultimodalParts(parts);
     const imageAndExtraParts = normalizedParts.filter((part) => (
       part.type === "image" ||
@@ -5267,7 +5267,7 @@
     }
 
     const label = readImageLabel(part);
-    const mimeType = readString$1V(part.mimeType) || "image/*";
+    const mimeType = readString$1X(part.mimeType) || "image/*";
     const bytes = readImageBytes(part);
     return bytes > 0
       ? `${label} (${mimeType}, ${bytes} bytes)`
@@ -5275,7 +5275,7 @@
   }
 
   function parseDataUrl(value) {
-    const source = readString$1V(value);
+    const source = readString$1X(value);
     const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/i.exec(source);
 
     if (!match) {
@@ -5284,7 +5284,7 @@
 
     return {
       data: match[2],
-      mimeType: readString$1V(match[1]) || "application/octet-stream"
+      mimeType: readString$1X(match[1]) || "application/octet-stream"
     };
   }
 
@@ -5294,13 +5294,13 @@
     }
 
     if (part.type === "text") {
-      const text = readString$1V(part.text);
+      const text = readString$1X(part.text);
       return text ? { type: "text", text } : null;
     }
 
     if (part.type === "image") {
-      const url = readString$1V(part.url);
-      const mimeType = readString$1V(part.mimeType);
+      const url = readString$1X(part.url);
+      const mimeType = readString$1X(part.mimeType);
 
       if (!url || !mimeType) {
         return null;
@@ -5319,11 +5319,11 @@
   }
 
   function readImageLabel(part) {
-    return readString$1V(part && part.filename) || "Image";
+    return readString$1X(part && part.filename) || "Image";
   }
 
   function estimateBase64Bytes(data) {
-    const text = readString$1V(data);
+    const text = readString$1X(data);
 
     if (!text) {
       return 0;
@@ -5342,7 +5342,7 @@
   }
 
   function readOptionalString$2(value) {
-    const text = readString$1V(value);
+    const text = readString$1X(value);
     return text || null;
   }
 
@@ -5352,7 +5352,7 @@
       : null;
   }
 
-  function readString$1V(value) {
+  function readString$1X(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5617,7 +5617,7 @@
    * / invalid URLs are dropped. Order is stable (first occurrence wins).
    */
   function buildThreadScopedEvidenceUrls(memoryEntries, activeThreadId) {
-    const threadId = readString$1U(activeThreadId);
+    const threadId = readString$1W(activeThreadId);
     if (!threadId) return null;
     const list = Array.isArray(memoryEntries) ? memoryEntries : [];
     if (list.length === 0) return null;
@@ -5625,7 +5625,7 @@
     for (const entry of list) {
       if (!entry || typeof entry !== "object") continue;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-      const entryThread = readString$1U(metadata.threadId) || DEFAULT_THREAD_ID;
+      const entryThread = readString$1W(metadata.threadId) || DEFAULT_THREAD_ID;
       if (entryThread !== threadId) continue;
       collectUrlsFromMetadata(metadata, urls);
     }
@@ -5646,23 +5646,23 @@
     const list = Array.isArray(entries) ? entries : [];
     if (!scope || typeof scope !== "object") return list.slice();
     if (scope.crossThread === true) return list.slice();
-    const threadId = readString$1U(scope.threadId);
+    const threadId = readString$1W(scope.threadId);
     if (!threadId) return list.slice();
     return list.filter((entry) => {
       if (!entry || typeof entry !== "object") return false;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-      const entryThread = readString$1U(metadata.threadId) || DEFAULT_THREAD_ID;
+      const entryThread = readString$1W(metadata.threadId) || DEFAULT_THREAD_ID;
       return entryThread === threadId;
     });
   }
 
   function collectUrlsFromMetadata(metadata, sink) {
-    const direct = readString$1U(metadata.url) || readString$1U(metadata.sourceUrl);
+    const direct = readString$1W(metadata.url) || readString$1W(metadata.sourceUrl);
     if (direct) sink.add(direct);
     if (Array.isArray(metadata.sources)) {
       for (const source of metadata.sources) {
         if (source && typeof source === "object") {
-          const url = readString$1U(source.url);
+          const url = readString$1W(source.url);
           if (url) sink.add(url);
         }
       }
@@ -5685,12 +5685,12 @@
 
     const context = projectSessionContextFromSnapshot(snapshot);
     return {
-      activeQuery: readString$1U(context && context.activeQuery),
-      clarificationStatus: readString$1U(context && context.clarificationStatus) || "none",
-      currentGoal: readString$1U(context && context.currentGoal),
-      currentTopic: readString$1U(context && context.currentTopic),
+      activeQuery: readString$1W(context && context.activeQuery),
+      clarificationStatus: readString$1W(context && context.clarificationStatus) || "none",
+      currentGoal: readString$1W(context && context.currentGoal),
+      currentTopic: readString$1W(context && context.currentTopic),
       lastResolution: context && context.lastResolution ? stableClone(context.lastResolution) : null,
-      openAmbiguity: readString$1U(context && context.openAmbiguity),
+      openAmbiguity: readString$1W(context && context.openAmbiguity),
       pendingClarification: context && context.pendingClarification ? stableClone(context.pendingClarification) : null
     };
   }
@@ -5702,7 +5702,7 @@
 
     const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
     const kind = readEvidenceKind(metadata.kind);
-    const status = readString$1U(metadata.status) || "confirmed";
+    const status = readString$1W(metadata.status) || "confirmed";
     const text = readEntryText$1(entry);
 
     if (!kind || status !== "confirmed" || !text) {
@@ -5710,14 +5710,14 @@
     }
 
     const slot = normalizeSlot$1(metadata.slot);
-    const threadId = readString$1U(metadata.threadId) || DEFAULT_THREAD_ID;
-    const turnId = readString$1U(metadata.turnId) || null;
-    const source = readString$1U(metadata.source) || null;
-    const supersededBy = readString$1U(metadata.supersededBy) || null;
+    const threadId = readString$1W(metadata.threadId) || DEFAULT_THREAD_ID;
+    const turnId = readString$1W(metadata.turnId) || null;
+    const source = readString$1W(metadata.source) || null;
+    const supersededBy = readString$1W(metadata.supersededBy) || null;
     const confidence = typeof metadata.confidence === "number"
       ? clampConfidence$2(metadata.confidence)
       : DEFAULT_CONFIDENCE;
-    const id = readString$1U(metadata.id)
+    const id = readString$1W(metadata.id)
       || `${threadId}|${kind}|${slot || normalizeText(text)}|${index}`;
 
     return {
@@ -5776,8 +5776,8 @@
   function anchorTurns(compacted, recentTurns, anchors) {
     const allTurns = Array.isArray(compacted) ? compacted : [];
     const recent = Array.isArray(recentTurns) ? recentTurns : [];
-    const currentGoal = readString$1U(anchors && anchors.currentGoal);
-    const currentTopic = readString$1U(anchors && anchors.currentTopic);
+    const currentGoal = readString$1W(anchors && anchors.currentGoal);
+    const currentTopic = readString$1W(anchors && anchors.currentTopic);
     const selected = new Set(recent.map((turn) => allTurns.indexOf(turn)).filter((index) => index >= 0));
     const goalIndex = findAnchorTurnIndex(allTurns, currentGoal);
     const topicIndex = findAnchorTurnIndex(allTurns, currentTopic);
@@ -5891,7 +5891,7 @@
     }
 
     for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const userText = readString$1U(turns[index] && turns[index].user);
+      const userText = readString$1W(turns[index] && turns[index].user);
       const normalizedUser = normalizeAnchorText$1(userText);
       if (!normalizedUser) {
         continue;
@@ -5914,7 +5914,7 @@
   }
 
   function readEvidenceKind(value) {
-    const normalized = readString$1U(value);
+    const normalized = readString$1W(value);
     return EVIDENCE_KINDS.includes(normalized) ? normalized : "";
   }
 
@@ -5934,17 +5934,17 @@
   }
 
   function normalizeText(value) {
-    return readString$1U(value)
+    return readString$1W(value)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
   }
 
   function normalizeAnchorText$1(value) {
-    return readString$1U(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
+    return readString$1W(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
   }
 
-  function readString$1U(value) {
+  function readString$1W(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -5981,7 +5981,7 @@
     return {
       decisionsCount: countEvidenceItems(items, "decision"),
       ambiguityPresent: hasText(context && context.openAmbiguity),
-      clarificationStatus: readString$1T(context && context.clarificationStatus) || "none",
+      clarificationStatus: readString$1V(context && context.clarificationStatus) || "none",
       factsCount: countEvidenceItems(items, "fact"),
       goalPresent: hasText(context && context.currentGoal),
       historyCount: countHistoryMessages((context && (context.recentTurns || context.history)) || ""),
@@ -6006,7 +6006,7 @@
     }
 
     return [
-      readString$1T(heading) || "Session evidence:",
+      readString$1V(heading) || "Session evidence:",
       renderSection("Current goal", sessionContext.currentGoal),
       renderSection("Current topic", sessionContext.currentTopic),
       renderSection("Active query", sessionContext.activeQuery),
@@ -6150,7 +6150,7 @@
     return text ? `${title}:\n${text}` : "";
   }
 
-  function readString$1T(value) {
+  function readString$1V(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6163,12 +6163,12 @@
   }
 
   function readClarificationStatus$1(value) {
-    const text = readString$1T(value);
+    const text = readString$1V(value);
     return text && text !== "none" ? text : "";
   }
 
   function hasText(value) {
-    return readString$1T(value).length > 0;
+    return readString$1V(value).length > 0;
   }
 
   function countEvidenceItems(items, kind) {
@@ -6182,7 +6182,7 @@
   }
 
   function countHistoryMessages(value) {
-    const text = readString$1T(value);
+    const text = readString$1V(value);
 
     if (!text) {
       return 0;
@@ -6196,7 +6196,7 @@
   }
 
   function countNumberedLines(value) {
-    const text = readString$1T(value);
+    const text = readString$1V(value);
 
     if (!text) {
       return 0;
@@ -6254,13 +6254,13 @@
         usage.input_tokens,
         usage.promptTokenCount
       ),
-      model: readString$1S(output.model) || null,
+      model: readString$1U(output.model) || null,
       outputTokens: readUsageNumber(
         usage.completion_tokens,
         usage.output_tokens,
         usage.candidatesTokenCount
       ),
-      provider: readString$1S(output.provider) || null,
+      provider: readString$1U(output.provider) || null,
       totalTokens: readUsageNumber(
         usage.total_tokens,
         usage.totalTokenCount,
@@ -6289,7 +6289,7 @@
   }
 
   function estimateProviderPromptTokens(request, sessionPolicy) {
-    const provider = readString$1S(request && request.provider) || "openai";
+    const provider = readString$1U(request && request.provider) || "openai";
     const sessionPrompt = buildSessionContextSystemPrompt(request && request.sessionContext);
     const bytesPerToken = readPositiveInteger$m(
       sessionPolicy && sessionPolicy.charsPerToken,
@@ -6306,7 +6306,7 @@
   function estimateOpenAIPromptTokens(request, sessionPrompt, bytesPerToken) {
     let total = OPENAI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
 
-    if (readString$1S(request && request.systemPrompt)) {
+    if (readString$1U(request && request.systemPrompt)) {
       total += estimateMessageTokens("system", request.systemPrompt, bytesPerToken);
     }
 
@@ -6321,7 +6321,7 @@
 
   function estimateGeminiPromptTokens(request, sessionPrompt, bytesPerToken) {
     let total = GEMINI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
-    const systemPrompt = [readString$1S(request && request.systemPrompt), sessionPrompt]
+    const systemPrompt = [readString$1U(request && request.systemPrompt), sessionPrompt]
       .filter(Boolean)
       .join("\n\n");
 
@@ -6348,7 +6348,7 @@
         return total;
       }
 
-      const role = readString$1S(message.role) || "user";
+      const role = readString$1U(message.role) || "user";
       return total + estimatePartsTokens(message.parts, bytesPerToken, overhead, role);
     }, 0);
   }
@@ -6357,7 +6357,7 @@
     const list = Array.isArray(parts) ? parts : [];
     const text = list
       .filter((part) => part && typeof part === "object" && !isImagePart(part))
-      .map((part) => readString$1S(part.text))
+      .map((part) => readString$1U(part.text))
       .filter(Boolean)
       .join("\n");
     const imageCount = list.filter(isImagePart).length;
@@ -6389,7 +6389,7 @@
     return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 
-  function readString$1S(value) {
+  function readString$1U(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -6470,13 +6470,13 @@
     if (!ledger || typeof ledger !== "object") return null;
     if (!params || typeof params !== "object") return null;
 
-    const provider = readString$1R(params.provider);
-    const model = readString$1R(params.model);
-    const inputTokens = readFiniteNumber$6(params.inputTokens);
-    const outputTokens = readFiniteNumber$6(params.outputTokens);
-    const totalTokens = readFiniteNumber$6(params.totalTokens)
+    const provider = readString$1T(params.provider);
+    const model = readString$1T(params.model);
+    const inputTokens = readFiniteNumber$7(params.inputTokens);
+    const outputTokens = readFiniteNumber$7(params.outputTokens);
+    const totalTokens = readFiniteNumber$7(params.totalTokens)
       ?? sumTokens(inputTokens, outputTokens);
-    const latencyMs = readFiniteNumber$6(params.latencyMs);
+    const latencyMs = readFiniteNumber$7(params.latencyMs);
 
     if (
       inputTokens == null &&
@@ -6491,7 +6491,7 @@
     const cost = resolveCost(ledger, {
       provider,
       model,
-      callKind: readString$1R(params.callKind) || null,
+      callKind: readString$1T(params.callKind) || null,
       inputTokens,
       outputTokens
     });
@@ -6505,7 +6505,7 @@
     const entry = {
       ts: Number.isFinite(params.ts) ? params.ts : Date.now(),
       phase: normalizePhase(params.phase),
-      callKind: readString$1R(params.callKind) || null,
+      callKind: readString$1T(params.callKind) || null,
       provider: provider || null,
       model: model || null,
       inputTokens,
@@ -6557,11 +6557,11 @@
 
   function readPricingEntry(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-    const input = readFiniteNumber$6(raw.input);
-    const output = readFiniteNumber$6(raw.output);
+    const input = readFiniteNumber$7(raw.input);
+    const output = readFiniteNumber$7(raw.output);
     if (input == null && output == null) return null;
     const per = readPositiveNumber$2(raw.per) || DEFAULT_PRICING_PER;
-    const currency = readString$1R(raw.currency) || "USD";
+    const currency = readString$1T(raw.currency) || "USD";
     return { input, output, per, currency };
   }
 
@@ -6624,8 +6624,8 @@
   }
 
   function compositeKey(provider, model) {
-    const p = readString$1R(provider).toLowerCase();
-    const m = readString$1R(model).toLowerCase();
+    const p = readString$1T(provider).toLowerCase();
+    const m = readString$1T(model).toLowerCase();
     if (!p && !m) return "";
     return `${p || "n/a"}:${m || "n/a"}`;
   }
@@ -6652,11 +6652,11 @@
     return (input || 0) + (output || 0);
   }
 
-  function readString$1R(value) {
+  function readString$1T(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readFiniteNumber$6(value) {
+  function readFiniteNumber$7(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
@@ -6759,14 +6759,14 @@
       model: typeof detail.model === "string"
         ? detail.model
         : (typeof usage.model === "string" ? usage.model : null),
-      inputTokens: readFiniteNumber$5(usage.inputTokens),
-      outputTokens: readFiniteNumber$5(usage.outputTokens),
-      totalTokens: readFiniteNumber$5(usage.totalTokens),
-      latencyMs: readFiniteNumber$5(detail.durationMs)
+      inputTokens: readFiniteNumber$6(usage.inputTokens),
+      outputTokens: readFiniteNumber$6(usage.outputTokens),
+      totalTokens: readFiniteNumber$6(usage.totalTokens),
+      latencyMs: readFiniteNumber$6(detail.durationMs)
     });
   }
 
-  function readFiniteNumber$5(value) {
+  function readFiniteNumber$6(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
@@ -6943,7 +6943,7 @@
     if (!result || typeof result !== "object") return true;
     const output = result.output && typeof result.output === "object" ? result.output : {};
     if (output.ok === false) return true;
-    return readString$1Q(output.status) === "failed" || readString$1Q(output.status) === "blocked";
+    return readString$1S(output.status) === "failed" || readString$1S(output.status) === "blocked";
   }
 
   function createActionSignature(action, args) {
@@ -6965,7 +6965,7 @@
   function createDecision$2(action, code, actionValue, count, signature) {
     return {
       action,
-      actionName: readString$1Q(actionValue && actionValue.name) || null,
+      actionName: readString$1S(actionValue && actionValue.name) || null,
       code,
       count,
       message: createMessage(action, code, actionValue, count),
@@ -6974,7 +6974,7 @@
   }
 
   function createMessage(action, code, actionValue, count) {
-    const name = readString$1Q(actionValue && actionValue.name) || "action";
+    const name = readString$1S(actionValue && actionValue.name) || "action";
     if (code === "exact_failure_block") return `${name} repeated the same failing arguments ${count} time(s). Choose a different approach.`;
     if (code === "same_action_failure_halt") return `${name} failed ${count} time(s). Stop retrying this action path.`;
     if (code === "same_action_failure_warn") return `${name} has repeated failures. Inspect the failure and change strategy.`;
@@ -6986,12 +6986,12 @@
   function normalizeDecision(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     return {
-      action: readString$1Q(value.action) || "allow",
-      actionName: readString$1Q(value.actionName) || null,
-      code: readString$1Q(value.code) || "allow",
+      action: readString$1S(value.action) || "allow",
+      actionName: readString$1S(value.actionName) || null,
+      code: readString$1S(value.code) || "allow",
       count: readPositiveInteger$l(value.count, 0),
-      message: readString$1Q(value.message),
-      signature: readString$1Q(value.signature) || null
+      message: readString$1S(value.message),
+      signature: readString$1S(value.signature) || null
     };
   }
 
@@ -6999,7 +6999,7 @@
     const output = {};
     if (!value || typeof value !== "object" || Array.isArray(value)) return output;
     for (const [key, count] of Object.entries(value)) {
-      const normalizedKey = readString$1Q(key);
+      const normalizedKey = readString$1S(key);
       if (!normalizedKey) continue;
       output[normalizedKey] = readPositiveInteger$l(count, 0);
     }
@@ -7011,8 +7011,8 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) return output;
     for (const [key, entry] of Object.entries(value)) {
       if (!entry || typeof entry !== "object") continue;
-      const normalizedKey = readString$1Q(key);
-      const outputHash = readString$1Q(entry.outputHash);
+      const normalizedKey = readString$1S(key);
+      const outputHash = readString$1S(entry.outputHash);
       if (!normalizedKey || !outputHash) continue;
       output[normalizedKey] = {
         count: readPositiveInteger$l(entry.count, 0),
@@ -7026,12 +7026,223 @@
     return Number.isInteger(value) && value >= 0 ? value : fallback;
   }
 
+  function readString$1S(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  const DEFAULT_WEB_RESEARCH_RECOVERY_ACTIONS = Object.freeze(["web_search", "read_url"]);
+
+  function normalizeEvidencePolicyConfig(value) {
+    if (value === false) {
+      return {
+        enabled: false,
+        profile: "host",
+        recoveryActions: [],
+        structuredToolEvidence: true
+      };
+    }
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const profile = readString$1R(source.profile) || readString$1R(source.mode) || "web_research";
+    const recoveryActions = Array.isArray(source.recoveryActions)
+      ? source.recoveryActions.map(readString$1R).filter(Boolean)
+      : profile === "web_research"
+        ? DEFAULT_WEB_RESEARCH_RECOVERY_ACTIONS.slice()
+        : [];
+    return {
+      enabled: source.enabled !== false,
+      profile,
+      recoveryActions: Array.from(new Set(recoveryActions)),
+      structuredToolEvidence: source.structuredToolEvidence !== false
+    };
+  }
+
+  function readEvidencePolicy(runtimeConfig) {
+    if (runtimeConfig && runtimeConfig.evidencePolicy === false) {
+      return normalizeEvidencePolicyConfig(false);
+    }
+    const policy = runtimeConfig && runtimeConfig.evidencePolicy && typeof runtimeConfig.evidencePolicy === "object"
+      ? runtimeConfig.evidencePolicy
+      : null;
+    return normalizeEvidencePolicyConfig(policy || {});
+  }
+
+  function readEvidenceRecoveryActions(runtimeConfig) {
+    const policy = readEvidencePolicy(runtimeConfig);
+    return policy.enabled === false ? [] : policy.recoveryActions.slice();
+  }
+
+  function formatEvidenceRecoveryActions(runtimeConfig, fallback = "continue evidence work") {
+    const actions = readEvidenceRecoveryActions(runtimeConfig);
+    return actions.length > 0 ? actions.join("/") : fallback;
+  }
+
+  function countStructuredToolEvidence(runState) {
+    const history = runState &&
+      runState.toolContext &&
+      Array.isArray(runState.toolContext.history)
+      ? runState.toolContext.history
+      : [];
+    return history.filter((entry) => hasStructuredEvidence(entry, 0)).length;
+  }
+
+  function hasStructuredEvidence(value, depth) {
+    if (depth > 3 || value == null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    if (typeof value === "number" || typeof value === "boolean") return true;
+    if (Array.isArray(value)) return value.some((item) => hasStructuredEvidence(item, depth + 1));
+    if (typeof value === "object") {
+      if (value.ok === false || value.error) return false;
+      const output = value.output && typeof value.output === "object" ? value.output : value;
+      return Object.entries(output).some(([, item]) => hasStructuredEvidence(item, depth + 1));
+    }
+    return false;
+  }
+
+  function readString$1R(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  function normalizeFinalReadiness(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    const decision = readString$1Q(value.decision);
+    if (decision !== "ready" && decision !== "limited") {
+      return null;
+    }
+    const requirementsAssessment = normalizeRequirementsAssessment(
+      value.requirementsAssessment || value.selfAudit
+    );
+    const normalized = {
+      decision,
+      evidenceMode: readString$1Q(value.evidenceMode) || null,
+      limitations: readString$1Q(value.limitations) || null
+    };
+    if (requirementsAssessment) {
+      normalized.requirementsAssessment = requirementsAssessment;
+    }
+    return normalized;
+  }
+
+  function createFinalReadinessAssessment(options = {}) {
+    const runState = options.runState && typeof options.runState === "object" ? options.runState : {};
+    const finalReadiness = normalizeFinalReadiness(options.finalReadiness);
+    const quality = runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+      && runState.virtualWorkspace.quality && typeof runState.virtualWorkspace.quality === "object"
+      ? runState.virtualWorkspace.quality
+      : {};
+    const researchState = runState.researchState && typeof runState.researchState === "object"
+      ? runState.researchState
+      : {};
+    const finalCandidateStats = normalizeTextStats$7(quality.finalCandidateStats);
+    const successfulReadUrlCount = countSuccessfulReadUrlArtifacts(runState);
+    const successfulEvidenceCount = countSuccessfulEvidenceArtifacts(runState, options.runtimeConfig);
+    const observed = {
+      finalCandidateReady: quality.finalCandidateReady === true,
+      finalCandidateStats,
+      researchFinalAllowed: researchState.finalAllowed === true,
+      researchFinalReason: readString$1Q(researchState.finalReason) || null,
+      researchGaps: Array.isArray(researchState.gaps)
+        ? researchState.gaps.map(readString$1Q).filter(Boolean).slice(0, 12)
+        : [],
+      researchQualityGateRequired: researchState.qualityGateRequired === true,
+      successfulEvidenceCount,
+      successfulReadUrlCount
+    };
+    const hasAssessment = Boolean(finalReadiness && finalReadiness.requirementsAssessment);
+    const result = {
+      ai: hasAssessment ? finalReadiness.requirementsAssessment : null,
+      observed,
+      status: hasAssessment ? "declared" : "missing"
+    };
+    return result;
+  }
+
+  function countSuccessfulReadUrlArtifacts(runState) {
+    const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
+      ? runState.researchContext.readSources
+      : [];
+    return readSources.filter((source) => {
+      if (!source || typeof source !== "object") return false;
+      if (source.ok === false) return false;
+      const status = typeof source.status === "number" ? source.status : null;
+      const originStatus = typeof source.originStatus === "number" ? source.originStatus : null;
+      if (status != null && status >= 400) return false;
+      if (originStatus != null && originStatus >= 400) return false;
+      return Boolean(readString$1Q(source.text) || readString$1Q(source.title));
+    }).length;
+  }
+
+  function normalizeRequirementsAssessment(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    return {
+      checkedReadinessAgainstUserRequest: value.checkedReadinessAgainstUserRequest === true,
+      checkedEvidence: value.checkedEvidence === true,
+      checkedReadUrlEvidence: value.checkedReadUrlEvidence === true,
+      checkedWorkspaceStats: value.checkedWorkspaceStats === true,
+      evidenceSatisfied: typeof value.evidenceSatisfied === "boolean" ? value.evidenceSatisfied : null,
+      lengthSatisfied: typeof value.lengthSatisfied === "boolean" ? value.lengthSatisfied : null,
+      observedLength: readFiniteNumber$5(value.observedLength) ?? readFiniteNumber$5(value.actualLength),
+      observedLengthUnit: normalizeLengthUnit$1(value.observedLengthUnit || value.lengthUnit),
+      remainingGaps: Array.isArray(value.remainingGaps)
+        ? value.remainingGaps.map(readString$1Q).filter(Boolean).slice(0, 12)
+        : [],
+      requestedLength: readFiniteNumber$5(value.requestedLength),
+      requirementSatisfied: typeof value.requirementSatisfied === "boolean" ? value.requirementSatisfied : null,
+      summary: readString$1Q(value.summary) || null,
+      successfulEvidenceCount: readFiniteNumber$5(value.successfulEvidenceCount),
+      successfulReadUrlCount: readFiniteNumber$5(value.successfulReadUrlCount),
+      userRequirementSummary: readString$1Q(value.userRequirementSummary) || null
+    };
+  }
+
+  function countSuccessfulEvidenceArtifacts(runState, runtimeConfig) {
+    const policy = readEvidencePolicy(runtimeConfig);
+    if (policy.enabled === false) return 0;
+    const readUrlCount = countSuccessfulReadUrlArtifacts(runState);
+    const structuredToolCount = policy.structuredToolEvidence
+      ? countStructuredToolEvidence(runState)
+      : 0;
+    return readUrlCount + structuredToolCount;
+  }
+
+  function normalizeTextStats$7(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const hasAny = ["chars", "nonWhitespaceChars", "cjkChars", "words"].some((key) => Number.isFinite(source[key]));
+    if (!hasAny) return null;
+    return {
+      chars: readNumber$n(source.chars),
+      cjkChars: readNumber$n(source.cjkChars),
+      nonWhitespaceChars: readNumber$n(source.nonWhitespaceChars),
+      words: readNumber$n(source.words)
+    };
+  }
+
+  function normalizeLengthUnit$1(value) {
+    const text = readString$1Q(value).toLowerCase();
+    if (text === "word" || text === "words") return "words";
+    if (text === "token" || text === "tokens") return "tokens";
+    if (text === "cjk_chars" || text.includes("\u4e2d\u6587") || text === "\u5b57" || text === "\u5b57\u6570") return "cjk_chars";
+    if (text === "\u5b57\u7b26" || text === "char" || text === "chars" || text === "characters") return "chars";
+    return "chars";
+  }
+
+  function readFiniteNumber$5(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  function readNumber$n(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  }
+
   function readString$1Q(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  // AGRUN-263 — built-in default. Tool-loop hosts (e.g. ERP) can REPLACE
-  // this list via `runtimeConfig.productiveProgressDimensions`, e.g.
+  // AGRUN-263 — built-in default. Tool-loop hosts can REPLACE this list via
+  // `runtimeConfig.productiveProgressDimensions`, e.g.
   // `["workspace","source","tool_result"]`. Replacement (not merge) is
   // intentional so misconfiguration is loud rather than silently additive.
   const DEFAULT_PRODUCTIVE_PROGRESS_DIMENSIONS = ["workspace", "source"];
@@ -7043,15 +7254,25 @@
           .filter(Boolean)
       : null;
     if (configured && configured.length > 0) return configured.slice();
-    return DEFAULT_PRODUCTIVE_PROGRESS_DIMENSIONS.slice();
+    const defaults = DEFAULT_PRODUCTIVE_PROGRESS_DIMENSIONS.slice();
+    const evidencePolicy = runtimeConfig && runtimeConfig.evidencePolicy && typeof runtimeConfig.evidencePolicy === "object"
+      ? runtimeConfig.evidencePolicy
+      : null;
+    if (evidencePolicy && evidencePolicy.enabled !== false && evidencePolicy.profile && evidencePolicy.profile !== "web_research") {
+      defaults.push("evidence");
+    }
+    return defaults;
   }
 
-  function createProgressSnapshot$1(runState) {
+  function createProgressSnapshot$1(runState, runtimeConfig) {
     const source = runState && typeof runState === "object" ? runState : {};
     const researchContext = source.researchContext && typeof source.researchContext === "object" ? source.researchContext : {};
     const readSources = Array.isArray(researchContext.readSources) ? researchContext.readSources : [];
     const searchResults = collectSearchResults$1(researchContext);
     const sourceMinimum = readSourceMinimum$4(source);
+    const evidenceMinimum = readEvidenceMinimum(source, sourceMinimum);
+    const successfulReadUrlCount = readSuccessfulReadUrlCount$3(source, readSources);
+    const successfulEvidenceCount = readSuccessfulEvidenceCount$1(source, readSources, runtimeConfig, successfulReadUrlCount);
     const candidate = readCandidateSnapshot$2(source);
     const todo = readTodoSnapshot(source);
     const skill = readSkillSnapshot(source);
@@ -7061,16 +7282,20 @@
 
     return {
       candidate,
+      evidenceArtifactCount: evidenceMinimum ? readNumber$m(evidenceMinimum.evidenceArtifacts) : readSources.length,
+      evidenceMinimumPassed: evidenceMinimum ? evidenceMinimum.passed === true : false,
       memoryEntriesAdded,
       readSourceCount: readSources.length,
       readSourceUrlCount: countDistinctReadUrls(readSources),
+      relevantEvidenceArtifactCount: evidenceMinimum ? readNumber$m(evidenceMinimum.relevantEvidenceArtifacts) : countRelevantReadSources(readSources),
       relevantSourceCount: sourceMinimum ? readNumber$m(sourceMinimum.relevantSources) : countRelevantReadSources(readSources),
       requestedLength: readRequestedLengthStatus(source),
       searchPassCount: Array.isArray(researchContext.searchPasses) ? researchContext.searchPasses.length : 0,
       searchResultUrlCount: countDistinctSearchUrls(searchResults),
       skill,
       sourceMinimumPassed: sourceMinimum ? sourceMinimum.passed === true : false,
-      successfulReadUrlCount: readSuccessfulReadUrlCount$3(source, readSources),
+      successfulEvidenceCount,
+      successfulReadUrlCount,
       todo,
       toolHistoryCount: source.toolContext && Array.isArray(source.toolContext.history)
         ? source.toolContext.history.length
@@ -7089,6 +7314,12 @@
       ? options.extraDimensions.filter((d) => typeof d === "string" && d)
       : [];
     const dimensions = [];
+    if (after.successfulEvidenceCount > before.successfulEvidenceCount ||
+        after.evidenceArtifactCount > before.evidenceArtifactCount ||
+        after.relevantEvidenceArtifactCount > before.relevantEvidenceArtifactCount ||
+        (after.evidenceMinimumPassed === true && before.evidenceMinimumPassed !== true)) {
+      dimensions.push("evidence");
+    }
     if (after.successfulReadUrlCount > before.successfulReadUrlCount ||
         after.readSourceUrlCount > before.readSourceUrlCount ||
         after.relevantSourceCount > before.relevantSourceCount ||
@@ -7144,9 +7375,12 @@
         path: readString$1P(source.candidate && source.candidate.path) || null,
         words: readNumber$m(source.candidate && source.candidate.words)
       },
+      evidenceArtifactCount: readNumber$m(source.evidenceArtifactCount != null ? source.evidenceArtifactCount : source.readSourceCount),
+      evidenceMinimumPassed: source.evidenceMinimumPassed === true || source.sourceMinimumPassed === true,
       memoryEntriesAdded: readNumber$m(source.memoryEntriesAdded),
       readSourceCount: readNumber$m(source.readSourceCount),
       readSourceUrlCount: readNumber$m(source.readSourceUrlCount),
+      relevantEvidenceArtifactCount: readNumber$m(source.relevantEvidenceArtifactCount != null ? source.relevantEvidenceArtifactCount : source.relevantSourceCount),
       relevantSourceCount: readNumber$m(source.relevantSourceCount),
       requestedLength: {
         observed: readNumber$m(source.requestedLength && source.requestedLength.observed),
@@ -7161,6 +7395,7 @@
         loadedCount: readNumber$m(source.skill && source.skill.loadedCount)
       },
       sourceMinimumPassed: source.sourceMinimumPassed === true,
+      successfulEvidenceCount: readNumber$m(source.successfulEvidenceCount != null ? source.successfulEvidenceCount : source.successfulReadUrlCount),
       successfulReadUrlCount: readNumber$m(source.successfulReadUrlCount),
       todo: {
         completed: readNumber$m(source.todo && source.todo.completed),
@@ -7180,12 +7415,16 @@
     const snapshot = normalizeProgressSnapshot$1(value);
     return {
       candidate: snapshot.candidate,
+      evidenceArtifactCount: snapshot.evidenceArtifactCount,
+      evidenceMinimumPassed: snapshot.evidenceMinimumPassed,
       readSourceCount: snapshot.readSourceCount,
       readSourceUrlCount: snapshot.readSourceUrlCount,
+      relevantEvidenceArtifactCount: snapshot.relevantEvidenceArtifactCount,
       relevantSourceCount: snapshot.relevantSourceCount,
       searchPassCount: snapshot.searchPassCount,
       searchResultUrlCount: snapshot.searchResultUrlCount,
       sourceMinimumPassed: snapshot.sourceMinimumPassed,
+      successfulEvidenceCount: snapshot.successfulEvidenceCount,
       successfulReadUrlCount: snapshot.successfulReadUrlCount,
       todo: snapshot.todo,
       workspace: snapshot.workspace
@@ -7288,6 +7527,20 @@
     return loop.sourceMinimum && typeof loop.sourceMinimum === "object" ? loop.sourceMinimum : null;
   }
 
+  function readEvidenceMinimum(runState, sourceMinimum = readSourceMinimum$4(runState)) {
+    const packet = readAcceptancePacket$3(runState);
+    if (packet && packet.evidence && packet.evidence.evidenceMinimum && typeof packet.evidence.evidenceMinimum === "object") {
+      return packet.evidence.evidenceMinimum;
+    }
+    const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+      ? runState.researchReportLoop
+      : {};
+    if (loop.evidenceMinimum && typeof loop.evidenceMinimum === "object") {
+      return loop.evidenceMinimum;
+    }
+    return buildEvidenceMinimumFromSourceMinimum(sourceMinimum);
+  }
+
   function readAcceptancePacket$3(runState) {
     const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
       ? runState.researchReportLoop
@@ -7362,6 +7615,32 @@
     }
     const sources = Array.isArray(readSources) ? readSources : [];
     return sources.filter((source) => source && (source.ok === true || source.status === 200 || source.status === "ok")).length;
+  }
+
+  function readSuccessfulEvidenceCount$1(runState, readSources, runtimeConfig, successfulReadUrlCount) {
+    const packet = readAcceptancePacket$3(runState);
+    if (packet && packet.evidence) {
+      const value = readNullableNumber$7(packet.evidence.successfulEvidenceCount);
+      if (value != null) return value;
+    }
+    const policy = runtimeConfig && runtimeConfig.evidencePolicy && typeof runtimeConfig.evidencePolicy === "object"
+      ? runtimeConfig.evidencePolicy
+      : null;
+    if (policy && policy.enabled !== false && policy.profile && policy.profile !== "web_research") {
+      return countSuccessfulEvidenceArtifacts(runState, runtimeConfig);
+    }
+    return readNumber$m(successfulReadUrlCount != null ? successfulReadUrlCount : readSuccessfulReadUrlCount$3(runState, readSources));
+  }
+
+  function buildEvidenceMinimumFromSourceMinimum(sourceMinimum) {
+    if (!sourceMinimum || typeof sourceMinimum !== "object") return null;
+    return {
+      evidenceArtifacts: readNumber$m(sourceMinimum.readSources),
+      minEvidenceArtifacts: readNumber$m(sourceMinimum.minReadSources),
+      minRelevantEvidenceArtifacts: readNumber$m(sourceMinimum.minRelevantSources),
+      passed: sourceMinimum.passed === true,
+      relevantEvidenceArtifacts: readNumber$m(sourceMinimum.relevantSources)
+    };
   }
 
   function countRelevantReadSources(readSources) {
@@ -7770,8 +8049,8 @@
     const previous = runState.researchState && typeof runState.researchState === "object"
       ? runState.researchState
       : {};
-    const recoveryMode = detectFinalizeOnlyResearchRecovery(runState, options)
-      ? "finalize_existing_evidence"
+    const recoveryMode = detectContinuedResearchThread(runState, options)
+      ? "continued_research_thread"
       : null;
     const required = isLongResearchRun(runState, options);
     const topic = extractResearchTopic(runState, options);
@@ -7839,7 +8118,7 @@
       : {};
     const recoveryMode = readString$1N(options && options.recoveryMode)
       || readString$1N(state.recoveryMode);
-    const prompt = recoveryMode === "finalize_existing_evidence"
+    const prompt = recoveryMode === "continued_research_thread"
       ? readString$1N(runState && runState.threadGoalAnchorText)
         || readString$1N(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)
         || readString$1N(runState && runState.originalQuery)
@@ -7973,17 +8252,29 @@
     return isLongResearchRun(runState, options);
   }
 
-  function detectFinalizeOnlyResearchRecovery(runState, options = {}) {
+  // AGRUN-246-E/J — fact-based, NO prompt regex. The runtime exposes the
+  // FACT that this turn continues a research thread already carrying
+  // evidence; the AI's planner owns the finalize-vs-more-research choice
+  // by picking its next action (finalize/final_answer vs web_search/read_url).
+  //
+  // What was deleted: three English-only regex helpers
+  // (`hasFinalizeExistingEvidenceIntent` / `hasExplicitMoreResearchIntent`
+  // /`hasExplicitNewTopicIntent`) that scanned the follow-up prompt to
+  // decide "user wants finalize" and armed a force-finalize bypass
+  // (`maybeCreateFinalizeOnlyResearchRecoveryFinal` in
+  // action-loop-session-loop.js, also deleted). That was push-mode disguised
+  // as recovery: runtime classified intent before the AI saw the prompt, then
+  // finalized for it. Per the 2026-05-23 non-ai-first audit §C2 + the
+  // ai-first-push-deletion contract, intent classification belongs to the AI.
+  //
+  // The remaining signal is a fact only: existing artifacts + a continued
+  // thread (follow-up turn or a stable cross-turn topic) + not a declared new
+  // topic. It re-keys the workspace topic/goal source to the thread anchor and
+  // is surfaced read-only to the planner; it never forces an action.
+  function detectContinuedResearchThread(runState, options = {}) {
     if (!hasExistingResearchArtifacts(runState)) return false;
-    const prompt = readCurrentPrompt(runState, options);
-    if (!prompt) return false;
-    if (!isFollowUpTurn(runState, options) && !readStableResearchTopic(runState, options)) {
-      return false;
-    }
-    if (hasExplicitMoreResearchIntent(prompt) || hasExplicitNewTopicIntent(runState, options)) {
-      return false;
-    }
-    return hasFinalizeExistingEvidenceIntent(prompt);
+    if (isNewResearchTopicTurn(runState, options)) return false;
+    return isFollowUpTurn(runState, options) || Boolean(readStableResearchTopic(runState, options));
   }
 
   function readStableResearchTopic(runState, options = {}) {
@@ -8194,7 +8485,7 @@
   }
 
   function extractResearchTopic(runState, options) {
-    if (detectFinalizeOnlyResearchRecovery(runState, options)) {
+    if (detectContinuedResearchThread(runState, options)) {
       const stableTopic = readStableResearchTopic(runState, options);
       if (stableTopic) return stableTopic;
     }
@@ -8227,14 +8518,6 @@
     const quoted = prompt.match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
     if (quoted) return quoted[1].trim();
     return prompt.trim().slice(0, 160);
-  }
-
-  function readCurrentPrompt(runState, options) {
-    return readString$1N(options && options.prompt)
-      || readString$1N(runState && runState.observationSummary && runState.observationSummary.prompt)
-      || readString$1N(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.goal)
-      || readString$1N(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.goal)
-      || readString$1N(runState && runState.originalQuery);
   }
 
   function hasExistingResearchArtifacts(runState) {
@@ -8282,47 +8565,24 @@
     return kinds.includes("follow_up") || kinds.includes("continuation");
   }
 
-  function hasFinalizeExistingEvidenceIntent(prompt) {
-    const text = readString$1N(prompt).toLowerCase();
-    if (!text) return false;
-    return /\bfinali[sz]e\b/.test(text) ||
-      /\b(?:answer|summari[sz]e|produce|write|complete|finish)\b/.test(text) && /\b(?:existing|available|collected|already|current|gathered)\b/.test(text) ||
-      /\b(?:existing|available|collected|already|current|gathered)\s+(?:evidence|sources?|information|data)\b/.test(text) ||
-      /\bwhatever\s+(?:information|evidence)\s+(?:is\s+)?available\b/.test(text);
-  }
-
-  function hasExplicitMoreResearchIntent(prompt) {
-    const text = readString$1N(prompt).toLowerCase();
-    if (/\b(?:without|no|do not|don't)\s+(?:more\s+)?(?:search|research|read|look\s+up|find)\b/.test(text)) {
-      return false;
-    }
-    return /\b(?:search|research|investigate|look\s+up|read|find)\b.{0,40}\b(?:more|additional|extra|new|fresh|another|different)\b/.test(text) ||
-      /\b(?:more|additional|extra|new|fresh|another|different)\b.{0,40}\b(?:sources?|evidence|search|research|reads?|web)\b/.test(text);
-  }
-
-  function hasExplicitNewTopicIntent(runState, options) {
+  // AGRUN-246-E/J — fact-based "new topic" signal. Reads only the AI/router-
+  // declared `turnIntent.kind === "new_task"`; no prompt regex, no stable-vs-
+  // prompt topic-token comparison. A genuine pivot to a new research topic is
+  // the turn-intent layer's call (turn-intent-planner.js), not a runtime
+  // lexical guess.
+  function isNewResearchTopicTurn(runState, options) {
     const kind = readString$1N(options && options.turnIntent && options.turnIntent.kind)
       || readString$1N(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind)
       || readString$1N(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind)
       || readString$1N(runState && runState.turnState && runState.turnState.turnIntentKind);
-    if (kind === "new_task") return true;
-    const prompt = readCurrentPrompt(runState, options);
-    if (!prompt) return false;
-    const stableTopic = readStableResearchTopic(runState, { ...options, skipPromptTopic: true });
-    const promptTopic = extractTopicFromPrompt(prompt);
-    return Boolean(stableTopic && promptTopic && normalizeTopicKey$1(stableTopic) !== normalizeTopicKey$1(promptTopic) && /\b(?:research|investigate|look\s+up|find\s+out)\b/i.test(prompt));
+    return kind === "new_task";
   }
 
   function isUsableStableTopic(topic, options) {
     if (!topic) return false;
     if (options && options.skipPromptTopic && topic === extractTopicFromPrompt(readString$1N(options.prompt))) return false;
-    if (hasFinalizeExistingEvidenceIntent(topic)) return false;
     if (/^(?:research topic|n\/a)$/i.test(topic)) return false;
     return true;
-  }
-
-  function normalizeTopicKey$1(value) {
-    return readString$1N(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
 
   function collectSearchResults(runState) {
@@ -8431,6 +8691,8 @@
     "workspace_propose_patch",
     "workspace_apply_patch",
     "workspace_insert_after_section",
+    "workspace_multi_edit",
+    "workspace_review_candidate",
     "workspace_finalize_candidate",
     "workspace_publish_candidate_limited_with_remainingGaps"
   ];
@@ -8486,7 +8748,7 @@
     const outcomeHash = readString$1M(context.outcomeHash) || createOutcomeHash(runState, context, actionName);
     const semanticFingerprint = readString$1M(context.semanticFingerprint) ||
       createSemanticTerminalFingerprint(runState, context, actionName);
-    const snapshot = createProgressSnapshot$1(runState);
+    const snapshot = createProgressSnapshot$1(runState, context.runtimeConfig);
     // AGRUN-263 — `tool_result` dimension: when configured productive
     // whitelist includes `tool_result`, AND the new toolHistory entry is a
     // genuinely NEW (action+args) call vs. last N, count it as productive.
@@ -9037,7 +9299,7 @@
       const productiveDims = Array.isArray(progress.productiveDimensions)
         ? progress.productiveDimensions
         : [];
-      const hasSourceProgress = productiveDims.includes("source");
+      const hasSourceProgress = productiveDims.includes("source") || productiveDims.includes("evidence");
       // Source progress (successful read_url adding a relevant source) is a
       // strong signal of recovery — clear immediately. Workspace-only
       // progress (e.g. a single workspace_replace after several reads) is
@@ -11906,134 +12168,9 @@
     return Number.isFinite(value) ? value : 0;
   }
 
-  function normalizeFinalReadiness(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-    const decision = readString$1H(value.decision);
-    if (decision !== "ready" && decision !== "limited") {
-      return null;
-    }
-    const requirementsAssessment = normalizeRequirementsAssessment(
-      value.requirementsAssessment || value.selfAudit
-    );
-    const normalized = {
-      decision,
-      evidenceMode: readString$1H(value.evidenceMode) || null,
-      limitations: readString$1H(value.limitations) || null
-    };
-    if (requirementsAssessment) {
-      normalized.requirementsAssessment = requirementsAssessment;
-    }
-    return normalized;
-  }
-
-  function createFinalReadinessAssessment(options = {}) {
-    const runState = options.runState && typeof options.runState === "object" ? options.runState : {};
-    const finalReadiness = normalizeFinalReadiness(options.finalReadiness);
-    const quality = runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
-      && runState.virtualWorkspace.quality && typeof runState.virtualWorkspace.quality === "object"
-      ? runState.virtualWorkspace.quality
-      : {};
-    const researchState = runState.researchState && typeof runState.researchState === "object"
-      ? runState.researchState
-      : {};
-    const finalCandidateStats = normalizeTextStats$6(quality.finalCandidateStats);
-    const successfulReadUrlCount = countSuccessfulReadUrlArtifacts(runState);
-    const observed = {
-      finalCandidateReady: quality.finalCandidateReady === true,
-      finalCandidateStats,
-      researchFinalAllowed: researchState.finalAllowed === true,
-      researchFinalReason: readString$1H(researchState.finalReason) || null,
-      researchGaps: Array.isArray(researchState.gaps)
-        ? researchState.gaps.map(readString$1H).filter(Boolean).slice(0, 12)
-        : [],
-      researchQualityGateRequired: researchState.qualityGateRequired === true,
-      successfulReadUrlCount
-    };
-    const hasAssessment = Boolean(finalReadiness && finalReadiness.requirementsAssessment);
-    const result = {
-      ai: hasAssessment ? finalReadiness.requirementsAssessment : null,
-      observed,
-      status: hasAssessment ? "declared" : "missing"
-    };
-    return result;
-  }
-
-  function countSuccessfulReadUrlArtifacts(runState) {
-    const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
-      ? runState.researchContext.readSources
-      : [];
-    return readSources.filter((source) => {
-      if (!source || typeof source !== "object") return false;
-      if (source.ok === false) return false;
-      const status = typeof source.status === "number" ? source.status : null;
-      const originStatus = typeof source.originStatus === "number" ? source.originStatus : null;
-      if (status != null && status >= 400) return false;
-      if (originStatus != null && originStatus >= 400) return false;
-      return Boolean(readString$1H(source.text) || readString$1H(source.title));
-    }).length;
-  }
-
-  function normalizeRequirementsAssessment(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-    return {
-      checkedReadinessAgainstUserRequest: value.checkedReadinessAgainstUserRequest === true,
-      checkedReadUrlEvidence: value.checkedReadUrlEvidence === true,
-      checkedWorkspaceStats: value.checkedWorkspaceStats === true,
-      evidenceSatisfied: typeof value.evidenceSatisfied === "boolean" ? value.evidenceSatisfied : null,
-      lengthSatisfied: typeof value.lengthSatisfied === "boolean" ? value.lengthSatisfied : null,
-      observedLength: readFiniteNumber$4(value.observedLength) ?? readFiniteNumber$4(value.actualLength),
-      observedLengthUnit: normalizeLengthUnit(value.observedLengthUnit || value.lengthUnit),
-      remainingGaps: Array.isArray(value.remainingGaps)
-        ? value.remainingGaps.map(readString$1H).filter(Boolean).slice(0, 12)
-        : [],
-      requestedLength: readFiniteNumber$4(value.requestedLength),
-      requirementSatisfied: typeof value.requirementSatisfied === "boolean" ? value.requirementSatisfied : null,
-      summary: readString$1H(value.summary) || null,
-      successfulReadUrlCount: readFiniteNumber$4(value.successfulReadUrlCount),
-      userRequirementSummary: readString$1H(value.userRequirementSummary) || null
-    };
-  }
-
-  function normalizeTextStats$6(value) {
-    const source = value && typeof value === "object" ? value : {};
-    const hasAny = ["chars", "nonWhitespaceChars", "cjkChars", "words"].some((key) => Number.isFinite(source[key]));
-    if (!hasAny) return null;
-    return {
-      chars: readNumber$j(source.chars),
-      cjkChars: readNumber$j(source.cjkChars),
-      nonWhitespaceChars: readNumber$j(source.nonWhitespaceChars),
-      words: readNumber$j(source.words)
-    };
-  }
-
-  function normalizeLengthUnit(value) {
-    const text = readString$1H(value).toLowerCase();
-    if (text === "word" || text === "words") return "words";
-    if (text === "token" || text === "tokens") return "tokens";
-    if (text === "cjk_chars" || text.includes("\u4e2d\u6587") || text === "\u5b57" || text === "\u5b57\u6570") return "cjk_chars";
-    if (text === "\u5b57\u7b26" || text === "char" || text === "chars" || text === "characters") return "chars";
-    return "chars";
-  }
-
-  function readFiniteNumber$4(value) {
-    return typeof value === "number" && Number.isFinite(value) ? value : null;
-  }
-
-  function readNumber$j(value) {
-    return typeof value === "number" && Number.isFinite(value) ? value : 0;
-  }
-
-  function readString$1H(value) {
-    return typeof value === "string" ? value.trim() : "";
-  }
-
   function applyTerminalFinalContract(options = {}) {
     const runState = options.runState && typeof options.runState === "object" ? options.runState : null;
-    const source = readString$1G(options.source) || "final_response";
+    const source = readString$1H(options.source) || "final_response";
     const contractText = readTerminalContractText(options);
     const suffixAudit = normalizeExplicitFinalSuffix(options.text, contractText);
     const readinessAudit = inspectTerminalReadinessConsistency({
@@ -12078,7 +12215,7 @@
       return { issues, ok: true, status: finalReadiness ? "missing_requirements_assessment" : "not_declared" };
     }
 
-    const declaredReadUrls = readFiniteNumber$3(assessment.successfulReadUrlCount);
+    const declaredReadUrls = readFiniteNumber$4(assessment.successfulReadUrlCount);
     const observedReadUrls = countSuccessfulReadUrlArtifacts(runState);
     if (declaredReadUrls != null && declaredReadUrls !== observedReadUrls) {
       issues.push({
@@ -12099,13 +12236,13 @@
     if (researchGateBlocked && assessment.evidenceSatisfied === true) {
       issues.push({
         code: "evidence_satisfied_conflicts_with_research_gate",
-        researchFinalReason: readString$1G(researchState.finalReason) || null
+        researchFinalReason: readString$1H(researchState.finalReason) || null
       });
     }
     if (researchGateBlocked && finalReadiness.decision === "ready") {
       issues.push({
         code: "ready_conflicts_with_research_gate",
-        researchFinalReason: readString$1G(researchState.finalReason) || null
+        researchFinalReason: readString$1H(researchState.finalReason) || null
       });
     }
 
@@ -12130,7 +12267,7 @@
     }
 
     const requestedLengthContract = extractRequestedLengthContract(readTerminalContractText(options));
-    const textStats = normalizeTextStats$5(options.textStats);
+    const textStats = normalizeTextStats$6(options.textStats);
     if (requestedLengthContract) {
       const declaredUnit = readStatsKeyForUnit(assessment.observedLengthUnit);
       if (declaredUnit !== requestedLengthContract.statsKey) {
@@ -12140,7 +12277,7 @@
           requestedUnit: requestedLengthContract.unit
         });
       }
-      const declaredRequestedLength = readFiniteNumber$3(assessment.requestedLength);
+      const declaredRequestedLength = readFiniteNumber$4(assessment.requestedLength);
       if (declaredRequestedLength != null && declaredRequestedLength !== requestedLengthContract.value) {
         issues.push({
           code: "requested_length_mismatch",
@@ -12184,7 +12321,7 @@
 
   function normalizeExplicitFinalSuffix(text, contractText) {
     const suffix = extractExplicitFinalSuffix(contractText);
-    const source = readString$1G(text);
+    const source = readString$1H(text);
     if (!suffix) {
       return {
         count: 0,
@@ -12230,7 +12367,7 @@
     const seen = new Set();
     const text = [];
     for (const piece of pieces) {
-      const value = readString$1G(piece);
+      const value = readString$1H(piece);
       if (!value || seen.has(value)) continue;
       seen.add(value);
       text.push(value);
@@ -12239,7 +12376,7 @@
   }
 
   function extractRequestedLengthContract(prompt) {
-    const value = readString$1G(prompt);
+    const value = readString$1H(prompt);
     if (!value) return null;
     const wordMatch = value.match(/\b(\d{2,6})\s*[- ]?words?\b/i);
     if (wordMatch) {
@@ -12269,14 +12406,14 @@
   }
 
   function extractExplicitFinalSuffix(prompt) {
-    const value = readString$1G(prompt);
+    const value = readString$1H(prompt);
     if (!value) return "";
     const match = value.match(/\bend\s+exactly\s*(?::|(?:with|as)\s+)([`"'“”]?)([A-Za-z0-9_.:/-]{3,160})\1/i);
-    return match ? readString$1G(match[2]) : "";
+    return match ? readString$1H(match[2]) : "";
   }
 
   function summarizeFinalText(content) {
-    const text = readString$1G(content);
+    const text = readString$1H(content);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -12288,7 +12425,7 @@
   }
 
   function readStatsKeyForUnit(unit) {
-    const value = readString$1G(unit).toLowerCase();
+    const value = readString$1H(unit).toLowerCase();
     if (value === "words" || value === "word") return "words";
     if (value === "cjk_chars" || value === "cjk" || value.includes("cjk")) return "cjkChars";
     if (value === "non_whitespace_chars" || value === "nonwhitespacechars") return "nonWhitespaceChars";
@@ -12306,13 +12443,13 @@
     runState.terminalFinalContract = audit;
   }
 
-  function normalizeTextStats$5(value) {
+  function normalizeTextStats$6(value) {
     const source = value && typeof value === "object" ? value : {};
     return {
-      chars: readNumber$i(source.chars),
-      cjkChars: readNumber$i(source.cjkChars),
-      nonWhitespaceChars: readNumber$i(source.nonWhitespaceChars),
-      words: readNumber$i(source.words)
+      chars: readNumber$j(source.chars),
+      cjkChars: readNumber$j(source.cjkChars),
+      nonWhitespaceChars: readNumber$j(source.nonWhitespaceChars),
+      words: readNumber$j(source.words)
     };
   }
 
@@ -12335,23 +12472,23 @@
     const source = packet || loop;
     if (!source) return null;
     return {
-      minReadSources: readNumber$i(source.minReadSources),
-      minRelevantSources: readNumber$i(source.minRelevantSources),
+      minReadSources: readNumber$j(source.minReadSources),
+      minRelevantSources: readNumber$j(source.minRelevantSources),
       passed: source.passed === true,
-      readSources: readNumber$i(source.readSources),
-      relevantSources: readNumber$i(source.relevantSources)
+      readSources: readNumber$j(source.readSources),
+      relevantSources: readNumber$j(source.relevantSources)
     };
   }
 
-  function readFiniteNumber$3(value) {
+  function readFiniteNumber$4(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
-  function readNumber$i(value) {
+  function readNumber$j(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1G(value) {
+  function readString$1H(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -12388,20 +12525,20 @@
   function normalizeCandidatePathMismatchSignal(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
     if (!source) return null;
-    const mismatchKind = readString$1F(source.mismatchKind);
+    const mismatchKind = readString$1G(source.mismatchKind);
     const selectedPath = normalizeWorkspacePath(source.selectedPath);
     if (!mismatchKind || !selectedPath) return null;
     return {
-      action: readString$1F(source.action) || null,
+      action: readString$1G(source.action) || null,
       activePath: normalizeWorkspacePath(source.activePath) || selectedPath,
       finalizedPath: normalizeWorkspacePath(source.finalizedPath) || null,
       kind: "candidate_path_mismatch_signal",
       lastWrittenPath: normalizeWorkspacePath(source.lastWrittenPath) || null,
       mismatchKind,
-      observedAt: readString$1F(source.observedAt) || null,
+      observedAt: readString$1G(source.observedAt) || null,
       publishedPath: normalizeWorkspacePath(source.publishedPath) || null,
       selectedPath,
-      status: readString$1F(source.status) || "observed",
+      status: readString$1G(source.status) || "observed",
       writtenPath: normalizeWorkspacePath(source.writtenPath) || null
     };
   }
@@ -12567,7 +12704,7 @@
   }
 
   function isContentWriteAction(action) {
-    const value = readString$1F(action);
+    const value = readString$1G(action);
     return value === "write" ||
       value === "replace" ||
       value === "append" ||
@@ -12606,7 +12743,7 @@
   }
 
   function normalizeLifecycleStatus(value) {
-    const status = readString$1F(value);
+    const status = readString$1G(value);
     if (!status) return "";
     if (
       status === "idle" ||
@@ -12623,12 +12760,12 @@
   }
 
   function normalizeWorkspacePath(value) {
-    const path = readString$1F(value);
+    const path = readString$1G(value);
     if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return "";
     return path;
   }
 
-  function readString$1F(value) {
+  function readString$1G(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -12674,7 +12811,7 @@
     // longer pre-populated; AI creates files by calling workspace_write.
     return {
       enabled: options.enabled === true,
-      mode: readString$1E(options.mode) || "complex_response",
+      mode: readString$1F(options.mode) || "complex_response",
       files: {},
       operations: [],
       pendingPatch: null,
@@ -12720,16 +12857,16 @@
       if (path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) continue;
       const file = source && typeof source === "object" ? source : {};
       files[path] = {
-        content: readString$1E(file.content),
+        content: readString$1F(file.content),
         path,
-        updatedAt: readString$1E(file.updatedAt) || null,
+        updatedAt: readString$1F(file.updatedAt) || null,
         version: readPositiveInteger$j(file.version) || 0
       };
     }
     const quality = normalizeWorkspaceQuality(value.quality);
     return {
       enabled: value.enabled === true,
-      mode: readString$1E(value.mode) || "complex_response",
+      mode: readString$1F(value.mode) || "complex_response",
       files,
       operations: normalizeOperations(value.operations),
       pendingPatch: normalizePendingPatch(value.pendingPatch),
@@ -12753,7 +12890,7 @@
       out[key] = {
         count,
         lastCycle: readPositiveInteger$j(raw.lastCycle) || 0,
-        findPreview: readString$1E(raw.findPreview).slice(0, 80)
+        findPreview: readString$1F(raw.findPreview).slice(0, 80)
       };
     }
     return out;
@@ -12775,7 +12912,7 @@
     // ADR-0013 — workspace path validation is recoverable, not fatal.
     // Returns { ok, path?, error? }. Callers translate failure into an
     // invalid_args observation rather than throwing.
-    const value = readString$1E(path);
+    const value = readString$1F(path);
     if (!value) {
       return { ok: false, error: "workspace_path_required", path: value };
     }
@@ -12831,7 +12968,7 @@
     const pathValidation = validateWorkspacePathRecoverable(path);
     if (!pathValidation.ok) {
       return addWorkspaceFileStats({
-        ...createWorkspaceFile(readString$1E(path) || "", ""),
+        ...createWorkspaceFile(readString$1F(path) || "", ""),
         status: "invalid_args",
         error: pathValidation.error,
         message: describeWorkspacePathError(pathValidation.error)
@@ -12848,7 +12985,7 @@
 
   function readWorkspaceFinalCandidate$1(workspace, path) {
     const source = normalizeVirtualWorkspace(workspace) || createEmptyVirtualWorkspace();
-    const resolvedPath = readString$1E(path) || readFinalCandidatePath(source);
+    const resolvedPath = readString$1F(path) || readFinalCandidatePath(source);
     const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
     if (!pathValidation.ok) {
       return addWorkspaceFileStats({
@@ -12872,7 +13009,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "read",
-        path: readString$1E(path) || "<unset>",
+        path: readString$1F(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
@@ -12895,6 +13032,54 @@
     }, options);
     recordWorkspaceCandidateRead(workspace, filePath, { });
     syncRunStateCandidatePathMismatchSignal(runState, workspace);
+    return workspace;
+  }
+
+  function recordWorkspaceCandidateReview(runState, path, review, options = {}) {
+    const workspace = ensureVirtualWorkspace(runState, {
+      config: options.config,
+      force: true,
+      prompt: options.prompt
+    });
+    const pathValidation = validateWorkspacePathRecoverable(path);
+    if (!pathValidation.ok) {
+      appendWorkspaceOperation(workspace, {
+        action: "review_candidate",
+        path: readString$1F(path) || "<unset>",
+        status: "invalid_args",
+        summary: options.summary || describeWorkspacePathError(pathValidation.error),
+        cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      }, options);
+      return workspace;
+    }
+    const filePath = pathValidation.path;
+    const file = readWorkspaceFile(workspace, filePath);
+    const source = review && typeof review === "object" && !Array.isArray(review) ? review : {};
+    const issues = Array.isArray(source.issues)
+      ? source.issues.map(normalizeCandidateReviewIssue).filter(Boolean).slice(0, 24)
+      : [];
+    const candidateReview = {
+      fileUpdatedAt: readString$1F(file.updatedAt) || null,
+      fileVersion: readPositiveInteger$j(file.version) || 0,
+      finalSectionTitle: readString$1F(source.finalSectionTitle) || null,
+      issueCount: issues.length,
+      issues,
+      path: filePath,
+      readyToPublish: source.readyToPublish === true,
+      repairPlan: readString$1F(source.repairPlan) || null,
+      requirementsChecklist: normalizeCandidateRequirementsChecklist(source.requirementsChecklist),
+      reviewedAt: new Date().toISOString(),
+      summary: readString$1F(source.summary) || null,
+      textStats: file.textStats || summarizeTextStats$2(file.content)
+    };
+    workspace.quality.candidateReview = candidateReview;
+    appendWorkspaceOperation(workspace, {
+      action: "review_candidate",
+      path: filePath,
+      status: "ok",
+      summary: candidateReview.summary || options.summary || `reviewed ${filePath}`,
+      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    }, options);
     return workspace;
   }
 
@@ -12928,14 +13113,14 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "write",
-        path: readString$1E(path) || "<unset>",
+        path: readString$1F(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
       }, options);
       refreshWorkspaceQuality(workspace);
       return {
-        ...createWorkspaceFile(readString$1E(path) || "", ""),
+        ...createWorkspaceFile(readString$1F(path) || "", ""),
         status: "invalid_args",
         error: pathValidation.error,
         message: describeWorkspacePathError(pathValidation.error)
@@ -12943,7 +13128,7 @@
     }
     const filePath = pathValidation.path;
     const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
-    const nextContent = truncate$2(readString$1E(content), maxFileChars);
+    const nextContent = truncate$2(readString$1F(content), maxFileChars);
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
     const shrinkRisk = detectDestructiveWriteShrink(workspace, filePath, file, nextContent);
     if (shrinkRisk) {
@@ -12987,9 +13172,9 @@
     const quality = workspace && workspace.quality && typeof workspace.quality === "object"
       ? workspace.quality
       : {};
-    const finalCandidatePath = readString$1E(quality.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1F(quality.finalCandidatePath) || "final_candidate.md";
     if (filePath !== finalCandidatePath) return null;
-    const current = readString$1E(file && file.content);
+    const current = readString$1F(file && file.content);
     if (!current) return null;
     const before = summarizeTextStats$2(current);
     const after = summarizeTextStats$2(nextContent);
@@ -13015,7 +13200,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "insert_after_section",
-        path: readString$1E(path) || "<unset>",
+        path: readString$1F(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
@@ -13029,7 +13214,7 @@
       });
     }
     const filePath = pathValidation.path;
-    const targetHeading = normalizeHeadingText(heading);
+    const targetHeading = normalizeInsertableSectionText(heading);
     if (!targetHeading) {
       appendWorkspaceOperation(workspace, {
         action: "insert_after_section",
@@ -13048,12 +13233,12 @@
       });
     }
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-    const current = readString$1E(file.content);
-    const addition = readString$1E(content);
+    const current = readString$1F(file.content);
+    const addition = readString$1F(content);
     const insertResult = insertAfterMarkdownSection(current, targetHeading, addition, options);
     const beforeStructure = inspectWorkspaceCandidateStructure(current);
     const afterStructure = inspectWorkspaceCandidateStructure(insertResult.content);
-    const finalCandidatePath = readString$1E(workspace.quality && workspace.quality.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1F(workspace.quality && workspace.quality.finalCandidatePath) || "final_candidate.md";
     const structureRisk = insertResult.changed && filePath === finalCandidatePath && isStructureMaybeWorse(beforeStructure, afterStructure)
       ? "structure_maybe_worse"
       : null;
@@ -13105,7 +13290,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "remove",
-        path: readString$1E(path) || "<unset>",
+        path: readString$1F(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
@@ -13116,12 +13301,12 @@
         status: "invalid_args",
         error: pathValidation.error,
         message: describeWorkspacePathError(pathValidation.error),
-        file: { ...createWorkspaceFile(readString$1E(path) || "", "") }
+        file: { ...createWorkspaceFile(readString$1F(path) || "", "") }
       };
     }
     const filePath = pathValidation.path;
     const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-    const hadContent = readString$1E(file.content).length > 0;
+    const hadContent = readString$1F(file.content).length > 0;
     workspace.files[filePath] = createWorkspaceFile(filePath, "");
     if (hadContent) {
       workspace.version += 1;
@@ -13147,7 +13332,7 @@
     if (!fromValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "move",
-        path: readString$1E(from) || "<unset>",
+        path: readString$1F(from) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(fromValidation.error),
         cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
@@ -13181,7 +13366,7 @@
       return { moved: false, status: "same_path", error: "same_path", message: `workspace_move source and destination are the same: ${fromPath}`, fromFile: workspace.files[fromPath] || null, toFile: null };
     }
     const fromFile = workspace.files[fromPath] || createWorkspaceFile(fromPath, "");
-    const sourceContent = readString$1E(fromFile.content);
+    const sourceContent = readString$1F(fromFile.content);
     if (!sourceContent) {
       appendWorkspaceOperation(workspace, {
         action: "move",
@@ -13194,7 +13379,7 @@
       return { moved: false, status: "source_not_found", error: "source_not_found", message: `workspace_move source ${fromPath} has no content`, fromFile: workspace.files[fromPath] || null, toFile: null };
     }
     const toFile = workspace.files[toPath] || createWorkspaceFile(toPath, "");
-    if (readString$1E(toFile.content) && options.overwrite !== true) {
+    if (readString$1F(toFile.content) && options.overwrite !== true) {
       appendWorkspaceOperation(workspace, {
         action: "move",
         path: fromPath,
@@ -13238,7 +13423,7 @@
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
         action: "replace",
-        path: readString$1E(path) || "<unset>",
+        path: readString$1F(path) || "<unset>",
         status: "invalid_args",
         summary: options.summary || describeWorkspacePathError(pathValidation.error),
         cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
@@ -13371,7 +13556,7 @@
     const pathValidation = validateWorkspacePathRecoverable(path);
     if (!pathValidation.ok) {
       const patch = createInvalidPendingPatch({
-        path: readString$1E(path) || "",
+        path: readString$1F(path) || "",
         status: "invalid_args",
         riskFlags: ["not_found"],
         message: describeWorkspacePathError(pathValidation.error)
@@ -13454,11 +13639,11 @@
         error: "pending_patch_missing",
         file: null,
         message: "workspace_apply_patch requires a valid pending patch from workspace_propose_patch.",
-        patchId: readString$1E(patchId) || null,
+        patchId: readString$1F(patchId) || null,
         status: "missing_pending_patch"
       };
     }
-    const requestedPatchId = readString$1E(patchId);
+    const requestedPatchId = readString$1F(patchId);
     if (requestedPatchId && requestedPatchId !== pending.patchId) {
       return {
         changed: false,
@@ -13585,12 +13770,12 @@
       kind: "virtual_workspace_pending_patch",
       operations: [],
       patchId: `patch-${Date.now()}-invalid`,
-      path: readString$1E(options.path),
-      previewSummary: readString$1E(options.message) || "Patch preview could not be created.",
-      riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString$1E).filter(Boolean) : [],
+      path: readString$1F(options.path),
+      previewSummary: readString$1F(options.message) || "Patch preview could not be created.",
+      riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString$1F).filter(Boolean) : [],
       structureAfter: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
       structureBefore: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
-      status: readString$1E(options.status) || "preview_blocked",
+      status: readString$1F(options.status) || "preview_blocked",
       valid: false,
       version: 1,
       afterContent: ""
@@ -13620,7 +13805,7 @@
     return source
       .map((operation) => {
         const op = operation && typeof operation === "object" && !Array.isArray(operation) ? operation : {};
-        const type = readString$1E(op.type || op.operation || op.action);
+        const type = readString$1F(op.type || op.operation || op.action);
         if (type === "replace") {
           return {
             type,
@@ -13688,7 +13873,7 @@
         continue;
       }
       if (operation.type === "append") {
-        const addition = readString$1E(operation.content);
+        const addition = readString$1F(operation.content);
         if (!addition) {
           riskFlags.push("no_growth");
           diagnostics.push({ status: "empty_content", type: operation.type });
@@ -13700,8 +13885,8 @@
         continue;
       }
       if (operation.type === "insert_after_section") {
-        const targetHeading = normalizeHeadingText(operation.heading);
-        const addition = readString$1E(operation.content);
+        const targetHeading = normalizeInsertableSectionText(operation.heading);
+        const addition = readString$1F(operation.content);
         if (!targetHeading || !addition) {
           riskFlags.push("not_found");
           diagnostics.push({ status: "invalid_args", type: operation.type });
@@ -13748,7 +13933,7 @@
 
   function summarizePatchOperation(operation) {
     if (!operation || typeof operation !== "object") return null;
-    const type = readString$1E(operation.type);
+    const type = readString$1F(operation.type);
     if (!type) return null;
     if (type === "replace") {
       return {
@@ -13768,7 +13953,7 @@
       return {
         type,
         contentChars: typeof operation.content === "string" ? operation.content.length : 0,
-        heading: normalizeHeadingText(operation.heading)
+        heading: normalizeInsertableSectionText(operation.heading)
       };
     }
     if (type === "normalize_headings") {
@@ -13784,7 +13969,7 @@
   }
 
   function summarizePatchPreview(operations, facts) {
-    const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString$1E(operation && operation.type)).filter(Boolean);
+    const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString$1F(operation && operation.type)).filter(Boolean);
     const beforeWords = facts && facts.beforeStats ? facts.beforeStats.words : 0;
     const afterWords = facts && facts.afterStats ? facts.afterStats.words : 0;
     const riskFlags = Array.isArray(facts && facts.riskFlags) ? facts.riskFlags : [];
@@ -13806,7 +13991,7 @@
   // { changed: false } when there's nothing to do or when the file has issues
   // other than duplicate_section_numbers (those need AI repair).
   function tryAutoNormalizeSectionNumbers(content, filePath) {
-    const text = readString$1E(content);
+    const text = readString$1F(content);
     if (!text) return { changed: false, changedCount: 0, content: text };
     const structure = inspectWorkspaceCandidateStructure(text);
     if (!structure || structure.ok === true) {
@@ -13815,7 +14000,7 @@
     const issueCodes = Array.isArray(structure.issueCodes) ? structure.issueCodes : [];
     // Auto-fixable codes (all pure AST renumber work). Mixing with anything
     // else (duplicate_headings — same title twice may be intentional,
-    // raw_prompt_title — needs LLM, repeated_conclusion — needs LLM) bails out
+    // raw_prompt_title — needs LLM) bails out
     // because the AI still has content work to do and we don't want to mask
     // that by mechanically renumbering and falsely flipping ok=true.
     const AUTO_FIXABLE = new Set([
@@ -13844,9 +14029,9 @@
         // prefix with level `#`s. applyNormalizeHeadingsPatch uses the
         // existing line's level when text has no leading `#`, so we send the
         // bare "<newNum>. title" form to keep it level-agnostic.
-        const raw = readString$1E(hint.raw);
-        const currentNumber = readString$1E(hint.currentNumber);
-        const candidateNumber = readString$1E(hint.candidateNumber);
+        const raw = readString$1F(hint.raw);
+        const currentNumber = readString$1F(hint.currentNumber);
+        const candidateNumber = readString$1F(hint.candidateNumber);
         const titlePart = raw.replace(new RegExp(`^${escapeRegExp$3(currentNumber)}\\.\\s*`), "");
         const newText = `${candidateNumber}. ${titlePart}`.trim();
         return { lineNumber: readPositiveInteger$j(hint.lineNumber), text: newText };
@@ -13870,7 +14055,7 @@
   }
 
   function escapeRegExp$3(value) {
-    return readString$1E(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return readString$1F(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function applyNormalizeHeadingsPatch(current, operation) {
@@ -13913,8 +14098,8 @@
   }
 
   function formatNormalizedHeadingLine(currentLine, replacement) {
-    const current = readString$1E(currentLine);
-    const text = readString$1E(replacement);
+    const current = readString$1F(currentLine);
+    const text = readString$1F(replacement);
     if (!current || !text) return "";
     if (/^#{1,6}\s+\S/.test(text)) {
       return text.replace(/\s+#+\s*$/, "").trim();
@@ -13931,15 +14116,15 @@
       duplicateHeadingCount: readPositiveInteger$j(structure.duplicateHeadingCount) || 0,
       duplicateNumberCount: readPositiveInteger$j(structure.duplicateNumberCount) || 0,
       headingCount: readPositiveInteger$j(structure.headingCount) || 0,
-      issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString$1E).filter(Boolean).slice(0, 8) : [],
+      issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString$1F).filter(Boolean).slice(0, 8) : [],
       ok: structure.ok === true,
-      repeatedHeadingContexts: normalizeStructureContexts(structure.repeatedHeadingContexts, "heading"),
+      repeatedHeadingContexts: normalizeStructureContexts$1(structure.repeatedHeadingContexts, "heading"),
       repeatedHeadingSamples: normalizeRepeatedHeadingSamples(structure.repeatedHeadingSamples),
-      repeatedNumberContexts: normalizeStructureContexts(structure.repeatedNumberContexts, "number"),
+      repeatedNumberContexts: normalizeStructureContexts$1(structure.repeatedNumberContexts, "number"),
       repeatedNumberSamples: normalizeRepeatedNumberSamples(structure.repeatedNumberSamples),
-      sectionNumberRepairHints: normalizeSectionNumberRepairHints(structure.sectionNumberRepairHints),
-      sectionSequenceRepairHints: normalizeSectionNumberRepairHints(structure.sectionSequenceRepairHints),
-      status: readString$1E(structure.status) || "unknown"
+      sectionNumberRepairHints: normalizeSectionNumberRepairHints$1(structure.sectionNumberRepairHints),
+      sectionSequenceRepairHints: normalizeSectionNumberRepairHints$1(structure.sectionSequenceRepairHints),
+      status: readString$1F(structure.status) || "unknown"
     };
   }
 
@@ -14146,7 +14331,7 @@
   }
 
   function normalizeWorkspaceQuotes(value) {
-    return readString$1E(value)
+    return readString$1F(value)
       .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
       .replace(/[\u201C\u201D\u201E\u201F]/g, "\"")
       .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, "-");
@@ -14278,7 +14463,7 @@
       force: true,
       prompt: options.prompt
     });
-    const resolvedPath = readString$1E(path) || "final_candidate.md";
+    const resolvedPath = readString$1F(path) || "final_candidate.md";
     const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
     if (!pathValidation.ok) {
       appendWorkspaceOperation(workspace, {
@@ -14298,9 +14483,9 @@
     }
     const filePath = pathValidation.path;
     let file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-    if (filePath === "final_candidate.md" && !readString$1E(file.content)) {
+    if (filePath === "final_candidate.md" && !readString$1F(file.content)) {
       const draft = workspace.files["draft.md"] || createWorkspaceFile("draft.md", "");
-      const draftContent = readString$1E(draft.content);
+      const draftContent = readString$1F(draft.content);
       if (draftContent) {
         file = {
           content: draftContent,
@@ -14331,8 +14516,8 @@
     // existing inspectWorkspaceCandidateStructure already emits
     // sectionNumberRepairHints with a deterministic next-available-number
     // suggestion. Other issue codes (duplicate_headings — same title in two
-    // places might be intentional; raw_prompt_title — needs LLM; repeated_
-    // conclusion — needs LLM) are left to AI repair via the existing signals.
+    // places might be intentional; raw_prompt_title — needs LLM) are left to AI
+    // repair via the existing signals.
     const autoNormalizeAttempt = tryAutoNormalizeSectionNumbers(file.content);
     if (autoNormalizeAttempt && autoNormalizeAttempt.changed) {
       const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
@@ -14354,7 +14539,7 @@
       recordWorkspaceCandidateWrite(workspace, filePath, { action: "auto_normalize_headings" });
     }
 
-    const ready = readString$1E(file.content).length > 0;
+    const ready = readString$1F(file.content).length > 0;
     workspace.quality.finalCandidatePath = filePath;
     workspace.quality.finalCandidateReady = ready;
     refreshWorkspaceQuality(workspace, { prompt: options.prompt });
@@ -14399,7 +14584,7 @@
       ? opts.candidatePathMismatchSignal
       : candidateProjection.candidatePathMismatchSignal;
     const finalCandidateFile = source.files[finalCandidatePath] || null;
-    const finalCandidateContent = readString$1E(finalCandidateFile && finalCandidateFile.content);
+    const finalCandidateContent = readString$1F(finalCandidateFile && finalCandidateFile.content);
     const finalCandidateStats = summarizeTextStats$2(finalCandidateContent);
     const finalCandidateStatus = readFinalCandidateStatus(source, finalCandidatePath, quality);
     const inspectedFinalCandidateStructure = inspectWorkspaceCandidateStructure(finalCandidateContent);
@@ -14414,14 +14599,20 @@
       ? qualityFinalCandidateStructure
       : inspectedFinalCandidateStructure;
     const publishProtocol = inspectWorkspacePublishProtocol(source, finalCandidatePath);
+    const candidateReview = quality.candidateReview && typeof quality.candidateReview === "object"
+      ? quality.candidateReview
+      : null;
+    const candidateQualitySignal = quality.candidateQualitySignal && typeof quality.candidateQualitySignal === "object"
+      ? quality.candidateQualitySignal
+      : null;
     const pendingPatch = source.pendingPatch && typeof source.pendingPatch === "object"
       ? source.pendingPatch
       : null;
     const checks = Array.isArray(quality.checks)
       ? quality.checks.map((check) => {
-        const code = readString$1E(check && check.code);
-        const status = readString$1E(check && check.status);
-        const reason = readString$1E(check && check.reason);
+        const code = readString$1F(check && check.code);
+        const status = readString$1F(check && check.status);
+        const reason = readString$1F(check && check.reason);
         return [code, status, reason].filter(Boolean).join("=");
       }).filter(Boolean).slice(0, 12)
       : [];
@@ -14440,7 +14631,7 @@
         ].join("\n");
       });
     const contentFileCount = Object.keys(source.files)
-      .filter((path) => readString$1E(source.files[path] && source.files[path].content))
+      .filter((path) => readString$1F(source.files[path] && source.files[path].content))
       .length;
     if (files.length === 0) {
       return "";
@@ -14460,7 +14651,7 @@
         : null,
       [
         "Virtual workspace advisory state:",
-        `quality_status=${readString$1E(quality.status) || "n/a"}`,
+        `quality_status=${readString$1F(quality.status) || "n/a"}`,
         `final_candidate_path=${finalCandidatePath}`,
         `candidate_lifecycle=activePath:${candidateLifecycle.activePath || "n/a"}, draftPaths:${candidateLifecycle.draftPaths.length > 0 ? candidateLifecycle.draftPaths.join(",") : "none"}, lastWrittenPath:${candidateLifecycle.lastWrittenPath || "none"}, lastReadPath:${candidateLifecycle.lastReadPath || "none"}, finalizedPath:${candidateLifecycle.finalizedPath || "none"}, publishedPath:${candidateLifecycle.publishedPath || "none"}, status:${candidateLifecycle.status || "n/a"}`,
         candidatePathMismatchSignal
@@ -14491,6 +14682,15 @@
           ? `section_number_repair_context=${formatSectionNumberRepairHints(finalCandidateStructure.sectionNumberRepairHints)}`
           : null,
         `publish_protocol_state=finalized_after_write:${publishProtocol.finalizedAfterLatestWrite ? "yes" : "no"}, read_after_finalize:${publishProtocol.readAfterFinalize ? "yes" : "no"}`,
+        candidateReview
+          ? `candidate_review=path:${candidateReview.path || "n/a"}, readyToPublish:${candidateReview.readyToPublish === true ? "yes" : "no"}, issueCount:${readPositiveInteger$j(candidateReview.issueCount) || 0}, checklistCount:${Array.isArray(candidateReview.requirementsChecklist) ? candidateReview.requirementsChecklist.length : 0}, finalSectionTitle:${candidateReview.finalSectionTitle || "none"}`
+          : "candidate_review=none",
+        candidateReview && Array.isArray(candidateReview.requirementsChecklist) && candidateReview.requirementsChecklist.length > 0
+          ? `candidate_requirements_checklist=${formatCandidateRequirementsChecklist(candidateReview.requirementsChecklist)}`
+          : null,
+        candidateQualitySignal
+          ? `candidate_quality_signal=status:${candidateQualitySignal.status || "unknown"}, blockingIssues:${Array.isArray(candidateQualitySignal.blockingIssueCodes) && candidateQualitySignal.blockingIssueCodes.length > 0 ? candidateQualitySignal.blockingIssueCodes.join(",") : "none"}, advisoryIssues:${Array.isArray(candidateQualitySignal.advisoryIssueCodes) && candidateQualitySignal.advisoryIssueCodes.length > 0 ? candidateQualitySignal.advisoryIssueCodes.join(",") : "none"}`
+          : "candidate_quality_signal=none",
         pendingPatch
           ? `pending_patch=patchId:${pendingPatch.patchId}, path:${pendingPatch.path}, status:${pendingPatch.status}, deltaWords:${pendingPatch.deltaWords}, riskFlags:${Array.isArray(pendingPatch.riskFlags) && pendingPatch.riskFlags.length > 0 ? pendingPatch.riskFlags.join(",") : "none"}`
           : "pending_patch=none",
@@ -14512,22 +14712,22 @@
   }
 
   function formatStructureRepairAdvisory(finalCandidateStructure, allowedActions) {
-    const reason = readString$1E(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
+    const reason = readString$1F(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
     const actions = Array.isArray(allowedActions) ? allowedActions : [];
     const canPatch = actions.includes("workspace_propose_patch") || actions.includes("workspace_apply_patch");
     const canRewrite = actions.includes("workspace_write") || actions.includes("workspace_replace");
     if (canPatch && !canRewrite) {
       return `structure_repair_required=${reason}. Use workspace_propose_patch first and workspace_apply_patch only for a valid preview. Do not append or insert new sections when length is already satisfied.`;
     }
-    return `structure_repair_required=${reason}. Produce one coherent report with unique section headings before publishing. If the selected candidate text is already projected or was just read, do not repeat workspace_read; use workspace_write or workspace_replace for a full-outline repair.`;
+    return `structure_repair_required=${reason}. Produce one coherent candidate with unique section headings before publishing. If the selected candidate text is already projected or was just read, do not repeat workspace_read; use workspace_write or workspace_replace for a full-outline repair.`;
   }
 
   function formatStructureContextLine(contexts, key) {
     return (Array.isArray(contexts) ? contexts : [])
       .map((context) => {
-        const label = readString$1E(context && context[key]);
+        const label = readString$1F(context && context[key]);
         const occurrences = (Array.isArray(context && context.occurrences) ? context.occurrences : [])
-          .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString$1E(occurrence.raw)}"`)
+          .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString$1F(occurrence.raw)}"`)
           .filter(Boolean)
           .join(", ");
         return label && occurrences ? `${label} -> ${occurrences}` : null;
@@ -14537,13 +14737,35 @@
       .join(" | ");
   }
 
+  function formatCandidateRequirementsChecklist(checklist) {
+    return (Array.isArray(checklist) ? checklist : [])
+      .map((item) => {
+        const source = item && typeof item === "object" ? item : {};
+        const id = readString$1F(source.id) || "requirement";
+        const kind = readString$1F(source.kind) || "unknown";
+        const status = readString$1F(source.status) || "unknown";
+        const requirement = readString$1F(source.requirement).replace(/\s+/g, " ");
+        const gap = readString$1F(source.remainingGap).replace(/\s+/g, " ");
+        const repair = readString$1F(source.repairAction).replace(/\s+/g, " ");
+        return [
+          `${id}:${kind}:${status}`,
+          requirement ? `requirement=${truncate$2(requirement, 120)}` : "",
+          gap ? `gap=${truncate$2(gap, 120)}` : "",
+          repair ? `repair=${truncate$2(repair, 120)}` : ""
+        ].filter(Boolean).join(" ");
+      })
+      .filter(Boolean)
+      .slice(0, 8)
+      .join(" | ");
+  }
+
   function formatSectionNumberRepairHints(hints) {
     return (Array.isArray(hints) ? hints : [])
       .map((hint) => {
         const lineNumber = readPositiveInteger$j(hint && hint.lineNumber);
-        const currentNumber = readString$1E(hint && hint.currentNumber);
-        const candidateNumber = readString$1E(hint && (hint.candidateNumber || hint.suggestedNumber));
-        const raw = truncate$2(readString$1E(hint && hint.raw), 160);
+        const currentNumber = readString$1F(hint && hint.currentNumber);
+        const candidateNumber = readString$1F(hint && (hint.candidateNumber || hint.suggestedNumber));
+        const raw = truncate$2(readString$1F(hint && hint.raw), 160);
         if (lineNumber == null || !currentNumber || !candidateNumber || !raw) return null;
         return `lineNumber ${lineNumber} currentNumber ${currentNumber} candidateNumber ${candidateNumber} raw "${raw}"`;
       })
@@ -14553,15 +14775,15 @@
   }
 
   function selectWorkspacePromptFiles(source, options = {}) {
-    const finalCandidatePath = readString$1E(options.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1F(options.finalCandidatePath) || "final_candidate.md";
     const maxFiles = readPositiveInteger$j(options.maxFiles) || 5;
     const files = Object.keys(source.files)
       .sort()
       .map((path) => source.files[path])
-      .filter((file) => readString$1E(file && file.content));
+      .filter((file) => readString$1F(file && file.content));
     const selected = files.slice(-maxFiles);
-    const finalCandidate = files.find((file) => readString$1E(file && file.path) === finalCandidatePath);
-    if (!finalCandidate || selected.some((file) => readString$1E(file && file.path) === finalCandidatePath)) {
+    const finalCandidate = files.find((file) => readString$1F(file && file.path) === finalCandidatePath);
+    if (!finalCandidate || selected.some((file) => readString$1F(file && file.path) === finalCandidatePath)) {
       return selected;
     }
     return selected.length >= maxFiles
@@ -14645,13 +14867,13 @@
     // advisory-only and AI decides what to do with it.
     const fileContent = (path) => {
       const file = workspace.files && workspace.files[path];
-      return readString$1E(file && file.content);
+      return readString$1F(file && file.content);
     };
     const outline = fileContent("outline.md");
     const evidence = fileContent("evidence.json");
     const draft = fileContent("draft.md");
     const critique = fileContent("critique.md");
-    const finalCandidatePath = readString$1E(options.finalCandidatePath) || readFinalCandidatePath(workspace);
+    const finalCandidatePath = readString$1F(options.finalCandidatePath) || readFinalCandidatePath(workspace);
     const finalCandidate = fileContent(finalCandidatePath);
     const finalCandidateSameAsOutline = Boolean(outline && finalCandidate && normalizeComparableText$4(outline) === normalizeComparableText$4(finalCandidate));
     const draftSameAsOutline = Boolean(outline && draft && normalizeComparableText$4(outline) === normalizeComparableText$4(draft));
@@ -14688,7 +14910,7 @@
   }
 
   function inspectWorkspaceCandidateStructure(text, options = {}) {
-    const value = readString$1E(text);
+    const value = readString$1F(text);
     const maxSamples = readPositiveInteger$j(options.maxSamples) || 5;
     if (!value) {
       return {
@@ -14709,7 +14931,10 @@
     const numberCounts = new Map();
     for (const heading of headings) {
       if (!heading.normalized) continue;
-      headingCounts.set(heading.normalized, (headingCounts.get(heading.normalized) || 0) + 1);
+      const headingKey = heading.level <= 2 && heading.labelNormalized
+        ? heading.labelNormalized
+        : heading.normalized;
+      headingCounts.set(headingKey, (headingCounts.get(headingKey) || 0) + 1);
       if (heading.number != null && heading.level <= 3) {
         numberCounts.set(heading.number, (numberCounts.get(heading.number) || 0) + 1);
       }
@@ -14729,7 +14954,12 @@
         count: sample.count,
         heading: sample.heading,
         occurrences: headings
-          .filter((heading) => heading.normalized === sample.heading)
+          .filter((heading) => {
+            const headingKey = heading.level <= 2 && heading.labelNormalized
+              ? heading.labelNormalized
+              : heading.normalized;
+            return headingKey === sample.heading;
+          })
           .map((heading) => ({
             lineNumber: heading.lineNumber,
             raw: truncate$2(heading.raw, 160)
@@ -14767,21 +14997,17 @@
       ? buildSectionSequenceRepairHints(headings)
       : [];
     const firstHeading = headings[0] || null;
-    const title = readString$1E(firstHeading && firstHeading.raw);
-    const normalizedTitle = readString$1E(firstHeading && firstHeading.normalized);
+    const title = readString$1F(firstHeading && firstHeading.raw);
+    const normalizedTitle = readString$1F(firstHeading && firstHeading.normalized);
     const rawPromptTitle = Boolean(
-      title.length > 140 ||
-      /^research report generate\b/i.test(title) ||
-      /generate a \d{3,5}[-\s]*word report/i.test(title)
+      title.length > 140
     );
-    const repeatedConclusion = repeatedHeadingSamples.some((entry) => /\bconclusion\b/.test(entry.heading));
     const issueCodes = [];
     if (rawPromptTitle) issueCodes.push("raw_prompt_title");
     if (repeatedHeadingSamples.length > 0) issueCodes.push("duplicate_headings");
     if (repeatedNumberSamples.length > 0) issueCodes.push("duplicate_section_numbers");
     if (nonMonotonic) issueCodes.push("non_monotonic_section_numbers");
     if (gapped) issueCodes.push("gapped_section_numbers");
-    if (repeatedConclusion) issueCodes.push("repeated_conclusion");
     const ok = issueCodes.length === 0;
     return {
       duplicateHeadingCount: repeatedHeadingSamples.reduce((sum, entry) => sum + entry.count - 1, 0),
@@ -14835,7 +15061,7 @@
     const out = [];
     for (const heading of headings) {
       if (!heading || heading.level !== 2) continue;
-      const number = readString$1E(heading.number);
+      const number = readString$1F(heading.number);
       if (!number) continue;
       const major = number.split(".")[0];
       const parsed = Number.parseInt(major, 10);
@@ -14870,17 +15096,17 @@
 
   function buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSamples) {
     const repeatedNumbers = new Set((Array.isArray(repeatedNumberSamples) ? repeatedNumberSamples : [])
-      .map((entry) => readString$1E(entry && entry.number))
+      .map((entry) => readString$1F(entry && entry.number))
       .filter(Boolean));
     if (repeatedNumbers.size === 0) return [];
     const occupiedNumbers = new Set((Array.isArray(headings) ? headings : [])
-      .map((heading) => readString$1E(heading && heading.number))
+      .map((heading) => readString$1F(heading && heading.number))
       .filter(Boolean));
     const repeatedOccurrences = new Map();
     return (Array.isArray(headings) ? headings : [])
       .filter((heading) => heading && heading.number != null && heading.level <= 3)
       .map((heading) => {
-        const currentNumber = readString$1E(heading.number);
+        const currentNumber = readString$1F(heading.number);
         if (!repeatedNumbers.has(currentNumber)) return null;
         const occurrenceIndex = (repeatedOccurrences.get(currentNumber) || 0) + 1;
         repeatedOccurrences.set(currentNumber, occurrenceIndex);
@@ -14904,7 +15130,7 @@
   }
 
   function suggestNextSectionNumber(currentNumber, occupiedNumbers) {
-    const value = readString$1E(currentNumber);
+    const value = readString$1F(currentNumber);
     const parts = value.split(".").map((part) => Number.parseInt(part, 10));
     if (parts.length === 0 || parts.some((part) => !Number.isInteger(part) || part < 0)) {
       return value;
@@ -14925,7 +15151,7 @@
     const quality = workspace && typeof workspace === "object" && workspace.quality && typeof workspace.quality === "object"
       ? workspace.quality
       : {};
-    const path = readString$1E(quality.finalCandidatePath);
+    const path = readString$1F(quality.finalCandidatePath);
     if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) {
       return "final_candidate.md";
     }
@@ -14937,7 +15163,7 @@
   }
 
   function normalizeComparableText$4(value) {
-    return readString$1E(value)
+    return readString$1F(value)
       .toLowerCase()
       .replace(/[`*_#>-]/g, "")
       .replace(/\s+/g, " ")
@@ -14959,8 +15185,8 @@
       workspace.quality = createWorkspaceQuality();
     }
     workspace.quality.lastRead = {
-      observedAt: readString$1E(file.updatedAt) || new Date().toISOString(),
-      path: readString$1E(file.path),
+      observedAt: readString$1F(file.updatedAt) || new Date().toISOString(),
+      path: readString$1F(file.path),
       textStats: summarizeTextStats$2(file.content)
     };
   }
@@ -14973,7 +15199,7 @@
   // are included because weak live models often draft long reports with
   // bare section labels such as `Definition` or `**Conclusion**`.
   function collectMarkdownHeadings(text) {
-    const value = readString$1E(text);
+    const value = readString$1F(text);
     if (!value) return [];
     const lines = value.split(/\r?\n/);
     const headings = [];
@@ -14990,16 +15216,17 @@
   }
 
   function collectMarkdownHeadingsDetailed(text) {
-    const value = readString$1E(text);
+    const value = readString$1F(text);
     if (!value) return [];
     const lines = value.split(/\r?\n/);
     const headings = [];
     for (let index = 0; index < lines.length; index += 1) {
       const level = readHeadingLevel(lines[index]);
       if (level == null) continue;
-      const raw = readString$1E(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
+      const raw = readString$1F(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
       const normalized = normalizeHeadingText(lines[index]);
       headings.push({
+        labelNormalized: normalizeHeadingLabelText(raw),
         level,
         lineNumber: index + 1,
         normalized,
@@ -15011,13 +15238,15 @@
   }
 
   function extractMarkdownSectionNumber(rawHeadingText) {
-    const value = readString$1E(rawHeadingText);
+    const value = readString$1F(rawHeadingText);
     const match = value.match(/^(\d{1,3}(?:\.\d{1,3})*)\.?(?=\s|$)/);
     return match ? match[1] : null;
   }
 
   function createWorkspaceQuality() {
     return {
+      candidateQualitySignal: null,
+      candidateReview: null,
       checks: [],
       finalCandidatePath: "final_candidate.md",
       finalCandidateReady: false,
@@ -15031,7 +15260,7 @@
 
   function createWorkspaceFile(path, content) {
     return {
-      content: readString$1E(content),
+      content: readString$1F(content),
       path,
       updatedAt: null,
       version: 0
@@ -15041,25 +15270,25 @@
   function appendWorkspaceOperation(workspace, operation, options = {}) {
     const maxOperations = readPositiveInteger$j(options.maxOperations) || DEFAULT_MAX_OPERATIONS;
     const next = {
-      action: readString$1E(operation.action) || "workspace",
+      action: readString$1F(operation.action) || "workspace",
       createdAt: new Date().toISOString(),
       cycle: readPositiveInteger$j(operation.cycle) || 0,
       id: `vw-${Date.now()}-${workspace.operations.length + 1}`,
-      path: readString$1E(operation.path) || null,
-      status: readString$1E(operation.status) || "ok",
-      summary: truncate$2(readString$1E(operation.summary), DEFAULT_MAX_OPERATION_CHARS)
+      path: readString$1F(operation.path) || null,
+      status: readString$1F(operation.status) || "ok",
+      summary: truncate$2(readString$1F(operation.summary), DEFAULT_MAX_OPERATION_CHARS)
     };
     workspace.operations = normalizeOperations(workspace.operations).concat(next).slice(-maxOperations);
   }
 
   function summarizeWorkspaceFile(file) {
-    const content = readString$1E(file && file.content);
+    const content = readString$1F(file && file.content);
     return {
       hasContent: content.length > 0,
-      path: readString$1E(file && file.path),
+      path: readString$1F(file && file.path),
       size: content.length,
       textStats: summarizeTextStats$2(content),
-      updatedAt: readString$1E(file && file.updatedAt) || null,
+      updatedAt: readString$1F(file && file.updatedAt) || null,
       version: readPositiveInteger$j(file && file.version) || 0
     };
   }
@@ -15077,13 +15306,13 @@
       .map((entry, index) => {
         if (!entry || typeof entry !== "object") return null;
         return {
-          action: readString$1E(entry.action) || "workspace",
-          createdAt: readString$1E(entry.createdAt) || null,
+          action: readString$1F(entry.action) || "workspace",
+          createdAt: readString$1F(entry.createdAt) || null,
           cycle: readPositiveInteger$j(entry.cycle) || 0,
-          id: readString$1E(entry.id) || `vw-${index + 1}`,
-          path: readString$1E(entry.path) || null,
-          status: readString$1E(entry.status) || "ok",
-          summary: truncate$2(readString$1E(entry.summary), DEFAULT_MAX_OPERATION_CHARS)
+          id: readString$1F(entry.id) || `vw-${index + 1}`,
+          path: readString$1F(entry.path) || null,
+          status: readString$1F(entry.status) || "ok",
+          summary: truncate$2(readString$1F(entry.summary), DEFAULT_MAX_OPERATION_CHARS)
         };
       })
       .filter(Boolean)
@@ -15095,28 +15324,28 @@
     if (!source) return null;
     const pathValidation = validateWorkspacePathRecoverable(source.path);
     if (!pathValidation.ok) return null;
-    const patchId = readString$1E(source.patchId);
+    const patchId = readString$1F(source.patchId);
     if (!patchId) return null;
     return {
       afterContent: typeof source.afterContent === "string" ? source.afterContent : "",
-      afterHash: readString$1E(source.afterHash),
+      afterHash: readString$1F(source.afterHash),
       afterWords: readPositiveInteger$j(source.afterWords) || 0,
       baseVersion: readPositiveInteger$j(source.baseVersion) || 0,
-      beforeHash: readString$1E(source.beforeHash),
-      beforeHashFuzzy: readString$1E(source.beforeHashFuzzy) || null,
+      beforeHash: readString$1F(source.beforeHash),
+      beforeHashFuzzy: readString$1F(source.beforeHashFuzzy) || null,
       beforeWords: readPositiveInteger$j(source.beforeWords) || 0,
       changed: source.changed === true,
-      createdAt: readString$1E(source.createdAt) || null,
+      createdAt: readString$1F(source.createdAt) || null,
       deltaWords: typeof source.deltaWords === "number" && Number.isFinite(source.deltaWords) ? source.deltaWords : 0,
       kind: "virtual_workspace_pending_patch",
       operations: Array.isArray(source.operations) ? source.operations.map(summarizePatchOperation).filter(Boolean).slice(0, 8) : [],
       patchId,
       path: pathValidation.path,
-      previewSummary: readString$1E(source.previewSummary),
-      riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString$1E).filter(Boolean).slice(0, 8) : [],
+      previewSummary: readString$1F(source.previewSummary),
+      riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString$1F).filter(Boolean).slice(0, 8) : [],
       structureAfter: summarizePatchStructure(source.structureAfter),
       structureBefore: summarizePatchStructure(source.structureBefore),
-      status: readString$1E(source.status) || "preview_blocked",
+      status: readString$1F(source.status) || "preview_blocked",
       valid: source.valid === true,
       version: readPositiveInteger$j(source.version) || 1
     };
@@ -15125,37 +15354,162 @@
   function normalizeWorkspaceQuality(value) {
     const source = value && typeof value === "object" ? value : {};
     return {
+      candidateQualitySignal: normalizeStoredCandidateQualitySignal(source.candidateQualitySignal),
+      candidateReview: normalizeCandidateReview(source.candidateReview),
       checks: (Array.isArray(source.checks) ? source.checks : [])
         .map((check) => {
           if (!check || typeof check !== "object") return null;
           return {
-            name: readString$1E(check.name) || "check",
-            reason: readString$1E(check.reason) || "n/a",
-            status: readString$1E(check.status) || "unknown"
+            name: readString$1F(check.name) || "check",
+            reason: readString$1F(check.reason) || "n/a",
+            status: readString$1F(check.status) || "unknown"
           };
         })
         .filter(Boolean),
-      finalCandidatePath: readString$1E(source.finalCandidatePath) || "final_candidate.md",
+      finalCandidatePath: readString$1F(source.finalCandidatePath) || "final_candidate.md",
       finalCandidateReady: source.finalCandidateReady === true,
       finalCandidateStructure: normalizeWorkspaceCandidateStructure(source.finalCandidateStructure),
-      finalCandidateStats: normalizeTextStats$4(source.finalCandidateStats),
+      finalCandidateStats: normalizeTextStats$5(source.finalCandidateStats),
       lastRead: normalizeWorkspaceLastRead(source.lastRead),
       lastIssueCodes: Array.isArray(source.lastIssueCodes)
-        ? source.lastIssueCodes.map(readString$1E).filter(Boolean)
+        ? source.lastIssueCodes.map(readString$1F).filter(Boolean)
         : [],
-      status: readString$1E(source.status) || "needs_draft"
+      status: readString$1F(source.status) || "needs_draft"
     };
   }
 
   function normalizeWorkspaceLastRead(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
     if (!source) return null;
-    const path = readString$1E(source.path);
+    const path = readString$1F(source.path);
     if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
     return {
-      observedAt: readString$1E(source.observedAt) || null,
+      observedAt: readString$1F(source.observedAt) || null,
       path,
-      textStats: normalizeTextStats$4(source.textStats)
+      textStats: normalizeTextStats$5(source.textStats)
+    };
+  }
+
+  function normalizeCandidateReview(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const path = readString$1F(source.path);
+    if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
+    return {
+      fileUpdatedAt: readString$1F(source.fileUpdatedAt) || null,
+      fileVersion: readPositiveInteger$j(source.fileVersion) || 0,
+      finalSectionTitle: readString$1F(source.finalSectionTitle) || null,
+      issueCount: readPositiveInteger$j(source.issueCount) || 0,
+      issues: Array.isArray(source.issues)
+        ? source.issues.map(normalizeCandidateReviewIssue).filter(Boolean).slice(0, 24)
+        : [],
+      path,
+      readyToPublish: source.readyToPublish === true,
+      repairPlan: readString$1F(source.repairPlan) || null,
+      requirementsChecklist: normalizeCandidateRequirementsChecklist(source.requirementsChecklist),
+      reviewedAt: readString$1F(source.reviewedAt) || null,
+      summary: readString$1F(source.summary) || null,
+      textStats: normalizeTextStats$5(source.textStats)
+    };
+  }
+
+  function normalizeCandidateReviewIssue(value) {
+    if (typeof value === "string") {
+      const text = readString$1F(value);
+      return text ? { code: "ai_review_issue", severity: "advisory", summary: truncate$2(text, 240) } : null;
+    }
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const summary = readString$1F(source.summary || source.message || source.issue);
+    const code = readString$1F(source.code) || "ai_review_issue";
+    return {
+      code,
+      severity: readString$1F(source.severity) === "blocking" ? "blocking" : "advisory",
+      summary: truncate$2(summary || code, 240)
+    };
+  }
+
+  function normalizeCandidateRequirementsChecklist(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry, index) => normalizeCandidateRequirement(entry, index))
+      .filter(Boolean)
+      .slice(0, 24);
+  }
+
+  function normalizeCandidateRequirement(value, index) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const requirement = readString$1F(source.requirement || source.summary || source.text);
+    if (!requirement) return null;
+    const id = readString$1F(source.id) || `requirement_${index + 1}`;
+    const kind = normalizeCandidateRequirementKind(source.kind || source.type);
+    const status = normalizeCandidateRequirementStatus(source.status || source.result);
+    return {
+      evidence: truncate$2(readString$1F(source.evidence), 360) || null,
+      id: truncate$2(id, 80),
+      kind,
+      remainingGap: truncate$2(readString$1F(source.remainingGap || source.gap), 360) || null,
+      repairAction: truncate$2(readString$1F(source.repairAction || source.repairPlan), 360) || null,
+      requirement: truncate$2(requirement, 360),
+      status
+    };
+  }
+
+  function normalizeCandidateRequirementKind(value) {
+    const text = readString$1F(value).toLowerCase();
+    if (text === "objective" || text === "fact" || text === "measurable") return "objective";
+    if (text === "subjective" || text === "editorial" || text === "quality") return "subjective";
+    return "unknown";
+  }
+
+  function normalizeCandidateRequirementStatus(value) {
+    const text = readString$1F(value).toLowerCase();
+    if (text === "met" || text === "pass" || text === "passed" || text === "done") return "met";
+    if (text === "partial" || text === "partially_met" || text === "partly_met") return "partial";
+    if (text === "unmet" || text === "fail" || text === "failed" || text === "missing") return "unmet";
+    return "unknown";
+  }
+
+  function normalizeStoredCandidateQualitySignal(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const issues = Array.isArray(source.issues)
+      ? source.issues.map((issue) => {
+          const item = issue && typeof issue === "object" && !Array.isArray(issue) ? issue : {};
+          const code = readString$1F(item.code);
+          if (!code) return null;
+          return {
+            code,
+            message: readString$1F(item.message) || code,
+            severity: readString$1F(item.severity) === "advisory" ? "advisory" : "blocking",
+            path: readString$1F(item.path) || null,
+            requirementId: readString$1F(item.requirementId) || null,
+            status: readString$1F(item.status) || null,
+            url: readString$1F(item.url) || null
+          };
+        }).filter(Boolean).slice(0, 24)
+      : [];
+    const blockingIssueCodes = Array.isArray(source.blockingIssueCodes)
+      ? source.blockingIssueCodes.map(readString$1F).filter(Boolean).slice(0, 24)
+      : issues.filter((issue) => issue.severity === "blocking").map((issue) => issue.code);
+    return {
+      advisoryIssueCodes: Array.isArray(source.advisoryIssueCodes)
+        ? source.advisoryIssueCodes.map(readString$1F).filter(Boolean).slice(0, 24)
+        : issues.filter((issue) => issue.severity !== "blocking").map((issue) => issue.code),
+      blockingIssueCodes,
+      hasBlockingIssues: blockingIssueCodes.length > 0,
+      issueCodes: Array.isArray(source.issueCodes)
+        ? source.issueCodes.map(readString$1F).filter(Boolean).slice(0, 24)
+        : issues.map((issue) => issue.code),
+      issues,
+      kind: "candidate_quality_signal",
+      ok: source.ok === true && blockingIssueCodes.length === 0,
+      path: readString$1F(source.path) || null,
+      requirementsChecklist: normalizeCandidateRequirementsChecklist(source.requirementsChecklist),
+      reviewRequired: source.reviewRequired === true,
+      status: readString$1F(source.status) || (blockingIssueCodes.length > 0 ? "blocked" : "pass"),
+      version: 1
     };
   }
 
@@ -15167,29 +15521,29 @@
       duplicateNumberCount: readPositiveInteger$j(source.duplicateNumberCount) || 0,
       headingCount: readPositiveInteger$j(source.headingCount) || 0,
       issueCodes: Array.isArray(source.issueCodes)
-        ? source.issueCodes.map(readString$1E).filter(Boolean).slice(0, 12)
+        ? source.issueCodes.map(readString$1F).filter(Boolean).slice(0, 12)
         : [],
       ok: source.ok === true,
-      reason: readString$1E(source.reason) || "n/a",
-      repeatedHeadingContexts: normalizeStructureContexts(source.repeatedHeadingContexts, "heading"),
+      reason: readString$1F(source.reason) || "n/a",
+      repeatedHeadingContexts: normalizeStructureContexts$1(source.repeatedHeadingContexts, "heading"),
       repeatedHeadingSamples: normalizeRepeatedHeadingSamples(source.repeatedHeadingSamples),
-      repeatedNumberContexts: normalizeStructureContexts(source.repeatedNumberContexts, "number"),
+      repeatedNumberContexts: normalizeStructureContexts$1(source.repeatedNumberContexts, "number"),
       repeatedNumberSamples: normalizeRepeatedNumberSamples(source.repeatedNumberSamples),
-      sectionNumberRepairHints: normalizeSectionNumberRepairHints(source.sectionNumberRepairHints),
-      sectionSequenceRepairHints: normalizeSectionNumberRepairHints(source.sectionSequenceRepairHints),
-      status: readString$1E(source.status) || "unknown",
-      title: truncate$2(readString$1E(source.title), 200)
+      sectionNumberRepairHints: normalizeSectionNumberRepairHints$1(source.sectionNumberRepairHints),
+      sectionSequenceRepairHints: normalizeSectionNumberRepairHints$1(source.sectionSequenceRepairHints),
+      status: readString$1F(source.status) || "unknown",
+      title: truncate$2(readString$1F(source.title), 200)
     };
   }
 
-  function normalizeSectionNumberRepairHints(value) {
+  function normalizeSectionNumberRepairHints$1(value) {
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
         const lineNumber = readPositiveInteger$j(entry.lineNumber);
-        const candidateNumber = readString$1E(entry.candidateNumber || entry.suggestedNumber);
-        const currentNumber = readString$1E(entry.currentNumber);
-        const raw = readString$1E(entry.raw);
+        const candidateNumber = readString$1F(entry.candidateNumber || entry.suggestedNumber);
+        const currentNumber = readString$1F(entry.currentNumber);
+        const raw = readString$1F(entry.raw);
         if (lineNumber == null || !candidateNumber || !currentNumber || !raw) return null;
         return {
           candidateNumber,
@@ -15207,7 +15561,7 @@
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const heading = readString$1E(entry.heading);
+        const heading = readString$1F(entry.heading);
         if (!heading) return null;
         return {
           count: readPositiveInteger$j(entry.count) || 1,
@@ -15222,7 +15576,7 @@
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const number = readString$1E(entry.number);
+        const number = readString$1F(entry.number);
         if (!number) return null;
         return {
           count: readPositiveInteger$j(entry.count) || 1,
@@ -15233,17 +15587,17 @@
       .slice(0, 5);
   }
 
-  function normalizeStructureContexts(value, key) {
+  function normalizeStructureContexts$1(value, key) {
     return (Array.isArray(value) ? value : [])
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const label = readString$1E(entry[key]);
+        const label = readString$1F(entry[key]);
         if (!label) return null;
         const occurrences = (Array.isArray(entry.occurrences) ? entry.occurrences : [])
           .map((occurrence) => {
             if (!occurrence || typeof occurrence !== "object") return null;
             const lineNumber = readPositiveInteger$j(occurrence.lineNumber);
-            const raw = readString$1E(occurrence.raw);
+            const raw = readString$1F(occurrence.raw);
             if (lineNumber == null || !raw) return null;
             return {
               lineNumber,
@@ -15267,12 +15621,12 @@
     if (!source || source.enabled !== true) return false;
     if (Array.isArray(source.operations) && source.operations.length > 0) return true;
     return Object.values(source.files || {}).some((file) => (
-      file && typeof file === "object" && readString$1E(file.content)
+      file && typeof file === "object" && readString$1F(file.content)
     ));
   }
 
   function truncate$2(value, maxChars) {
-    const text = readString$1E(value);
+    const text = readString$1F(value);
     const limit = readPositiveInteger$j(maxChars) || DEFAULT_MAX_FILE_CHARS$1;
     return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 3))}...`;
   }
@@ -15283,8 +15637,8 @@
   }
 
   function insertAfterMarkdownSection(text, targetHeading, addition, options = {}) {
-    const current = readString$1E(text);
-    const insertText = readString$1E(addition);
+    const current = readString$1F(text);
+    const insertText = readString$1F(addition);
     if (!current || !insertText) {
       return { changed: false, content: current, availableHeadings: collectMarkdownHeadings(current) };
     }
@@ -15315,12 +15669,12 @@
   }
 
   function readHeadingLevel(value) {
-    const match = readString$1E(value).match(/^(#{1,6})\s+\S/);
+    const match = readString$1F(value).match(/^(#{1,6})\s+\S/);
     return match ? match[1].length : null;
   }
 
   function readInsertableSectionLevel(lines, index) {
-    const line = readString$1E(Array.isArray(lines) ? lines[index] : "");
+    const line = readString$1F(Array.isArray(lines) ? lines[index] : "");
     if (!line) return null;
     const markdownLevel = readHeadingLevel(line);
     if (markdownLevel != null) return markdownLevel;
@@ -15329,7 +15683,7 @@
   }
 
   function isStandaloneSectionLine(lines, index) {
-    const line = readString$1E(Array.isArray(lines) ? lines[index] : "");
+    const line = readString$1F(Array.isArray(lines) ? lines[index] : "");
     if (!line || line.length > 120) return false;
     if (/^(?:[-*+]|\d+[.)])\s+/.test(line)) return false;
     if (/^https?:\/\//i.test(line)) return false;
@@ -15338,14 +15692,14 @@
     if (!normalized) return false;
     const wordCount = normalized.split(/\s+/).filter(Boolean).length;
     if (wordCount > 10) return false;
-    const previous = index > 0 ? readString$1E(lines[index - 1]) : "";
-    const next = index < lines.length - 1 ? readString$1E(lines[index + 1]) : "";
+    const previous = index > 0 ? readString$1F(lines[index - 1]) : "";
+    const next = index < lines.length - 1 ? readString$1F(lines[index + 1]) : "";
     return (!previous || readHeadingLevel(lines[index - 1]) != null)
       && (!next || readHeadingLevel(lines[index + 1]) == null);
   }
 
   function normalizeHeadingText(value) {
-    return readString$1E(value)
+    return readString$1F(value)
       .replace(/^#{1,6}\s+/, "")
       .replace(/\s+#+\s*$/, "")
       .toLowerCase()
@@ -15355,10 +15709,15 @@
       .trim();
   }
 
-  function normalizeInsertableSectionText(value) {
+  function normalizeHeadingLabelText(value) {
     return normalizeHeadingText(value)
-      .replace(/^[-–—]+\s*/, "")
       .replace(/^\d{1,3}(?:\.\d{1,3})*\.?\s+/, "")
+      .trim();
+  }
+
+  function normalizeInsertableSectionText(value) {
+    return normalizeHeadingLabelText(value)
+      .replace(/^[-–—]+\s*/, "")
       .replace(/\s*:\s*$/, "")
       .trim();
   }
@@ -15376,7 +15735,7 @@
     // Read-only inspector — invalid path returns a neutral protocol view
     // so the planner block stays observable without throwing. Callers that
     // care about validity (publish action) check filePath themselves.
-    const resolvedPath = readString$1E(path) || "final_candidate.md";
+    const resolvedPath = readString$1F(path) || "final_candidate.md";
     const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
     const filePath = pathValidation.ok ? pathValidation.path : resolvedPath;
     const source = normalizeVirtualWorkspace(workspace);
@@ -15384,6 +15743,7 @@
     let latestWriteIndex = -1;
     let latestFinalizeIndex = -1;
     let latestReadIndex = -1;
+    let latestReviewIndex = -1;
     operations.forEach((operation, index) => {
       if (!operation || operation.path !== filePath) return;
       if (
@@ -15402,29 +15762,35 @@
       if (operation.action === "read") {
         latestReadIndex = index;
       }
+      if (operation.action === "review_candidate") {
+        latestReviewIndex = index;
+      }
     });
     return {
       finalizedAfterLatestWrite: latestFinalizeIndex > -1 && latestFinalizeIndex > latestWriteIndex,
       latestFinalizeIndex,
       latestReadIndex,
+      latestReviewIndex,
       latestWriteIndex,
       path: filePath,
       readAfterLatestContentChange: latestReadIndex > -1 && latestReadIndex > latestWriteIndex,
-      readAfterFinalize: latestReadIndex > -1 && latestReadIndex > latestFinalizeIndex
+      readAfterFinalize: latestReadIndex > -1 && latestReadIndex > latestFinalizeIndex,
+      reviewAfterLatestContentChange: latestReviewIndex > -1 && latestReviewIndex > latestWriteIndex,
+      reviewAfterRead: latestReviewIndex > -1 && latestReviewIndex > latestReadIndex
     };
   }
 
   function readFinalCandidateStatus(source, finalCandidatePath, quality) {
     const file = source && source.files ? source.files[finalCandidatePath] : null;
     if (!file) return "missing";
-    const content = readString$1E(file && file.content);
+    const content = readString$1F(file && file.content);
     if (!content) return "empty";
     if (quality && quality.finalCandidateReady === true) return "ready";
     return "drafted";
   }
 
   function summarizeTextStats$2(value) {
-    const text = readString$1E(value);
+    const text = readString$1F(value);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -15435,7 +15801,7 @@
     };
   }
 
-  function normalizeTextStats$4(value) {
+  function normalizeTextStats$5(value) {
     const source = value && typeof value === "object" ? value : {};
     return {
       chars: readPositiveInteger$j(source.chars) || 0,
@@ -15446,7 +15812,7 @@
   }
 
   function formatTextStats$1(stats) {
-    const value = normalizeTextStats$4(stats);
+    const value = normalizeTextStats$5(stats);
     return `chars:${value.chars},nonWhitespace:${value.nonWhitespaceChars},cjk:${value.cjkChars},words:${value.words}`;
   }
 
@@ -15458,13 +15824,13 @@
     return entries.length > 0 ? `{${entries.join(",")}}` : "{}";
   }
 
-  function readString$1E(value) {
+  function readString$1F(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readStringArray$7(value) {
     return Array.isArray(value)
-      ? value.map(readString$1E).filter(Boolean)
+      ? value.map(readString$1F).filter(Boolean)
       : [];
   }
 
@@ -15482,6 +15848,7 @@
       lastConflictCodes: [],
       lastObservableDeficits: null,
       lastSourceMinimum: null,
+      lastSuccessfulEvidenceCount: 0,
       lastSuccessfulReadUrlCount: 0,
       repeatedLengthReadinessConflictCount: 0,
       repeatedPublishBlockCount: 0,
@@ -15519,6 +15886,7 @@
       sourceMinimum
     });
     const successfulReadUrlCount = readSuccessfulReadUrlCount$2(runState, packet);
+    const successfulEvidenceCount = readSuccessfulEvidenceCount(runState, context, packet);
     const researchState = readResearchState(runState, packet);
     const finalReadiness = readFinalReadiness$1(runState, context);
     const conflictCodes = readConflictCodes({
@@ -15542,6 +15910,7 @@
     const progressSignals = readProgressSignals(previous, {
       candidate,
       sourceMinimum,
+      successfulEvidenceCount,
       successfulReadUrlCount,
       validLimitedWithGaps
     });
@@ -15550,7 +15919,7 @@
       activeConflictDimensions,
       candidate,
       conflictCodes,
-      finalReadinessDecision: readString$1D(finalReadiness && finalReadiness.decision) || null,
+      finalReadinessDecision: readString$1E(finalReadiness && finalReadiness.decision) || null,
       hasProgress: progressSignals.all.length > 0,
       observableDeficits,
       packet,
@@ -15558,7 +15927,9 @@
       publishBlock: readPublishBlockSnapshot$1(runState, packet),
       researchState,
       requestedLength,
+      runtimeConfig: context.runtimeConfig,
       sourceMinimum,
+      successfulEvidenceCount,
       successfulReadUrlCount,
       validLimitedWithGaps
     };
@@ -15580,27 +15951,28 @@
       : null;
     return {
       activeConflictDimensions: Array.isArray(value.activeConflictDimensions)
-        ? value.activeConflictDimensions.map(readString$1D).filter(Boolean).slice(0, 6)
+        ? value.activeConflictDimensions.map(readString$1E).filter(Boolean).slice(0, 6)
         : [],
-      status: readString$1D(value.status) || "tracking",
-      repeatedSourceReadinessConflictCount: readNumber$h(value.repeatedSourceReadinessConflictCount),
-      repeatedLengthReadinessConflictCount: readNumber$h(value.repeatedLengthReadinessConflictCount),
-      repeatedReadinessConflictCount: readNumber$h(value.repeatedReadinessConflictCount),
-      repeatedPublishBlockCount: readNumber$h(value.repeatedPublishBlockCount),
-      stepsWithoutNewEvidence: readNumber$h(value.stepsWithoutNewEvidence),
-      lastSuccessfulReadUrlCount: readNumber$h(value.lastSuccessfulReadUrlCount),
+      status: readString$1E(value.status) || "tracking",
+      repeatedSourceReadinessConflictCount: readNumber$i(value.repeatedSourceReadinessConflictCount),
+      repeatedLengthReadinessConflictCount: readNumber$i(value.repeatedLengthReadinessConflictCount),
+      repeatedReadinessConflictCount: readNumber$i(value.repeatedReadinessConflictCount),
+      repeatedPublishBlockCount: readNumber$i(value.repeatedPublishBlockCount),
+      stepsWithoutNewEvidence: readNumber$i(value.stepsWithoutNewEvidence),
+      lastSuccessfulEvidenceCount: readNumber$i(value.lastSuccessfulEvidenceCount),
+      lastSuccessfulReadUrlCount: readNumber$i(value.lastSuccessfulReadUrlCount),
       lastConflictCodes: Array.isArray(value.lastConflictCodes)
-        ? value.lastConflictCodes.map(readString$1D).filter(Boolean).slice(0, 8)
+        ? value.lastConflictCodes.map(readString$1E).filter(Boolean).slice(0, 8)
         : [],
       sourceMinimum: sourceMinimum ? {
         passed: sourceMinimum.passed === true,
-        reads: readNumber$h(sourceMinimum.readSources),
-        minReads: readNumber$h(sourceMinimum.minReadSources),
-        relevant: readNumber$h(sourceMinimum.relevantSources),
-        minRelevant: readNumber$h(sourceMinimum.minRelevantSources)
+        reads: readNumber$i(sourceMinimum.readSources),
+        minReads: readNumber$i(sourceMinimum.minReadSources),
+        relevant: readNumber$i(sourceMinimum.relevantSources),
+        minRelevant: readNumber$i(sourceMinimum.minRelevantSources)
       } : null,
       candidate: candidate ? {
-        path: readString$1D(candidate.path) || null,
+        path: readString$1E(candidate.path) || null,
         chars: readNullableNumber$5(candidate.chars),
         cjkChars: readNullableNumber$5(candidate.cjkChars),
         words: readNullableNumber$5(candidate.words)
@@ -15609,26 +15981,26 @@
         lengthDeficit: readNullableNumber$5(deficits.lengthDeficit),
         lengthObserved: readNullableNumber$5(deficits.lengthObserved),
         lengthRequested: readNullableNumber$5(deficits.lengthRequested),
-        lengthUnit: readString$1D(deficits.lengthUnit) || null,
+        lengthUnit: readString$1E(deficits.lengthUnit) || null,
         readSourceDeficit: readNullableNumber$5(deficits.readSourceDeficit),
         relevantSourceDeficit: readNullableNumber$5(deficits.relevantSourceDeficit)
       } : null,
       sourceProgressSignals: Array.isArray(value.sourceProgressSignals)
-        ? value.sourceProgressSignals.map(readString$1D).filter(Boolean).slice(0, 8)
+        ? value.sourceProgressSignals.map(readString$1E).filter(Boolean).slice(0, 8)
         : [],
       workspaceProgressSignals: Array.isArray(value.workspaceProgressSignals)
-        ? value.workspaceProgressSignals.map(readString$1D).filter(Boolean).slice(0, 8)
+        ? value.workspaceProgressSignals.map(readString$1E).filter(Boolean).slice(0, 8)
         : [],
       acceptanceConvergenceSignal: signal ? {
-        kind: readString$1D(signal.kind) || "acceptance_convergence_signal",
-        status: readString$1D(signal.status) || null,
-        reason: readString$1D(signal.reason) || null,
-        forbiddenReadiness: readString$1D(signal.forbiddenReadiness) || null,
+        kind: readString$1E(signal.kind) || "acceptance_convergence_signal",
+        status: readString$1E(signal.status) || null,
+        reason: readString$1E(signal.reason) || null,
+        forbiddenReadiness: readString$1E(signal.forbiddenReadiness) || null,
         allowedNextMoves: Array.isArray(signal.allowedNextMoves)
-          ? signal.allowedNextMoves.map(readString$1D).filter(Boolean).slice(0, 6)
+          ? signal.allowedNextMoves.map(readString$1E).filter(Boolean).slice(0, 6)
           : [],
         requiredLimitedFields: Array.isArray(signal.requiredLimitedFields)
-          ? signal.requiredLimitedFields.map(readString$1D).filter(Boolean).slice(0, 6)
+          ? signal.requiredLimitedFields.map(readString$1E).filter(Boolean).slice(0, 6)
           : [],
         requiredCorrection: signal.requiredCorrection && typeof signal.requiredCorrection === "object"
           ? cloneValue$1(signal.requiredCorrection)
@@ -15649,39 +16021,39 @@
     const hasReadyConflict = hasSourceConflict || hasLengthConflict || progress.conflictCodes.includes("readiness_audit_failed");
     const hasSourceProgress = progress.progressSignals.source.length > 0;
     const hasWorkspaceProgress = progress.progressSignals.workspace.length > 0;
-    const previousPublishCount = readNumber$h(previous.publishBlockCount);
-    const publishCount = readNumber$h(progress.publishBlock && progress.publishBlock.count);
+    const previousPublishCount = readNumber$i(previous.publishBlockCount);
+    const publishCount = readNumber$i(progress.publishBlock && progress.publishBlock.count);
     const publishBlockIncreased = publishCount > previousPublishCount;
     const repeatedSourceReadinessConflictCount = hasSourceProgress || progress.validLimitedWithGaps
       ? 0
       : hasSourceConflict
-        ? readNumber$h(previous.repeatedSourceReadinessConflictCount) + 1
-        : readNumber$h(previous.repeatedSourceReadinessConflictCount);
+        ? readNumber$i(previous.repeatedSourceReadinessConflictCount) + 1
+        : readNumber$i(previous.repeatedSourceReadinessConflictCount);
     const repeatedLengthReadinessConflictCount = hasWorkspaceProgress || progress.validLimitedWithGaps
       ? 0
       : hasLengthConflict
-        ? readNumber$h(previous.repeatedLengthReadinessConflictCount) + 1
-        : readNumber$h(previous.repeatedLengthReadinessConflictCount);
+        ? readNumber$i(previous.repeatedLengthReadinessConflictCount) + 1
+        : readNumber$i(previous.repeatedLengthReadinessConflictCount);
     const repeatedReadinessConflictCount = Math.max(
       repeatedSourceReadinessConflictCount,
       repeatedLengthReadinessConflictCount,
       hasReadyConflict && !hasSourceConflict && !hasLengthConflict && !progress.validLimitedWithGaps
-        ? readNumber$h(previous.repeatedReadinessConflictCount) + 1
+        ? readNumber$i(previous.repeatedReadinessConflictCount) + 1
         : 0
     );
     const repeatedPublishBlockCount = hasSourceProgress || hasWorkspaceProgress || progress.validLimitedWithGaps
       ? 0
       : publishBlockIncreased
-        ? readNumber$h(previous.repeatedPublishBlockCount) + 1
-        : readNumber$h(previous.repeatedPublishBlockCount);
+        ? readNumber$i(previous.repeatedPublishBlockCount) + 1
+        : readNumber$i(previous.repeatedPublishBlockCount);
     const stepsWithoutNewEvidence = hasSourceProgress || progress.validLimitedWithGaps
       ? 0
-      : readNumber$h(previous.stepsWithoutNewEvidence) + 1;
+      : readNumber$i(previous.stepsWithoutNewEvidence) + 1;
     const shouldSignal = shouldEmitConvergenceSignal(progress, {
       repeatedLengthReadinessConflictCount,
       repeatedSourceReadinessConflictCount
     });
-    const signal = shouldSignal ? buildAcceptanceConvergenceSignal(progress, runState) : null;
+    const signal = shouldSignal ? buildAcceptanceConvergenceSignal(progress, runState, progress.runtimeConfig) : null;
     return {
       acceptanceConvergenceSignal: progress.validLimitedWithGaps ? null : signal,
       activeConflictDimensions: progress.activeConflictDimensions.slice(0, 6),
@@ -15689,7 +16061,8 @@
       lastConflictCodes: progress.conflictCodes.slice(0, 8),
       lastObservableDeficits: progress.observableDeficits ? cloneValue$1(progress.observableDeficits) : null,
       lastSourceMinimum: progress.sourceMinimum ? cloneValue$1(progress.sourceMinimum) : null,
-      lastSuccessfulReadUrlCount: readNumber$h(progress.successfulReadUrlCount),
+      lastSuccessfulEvidenceCount: readNumber$i(progress.successfulEvidenceCount),
+      lastSuccessfulReadUrlCount: readNumber$i(progress.successfulReadUrlCount),
       publishBlockCount: publishCount,
       repeatedLengthReadinessConflictCount,
       repeatedPublishBlockCount,
@@ -15713,24 +16086,24 @@
 
   function shouldEmitConvergenceSignal(progress, counts) {
     if (progress.validLimitedWithGaps) return false;
-    const repeatedSource = readNumber$h(counts && counts.repeatedSourceReadinessConflictCount);
-    const repeatedLength = readNumber$h(counts && counts.repeatedLengthReadinessConflictCount);
+    const repeatedSource = readNumber$i(counts && counts.repeatedSourceReadinessConflictCount);
+    const repeatedLength = readNumber$i(counts && counts.repeatedLengthReadinessConflictCount);
     const researchGateBlocked = progress.researchState && progress.researchState.finalAllowed === false;
     const sourceMinimumFailed = progress.sourceMinimum && progress.sourceMinimum.passed === false;
-    const lengthFailed = progress.observableDeficits && readNumber$h(progress.observableDeficits.lengthDeficit) > 0;
+    const lengthFailed = progress.observableDeficits && readNumber$i(progress.observableDeficits.lengthDeficit) > 0;
     if ((researchGateBlocked || sourceMinimumFailed) && repeatedSource >= READY_CONFLICT_THRESHOLD) return true;
     if (lengthFailed && repeatedLength >= READY_CONFLICT_THRESHOLD) return true;
     return false;
   }
 
-  function buildAcceptanceConvergenceSignal(progress, runState) {
+  function buildAcceptanceConvergenceSignal(progress, runState, runtimeConfig) {
     const sourceMinimumFailed = progress.sourceMinimum && progress.sourceMinimum.passed === false;
     const researchGateBlocked = progress.researchState && progress.researchState.finalAllowed === false;
-    const lengthFailed = progress.observableDeficits && readNumber$h(progress.observableDeficits.lengthDeficit) > 0;
+    const lengthFailed = progress.observableDeficits && readNumber$i(progress.observableDeficits.lengthDeficit) > 0;
     const activeDimensions = progress.activeConflictDimensions.slice(0, 6);
     const allowedNextMoves = [];
     if (sourceMinimumFailed || researchGateBlocked) {
-      allowedNextMoves.push("web_search", "read_url");
+      allowedNextMoves.push(...readEvidenceRecoveryActions(runtimeConfig));
     }
     if (lengthFailed) {
       allowedNextMoves.push("workspace_insert_after_section", "workspace_replace");
@@ -15762,7 +16135,7 @@
       },
       requiredLimitedFields: Array.from(new Set(requiredLimitedFields)),
       researchFinalAllowed: progress.researchState ? progress.researchState.finalAllowed === true : null,
-      researchFinalReason: progress.researchState ? readString$1D(progress.researchState.finalReason) || null : null,
+      researchFinalReason: progress.researchState ? readString$1E(progress.researchState.finalReason) || null : null,
       sourceMinimum: progress.sourceMinimum ? cloneValue$1(progress.sourceMinimum) : null,
       status: "needs_correction"
     };
@@ -15771,7 +16144,10 @@
   function readProgressSignals(previous, current) {
     const source = [];
     const workspace = [];
-    if (readNumber$h(current.successfulReadUrlCount) > readNumber$h(previous.lastSuccessfulReadUrlCount)) {
+    if (readNumber$i(current.successfulEvidenceCount) > readNumber$i(previous.lastSuccessfulEvidenceCount)) {
+      source.push("successful_evidence_increased");
+    }
+    if (readNumber$i(current.successfulReadUrlCount) > readNumber$i(previous.lastSuccessfulReadUrlCount)) {
       source.push("successful_read_url_increased");
     }
     const prevSm = previous.lastSourceMinimum && typeof previous.lastSourceMinimum === "object"
@@ -15779,8 +16155,8 @@
       : null;
     const sm = current.sourceMinimum && typeof current.sourceMinimum === "object" ? current.sourceMinimum : null;
     if (sm && prevSm) {
-      if (readNumber$h(sm.readSources) > readNumber$h(prevSm.readSources)) source.push("source_minimum_reads_increased");
-      if (readNumber$h(sm.relevantSources) > readNumber$h(prevSm.relevantSources)) source.push("source_minimum_relevant_increased");
+      if (readNumber$i(sm.readSources) > readNumber$i(prevSm.readSources)) source.push("source_minimum_reads_increased");
+      if (readNumber$i(sm.relevantSources) > readNumber$i(prevSm.relevantSources)) source.push("source_minimum_relevant_increased");
     }
     if (sm && sm.passed === true) source.push("source_minimum_passed");
     const prevCandidate = previous.lastCandidateStats && typeof previous.lastCandidateStats === "object"
@@ -15788,9 +16164,9 @@
       : null;
     const candidate = current.candidate && typeof current.candidate === "object" ? current.candidate : null;
     if (candidate && prevCandidate) {
-      if (readNumber$h(candidate.words) > readNumber$h(prevCandidate.words)) workspace.push("candidate_words_increased");
-      if (readNumber$h(candidate.chars) > readNumber$h(prevCandidate.chars)) workspace.push("candidate_chars_increased");
-      if (readNumber$h(candidate.cjkChars) > readNumber$h(prevCandidate.cjkChars)) workspace.push("candidate_cjk_increased");
+      if (readNumber$i(candidate.words) > readNumber$i(prevCandidate.words)) workspace.push("candidate_words_increased");
+      if (readNumber$i(candidate.chars) > readNumber$i(prevCandidate.chars)) workspace.push("candidate_chars_increased");
+      if (readNumber$i(candidate.cjkChars) > readNumber$i(prevCandidate.cjkChars)) workspace.push("candidate_cjk_increased");
     }
     const limited = current.validLimitedWithGaps ? ["valid_limited_with_remaining_gaps"] : [];
     return {
@@ -15804,13 +16180,13 @@
     const codes = [];
     if (Array.isArray(context && context.conflictIssues)) {
       context.conflictIssues.forEach((issue) => {
-        const code = readString$1D(issue && issue.code) || readString$1D(issue);
+        const code = readString$1E(issue && issue.code) || readString$1E(issue);
         if (code) codes.push(code);
       });
     }
-    const status = readString$1D(context && context.status);
+    const status = readString$1E(context && context.status);
     if (status === "readiness_audit_failed") codes.push("readiness_audit_failed");
-    const decision = readString$1D(finalReadiness && finalReadiness.decision);
+    const decision = readString$1E(finalReadiness && finalReadiness.decision);
     const assessment = finalReadiness && finalReadiness.requirementsAssessment && typeof finalReadiness.requirementsAssessment === "object"
       ? finalReadiness.requirementsAssessment
       : null;
@@ -15823,7 +16199,7 @@
     if (
       decision === "ready" &&
       observableDeficits &&
-      readNumber$h(observableDeficits.lengthDeficit) > 0
+      readNumber$i(observableDeficits.lengthDeficit) > 0
     ) {
       codes.push("ready_below_requested_length");
     }
@@ -15838,15 +16214,15 @@
 
   function isValidLimitedWithGaps(finalReadiness, context = {}) {
     if (!finalReadiness || typeof finalReadiness !== "object") return false;
-    if (readString$1D(finalReadiness.decision) !== "limited") return false;
+    if (readString$1E(finalReadiness.decision) !== "limited") return false;
     const assessment = finalReadiness.requirementsAssessment && typeof finalReadiness.requirementsAssessment === "object"
       ? finalReadiness.requirementsAssessment
       : null;
     if (!assessment || !Array.isArray(assessment.remainingGaps)) return false;
-    if (assessment.remainingGaps.map(readString$1D).filter(Boolean).length === 0) return false;
+    if (assessment.remainingGaps.map(readString$1E).filter(Boolean).length === 0) return false;
     const researchGateBlocked = context.researchState && context.researchState.finalAllowed === false;
     const sourceMinimumFailed = context.sourceMinimum && context.sourceMinimum.passed === false;
-    const lengthFailed = context.observableDeficits && readNumber$h(context.observableDeficits.lengthDeficit) > 0;
+    const lengthFailed = context.observableDeficits && readNumber$i(context.observableDeficits.lengthDeficit) > 0;
     if ((researchGateBlocked || sourceMinimumFailed) && assessment.evidenceSatisfied !== false) return false;
     if (lengthFailed && assessment.lengthSatisfied !== false) return false;
     if ((researchGateBlocked || sourceMinimumFailed || lengthFailed) && assessment.requirementSatisfied !== false) {
@@ -15859,7 +16235,7 @@
     const dimensions = [];
     if (researchState && researchState.finalAllowed === false) dimensions.push("research_gate");
     if (sourceMinimum && sourceMinimum.passed === false) dimensions.push("source");
-    if (observableDeficits && readNumber$h(observableDeficits.lengthDeficit) > 0) dimensions.push("length");
+    if (observableDeficits && readNumber$i(observableDeficits.lengthDeficit) > 0) dimensions.push("length");
     if (Array.isArray(conflictCodes)) {
       if (conflictCodes.some(isSourceConflictCode)) dimensions.push("source");
       if (conflictCodes.some(isLengthConflictCode)) dimensions.push("length");
@@ -15871,7 +16247,7 @@
   function readObservableDeficits$1({ candidate, requestedLength, sourceMinimum }) {
     const source = sourceMinimum && typeof sourceMinimum === "object" ? sourceMinimum : null;
     const requested = requestedLength && typeof requestedLength === "object" ? requestedLength : null;
-    const statsKey = requested ? readString$1D(requested.statsKey) || readStatsKeyForUnit(requested.unit) : "";
+    const statsKey = requested ? readString$1E(requested.statsKey) || readStatsKeyForUnit(requested.unit) : "";
     const observedLength = candidate && statsKey && Number.isFinite(candidate[statsKey])
       ? candidate[statsKey]
       : null;
@@ -15882,12 +16258,12 @@
         : null,
       lengthObserved: observedLength,
       lengthRequested: requestedValue,
-      lengthUnit: requested ? readString$1D(requested.unit) || null : null,
+      lengthUnit: requested ? readString$1E(requested.unit) || null : null,
       readSourceDeficit: source
-        ? Math.max(0, readNumber$h(source.minReadSources) - readNumber$h(source.readSources))
+        ? Math.max(0, readNumber$i(source.minReadSources) - readNumber$i(source.readSources))
         : null,
       relevantSourceDeficit: source
-        ? Math.max(0, readNumber$h(source.minRelevantSources) - readNumber$h(source.relevantSources))
+        ? Math.max(0, readNumber$i(source.minRelevantSources) - readNumber$i(source.relevantSources))
         : null
     };
   }
@@ -15907,19 +16283,19 @@
 
   function buildNextMoveContract$1(signal) {
     const dimensions = Array.isArray(signal.activeConflictDimensions)
-      ? signal.activeConflictDimensions.map(readString$1D).filter(Boolean)
+      ? signal.activeConflictDimensions.map(readString$1E).filter(Boolean)
       : [];
     const moves = Array.isArray(signal.allowedNextMoves)
-      ? signal.allowedNextMoves.map(readString$1D).filter(Boolean)
+      ? signal.allowedNextMoves.map(readString$1E).filter(Boolean)
       : [];
     const deficits = signal.observableDeficits && typeof signal.observableDeficits === "object"
       ? signal.observableDeficits
       : null;
     const deficitText = deficits
       ? [
-          readNumber$h(deficits.readSourceDeficit) > 0 ? `readSourceDeficit=${readNumber$h(deficits.readSourceDeficit)}` : "",
-          readNumber$h(deficits.relevantSourceDeficit) > 0 ? `relevantSourceDeficit=${readNumber$h(deficits.relevantSourceDeficit)}` : "",
-          readNumber$h(deficits.lengthDeficit) > 0 ? `lengthDeficit=${readNumber$h(deficits.lengthDeficit)} ${readString$1D(deficits.lengthUnit) || ""}`.trim() : ""
+          readNumber$i(deficits.readSourceDeficit) > 0 ? `readSourceDeficit=${readNumber$i(deficits.readSourceDeficit)}` : "",
+          readNumber$i(deficits.relevantSourceDeficit) > 0 ? `relevantSourceDeficit=${readNumber$i(deficits.relevantSourceDeficit)}` : "",
+          readNumber$i(deficits.lengthDeficit) > 0 ? `lengthDeficit=${readNumber$i(deficits.lengthDeficit)} ${readString$1E(deficits.lengthUnit) || ""}`.trim() : ""
         ].filter(Boolean).join(", ")
       : "";
     return [
@@ -15951,11 +16327,11 @@
       : null;
     const sm = packetSm || loopSm;
     return sm ? {
-      minReadSources: readNumber$h(sm.minReadSources),
-      minRelevantSources: readNumber$h(sm.minRelevantSources),
+      minReadSources: readNumber$i(sm.minReadSources),
+      minRelevantSources: readNumber$i(sm.minRelevantSources),
       passed: sm.passed === true,
-      readSources: readNumber$h(sm.readSources),
-      relevantSources: readNumber$h(sm.relevantSources)
+      readSources: readNumber$i(sm.readSources),
+      relevantSources: readNumber$i(sm.relevantSources)
     } : null;
   }
 
@@ -15968,7 +16344,7 @@
       : null;
     const file = workspace ? readWorkspaceFinalCandidate$1(workspace) : null;
     const quality = workspace && workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const stats = normalizeTextStats$3(
+    const stats = normalizeTextStats$4(
       (packetCandidate && packetCandidate.textStats)
       || (file && file.textStats)
       || quality.finalCandidateStats
@@ -15978,7 +16354,7 @@
       chars: stats.chars,
       cjkChars: stats.cjkChars,
       nonWhitespaceChars: stats.nonWhitespaceChars,
-      path: readString$1D(packetCandidate && packetCandidate.path) || readString$1D(file && file.path) || readString$1D(quality.finalCandidatePath) || null,
+      path: readString$1E(packetCandidate && packetCandidate.path) || readString$1E(file && file.path) || readString$1E(quality.finalCandidatePath) || null,
       words: stats.words
     };
   }
@@ -15990,19 +16366,28 @@
     return packetCount == null ? countSuccessfulReadUrlArtifacts(runState) : packetCount;
   }
 
+  function readSuccessfulEvidenceCount(runState, context, packet) {
+    const packetCount = packet && packet.evidence && Number.isFinite(packet.evidence.successfulEvidenceCount)
+      ? packet.evidence.successfulEvidenceCount
+      : null;
+    return packetCount == null
+      ? countSuccessfulEvidenceArtifacts(runState, context && context.runtimeConfig)
+      : packetCount;
+  }
+
   function readRequestedLengthSnapshot$1(runState, context, packet) {
     const packetLength = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
     if (packetLength && Number.isFinite(packetLength.value)) {
-      const unit = readString$1D(packetLength.unit) || null;
+      const unit = readString$1E(packetLength.unit) || null;
       return {
-        statsKey: readString$1D(packetLength.statsKey) || readStatsKeyForUnit(unit),
+        statsKey: readString$1E(packetLength.statsKey) || readStatsKeyForUnit(unit),
         unit,
         value: packetLength.value
       };
     }
-    return readRequestedLength$1(runState, context);
+    return readRequestedLength$2(runState, context);
   }
 
   function readResearchState(runState, packet) {
@@ -16014,11 +16399,11 @@
       : {};
     return {
       finalAllowed: packetEvidence ? packetEvidence.researchFinalAllowed === true : state.finalAllowed === true,
-      finalReason: packetEvidence ? readString$1D(packetEvidence.researchFinalReason) || null : readString$1D(state.finalReason) || null,
+      finalReason: packetEvidence ? readString$1E(packetEvidence.researchFinalReason) || null : readString$1E(state.finalReason) || null,
       gaps: packetEvidence && Array.isArray(packetEvidence.researchGaps)
-        ? packetEvidence.researchGaps.map(readString$1D).filter(Boolean).slice(0, 12)
+        ? packetEvidence.researchGaps.map(readString$1E).filter(Boolean).slice(0, 12)
         : Array.isArray(state.gaps)
-          ? state.gaps.map(readString$1D).filter(Boolean).slice(0, 12)
+          ? state.gaps.map(readString$1E).filter(Boolean).slice(0, 12)
           : [],
       qualityGateRequired: packetEvidence ? packetEvidence.researchQualityGateRequired === true : state.qualityGateRequired === true
     };
@@ -16032,9 +16417,9 @@
       ? runState.publishBlockSignal
       : {};
     return {
-      count: readNumber$h((packetPublish && packetPublish.count) ?? signal.count),
+      count: readNumber$i((packetPublish && packetPublish.count) ?? signal.count),
       cyclesRemaining: readNullableNumber$5((packetPublish && packetPublish.cyclesRemaining) ?? signal.cyclesRemaining),
-      lastStatus: readString$1D((packetPublish && packetPublish.lastStatus) ?? signal.lastStatus) || null
+      lastStatus: readString$1E((packetPublish && packetPublish.lastStatus) ?? signal.lastStatus) || null
     };
   }
 
@@ -16064,7 +16449,7 @@
       : {};
     return {
       activeConflictDimensions: Array.isArray(source.activeConflictDimensions)
-        ? source.activeConflictDimensions.map(readString$1D).filter(Boolean).slice(0, 6)
+        ? source.activeConflictDimensions.map(readString$1E).filter(Boolean).slice(0, 6)
         : [],
       acceptanceConvergenceSignal: source.acceptanceConvergenceSignal && typeof source.acceptanceConvergenceSignal === "object"
         ? cloneValue$1(source.acceptanceConvergenceSignal)
@@ -16073,7 +16458,7 @@
         ? cloneValue$1(source.lastCandidateStats)
         : null,
       lastConflictCodes: Array.isArray(source.lastConflictCodes)
-        ? source.lastConflictCodes.map(readString$1D).filter(Boolean).slice(0, 8)
+        ? source.lastConflictCodes.map(readString$1E).filter(Boolean).slice(0, 8)
         : [],
       lastObservableDeficits: source.lastObservableDeficits && typeof source.lastObservableDeficits === "object"
         ? cloneValue$1(source.lastObservableDeficits)
@@ -16081,39 +16466,40 @@
       lastSourceMinimum: source.lastSourceMinimum && typeof source.lastSourceMinimum === "object"
         ? cloneValue$1(source.lastSourceMinimum)
         : null,
-      lastSuccessfulReadUrlCount: readNumber$h(source.lastSuccessfulReadUrlCount),
-      publishBlockCount: readNumber$h(source.publishBlockCount),
-      repeatedLengthReadinessConflictCount: readNumber$h(source.repeatedLengthReadinessConflictCount),
-      repeatedPublishBlockCount: readNumber$h(source.repeatedPublishBlockCount),
-      repeatedReadinessConflictCount: readNumber$h(source.repeatedReadinessConflictCount),
-      repeatedSourceReadinessConflictCount: readNumber$h(source.repeatedSourceReadinessConflictCount),
+      lastSuccessfulEvidenceCount: readNumber$i(source.lastSuccessfulEvidenceCount),
+      lastSuccessfulReadUrlCount: readNumber$i(source.lastSuccessfulReadUrlCount),
+      publishBlockCount: readNumber$i(source.publishBlockCount),
+      repeatedLengthReadinessConflictCount: readNumber$i(source.repeatedLengthReadinessConflictCount),
+      repeatedPublishBlockCount: readNumber$i(source.repeatedPublishBlockCount),
+      repeatedReadinessConflictCount: readNumber$i(source.repeatedReadinessConflictCount),
+      repeatedSourceReadinessConflictCount: readNumber$i(source.repeatedSourceReadinessConflictCount),
       sourceProgressSignals: Array.isArray(source.sourceProgressSignals)
-        ? source.sourceProgressSignals.map(readString$1D).filter(Boolean).slice(0, 8)
+        ? source.sourceProgressSignals.map(readString$1E).filter(Boolean).slice(0, 8)
         : [],
-      status: readString$1D(source.status) || "tracking",
-      stepsWithoutNewEvidence: readNumber$h(source.stepsWithoutNewEvidence),
+      status: readString$1E(source.status) || "tracking",
+      stepsWithoutNewEvidence: readNumber$i(source.stepsWithoutNewEvidence),
       workspaceProgressSignals: Array.isArray(source.workspaceProgressSignals)
-        ? source.workspaceProgressSignals.map(readString$1D).filter(Boolean).slice(0, 8)
+        ? source.workspaceProgressSignals.map(readString$1E).filter(Boolean).slice(0, 8)
         : [],
       version: 1
     };
   }
 
-  function normalizeTextStats$3(value) {
+  function normalizeTextStats$4(value) {
     const source = value && typeof value === "object" ? value : {};
     const hasAny = ["chars", "nonWhitespaceChars", "cjkChars", "words"].some((key) => Number.isFinite(source[key]));
     if (!hasAny) return null;
     return {
-      chars: readNumber$h(source.chars),
-      cjkChars: readNumber$h(source.cjkChars),
-      nonWhitespaceChars: readNumber$h(source.nonWhitespaceChars),
-      words: readNumber$h(source.words)
+      chars: readNumber$i(source.chars),
+      cjkChars: readNumber$i(source.cjkChars),
+      nonWhitespaceChars: readNumber$i(source.nonWhitespaceChars),
+      words: readNumber$i(source.words)
     };
   }
 
-  function readRequestedLength$1(runState, context) {
+  function readRequestedLength$2(runState, context) {
     const contractText = readTerminalContractText({
-      request: context && context.request || { prompt: readString$1D(context && context.prompt) },
+      request: context && context.request || { prompt: readString$1E(context && context.prompt) },
       runState
     });
     const contract = extractRequestedLengthContract(contractText);
@@ -16125,11 +16511,11 @@
     };
   }
 
-  function readString$1D(value) {
+  function readString$1E(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readNumber$h(value) {
+  function readNumber$i(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
@@ -16320,36 +16706,36 @@
     const deficits = Array.isArray(value.recoverableDeficits)
       ? value.recoverableDeficits.map((entry) => ({
           allowedNextMoves: Array.isArray(entry.allowedNextMoves)
-            ? entry.allowedNextMoves.map(readString$1C).filter(Boolean).slice(0, 6)
+            ? entry.allowedNextMoves.map(readString$1D).filter(Boolean).slice(0, 6)
             : [],
           deficit: readNullableNumber$4(entry.deficit),
-          dimension: readString$1C(entry.dimension) || "requirement",
+          dimension: readString$1D(entry.dimension) || "requirement",
           observed: cloneValue$1(entry.observed),
           recoverable: entry.recoverable === true,
-          requiredAttempt: readString$1C(entry.requiredAttempt) || null,
+          requiredAttempt: readString$1D(entry.requiredAttempt) || null,
           target: cloneValue$1(entry.target),
-          unit: readString$1C(entry.unit) || null,
-          whyRecoverable: readString$1C(entry.whyRecoverable) || null
+          unit: readString$1D(entry.unit) || null,
+          whyRecoverable: readString$1D(entry.whyRecoverable) || null
         })).slice(0, 6)
       : [];
     return {
       kind: "requirement_recovery_evaluator",
-      status: readString$1C(value.status) || "tracking",
+      status: readString$1D(value.status) || "tracking",
       recoverableDeficits: deficits,
       validLimitedAllowed: value.validLimitedAllowed !== false,
       requiredAttemptBeforeLimited: Array.isArray(value.requiredAttemptBeforeLimited)
-        ? value.requiredAttemptBeforeLimited.map(readString$1C).filter(Boolean).slice(0, 6)
+        ? value.requiredAttemptBeforeLimited.map(readString$1D).filter(Boolean).slice(0, 6)
         : [],
       forbiddenMoves: Array.isArray(value.forbiddenMoves)
-        ? value.forbiddenMoves.map(readString$1C).filter(Boolean).slice(0, 6)
+        ? value.forbiddenMoves.map(readString$1D).filter(Boolean).slice(0, 6)
         : [],
       recoverySignals: value.recoverySignals && typeof value.recoverySignals === "object"
         ? {
             source: Array.isArray(value.recoverySignals.source)
-              ? value.recoverySignals.source.map(readString$1C).filter(Boolean).slice(0, 8)
+              ? value.recoverySignals.source.map(readString$1D).filter(Boolean).slice(0, 8)
               : [],
             workspace: Array.isArray(value.recoverySignals.workspace)
-              ? value.recoverySignals.workspace.map(readString$1C).filter(Boolean).slice(0, 8)
+              ? value.recoverySignals.workspace.map(readString$1D).filter(Boolean).slice(0, 8)
               : []
           }
         : { source: [], workspace: [] },
@@ -16357,7 +16743,7 @@
         ? {
             chars: readNullableNumber$4(value.lastCandidateStats.chars),
             cjkChars: readNullableNumber$4(value.lastCandidateStats.cjkChars),
-            path: readString$1C(value.lastCandidateStats.path) || null,
+            path: readString$1D(value.lastCandidateStats.path) || null,
             words: readNullableNumber$4(value.lastCandidateStats.words)
           }
         : null,
@@ -16365,7 +16751,7 @@
         ? cloneValue$1(value.lastObservableDeficits)
         : null,
       convergence: summarizeRequirementRecoveryConvergence(value.convergence),
-      nextMoveContract: readString$1C(value.nextMoveContract) || null
+      nextMoveContract: readString$1D(value.nextMoveContract) || null
     };
   }
 
@@ -16373,7 +16759,7 @@
     const finalReadiness = context.finalReadiness && typeof context.finalReadiness === "object"
       ? context.finalReadiness
       : null;
-    if (!finalReadiness || readString$1C(finalReadiness.decision) !== "limited") {
+    if (!finalReadiness || readString$1D(finalReadiness.decision) !== "limited") {
       return { ok: true, evaluator: evaluateRequirementRecovery(runState, context) };
     }
     const evaluator = evaluateRequirementRecovery(runState, context);
@@ -16402,14 +16788,14 @@
       : null;
     if (!repair || repair.active !== true) return false;
     if (!Array.isArray(recoverableDeficits) || recoverableDeficits.length === 0) return false;
-    const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString$1C(entry && entry.dimension)).filter(Boolean)));
+    const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString$1D(entry && entry.dimension)).filter(Boolean)));
     if (dimensions.includes("source")) return false;
     if (dimensions.some((dimension) => dimension !== "length")) return false;
     if (!workspaceSignals || workspaceSignals.expansionAttempted !== true) return false;
     const normalized = normalizeRequirementRecoveryConvergenceState(convergence);
     const lengthState = normalized.dimensionStates.length;
     return normalized.budgetState === "exhausted" ||
-      readNumber$g(lengthState.repeatedNoProgressCount) >= 2;
+      readNumber$h(lengthState.repeatedNoProgressCount) >= 2;
   }
 
   function buildNextMoveContract({ convergence, recoverableDeficits, requiredAttemptBeforeLimited, validLimitedAllowed }) {
@@ -16431,7 +16817,7 @@
       recoverableDeficits.flatMap((entry) => Array.isArray(entry.allowedNextMoves) ? entry.allowedNextMoves : [])
     ));
     const terminalWarning = convergence &&
-      readNumber$g(convergence.repeatedInvalidTerminalCount) >= REPEATED_INVALID_TERMINAL_THRESHOLD
+      readNumber$h(convergence.repeatedInvalidTerminalCount) >= REPEATED_INVALID_TERMINAL_THRESHOLD
       ? "Repeated workspace_publish_candidate/finalize attempts produced no observable requirement progress. Do not publish again until source or length facts improve, or validLimitedAllowed becomes true."
       : "";
     return [
@@ -16484,7 +16870,7 @@
     workspaceSignals
   }) {
     const previousConvergence = normalizeRequirementRecoveryConvergenceState(previous && previous.convergence);
-    const actionName = readString$1C(context && context.actionName);
+    const actionName = readString$1D(context && context.actionName);
     const finalReadiness = readFinalReadiness(context);
     const sourceRecoverable = recoverableDeficits.some((entry) => entry.dimension === "source");
     const lengthRecoverable = recoverableDeficits.some((entry) => entry.dimension === "length");
@@ -16573,21 +16959,21 @@
     return {
       passed: sourceMinimum ? sourceMinimum.passed === true : null,
       readSourceDeficit: deficits.readSourceDeficit,
-      readSources: sourceMinimum ? readNumber$g(sourceMinimum.readSources) : null,
+      readSources: sourceMinimum ? readNumber$h(sourceMinimum.readSources) : null,
       relevantSourceDeficit: deficits.relevantSourceDeficit,
-      relevantSources: sourceMinimum ? readNumber$g(sourceMinimum.relevantSources) : null,
+      relevantSources: sourceMinimum ? readNumber$h(sourceMinimum.relevantSources) : null,
       successfulReadUrlCount: readSuccessfulReadUrlCount$1(runState)
     };
   }
 
   function readLengthObservedSnapshot(candidate, requestedLength, deficits) {
     return {
-      chars: candidate ? readNumber$g(candidate.chars) : null,
-      cjkChars: candidate ? readNumber$g(candidate.cjkChars) : null,
+      chars: candidate ? readNumber$h(candidate.chars) : null,
+      cjkChars: candidate ? readNumber$h(candidate.cjkChars) : null,
       deficit: deficits.lengthDeficit,
       requested: requestedLength && Number.isFinite(requestedLength.value) ? requestedLength.value : null,
-      unit: requestedLength ? readString$1C(requestedLength.unit) || null : null,
-      words: candidate ? readNumber$g(candidate.words) : null
+      unit: requestedLength ? readString$1D(requestedLength.unit) || null : null,
+      words: candidate ? readNumber$h(candidate.words) : null
     };
   }
 
@@ -16598,9 +16984,9 @@
     if (!previous) return false;
     if (validLimited && sourceObservedHasDeficit(observed)) return true;
     if (observed.passed === true && previous.passed !== true) return true;
-    if (readNumber$g(observed.successfulReadUrlCount) > readNumber$g(previous.successfulReadUrlCount)) return true;
-    if (readNumber$g(observed.readSources) > readNumber$g(previous.readSources)) return true;
-    if (readNumber$g(observed.relevantSources) > readNumber$g(previous.relevantSources)) return true;
+    if (readNumber$h(observed.successfulReadUrlCount) > readNumber$h(previous.successfulReadUrlCount)) return true;
+    if (readNumber$h(observed.readSources) > readNumber$h(previous.readSources)) return true;
+    if (readNumber$h(observed.relevantSources) > readNumber$h(previous.relevantSources)) return true;
     return false;
   }
 
@@ -16609,22 +16995,22 @@
       ? previousState.lastObserved
       : null;
     if (!previous) return false;
-    if (validLimited && readNumber$g(observed.deficit) > 0) return true;
-    if (readNumber$g(observed.deficit) === 0 && readNumber$g(previous.deficit) > 0) return true;
-    if (readNumber$g(observed.words) > readNumber$g(previous.words)) return true;
-    if (readNumber$g(observed.chars) > readNumber$g(previous.chars)) return true;
-    if (readNumber$g(observed.cjkChars) > readNumber$g(previous.cjkChars)) return true;
+    if (validLimited && readNumber$h(observed.deficit) > 0) return true;
+    if (readNumber$h(observed.deficit) === 0 && readNumber$h(previous.deficit) > 0) return true;
+    if (readNumber$h(observed.words) > readNumber$h(previous.words)) return true;
+    if (readNumber$h(observed.chars) > readNumber$h(previous.chars)) return true;
+    if (readNumber$h(observed.cjkChars) > readNumber$h(previous.cjkChars)) return true;
     return false;
   }
 
   function sourceObservedHasDeficit(observed) {
-    return readNumber$g(observed && observed.readSourceDeficit) > 0 ||
-      readNumber$g(observed && observed.relevantSourceDeficit) > 0;
+    return readNumber$h(observed && observed.readSourceDeficit) > 0 ||
+      readNumber$h(observed && observed.relevantSourceDeficit) > 0;
   }
 
   function sourceHasDeficit(deficits) {
-    return readNumber$g(deficits && deficits.readSourceDeficit) > 0 ||
-      readNumber$g(deficits && deficits.relevantSourceDeficit) > 0;
+    return readNumber$h(deficits && deficits.readSourceDeficit) > 0 ||
+      readNumber$h(deficits && deficits.relevantSourceDeficit) > 0;
   }
 
   function readSuccessfulReadUrlCount$1(runState) {
@@ -16636,7 +17022,7 @@
     const readSources = runState && runState.researchContext && Array.isArray(runState.researchContext.readSources)
       ? runState.researchContext.readSources
       : [];
-    return readSources.filter((source) => source && (source.ok === true || readNumber$g(source.status) >= 200 && readNumber$g(source.status) < 300)).length;
+    return readSources.filter((source) => source && (source.ok === true || readNumber$h(source.status) >= 200 && readNumber$h(source.status) < 300)).length;
   }
 
   function readFinalReadiness(context) {
@@ -16648,28 +17034,28 @@
   }
 
   function isValidLimitedWithConcreteGaps(finalReadiness, deficits) {
-    if (!finalReadiness || readString$1C(finalReadiness.decision) !== "limited") return false;
+    if (!finalReadiness || readString$1D(finalReadiness.decision) !== "limited") return false;
     const assessment = finalReadiness.requirementsAssessment &&
       typeof finalReadiness.requirementsAssessment === "object"
       ? finalReadiness.requirementsAssessment
       : finalReadiness;
     const gaps = Array.isArray(assessment.remainingGaps)
-      ? assessment.remainingGaps.map(readString$1C).filter(Boolean)
+      ? assessment.remainingGaps.map(readString$1D).filter(Boolean)
       : Array.isArray(finalReadiness.remainingGaps)
-        ? finalReadiness.remainingGaps.map(readString$1C).filter(Boolean)
+        ? finalReadiness.remainingGaps.map(readString$1D).filter(Boolean)
         : [];
     if (gaps.length === 0) return false;
     if (sourceHasDeficit(deficits) && assessment.evidenceSatisfied !== false) return false;
-    if (readNumber$g(deficits.lengthDeficit) > 0 && assessment.lengthSatisfied !== false) return false;
-    if ((sourceHasDeficit(deficits) || readNumber$g(deficits.lengthDeficit) > 0) && assessment.requirementSatisfied !== false) return false;
+    if (readNumber$h(deficits.lengthDeficit) > 0 && assessment.lengthSatisfied !== false) return false;
+    if ((sourceHasDeficit(deficits) || readNumber$h(deficits.lengthDeficit) > 0) && assessment.requirementSatisfied !== false) return false;
     return true;
   }
 
   function isBlockedTerminalOutput(output) {
     if (!output || typeof output !== "object") return false;
-    const kind = readString$1C(output.kind);
-    const status = readString$1C(output.status);
-    const control = readString$1C(output.control);
+    const kind = readString$1D(output.kind);
+    const status = readString$1D(output.status);
+    const control = readString$1D(output.control);
     if (kind.includes("blocked") || kind.includes("continuation")) return true;
     if (status === "blocked" || status === "error" || status === "continue") return true;
     return control === "continue";
@@ -16682,7 +17068,7 @@
       ? runState.virtualWorkspace
       : null;
     const operationCount = workspace && Array.isArray(workspace.operations) ? workspace.operations.length : 0;
-    const chars = candidate ? readNumber$g(candidate.chars) : 0;
+    const chars = candidate ? readNumber$h(candidate.chars) : 0;
     if (cyclesRemaining != null && cyclesRemaining <= 0) return "exhausted";
     if (operationCount >= limits.maxOperations) return "exhausted";
     if (chars >= limits.maxFileChars) return "exhausted";
@@ -16727,7 +17113,7 @@
         source: normalizeDimensionState(value.dimensionStates && value.dimensionStates.source, "source"),
         length: normalizeDimensionState(value.dimensionStates && value.dimensionStates.length, "length")
       },
-      repeatedInvalidTerminalCount: readNumber$g(value.repeatedInvalidTerminalCount),
+      repeatedInvalidTerminalCount: readNumber$h(value.repeatedInvalidTerminalCount),
       budgetState: readBudgetStateValue(value.budgetState) || base.budgetState,
       recommendedContract: readRecommendedContractValue(value.recommendedContract) || base.recommendedContract,
       terminalPattern: value.terminalPattern && typeof value.terminalPattern === "object"
@@ -16741,13 +17127,13 @@
     const base = createDimensionState(dimension);
     if (!value || typeof value !== "object" || Array.isArray(value)) return base;
     return {
-      attempts: readNumber$g(value.attempts),
+      attempts: readNumber$h(value.attempts),
       dimension,
       exhausted: value.exhausted === true,
-      lastEffectiveAction: readString$1C(value.lastEffectiveAction) || null,
+      lastEffectiveAction: readString$1D(value.lastEffectiveAction) || null,
       lastObserved: value.lastObserved && typeof value.lastObserved === "object" ? cloneValue$1(value.lastObserved) : null,
-      progressCount: readNumber$g(value.progressCount),
-      repeatedNoProgressCount: readNumber$g(value.repeatedNoProgressCount)
+      progressCount: readNumber$h(value.progressCount),
+      repeatedNoProgressCount: readNumber$h(value.repeatedNoProgressCount)
     };
   }
 
@@ -16764,8 +17150,8 @@
       recommendedContract: normalized.recommendedContract,
       terminalPattern: normalized.terminalPattern
         ? {
-            kind: readString$1C(normalized.terminalPattern.kind) || null,
-            message: readString$1C(normalized.terminalPattern.message) || null,
+            kind: readString$1D(normalized.terminalPattern.kind) || null,
+            message: readString$1D(normalized.terminalPattern.message) || null,
             threshold: readNullableNumber$4(normalized.terminalPattern.threshold)
           }
         : null
@@ -16773,7 +17159,7 @@
   }
 
   function summarizeDimensionState(value) {
-    const normalized = normalizeDimensionState(value, readString$1C(value && value.dimension) || "requirement");
+    const normalized = normalizeDimensionState(value, readString$1D(value && value.dimension) || "requirement");
     return {
       attempts: normalized.attempts,
       exhausted: normalized.exhausted,
@@ -16785,12 +17171,12 @@
   }
 
   function readBudgetStateValue(value) {
-    const text = readString$1C(value);
+    const text = readString$1D(value);
     return ["enough", "low", "exhausted"].includes(text) ? text : "";
   }
 
   function readRecommendedContractValue(value) {
-    const text = readString$1C(value);
+    const text = readString$1D(value);
     return ["continue_recovery", "valid_limited_allowed", "fail_fast_debug"].includes(text) ? text : "";
   }
 
@@ -16803,7 +17189,7 @@
     const operationCount = Array.isArray(workspace.operations) ? workspace.operations.length : 0;
     const limits = readWorkspaceRecoveryLimits(context);
     if (operationCount >= limits.maxOperations) return false;
-    if (readNumber$g(candidate.chars) >= limits.maxFileChars) return false;
+    if (readNumber$h(candidate.chars) >= limits.maxFileChars) return false;
     return true;
   }
 
@@ -16823,9 +17209,9 @@
   function isSourceDeficitRecoverable(readUrlRecoverySignal, sourceSignals) {
     if (!sourceSignals.hasAnyEvidenceWork) return true;
     if (!readUrlRecoverySignal) return false;
-    if (!SOURCE_RECOVERY_STATUSES.has(readString$1C(readUrlRecoverySignal.status))) return false;
+    if (!SOURCE_RECOVERY_STATUSES.has(readString$1D(readUrlRecoverySignal.status))) return false;
     if (sourceSignals.alternateCandidateCount > 0 && !sourceSignals.alternateAttempted) return true;
-    if (readString$1C(readUrlRecoverySignal.status) === "retryable_failure" && readNumber$g(readUrlRecoverySignal.sameUrlAttemptCount) <= 1) return true;
+    if (readString$1D(readUrlRecoverySignal.status) === "retryable_failure" && readNumber$h(readUrlRecoverySignal.sameUrlAttemptCount) <= 1) return true;
     return false;
   }
 
@@ -16833,7 +17219,7 @@
     const researchState = runState && runState.researchState && typeof runState.researchState === "object"
       ? runState.researchState
       : null;
-    const finalReason = readString$1C(researchState && researchState.finalReason);
+    const finalReason = readString$1D(researchState && researchState.finalReason);
     if (researchState && (
       researchState.qualityGateRequired === true ||
       researchState.finalAllowed === false ||
@@ -16841,7 +17227,7 @@
     )) {
       return true;
     }
-    if (readUrlRecoverySignal && readString$1C(readUrlRecoverySignal.status) !== "none") return true;
+    if (readUrlRecoverySignal && readString$1D(readUrlRecoverySignal.status) !== "none") return true;
     const readSources = runState && runState.researchContext && Array.isArray(runState.researchContext.readSources)
       ? runState.researchContext.readSources
       : [];
@@ -16850,7 +17236,7 @@
   }
 
   function readWorkspaceRecoverySignals(runState, candidate) {
-    const path = readString$1C(candidate && candidate.path);
+    const path = readString$1D(candidate && candidate.path);
     const operations = runState && runState.virtualWorkspace && Array.isArray(runState.virtualWorkspace.operations)
       ? runState.virtualWorkspace.operations
       : [];
@@ -16859,10 +17245,10 @@
       (!path || operation.path === path)
     ));
     const expansionAttempted = relevant.some((operation) => (
-      WORKSPACE_RECOVERY_ACTIONS.has(readString$1C(operation.action)) &&
-      readString$1C(operation.status) === "ok"
+      WORKSPACE_RECOVERY_ACTIONS.has(readString$1D(operation.action)) &&
+      readString$1D(operation.status) === "ok"
     ));
-    const readAttempted = relevant.some((operation) => readString$1C(operation.action) === "read");
+    const readAttempted = relevant.some((operation) => readString$1D(operation.action) === "read");
     const signals = [];
     if (readAttempted) signals.push("workspace_read_attempted");
     if (expansionAttempted) signals.push("workspace_expansion_attempted");
@@ -16875,12 +17261,12 @@
       : {};
     const readSources = Array.isArray(researchContext.readSources) ? researchContext.readSources : [];
     const searchPasses = Array.isArray(researchContext.searchPasses) ? researchContext.searchPasses : [];
-    const failedUrl = normalizeUrl(readUrlRecoverySignal && readUrlRecoverySignal.failedUrl);
+    const failedUrl = normalizeUrl$1(readUrlRecoverySignal && readUrlRecoverySignal.failedUrl);
     const alternateCandidateCount = Array.isArray(readUrlRecoverySignal && readUrlRecoverySignal.alternateSourceCandidates)
       ? readUrlRecoverySignal.alternateSourceCandidates.length
       : 0;
     const alternateAttempted = Boolean(failedUrl) && readSources.some((source) => {
-      const url = normalizeUrl(source && source.url);
+      const url = normalizeUrl$1(source && source.url);
       return url && url !== failedUrl;
     });
     const hasAnyEvidenceWork = readSources.length > 0 || searchPasses.length > 0 || alternateCandidateCount > 0;
@@ -16898,7 +17284,7 @@
   }
 
   function readObservableDeficits({ candidate, requestedLength, sourceMinimum }) {
-    const statsKey = requestedLength ? readString$1C(requestedLength.statsKey) || readStatsKeyForUnit(requestedLength.unit) : "";
+    const statsKey = requestedLength ? readString$1D(requestedLength.statsKey) || readStatsKeyForUnit(requestedLength.unit) : "";
     const observedLength = candidate && statsKey && Number.isFinite(candidate[statsKey])
       ? candidate[statsKey]
       : null;
@@ -16909,12 +17295,12 @@
         : 0,
       lengthObserved: observedLength,
       lengthRequested: requestedValue,
-      lengthUnit: requestedLength ? readString$1C(requestedLength.unit) || null : null,
+      lengthUnit: requestedLength ? readString$1D(requestedLength.unit) || null : null,
       readSourceDeficit: sourceMinimum
-        ? Math.max(0, readNumber$g(sourceMinimum.minReadSources) - readNumber$g(sourceMinimum.readSources))
+        ? Math.max(0, readNumber$h(sourceMinimum.minReadSources) - readNumber$h(sourceMinimum.readSources))
         : 0,
       relevantSourceDeficit: sourceMinimum
-        ? Math.max(0, readNumber$g(sourceMinimum.minRelevantSources) - readNumber$g(sourceMinimum.relevantSources))
+        ? Math.max(0, readNumber$h(sourceMinimum.minRelevantSources) - readNumber$h(sourceMinimum.relevantSources))
         : 0
     };
   }
@@ -16928,7 +17314,7 @@
       ? runState.virtualWorkspace
       : null;
     const file = workspace ? readWorkspaceFinalCandidate$1(workspace, packetCandidate && packetCandidate.path) : null;
-    const stats = normalizeTextStats$2(
+    const stats = normalizeTextStats$3(
       (packetCandidate && packetCandidate.textStats)
       || (file && file.textStats)
       || (workspace && workspace.quality && workspace.quality.finalCandidateStats)
@@ -16938,7 +17324,7 @@
       chars: stats.chars,
       cjkChars: stats.cjkChars,
       nonWhitespaceChars: stats.nonWhitespaceChars,
-      path: readString$1C(packetCandidate && packetCandidate.path) || readString$1C(file && file.path) || null,
+      path: readString$1D(packetCandidate && packetCandidate.path) || readString$1D(file && file.path) || null,
       words: stats.words
     };
   }
@@ -16949,9 +17335,9 @@
       ? packet.requestedLength
       : null;
     if (packetLength && Number.isFinite(packetLength.value)) {
-      const unit = readString$1C(packetLength.unit) || null;
+      const unit = readString$1D(packetLength.unit) || null;
       return {
-        statsKey: readString$1C(packetLength.statsKey) || readStatsKeyForUnit(unit),
+        statsKey: readString$1D(packetLength.statsKey) || readStatsKeyForUnit(unit),
         unit,
         value: packetLength.value
       };
@@ -16962,7 +17348,7 @@
       ? context.finalReadiness.requirementsAssessment
       : null;
     if (assessment && Number.isFinite(assessment.requestedLength)) {
-      const unit = readString$1C(assessment.observedLengthUnit) || null;
+      const unit = readString$1D(assessment.observedLengthUnit) || null;
       return {
         statsKey: readStatsKeyForUnit(unit),
         unit,
@@ -16975,8 +17361,8 @@
     });
     const extracted = extractRequestedLengthContract(text);
     return extracted ? {
-      statsKey: readString$1C(extracted.statsKey) || readStatsKeyForUnit(extracted.unit),
-      unit: readString$1C(extracted.unit) || null,
+      statsKey: readString$1D(extracted.statsKey) || readStatsKeyForUnit(extracted.unit),
+      unit: readString$1D(extracted.unit) || null,
       value: extracted.value
     } : null;
   }
@@ -16990,11 +17376,11 @@
         : null;
     if (!source) return null;
     return {
-      minReadSources: readNumber$g(source.minReadSources),
-      minRelevantSources: readNumber$g(source.minRelevantSources),
+      minReadSources: readNumber$h(source.minReadSources),
+      minRelevantSources: readNumber$h(source.minRelevantSources),
       passed: source.passed === true,
-      readSources: readNumber$g(source.readSources),
-      relevantSources: readNumber$g(source.relevantSources)
+      readSources: readNumber$h(source.readSources),
+      relevantSources: readNumber$h(source.relevantSources)
     };
   }
 
@@ -17017,26 +17403,26 @@
       : null;
   }
 
-  function normalizeTextStats$2(value) {
+  function normalizeTextStats$3(value) {
     if (!value || typeof value !== "object") return null;
     return {
-      chars: readNumber$g(value.chars),
-      cjkChars: readNumber$g(value.cjkChars),
-      nonWhitespaceChars: readNumber$g(value.nonWhitespaceChars),
-      words: readNumber$g(value.words)
+      chars: readNumber$h(value.chars),
+      cjkChars: readNumber$h(value.cjkChars),
+      nonWhitespaceChars: readNumber$h(value.nonWhitespaceChars),
+      words: readNumber$h(value.words)
     };
   }
 
-  function normalizeUrl(value) {
-    const text = readString$1C(value);
+  function normalizeUrl$1(value) {
+    const text = readString$1D(value);
     return text ? text.replace(/\/+$/, "") : "";
   }
 
-  function readString$1C(value) {
+  function readString$1D(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readNumber$g(value) {
+  function readNumber$h(value) {
     const number = Number(value);
     return Number.isFinite(number) ? number : 0;
   }
@@ -17093,8 +17479,8 @@
 
   function classifyReadUrlFailure(output) {
     const source = output && typeof output === "object" ? output : {};
-    const error = readString$1B(source.error);
-    const reason = readString$1B(source.reason) || error || null;
+    const error = readString$1C(source.error);
+    const reason = readString$1C(source.reason) || error || null;
     const statusCode = readStatusCode(source.status);
     const originStatus = readStatusCode(source.originStatus);
     const effectiveStatus = originStatus ?? statusCode;
@@ -17110,7 +17496,7 @@
       };
     }
 
-    if (RETRYABLE_ERRORS.has(error) || RETRYABLE_ERRORS.has(readString$1B(source.code))) {
+    if (RETRYABLE_ERRORS.has(error) || RETRYABLE_ERRORS.has(readString$1C(source.code))) {
       return {
         category: "transient",
         error: error || null,
@@ -17134,7 +17520,7 @@
 
     if (
       NON_RETRYABLE_ERRORS.has(error) ||
-      NON_RETRYABLE_ERRORS.has(readString$1B(source.code)) ||
+      NON_RETRYABLE_ERRORS.has(readString$1C(source.code)) ||
       (effectiveStatus != null && NON_RETRYABLE_STATUS_CODES.has(effectiveStatus))
     ) {
       return {
@@ -17159,7 +17545,7 @@
 
   function refreshReadUrlRecoverySignal(runState, context = {}) {
     if (!runState || typeof runState !== "object") return null;
-    const actionName = readString$1B(context.actionName);
+    const actionName = readString$1C(context.actionName);
     if (actionName !== "read_url" && actionName !== "web_search") {
       return normalizeSignal(runState.readUrlRecoverySignal);
     }
@@ -17200,7 +17586,7 @@
       return next;
     }
 
-    const failedUrl = readString$1B(output.url) || readString$1B(context.url) || current.failedUrl || null;
+    const failedUrl = readString$1C(output.url) || readString$1C(context.url) || current.failedUrl || null;
     const classification = classifyReadUrlFailure(output);
     const attemptCount = countFailedReadAttempts(runState, failedUrl, output);
     const alternateSourceCandidates = readAlternateSourceCandidates(runState, failedUrl);
@@ -17309,7 +17695,7 @@
         output &&
         source.ok === false &&
         normalizeUrlKey$2(source.url) === currentUrl &&
-        readString$1B(source.error) === readString$1B(output.error) &&
+        readString$1C(source.error) === readString$1C(output.error) &&
         readStatusCode(source.status) === readStatusCode(output.status)
       )
     ));
@@ -17378,14 +17764,14 @@
 
   function normalizeCandidate$1(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const url = readString$1B(value.url);
+    const url = readString$1C(value.url);
     if (!url) return null;
     return {
-      domain: readString$1B(value.domain) || readDomain$6(url),
-      query: readString$1B(value.query) || null,
+      domain: readString$1C(value.domain) || readDomain$6(url),
+      query: readString$1C(value.query) || null,
       rank: readNullableNumber$3(value.rank),
-      snippet: readString$1B(value.snippet) || readString$1B(value.content) || null,
-      title: readString$1B(value.title) || url,
+      snippet: readString$1C(value.snippet) || readString$1C(value.content) || null,
+      title: readString$1C(value.title) || url,
       url
     };
   }
@@ -17404,27 +17790,27 @@
       : createReadUrlRecoverySignalState();
     return {
       kind: "read_url_recovery_signal",
-      status: readString$1B(source.status) || "none",
-      failedUrl: readString$1B(source.failedUrl) || null,
+      status: readString$1C(source.status) || "none",
+      failedUrl: readString$1C(source.failedUrl) || null,
       statusCode: readStatusCode(source.statusCode),
       originStatus: readStatusCode(source.originStatus),
-      reason: readString$1B(source.reason) || null,
+      reason: readString$1C(source.reason) || null,
       retryable: source.retryable === true,
-      sameUrlAttemptCount: readNumber$f(source.sameUrlAttemptCount),
+      sameUrlAttemptCount: readNumber$g(source.sameUrlAttemptCount),
       alternateSourceCandidates: Array.isArray(source.alternateSourceCandidates)
         ? source.alternateSourceCandidates.map(normalizeCandidate$1).filter(Boolean).slice(0, MAX_ALTERNATE_SOURCE_CANDIDATES)
         : [],
       allowedNextMoves: Array.isArray(source.allowedNextMoves)
-        ? source.allowedNextMoves.map(readString$1B).filter(Boolean).slice(0, 8)
+        ? source.allowedNextMoves.map(readString$1C).filter(Boolean).slice(0, 8)
         : [],
-      forbiddenMove: readString$1B(source.forbiddenMove) || null,
+      forbiddenMove: readString$1C(source.forbiddenMove) || null,
       updatedAtCycle: readNullableNumber$3(source.updatedAtCycle),
-      updatedBy: readString$1B(source.updatedBy) || null
+      updatedBy: readString$1C(source.updatedBy) || null
     };
   }
 
   function normalizeUrlKey$2(value) {
-    const url = readString$1B(value);
+    const url = readString$1C(value);
     if (!url) return "";
     try {
       const parsed = new URL(url);
@@ -17440,7 +17826,7 @@
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
-  function readNumber$f(value) {
+  function readNumber$g(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
@@ -17448,7 +17834,7 @@
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
 
-  function readString$1B(value) {
+  function readString$1C(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -17482,11 +17868,19 @@
         maxIndependentSearchAttempts: DEFAULT_MAX_INDEPENDENT_SEARCH_ATTEMPTS,
         maxPasses: DEFAULT_SEARCH_PASSES,
         maxResearchLoopVetoes: DEFAULT_MAX_RESEARCH_LOOP_VETOES,
+        minEvidenceArtifacts: DEFAULT_MIN_READ_SOURCES,
+        minRelevantEvidenceArtifacts: DEFAULT_MIN_RELEVANT_SOURCES,
         minReadSources: DEFAULT_MIN_READ_SOURCES,
         minRelevantSources: DEFAULT_MIN_RELEVANT_SOURCES
       };
     }
     const source = value && typeof value === "object" ? value : {};
+    const minReadSources = readPositiveInteger$i(source.minReadSources) ||
+      readPositiveInteger$i(source.minEvidenceArtifacts) ||
+      DEFAULT_MIN_READ_SOURCES;
+    const minRelevantSources = readPositiveInteger$i(source.minRelevantSources) ||
+      readPositiveInteger$i(source.minRelevantEvidenceArtifacts) ||
+      DEFAULT_MIN_RELEVANT_SOURCES;
     return {
       allowFinalWithLimitationsOnBudgetExhausted: source.allowFinalWithLimitationsOnBudgetExhausted !== false,
       enabled: source.enabled !== false,
@@ -17494,8 +17888,10 @@
       maxIndependentSearchAttempts: readPositiveInteger$i(source.maxIndependentSearchAttempts) || DEFAULT_MAX_INDEPENDENT_SEARCH_ATTEMPTS,
       maxPasses: readPositiveInteger$i(source.maxPasses) || DEFAULT_SEARCH_PASSES,
       maxResearchLoopVetoes: readPositiveInteger$i(source.maxResearchLoopVetoes) || DEFAULT_MAX_RESEARCH_LOOP_VETOES,
-      minReadSources: readPositiveInteger$i(source.minReadSources) || DEFAULT_MIN_READ_SOURCES,
-      minRelevantSources: readPositiveInteger$i(source.minRelevantSources) || DEFAULT_MIN_RELEVANT_SOURCES
+      minEvidenceArtifacts: minReadSources,
+      minRelevantEvidenceArtifacts: minRelevantSources,
+      minReadSources,
+      minRelevantSources
     };
   }
 
@@ -17520,6 +17916,7 @@
       lastTopic: null,
       recentQueries: [],
       recoveryMode: null,
+      evidenceMinimum: null,
       sourceMinimum: null,
       status: "idle",
       vetoCount: 0,
@@ -17556,7 +17953,7 @@
       ? researchState.sourceQuality
       : {};
     const readSources = readReadSources(runState);
-    const relevantSources = readNumber$e(sourceQuality.strong) + readNumber$e(sourceQuality.medium);
+    const relevantSources = readNumber$f(sourceQuality.strong) + readNumber$f(sourceQuality.medium);
     const sourceMinimum = {
       minReadSources: config.minReadSources,
       minRelevantSources: config.minRelevantSources,
@@ -17564,7 +17961,7 @@
       readSources: readSources.length,
       relevantSources
     };
-    const topic = readString$1A(researchState.topic) || extractTopic(prompt);
+    const topic = readString$1B(researchState.topic) || extractTopic(prompt);
     const candidateText = readDecisionText(context) || readWorkspaceFinalCandidate(runState) || readWorkspaceDraft$1(runState);
     const evidenceGraph = buildResearchEvidenceGraph(runState, {
       proposedText: candidateText,
@@ -17578,8 +17975,8 @@
       claimGraph: evidenceGraph.claimGraph || [],
       evidenceGraph,
       prompt,
-      recoveryMode: readString$1A(context && context.recoveryMode)
-        || readString$1A(researchState.recoveryMode)
+      recoveryMode: readString$1B(context && context.recoveryMode)
+        || readString$1B(researchState.recoveryMode)
         || null,
       required: researchState.qualityGateRequired === true,
       researchState: cloneValue$1(researchState),
@@ -17608,7 +18005,7 @@
     if (!decision || typeof decision !== "object" || decision.name !== "web_search") return null;
     const args = decision.args && typeof decision.args === "object" ? decision.args : {};
     const previous = normalizeLoopState(runState.researchReportLoop);
-    const query = readString$1A(args.query);
+    const query = readString$1B(args.query);
     const recentQueries = previous.recentQueries.slice();
     if (query) {
       recentQueries.push(query);
@@ -17634,14 +18031,14 @@
     const reset = applyTopicChangeReset(runState, previous, evaluation);
     const base = reset || previous;
     const gateSignal = buildGateSignal(evaluation, config, {
-      finalMode: readString$1A(context && context.finalMode) || base.finalMode,
-      status: readString$1A(context && context.status) || inferGateSignalStatus(evaluation),
+      finalMode: readString$1B(context && context.finalMode) || base.finalMode,
+      status: readString$1B(context && context.status) || inferGateSignalStatus(evaluation),
       vetoCount: base.vetoCount
     });
     gateSignal.acceptancePacket = buildAcceptancePacket(runState, evaluation, config, {
-      actionName: readString$1A(context && context.actionName) || null,
+      actionName: readString$1B(context && context.actionName) || null,
       request: context && context.request,
-      prompt: readString$1A(context && context.prompt),
+      prompt: readString$1B(context && context.prompt),
       status: gateSignal.status
     });
     return commitResearchReportLoop(runState, evaluation, {
@@ -17654,6 +18051,7 @@
 
   function buildGateSignal(evaluation, config, options) {
     const sm = evaluation.sourceMinimum;
+    const evidenceMinimumStatus = buildEvidenceMinimumStatus(sm);
     return {
       authorityStatus: evaluation.authorityCoverage ? cloneValue$1(evaluation.authorityCoverage) : null,
       budgetStatus: {
@@ -17665,6 +18063,7 @@
         : [],
       finalMode: options.finalMode || null,
       recoveryMode: evaluation.recoveryMode || null,
+      evidenceMinimumStatus,
       sourceMinimumStatus: {
         minReadSources: sm.minReadSources,
         minRelevantSources: sm.minRelevantSources,
@@ -17679,11 +18078,12 @@
 
   function buildAcceptancePacket(runState, evaluation, config, context) {
     const candidate = readWorkspaceCandidateSnapshot(runState);
-    const requestedLength = readRequestedLength(runState, context);
+    const requestedLength = readRequestedLength$1(runState, context);
     const observed = readRequestedObservedLength(candidate, requestedLength);
     const sourceMinimum = evaluation.sourceMinimum && typeof evaluation.sourceMinimum === "object"
       ? cloneValue$1(evaluation.sourceMinimum)
       : null;
+    const evidenceMinimum = buildEvidenceMinimum(sourceMinimum);
     const researchState = evaluation.researchState && typeof evaluation.researchState === "object"
       ? evaluation.researchState
       : {};
@@ -17693,25 +18093,75 @@
       cycles: readCycleBudget(runState),
       evidence: {
         researchFinalAllowed: researchState.finalAllowed === true,
-        researchFinalReason: readString$1A(researchState.finalReason) || null,
+        researchFinalReason: readString$1B(researchState.finalReason) || null,
         researchGaps: Array.isArray(researchState.gaps)
-          ? researchState.gaps.map(readString$1A).filter(Boolean).slice(0, 12)
+          ? researchState.gaps.map(readString$1B).filter(Boolean).slice(0, 12)
           : [],
         researchQualityGateRequired: researchState.qualityGateRequired === true,
+        evidenceMinimum,
         sourceMinimum,
+        successfulEvidenceCount: countSuccessfulEvidenceArtifacts(runState, context && context.runtimeConfig),
         successfulReadUrlCount: countSuccessfulReadUrlArtifacts(runState)
       },
       observedLength: observed,
       publish: readPublishBlockSnapshot(runState),
       recentSearch: readRecentSearchSnapshot(runState),
       requestedLength,
+      evidenceMinimumConfig: {
+        minEvidenceArtifacts: config.minReadSources,
+        minRelevantEvidenceArtifacts: config.minRelevantSources
+      },
       sourceMinimumConfig: {
         minReadSources: config.minReadSources,
         minRelevantSources: config.minRelevantSources
       },
-      status: readString$1A(context && context.status) || null,
-      updatedBy: readString$1A(context && context.actionName) || null
+      status: readString$1B(context && context.status) || null,
+      updatedBy: readString$1B(context && context.actionName) || null
     };
+  }
+
+  function buildEvidenceMinimum(sourceMinimum) {
+    if (!sourceMinimum || typeof sourceMinimum !== "object") return null;
+    return {
+      evidenceArtifacts: readNumber$f(sourceMinimum.readSources),
+      minEvidenceArtifacts: readNumber$f(sourceMinimum.minReadSources),
+      minRelevantEvidenceArtifacts: readNumber$f(sourceMinimum.minRelevantSources),
+      passed: sourceMinimum.passed === true,
+      relevantEvidenceArtifacts: readNumber$f(sourceMinimum.relevantSources)
+    };
+  }
+
+  function normalizeEvidenceMinimum(value, sourceMinimum) {
+    const source = value && typeof value === "object" && !Array.isArray(value)
+      ? value
+      : buildEvidenceMinimum(sourceMinimum);
+    if (!source || typeof source !== "object") return null;
+    return {
+      evidenceArtifacts: readNumber$f(source.evidenceArtifacts),
+      minEvidenceArtifacts: readPositiveInteger$i(source.minEvidenceArtifacts) ||
+        readPositiveInteger$i(sourceMinimum && sourceMinimum.minReadSources) ||
+        DEFAULT_MIN_READ_SOURCES,
+      minRelevantEvidenceArtifacts: readPositiveInteger$i(source.minRelevantEvidenceArtifacts) ||
+        readPositiveInteger$i(sourceMinimum && sourceMinimum.minRelevantSources) ||
+        DEFAULT_MIN_RELEVANT_SOURCES,
+      passed: source.passed === true,
+      relevantEvidenceArtifacts: readNumber$f(source.relevantEvidenceArtifacts)
+    };
+  }
+
+  function buildSourceMinimumFromEvidenceMinimum(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return {
+      minReadSources: readPositiveInteger$i(value.minEvidenceArtifacts) || DEFAULT_MIN_READ_SOURCES,
+      minRelevantSources: readPositiveInteger$i(value.minRelevantEvidenceArtifacts) || DEFAULT_MIN_RELEVANT_SOURCES,
+      passed: value.passed === true,
+      readSources: readNumber$f(value.evidenceArtifacts),
+      relevantSources: readNumber$f(value.relevantEvidenceArtifacts)
+    };
+  }
+
+  function buildEvidenceMinimumStatus(sourceMinimum) {
+    return buildEvidenceMinimum(sourceMinimum);
   }
 
   function shouldCommitResearchReportLoopGate(runState, previous, evaluation, context) {
@@ -17719,7 +18169,7 @@
     if (evaluation && evaluation.required === true) return true;
     if (previous && previous.enabled === true) return true;
     if (runState && runState.publishBlockSignal && typeof runState.publishBlockSignal === "object") return true;
-    const requestedLength = readRequestedLength(runState, context);
+    const requestedLength = readRequestedLength$1(runState, context);
     if (requestedLength && hasWorkspaceCandidate(runState)) return true;
     const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
       ? runState.virtualWorkspace
@@ -17755,22 +18205,22 @@
     const lastRead = quality.lastRead && typeof quality.lastRead === "object" ? quality.lastRead : null;
     return {
       lastRead: lastRead ? {
-        observedAt: readString$1A(lastRead.observedAt) || null,
-        path: readString$1A(lastRead.path) || null,
-        textStats: normalizeTextStats$1(lastRead.textStats)
+        observedAt: readString$1B(lastRead.observedAt) || null,
+        path: readString$1B(lastRead.path) || null,
+        textStats: normalizeTextStats$2(lastRead.textStats)
       } : null,
-      path: readString$1A(file && file.path) || readString$1A(quality.finalCandidatePath) || null,
+      path: readString$1B(file && file.path) || readString$1B(quality.finalCandidatePath) || null,
       ready: quality.finalCandidateReady === true,
-      status: readString$1A(quality.finalCandidateStatus) || null,
-      textStats: normalizeTextStats$1(
+      status: readString$1B(quality.finalCandidateStatus) || null,
+      textStats: normalizeTextStats$2(
         (file && file.textStats) || quality.finalCandidateStats
       )
     };
   }
 
-  function readRequestedLength(runState, context) {
+  function readRequestedLength$1(runState, context) {
     const contractText = readTerminalContractText({
-      request: context && context.request || { prompt: readString$1A(context && context.prompt) },
+      request: context && context.request || { prompt: readString$1B(context && context.prompt) },
       runState
     });
     const contract = extractRequestedLengthContract(contractText);
@@ -17792,8 +18242,8 @@
   }
 
   function readCycleBudget(runState) {
-    const used = readNumber$e(runState && runState.cycleCount);
-    const max = readNumber$e(runState && runState.maxSteps);
+    const used = readNumber$f(runState && runState.cycleCount);
+    const max = readNumber$f(runState && runState.maxSteps);
     return {
       max: max > 0 ? max : null,
       remaining: max > 0 ? Math.max(max - used, 0) : null,
@@ -17807,11 +18257,11 @@
       : null;
     if (!signal) return null;
     return {
-      count: readNumber$e(signal.count),
+      count: readNumber$f(signal.count),
       cyclesRemaining: Number.isFinite(signal.cyclesRemaining) ? signal.cyclesRemaining : null,
       cyclesUsed: Number.isFinite(signal.cyclesUsed) ? signal.cyclesUsed : null,
       lastCycle: Number.isFinite(signal.lastCycle) ? signal.lastCycle : null,
-      lastStatus: readString$1A(signal.lastStatus) || null,
+      lastStatus: readString$1B(signal.lastStatus) || null,
       recentBlocks: Array.isArray(signal.recentBlocks) ? cloneValue$1(signal.recentBlocks).slice(-5) : [],
       statusCounts: signal.statusCounts && typeof signal.statusCounts === "object"
         ? cloneValue$1(signal.statusCounts)
@@ -17833,7 +18283,7 @@
       : null;
     if (!workspace) return false;
     const file = readWorkspaceFinalCandidate$1(workspace);
-    return Boolean(file && readString$1A(file.content));
+    return Boolean(file && readString$1B(file.content));
   }
 
   // 2026-05-09 — `buildVetoObservation` deleted alongside
@@ -17861,7 +18311,8 @@
       lastSearchAttempt: cloneValue$1(previous.lastSearchAttempt || null),
       lastTopic: normalizeTopicKey(evaluation.topic) || previous.lastTopic || null,
       recentQueries: Array.isArray(previous.recentQueries) ? previous.recentQueries.slice() : [],
-      recoveryMode: readString$1A(evaluation.recoveryMode) || null,
+      recoveryMode: readString$1B(evaluation.recoveryMode) || null,
+      evidenceMinimum: buildEvidenceMinimum(evaluation.sourceMinimum),
       sourceMinimum: evaluation.sourceMinimum,
       status: options.status || "evaluating",
       vetoCount: readPositiveInteger$i(options.vetoCount) || 0,
@@ -17888,6 +18339,7 @@
         };
       }
       runState.researchWorkspace.reportLoop = {
+        evidenceMinimum: cloneValue$1(next.evidenceMinimum),
         finalMode: next.finalMode,
         gateSignal: cloneValue$1(next.gateSignal),
         recoveryMode: next.recoveryMode,
@@ -17911,12 +18363,15 @@
         claimEvidenceCount: evaluation.claimEvidence.length,
         claimGraphCount: Array.isArray(evaluation.claimGraph) ? evaluation.claimGraph.length : 0,
         evidenceGapCount: evaluation.evidenceGraph ? evaluation.evidenceGraph.evidenceGaps.length : 0,
+        evidenceMinimumPassed: buildEvidenceMinimum(evaluation.sourceMinimum).passed,
         finalMode: options.finalMode || null,
         sourceMinimumPassed: evaluation.sourceMinimum.passed,
         status: options.status || "evaluating"
       },
       observe: {
+        evidenceArtifacts: evaluation.sourceMinimum.readSources,
         readSources: evaluation.sourceMinimum.readSources,
+        relevantEvidenceArtifacts: evaluation.sourceMinimum.relevantSources,
         relevantSources: evaluation.sourceMinimum.relevantSources
       },
       orient: {
@@ -17932,7 +18387,7 @@
     const enabled = value.enabled === true;
     const sourceMinimumRaw = value.sourceMinimum && typeof value.sourceMinimum === "object"
       ? value.sourceMinimum
-      : null;
+      : buildSourceMinimumFromEvidenceMinimum(value.evidenceMinimum);
     // AGRUN-264 — when the loop is not active, preserve `sourceMinimum: null`
     // (or restore it to null if a stale enabled-true shape leaked in). When
     // enabled, normalize to numeric defaults so evaluation paths can rely on
@@ -17942,9 +18397,12 @@
           minReadSources: readPositiveInteger$i(sourceMinimumRaw && sourceMinimumRaw.minReadSources) || DEFAULT_MIN_READ_SOURCES,
           minRelevantSources: readPositiveInteger$i(sourceMinimumRaw && sourceMinimumRaw.minRelevantSources) || DEFAULT_MIN_RELEVANT_SOURCES,
           passed: Boolean(sourceMinimumRaw && sourceMinimumRaw.passed === true),
-          readSources: readNumber$e(sourceMinimumRaw && sourceMinimumRaw.readSources),
-          relevantSources: readNumber$e(sourceMinimumRaw && sourceMinimumRaw.relevantSources)
+          readSources: readNumber$f(sourceMinimumRaw && sourceMinimumRaw.readSources),
+          relevantSources: readNumber$f(sourceMinimumRaw && sourceMinimumRaw.relevantSources)
         }
+      : null;
+    const evidenceMinimum = enabled
+      ? normalizeEvidenceMinimum(value.evidenceMinimum, sourceMinimum)
       : null;
     return {
       authorityCoverage: value.authorityCoverage && typeof value.authorityCoverage === "object" ? cloneValue$1(value.authorityCoverage) : null,
@@ -17952,14 +18410,15 @@
       claimGraph: Array.isArray(value.claimGraph) ? cloneValue$1(value.claimGraph) : [],
       cycles: Array.isArray(value.cycles) ? cloneValue$1(value.cycles) : [],
       enabled,
-      finalMode: readString$1A(value.finalMode) || null,
+      finalMode: readString$1B(value.finalMode) || null,
       gateSignal: value.gateSignal && typeof value.gateSignal === "object" ? cloneValue$1(value.gateSignal) : null,
       lastSearchAttempt: value.lastSearchAttempt && typeof value.lastSearchAttempt === "object" ? cloneValue$1(value.lastSearchAttempt) : null,
-      lastTopic: readString$1A(value.lastTopic) || null,
+      lastTopic: readString$1B(value.lastTopic) || null,
       recentQueries: Array.isArray(value.recentQueries) ? cloneValue$1(value.recentQueries) : [],
-      recoveryMode: readString$1A(value.recoveryMode) || null,
+      recoveryMode: readString$1B(value.recoveryMode) || null,
+      evidenceMinimum,
       sourceMinimum,
-      status: readString$1A(value.status) || "idle",
+      status: readString$1B(value.status) || "idle",
       vetoCount: readPositiveInteger$i(value.vetoCount) || 0,
       version: readPositiveInteger$i(value.version) || 2
     };
@@ -17967,7 +18426,7 @@
 
   function applyTopicChangeReset(runState, previous, evaluation) {
     const nextTopic = normalizeTopicKey(evaluation && evaluation.topic);
-    const priorTopic = readString$1A(previous && previous.lastTopic) || null;
+    const priorTopic = readString$1B(previous && previous.lastTopic) || null;
     if (!nextTopic || !priorTopic || nextTopic === priorTopic) return null;
     if (typeof runState !== "object" || !runState) return null;
     if (Array.isArray(previous.cycles) && previous.cycles.length === 0 && (previous.vetoCount || 0) === 0) {
@@ -17993,7 +18452,7 @@
 
   function readDecisionText(context) {
     const decision = context && context.decision && typeof context.decision === "object" ? context.decision : null;
-    return decision ? readString$1A(decision.answer) || readString$1A(decision.text) : "";
+    return decision ? readString$1B(decision.answer) || readString$1B(decision.text) : "";
   }
 
   function readWorkspaceFinalCandidate(runState) {
@@ -18003,7 +18462,7 @@
     const file = workspace.files && typeof workspace.files === "object"
       ? workspace.files["final_candidate.md"]
       : null;
-    return file && typeof file === "object" ? readString$1A(file.content) : "";
+    return file && typeof file === "object" ? readString$1B(file.content) : "";
   }
 
   function readWorkspaceDraft$1(runState) {
@@ -18013,43 +18472,43 @@
     const file = workspace.files && typeof workspace.files === "object"
       ? workspace.files["draft.md"]
       : null;
-    return file && typeof file === "object" ? readString$1A(file.content) : "";
+    return file && typeof file === "object" ? readString$1B(file.content) : "";
   }
 
   function readPrompt$5(runState, context) {
-    return readString$1A(context && context.prompt)
-      || readString$1A(runState && runState.observationSummary && runState.observationSummary.prompt)
-      || readString$1A(runState && runState.originalQuery);
+    return readString$1B(context && context.prompt)
+      || readString$1B(runState && runState.observationSummary && runState.observationSummary.prompt)
+      || readString$1B(runState && runState.originalQuery);
   }
 
   function extractTopic(prompt) {
-    const quoted = readString$1A(prompt).match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
+    const quoted = readString$1B(prompt).match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
     if (quoted) return quoted[1].trim();
-    return readString$1A(prompt).slice(0, 160);
+    return readString$1B(prompt).slice(0, 160);
   }
 
   function normalizeTopicKey(value) {
-    const text = readString$1A(value);
+    const text = readString$1B(value);
     if (!text) return null;
     const trimmed = text.trim().toLowerCase().replace(/\s+/g, " ");
     return trimmed.length >= 3 ? trimmed : null;
   }
 
-  function readString$1A(value) {
+  function readString$1B(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readNumber$e(value) {
+  function readNumber$f(value) {
     return Number.isFinite(value) ? value : 0;
   }
 
-  function normalizeTextStats$1(value) {
+  function normalizeTextStats$2(value) {
     const source = value && typeof value === "object" ? value : {};
     return {
-      chars: readNumber$e(source.chars),
-      cjkChars: readNumber$e(source.cjkChars),
-      nonWhitespaceChars: readNumber$e(source.nonWhitespaceChars),
-      words: readNumber$e(source.words)
+      chars: readNumber$f(source.chars),
+      cjkChars: readNumber$f(source.cjkChars),
+      nonWhitespaceChars: readNumber$f(source.nonWhitespaceChars),
+      words: readNumber$f(source.words)
     };
   }
 
@@ -18193,31 +18652,65 @@
   const TERMINAL_REPAIR_HIGH_WATER_MARK = 6;
   const TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD = 3;
 
+  // AGRUN: thresholds are host-overridable policy, not hardcoded runtime law.
+  // Defaults preserve the historical behavior; a host can retune escalation via
+  // runtimeConfig.terminalRepair.thresholds without forking the runtime. The
+  // resolved values are surfaced read-only through the advisory persistence
+  // signal (vetoThreshold) so the planner can see the live policy.
+  const DEFAULT_TERMINAL_REPAIR_THRESHOLDS = Object.freeze({
+    hardVeto: TERMINAL_REPAIR_HARD_VETO_THRESHOLD,
+    highWaterMark: TERMINAL_REPAIR_HIGH_WATER_MARK,
+    advisorySignal: TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD
+  });
+
+  function readPositiveThreshold(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+  }
+
+  function resolveTerminalRepairThresholds(runtimeConfig) {
+    const cfg = runtimeConfig && typeof runtimeConfig === "object" && !Array.isArray(runtimeConfig)
+      ? runtimeConfig
+      : {};
+    const repair = cfg.terminalRepair && typeof cfg.terminalRepair === "object" && !Array.isArray(cfg.terminalRepair)
+      ? cfg.terminalRepair
+      : {};
+    const overrides = repair.thresholds && typeof repair.thresholds === "object" && !Array.isArray(repair.thresholds)
+      ? repair.thresholds
+      : {};
+    return {
+      hardVeto: readPositiveThreshold(overrides.hardVeto, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.hardVeto),
+      highWaterMark: readPositiveThreshold(overrides.highWaterMark, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.highWaterMark),
+      advisorySignal: readPositiveThreshold(overrides.advisorySignal, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.advisorySignal)
+    };
+  }
+
   function createTerminalRepairState(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const active = source.active === true;
     return {
       kind: "terminal_repair_state",
       active,
-      mode: readString$1z(source.mode) || (active ? "terminal_repair" : "none"),
-      reason: readString$1z(source.reason) || null,
+      mode: readString$1A(source.mode) || (active ? "terminal_repair" : "none"),
+      reason: readString$1A(source.reason) || null,
       activeDeficits: readStringArray$6(source.activeDeficits).slice(0, 8),
       observableDeficits: normalizeObservableDeficits(source.observableDeficits),
       allowedActions: readStringArray$6(source.allowedActions).slice(0, 16),
-      budgetState: readString$1z(source.budgetState) || "unknown",
-      escalation: readString$1z(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      budgetState: readString$1A(source.budgetState) || "unknown",
+      escalation: readString$1A(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
         forbiddenDecisions: readStringArray$6(source.forbiddenDecisions).slice(0, 8),
-        requiredRepair: readString$1z(source.requiredRepair) || null,
+        requiredRepair: readString$1A(source.requiredRepair) || null,
         validPublishContract: normalizeValidPublishContract(source.validPublishContract),
         lengthExpansionSignal: normalizeLengthExpansionSignal(source.lengthExpansionSignal),
+        workspaceRepairSignal: normalizeWorkspaceRepairSignal(source.workspaceRepairSignal),
         advisoryPersistenceSignal: normalizeAdvisoryPersistenceSignal(source.advisoryPersistenceSignal),
         actionOrderingSignals: normalizeActionOrderingSignals(source.actionOrderingSignals),
-        ignoredCount: readNumber$d(source.ignoredCount),
+        ignoredCount: readNumber$e(source.ignoredCount),
       activatedAtCycle: readNullableNumber$2(source.activatedAtCycle),
       lastUpdatedAtCycle: readNullableNumber$2(source.lastUpdatedAtCycle),
       lastIgnoredAtCycle: readNullableNumber$2(source.lastIgnoredAtCycle),
       progressSnapshot: normalizeProgressSnapshot(source.progressSnapshot),
-      clearedReason: active ? null : (readString$1z(source.clearedReason) || null),
+      clearedReason: active ? null : (readString$1A(source.clearedReason) || null),
       version: 1
     };
   }
@@ -18235,7 +18728,7 @@
     const cycle = readNullableNumber$2(runState && runState.cycleCount);
     const snapshot = createProgressSnapshot(runState);
     const progress = diffProgress(previous.progressSnapshot, snapshot);
-    const actionName = readString$1z(context.actionName);
+    const actionName = readString$1A(context.actionName);
     const output = readRecord(context.output);
     const completedTerminal = isTerminalCompleted(actionName, context);
 
@@ -18251,7 +18744,7 @@
     });
 
     const publishProtocolActionPending = isPublishProtocolRepairReason(previous.reason) &&
-      readString$1z(context && context.status) === "before_action";
+      readString$1A(context && context.status) === "before_action";
     const publishProtocolRequiredActionCompleted = isPublishProtocolRequiredActionCompleted(
       previous.reason,
       actionName,
@@ -18263,10 +18756,10 @@
       !publishProtocolRequiredActionCompleted &&
       isPublishProtocolStillBlockedForReason(runState, previous.reason);
     const publishProtocolTransitionPending =
-      readString$1z(previous.reason) === "missing_finalize_after_latest_write" &&
+      readString$1A(previous.reason) === "missing_finalize_after_latest_write" &&
       actionName === "workspace_finalize_candidate" &&
-      (readString$1z(output && output.kind) === "virtual_workspace_finalize_candidate" ||
-        readString$1z(context && context.status) === "after_workspace_finalize_candidate");
+      (readString$1A(output && output.kind) === "virtual_workspace_finalize_candidate" ||
+        readString$1A(context && context.status) === "after_workspace_finalize_candidate");
     if (
       previous.active &&
       !facts.forceActive &&
@@ -18310,15 +18803,17 @@
     // Without this, lite-tier runs get pinned: structureRepairConvergence forbids
     // publish, AI re-tries finalize, ignoredCount climbs, hard_veto fires, and the
     // only "exit" remains structure repair the model cannot do cleanly.
+    const thresholds = resolveTerminalRepairThresholds(context.runtimeConfig);
     const escalation =
-      (ignoredCount >= TERMINAL_REPAIR_HARD_VETO_THRESHOLD && facts.budgetState === "exhausted") ||
-      ignoredCount >= TERMINAL_REPAIR_HIGH_WATER_MARK
+      (ignoredCount >= thresholds.hardVeto && facts.budgetState === "exhausted") ||
+      ignoredCount >= thresholds.highWaterMark
         ? "hard_veto"
         : "advisory";
-      const allowedActions = buildAllowedActions(activeDeficits, facts.budgetState, activeReason, facts.observableDeficits, runState, escalation);
+      const allowedActions = buildAllowedActions(activeDeficits, facts.budgetState, activeReason, facts.observableDeficits, runState, escalation, context.runtimeConfig);
       const validPublishContract = buildValidPublishContract(activeDeficits, facts.observableDeficits, facts.budgetState, escalation);
       const lengthExpansionSignal = buildLengthExpansionSignal(runState, facts.observableDeficits);
-      const advisoryPersistenceSignal = buildAdvisoryPersistenceSignal(ignoredCount, escalation);
+      const workspaceRepairSignal = buildWorkspaceRepairSignal(runState, facts.observableDeficits, activeDeficits, allowedActions, activeReason, facts.budgetState, escalation);
+      const advisoryPersistenceSignal = buildAdvisoryPersistenceSignal(ignoredCount, escalation, thresholds);
       const actionOrderingSignals = buildActionOrderingSignals(runState, facts.observableDeficits, facts.budgetState, activeDeficits, allowedActions);
 
       return {
@@ -18332,9 +18827,10 @@
       budgetState: facts.budgetState,
       escalation,
         forbiddenDecisions: buildForbiddenDecisions(activeDeficits),
-        requiredRepair: buildRequiredRepair(activeDeficits, facts.observableDeficits, allowedActions, facts.budgetState, activeReason),
+        requiredRepair: buildRequiredRepair(activeDeficits, facts.observableDeficits, allowedActions, facts.budgetState, activeReason, context.runtimeConfig),
         validPublishContract,
         lengthExpansionSignal,
+        workspaceRepairSignal,
         advisoryPersistenceSignal,
         actionOrderingSignals,
         ignoredCount,
@@ -18366,6 +18862,7 @@
         requiredRepair: state.requiredRepair,
         validPublishContract: state.validPublishContract,
         lengthExpansionSignal: state.lengthExpansionSignal,
+        workspaceRepairSignal: state.workspaceRepairSignal,
         advisoryPersistenceSignal: state.advisoryPersistenceSignal,
         actionOrderingSignals: state.actionOrderingSignals,
         ignoredCount: state.ignoredCount,
@@ -18380,13 +18877,13 @@
     const state = createTerminalRepairState(terminalRepairState);
     const ignoredCount = ignoredCountOverride == null
       ? state.ignoredCount
-      : readNumber$d(ignoredCountOverride);
+      : readNumber$e(ignoredCountOverride);
     const length = observableDeficitsRecord(state.observableDeficits, "length");
     if (state.budgetState !== "enough") return null;
     if (ignoredCount < TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD) return null;
     if (!length) return null;
-    const observed = readNumber$d(length.observed);
-    const requested = readNumber$d(length.requested);
+    const observed = readNumber$e(length.observed);
+    const requested = readNumber$e(length.requested);
     if (!requested || observed >= requested) return null;
     return {
       kind: "budget_remaining_for_expansion",
@@ -18394,7 +18891,7 @@
       ignoredCount,
       observed,
       requested,
-      unit: readString$1z(length.unit) || "words",
+      unit: readString$1A(length.unit) || "words",
       gap: Math.max(requested - observed, 0)
     };
   }
@@ -18411,7 +18908,7 @@
       : {};
     const reasons = [];
     const hints = [];
-    if (readString$1z(readiness.decision) !== "limited") {
+    if (readString$1A(readiness.decision) !== "limited") {
       reasons.push("missing_limited_decision");
     }
     const assessment = readiness.requirementsAssessment && typeof readiness.requirementsAssessment === "object"
@@ -18465,9 +18962,10 @@
   }
 
   function getPublishProtocolRequiredActionForReason(reason) {
-    const value = readString$1z(reason);
+    const value = readString$1A(reason);
     if (value === "missing_finalize_after_latest_write") return "workspace_finalize_candidate";
     if (value === "missing_latest_workspace_read") return "workspace_read";
+    if (value === "missing_latest_candidate_review") return "workspace_review_candidate";
     return "";
   }
 
@@ -18476,7 +18974,22 @@
       ? terminalRepairState
       : {};
     const requiredAction = getPublishProtocolRequiredActionForReason(state.reason);
-    return Boolean(requiredAction && requiredAction === readString$1z(actionName));
+    return Boolean(requiredAction && requiredAction === readString$1A(actionName));
+  }
+
+  function isWorkspaceRepairInspectionActionForRepair(terminalRepairState, actionName) {
+    const state = terminalRepairState && typeof terminalRepairState === "object" && !Array.isArray(terminalRepairState)
+      ? terminalRepairState
+      : {};
+    const signal = state.workspaceRepairSignal && typeof state.workspaceRepairSignal === "object"
+      ? state.workspaceRepairSignal
+      : null;
+    return Boolean(
+      state.active === true &&
+      readString$1A(actionName) === "workspace_read" &&
+      signal &&
+      signal.mustInspectCandidate === true
+    );
   }
 
   function resolvePublishProtocolActionContract(runState) {
@@ -18518,12 +19031,12 @@
       typeof terminalRepairState.observableDeficits.length === "object"
       ? terminalRepairState.observableDeficits.length
       : null;
-    const requested = readNumber$d(length && length.requested);
-    const unit = readString$1z(length && length.unit) || "words";
-    const path = readString$1z(actionArgs && actionArgs.path);
+    const requested = readNumber$e(length && length.requested);
+    const unit = readString$1A(length && length.unit) || "words";
+    const path = readString$1A(actionArgs && actionArgs.path);
     if (!path || !requested) return sourceDeficits.slice();
     const stats = readWorkspaceFileStats(options && options.runState, path);
-    const observed = readNumber$d(stats && stats[unit]);
+    const observed = readNumber$e(stats && stats[unit]);
     if (observed >= requested) {
       return sourceDeficits.filter((name) => name !== "length");
     }
@@ -18533,22 +19046,22 @@
   function readTerminalRepairGaps(assessment, readiness) {
     const gaps = readStringArray$6(assessment && assessment.remainingGaps);
     if (gaps.length > 0) return gaps;
-    const fallback = readString$1z(
+    const fallback = readString$1A(
       readiness && (readiness.limitations || readiness.limitation || readiness.remainingGap)
-    ) || readString$1z(
+    ) || readString$1A(
       assessment && (assessment.limitations || assessment.limitation || assessment.remainingGap)
     );
     return fallback ? [fallback] : [];
   }
 
   function isBudgetConstrainedForLimitedPublish(terminalRepairState) {
-    const budgetState = readString$1z(terminalRepairState && terminalRepairState.budgetState);
+    const budgetState = readString$1A(terminalRepairState && terminalRepairState.budgetState);
     // ADR-0033 Tier A.8 (X1 fix) — hard_veto means AI has hit the wall on
     // structure repair (ignoredCount past the high-water mark). Even on
     // "enough" budget the rational next move is publish_limited with structure
     // noted in remainingGaps. Treat hard_veto state as constrained for the
     // purpose of allowing a limited publish contract.
-    const escalation = readString$1z(terminalRepairState && terminalRepairState.escalation);
+    const escalation = readString$1A(terminalRepairState && terminalRepairState.escalation);
     return budgetState === "low" || budgetState === "exhausted" || escalation === "hard_veto";
   }
 
@@ -18581,7 +19094,7 @@
   }
 
   function summarizeTextStats$1(value) {
-    const text = readString$1z(value);
+    const text = readString$1A(value);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -18598,15 +19111,15 @@
     const lengthStatus = readLengthStatus(packet, runState);
     const structure = readStructureStatus(runState);
     const todo = readTodoStatus(runState);
-    const actionName = readString$1z(context && context.actionName);
+    const actionName = readString$1A(context && context.actionName);
     const actionPattern = readRecord(runState && runState.actionPatternConvergence);
     const correction = readRecord(actionPattern && actionPattern.terminalCorrectionState);
     const cooldown = readRecord(actionPattern && actionPattern.terminalRetryCooldown);
     const readOnlyPlanning = readRecord(actionPattern && actionPattern.readOnlyPlanningState);
     const output = readRecord(context && context.output);
-    const publishBlocked = readString$1z(output && output.kind) === "virtual_workspace_publish_blocked" ||
-      readString$1z(output && output.kind) === "terminal_correction_preflight_block" ||
-      readString$1z(output && output.kind) === "terminal_repair_preflight_block";
+    const publishBlocked = readString$1A(output && output.kind) === "virtual_workspace_publish_blocked" ||
+      readString$1A(output && output.kind) === "terminal_correction_preflight_block" ||
+      readString$1A(output && output.kind) === "terminal_repair_preflight_block";
     const readinessBlocked = isReadinessRepairOutput(output);
     const deficits = [];
     const observableDeficits = {
@@ -18618,17 +19131,17 @@
     };
 
     if (sourceMinimum && sourceMinimum.passed !== true) {
-      const readSourceDeficit = Math.max(readNumber$d(sourceMinimum.minReadSources) - readNumber$d(sourceMinimum.readSources), 0);
-      const relevantSourceDeficit = Math.max(readNumber$d(sourceMinimum.minRelevantSources) - readNumber$d(sourceMinimum.relevantSources), 0);
+      const readSourceDeficit = Math.max(readNumber$e(sourceMinimum.minReadSources) - readNumber$e(sourceMinimum.readSources), 0);
+      const relevantSourceDeficit = Math.max(readNumber$e(sourceMinimum.minRelevantSources) - readNumber$e(sourceMinimum.relevantSources), 0);
       if (readSourceDeficit > 0 || relevantSourceDeficit > 0) {
         deficits.push("source");
         observableDeficits.source = {
-          minReadSources: readNumber$d(sourceMinimum.minReadSources),
-          minRelevantSources: readNumber$d(sourceMinimum.minRelevantSources),
+          minReadSources: readNumber$e(sourceMinimum.minReadSources),
+          minRelevantSources: readNumber$e(sourceMinimum.minRelevantSources),
           readSourceDeficit,
-          readSources: readNumber$d(sourceMinimum.readSources),
+          readSources: readNumber$e(sourceMinimum.readSources),
           relevantSourceDeficit,
-          relevantSources: readNumber$d(sourceMinimum.relevantSources),
+          relevantSources: readNumber$e(sourceMinimum.relevantSources),
           successfulReadUrlCount: readSuccessfulReadUrlCount(runState, packet)
         };
       }
@@ -18661,10 +19174,10 @@
     if (structure && structure.ok === false) {
       observableDeficits.structure = {
         issueCodes: readStringArray$6(structure.issueCodes).slice(0, 8),
-        reason: readString$1z(structure.reason) || readString$1z(structure.status) || "structure_not_ready",
+        reason: readString$1A(structure.reason) || readString$1A(structure.status) || "structure_not_ready",
         repeatedHeadingSamples: normalizeStructureSamples(structure.repeatedHeadingSamples, "heading"),
         repeatedNumberSamples: normalizeStructureSamples(structure.repeatedNumberSamples, "number"),
-        status: readString$1z(structure.status) || "fail"
+        status: readString$1A(structure.status) || "fail"
       };
     }
 
@@ -18713,8 +19226,8 @@
       observableDeficits,
       reason: structureRepairReason ||
         outputRepairReason ||
-        readString$1z(correction && correction.reason) ||
-        readString$1z(cooldown && cooldown.reason) ||
+        readString$1A(correction && correction.reason) ||
+        readString$1A(cooldown && cooldown.reason) ||
         (finalizedStructureBlocked ? "finalized_candidate_structure_not_ready" : null) ||
         (proactiveBudgetRepair ? `${budgetState}_budget_with_observable_deficits` : null) ||
         (readOnlyPlanningActive && activeDeficits.length > 0 ? "read_only_planning_with_observable_deficits" : null) ||
@@ -18734,15 +19247,15 @@
     return {
       kind: "readiness_payload_deficit",
       issues,
-      message: readString$1z((audit && audit.message) || result.message) || null,
-      status: readString$1z(result.status) || readString$1z(audit && audit.status) || "readiness_audit_failed"
+      message: readString$1A((audit && audit.message) || result.message) || null,
+      status: readString$1A(result.status) || readString$1A(audit && audit.status) || "readiness_audit_failed"
     };
   }
 
   function isReadinessRepairOutput(output) {
     const result = readRecord(output) || {};
-    const status = readString$1z(result.status);
-    const reason = readString$1z(result.reason);
+    const status = readString$1A(result.status);
+    const reason = readString$1A(result.reason);
     if (status === "readiness_audit_failed") return true;
     if (status.includes("readiness") || reason.includes("readiness")) return true;
     const audit = readRecord(result.readinessAudit);
@@ -18761,12 +19274,12 @@
         const issue = readRecord(entry);
         if (!issue) return null;
         return {
-          code: readString$1z(issue.code) || "readiness_payload_mismatch",
-          correction: readString$1z(issue.correction) || null,
+          code: readString$1A(issue.code) || "readiness_payload_mismatch",
+          correction: readString$1A(issue.correction) || null,
           declared: issue.declared != null ? issue.declared : null,
-          field: readString$1z(issue.field) || null,
+          field: readString$1A(issue.field) || null,
           observed: issue.observed != null ? issue.observed : null,
-          unit: readString$1z(issue.unit) || null
+          unit: readString$1A(issue.unit) || null
         };
       })
       .filter(Boolean)
@@ -18776,10 +19289,10 @@
   function buildLengthExpansionSignal(runState, observableDeficits) {
     const length = observableDeficitsRecord(observableDeficits, "length");
     if (!length) return null;
-    const observed = readNumber$d(length.observed);
-    const requested = readNumber$d(length.requested);
+    const observed = readNumber$e(length.observed);
+    const requested = readNumber$e(length.requested);
     if (!requested || observed >= requested) return null;
-    const unit = readString$1z(length.unit) || "words";
+    const unit = readString$1A(length.unit) || "words";
     const content = readFinalCandidateContent(runState);
     const perSectionDelta = buildPerSectionLengthDeltas(content, {
       requested,
@@ -18797,15 +19310,254 @@
     };
   }
 
-  function buildAdvisoryPersistenceSignal(ignoredCount, escalation) {
-    const count = readNumber$d(ignoredCount);
-    if (readString$1z(escalation) !== "advisory") return null;
-    if (count < TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD) return null;
+  function buildWorkspaceRepairSignal(runState, observableDeficits, activeDeficits, allowedActions, reason, budgetState, escalation) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    if (!workspace) return null;
+    const path = readFinalCandidatePathFromWorkspace(runState);
+    const files = workspace.files && typeof workspace.files === "object" ? workspace.files : null;
+    const file = files && path ? files[path] : null;
+    const content = readString$1A(file && file.content);
+    const fileStats = readRecord(file && file.textStats) || summarizeTextStats$1(content);
+    const length = observableDeficitsRecord(observableDeficits, "length");
+    const structureFact = observableDeficitsRecord(observableDeficits, "structure");
+    const inspectedStructure = content ? inspectWorkspaceCandidateStructure(content) : null;
+    const structure = mergeWorkspaceStructureFacts(structureFact, inspectedStructure);
+    const hasLengthGap = Boolean(length && readNumber$e(length.requested) > readNumber$e(length.observed));
+    const hasStructureGap = Boolean(structure && structure.status === "fail");
+    const active = hasLengthGap || hasStructureGap || readString$1A(reason).includes("workspace") || readString$1A(reason).includes("structure");
+    if (!active) return null;
+    const actions = readStringArray$6(allowedActions);
+    const protocol = readCurrentPublishProtocol(runState);
+    const mustInspectCandidate = shouldRequireWorkspaceRepairInspection({
+      activeDeficits,
+      allowedActions: actions,
+      observableDeficits,
+      runState
+    });
+    const sourceSummary = buildWorkspaceRepairSourceSummary(runState, observableDeficits);
+    const fullRewriteAllowed = Boolean(
+      (actions.includes("workspace_replace") || actions.includes("workspace_write")) &&
+      (hasStructureGap || (hasLengthGap && sourceSummary.successfulReadUrlCount > 0))
+    );
+    return {
+      kind: "workspace_repair_signal",
+      path,
+      reason: readString$1A(reason) || "workspace_repair_required",
+      budgetState: readString$1A(budgetState) || "unknown",
+      escalation: readString$1A(escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      latestReadStatus: {
+        latestWriteIndex: readNumber$e(protocol && protocol.latestWriteIndex),
+        latestFinalizeIndex: readNumber$e(protocol && protocol.latestFinalizeIndex),
+        latestReadIndex: readNumber$e(protocol && protocol.latestReadIndex),
+        readAfterLatestContentChange: Boolean(protocol && protocol.readAfterLatestContentChange),
+        readAfterFinalize: Boolean(protocol && protocol.readAfterFinalize)
+      },
+      mustInspectCandidate,
+      destructiveMutationRequiresInspection: Boolean(
+        hasSelectedFinalCandidateContent(runState) &&
+        protocol &&
+        protocol.readAfterLatestContentChange !== true &&
+        actions.some((actionName) => (
+          actionName === "workspace_replace" ||
+          actionName === "workspace_write" ||
+          actionName === "workspace_multi_edit" ||
+          actionName === "workspace_propose_patch"
+        ))
+      ),
+      candidate: {
+        path,
+        textStats: {
+          chars: readNumber$e(fileStats && fileStats.chars),
+          cjkChars: readNumber$e(fileStats && fileStats.cjkChars),
+          words: readNumber$e(fileStats && fileStats.words)
+        },
+        requestedLength: length ? readNumber$e(length.requested) : null,
+        requestedLengthUnit: length ? (readString$1A(length.unit) || "words") : null,
+        lengthDeficit: length ? readNumber$e(length.deficit) : 0,
+        headingOutline: buildHeadingOutline(content)
+      },
+      structure: structure ? {
+        issueCodes: readStringArray$6(structure.issueCodes).slice(0, 8),
+        reason: readString$1A(structure.reason) || null,
+        status: readString$1A(structure.status) || "unknown",
+        repeatedHeadingSamples: normalizeStructureSamples(structure.repeatedHeadingSamples, "heading"),
+        repeatedNumberSamples: normalizeStructureSamples(structure.repeatedNumberSamples, "number"),
+        repeatedHeadingContexts: normalizeStructureContexts(structure.repeatedHeadingContexts, "heading"),
+        repeatedNumberContexts: normalizeStructureContexts(structure.repeatedNumberContexts, "number"),
+        sectionNumberRepairHints: normalizeSectionNumberRepairHints(structure.sectionNumberRepairHints),
+        sectionSequenceRepairHints: normalizeSectionNumberRepairHints(structure.sectionSequenceRepairHints)
+      } : null,
+      sourceSummary,
+      recommendedActionOrder: buildWorkspaceRepairRecommendedActions({
+        allowedActions: actions,
+        fullRewriteAllowed,
+        hasLengthGap,
+        hasStructureGap,
+        mustInspectCandidate
+      })
+    };
+  }
+
+  function mergeWorkspaceStructureFacts(primary, inspected) {
+    const first = readRecord(primary);
+    const second = readRecord(inspected);
+    if (!first) return second;
+    if (!second) return first;
+    return {
+      ...second,
+      ...first,
+      issueCodes: readStringArray$6(first.issueCodes).length > 0 ? first.issueCodes : second.issueCodes,
+      repeatedHeadingContexts: Array.isArray(first.repeatedHeadingContexts) && first.repeatedHeadingContexts.length > 0
+        ? first.repeatedHeadingContexts
+        : second.repeatedHeadingContexts,
+      repeatedHeadingSamples: Array.isArray(first.repeatedHeadingSamples) && first.repeatedHeadingSamples.length > 0
+        ? first.repeatedHeadingSamples
+        : second.repeatedHeadingSamples,
+      repeatedNumberContexts: Array.isArray(first.repeatedNumberContexts) && first.repeatedNumberContexts.length > 0
+        ? first.repeatedNumberContexts
+        : second.repeatedNumberContexts,
+      repeatedNumberSamples: Array.isArray(first.repeatedNumberSamples) && first.repeatedNumberSamples.length > 0
+        ? first.repeatedNumberSamples
+        : second.repeatedNumberSamples,
+      sectionNumberRepairHints: Array.isArray(first.sectionNumberRepairHints) && first.sectionNumberRepairHints.length > 0
+        ? first.sectionNumberRepairHints
+        : second.sectionNumberRepairHints,
+      sectionSequenceRepairHints: Array.isArray(first.sectionSequenceRepairHints) && first.sectionSequenceRepairHints.length > 0
+        ? first.sectionSequenceRepairHints
+        : second.sectionSequenceRepairHints
+    };
+  }
+
+  function buildWorkspaceRepairSourceSummary(runState, observableDeficits) {
+    const context = readRecord(runState && runState.researchContext);
+    const readSources = Array.isArray(context && context.readSources) ? context.readSources : [];
+    const source = observableDeficitsRecord(observableDeficits, "source");
+    const packet = readAcceptancePacket(runState);
+    const sourceMinimum = readSourceMinimum(runState, packet);
+    return {
+      readSources: source ? readNumber$e(source.readSources) : Math.max(readNumber$e(sourceMinimum && sourceMinimum.readSources), readSources.length),
+      relevantSources: source ? readNumber$e(source.relevantSources) : readNumber$e(sourceMinimum && sourceMinimum.relevantSources),
+      minReadSources: source ? readNumber$e(source.minReadSources) : readNumber$e(sourceMinimum && sourceMinimum.minReadSources),
+      minRelevantSources: source ? readNumber$e(source.minRelevantSources) : readNumber$e(sourceMinimum && sourceMinimum.minRelevantSources),
+      successfulReadUrlCount: source ? readNumber$e(source.successfulReadUrlCount) : countSuccessfulReadUrlArtifacts(runState),
+      samples: readSources
+        .map((entry) => {
+          const item = readRecord(entry);
+          if (!item) return null;
+          const title = readString$1A(item.title) || readString$1A(item.name) || readString$1A(item.url);
+          return title ? {
+            title: title.slice(0, 120),
+            url: readString$1A(item.url).slice(0, 200) || null
+          } : null;
+        })
+        .filter(Boolean)
+        .slice(0, 5)
+    };
+  }
+
+  function buildWorkspaceRepairRecommendedActions(options = {}) {
+    const allowed = new Set(readStringArray$6(options.allowedActions));
+    const recommended = [];
+    const add = (actionName) => {
+      if (allowed.has(actionName) && !recommended.includes(actionName)) recommended.push(actionName);
+    };
+    if (options.mustInspectCandidate) add("workspace_read");
+    add("workspace_review_candidate");
+    if (options.hasStructureGap) {
+      add("workspace_propose_patch");
+      add("workspace_apply_patch");
+      add("workspace_replace");
+      add("workspace_write");
+    }
+    if (options.hasLengthGap) {
+      add("workspace_insert_after_section");
+      add("workspace_multi_edit");
+      add("workspace_replace");
+      add("workspace_write");
+    }
+    if (options.fullRewriteAllowed) {
+      add("workspace_replace");
+      add("workspace_write");
+    }
+    add("workspace_finalize_candidate");
+    add("workspace_publish_candidate");
+    return recommended.slice(0, 10);
+  }
+
+  function buildHeadingOutline(content) {
+    const lines = readString$1A(content).split(/\r?\n/);
+    const outline = [];
+    for (let index = 0; index < lines.length; index += 1) {
+      const raw = lines[index] || "";
+      const match = raw.match(/^(#{1,6})\s+(.+?)\s*$/);
+      if (!match) continue;
+      const text = readString$1A(match[2]);
+      const numberMatch = text.match(/^(\d+(?:\.\d+)*)\b/);
+      outline.push({
+        level: match[1].length,
+        lineNumber: index + 1,
+        number: numberMatch ? numberMatch[1] : null,
+        text: text.slice(0, 160)
+      });
+      if (outline.length >= 24) break;
+    }
+    return outline;
+  }
+
+  function normalizeStructureContexts(value, key) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) => {
+        const source = readRecord(entry);
+        const label = readString$1A(source && source[key]);
+        if (!label) return null;
+        return {
+          count: readNumber$e(source.count),
+          [key]: label.slice(0, 160),
+          occurrences: Array.isArray(source.occurrences)
+            ? source.occurrences.map((occurrence) => {
+                const item = readRecord(occurrence);
+                if (!item) return null;
+                return {
+                  lineNumber: readNumber$e(item.lineNumber),
+                  raw: readString$1A(item.raw).slice(0, 180)
+                };
+              }).filter((item) => item && item.lineNumber > 0 && item.raw).slice(0, 8)
+            : []
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 6);
+  }
+
+  function normalizeSectionNumberRepairHints(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) => {
+        const source = readRecord(entry);
+        if (!source) return null;
+        const lineNumber = readNumber$e(source.lineNumber);
+        if (!lineNumber) return null;
+        return {
+          candidateNumber: readString$1A(source.candidateNumber) || null,
+          currentNumber: readString$1A(source.currentNumber) || null,
+          lineNumber,
+          raw: readString$1A(source.raw).slice(0, 180)
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 12);
+  }
+
+  function buildAdvisoryPersistenceSignal(ignoredCount, escalation, thresholds = DEFAULT_TERMINAL_REPAIR_THRESHOLDS) {
+    const count = readNumber$e(ignoredCount);
+    if (readString$1A(escalation) !== "advisory") return null;
+    if (count < thresholds.advisorySignal) return null;
     return {
       kind: "terminal_repair_advisory_persistence_signal",
       ignoredCount: count,
-      vetoThreshold: TERMINAL_REPAIR_HIGH_WATER_MARK,
-      stepsRemainingBeforeHardVeto: Math.max(TERMINAL_REPAIR_HIGH_WATER_MARK - count, 0)
+      vetoThreshold: thresholds.highWaterMark,
+      stepsRemainingBeforeHardVeto: Math.max(thresholds.highWaterMark - count, 0)
     };
   }
 
@@ -18817,18 +19569,32 @@
   }
 
   function isReadinessOnlyDeficits(deficits) {
-    const active = Array.isArray(deficits) ? deficits.map(readString$1z).filter(Boolean) : [];
+    const active = Array.isArray(deficits) ? deficits.map(readString$1A).filter(Boolean) : [];
     return active.length === 1 && active[0] === "readiness";
   }
 
   function buildActionOrderingSignals(runState, observableDeficits, budgetState, activeDeficits, allowedActions) {
+    const signals = [];
+    if (shouldRequireWorkspaceRepairInspection({
+      activeDeficits,
+      allowedActions,
+      observableDeficits,
+      runState
+    })) {
+      signals.push({
+        kind: "workspace_repair_inspection_nudge",
+        preferredActions: ["workspace_read"],
+        reason: "candidate_not_read_after_latest_content_change",
+        workspaceWriteCount: countWorkspaceWriteOperations(runState)
+      });
+    }
     if (!shouldSurfaceMultiWriteIterationNudge({
       activeDeficits,
       budgetState,
       observableDeficits,
       runState
     })) {
-      return [];
+      return signals;
     }
     const actions = readStringArray$6(allowedActions);
     const preferredActions = [
@@ -18836,21 +19602,22 @@
       "workspace_multi_edit",
       "workspace_write"
     ].filter((actionName) => actions.includes(actionName));
-    return [{
+    signals.push({
       kind: "multi_write_iteration_nudge",
       preferredActions,
       reason: "length_deficit_with_budget_remaining_and_few_workspace_writes",
       workspaceWriteCount: countWorkspaceWriteOperations(runState)
-    }];
+    });
+    return signals;
   }
 
-  function buildAllowedActions(deficits, budgetState, reason, observableDeficits, runState, escalation) {
+  function buildAllowedActions(deficits, budgetState, reason, observableDeficits, runState, escalation, runtimeConfig) {
     const actions = new Set();
     // ADR-0033 Tier A.8 (X1 fix) — treat hard_veto state as a budget-constrained
     // exit condition for the structure-deficit branch, so AI can publish a
     // limited candidate (with structure in remainingGaps) instead of being
     // pinned into an unfixable repair loop.
-      const hardVetoActive = readString$1z(escalation) === "hard_veto";
+      const hardVetoActive = readString$1A(escalation) === "hard_veto";
       const lowBudget = budgetState === "low" || budgetState === "exhausted" || hardVetoActive;
       const todoLimitedPublishAllowed = isBudgetConstrainedForLimitedPublish({
         budgetState,
@@ -18868,19 +19635,21 @@
       const hasProductDeficit = hasSource || hasLength || hasStructureRepairSignal;
     const terminalLoopOnly = deficits.includes("terminal_loop") &&
       !deficits.some((name) => name === "source" || name === "length" || name === "structure" || name === "todo");
-    const publishProtocolReason = readString$1z(reason);
+    const publishProtocolReason = readString$1A(reason);
     const readOnlyPlanningForbiddenActions = readOnlyPlanningHardVetoForbiddenActions(runState);
+    const readOnlyPlanningHardVeto = readOnlyPlanningForbiddenActions.size > 0;
     const workspaceMutationGrowthHardVeto = isWorkspaceMutationGrowthHardVetoActive(runState);
     const lengthLimitedPublishAllowed = shouldExposeLimitedPublishForBudget({
       budgetState,
       hardVetoActive,
       hasLengthDeficit: hasLength || hasObservableLengthDeficit,
+      readOnlyPlanningHardVeto,
       workspaceMutationGrowthHardVeto
     });
     const workspacePatchSurface = resolveWorkspacePatchRepairSurface(runState, reason);
     const sourceHasUnreadCandidates = hasUnreadSourceCandidates(runState);
     const publishProtocolContract = resolvePublishProtocolActionContract(runState);
-    const protocolRecoveryAction = readString$1z(publishProtocolContract && publishProtocolContract.requiredAction);
+    const protocolRecoveryAction = readString$1A(publishProtocolContract && publishProtocolContract.requiredAction);
     const protocolRequiredAction = isPublishProtocolRepairReason(publishProtocolReason)
       ? protocolRecoveryAction
       : "";
@@ -18892,16 +19661,18 @@
       }
       if (emptyFinalCandidate) {
         if (hasSource || (hasReadinessOrTerminalLoop && !hasLength && !hasTodo)) {
-          if (!sourceHasUnreadCandidates && !readOnlyPlanningForbiddenActions.has("web_search")) {
-            actions.add("web_search");
-          }
-          actions.add("read_url");
+          addEvidenceRecoveryActions(actions, {
+            forbiddenActions: readOnlyPlanningForbiddenActions,
+            runtimeConfig,
+            sourceHasUnreadCandidates
+          });
         }
         actions.add("workspace_write");
         actions.add("workspace_replace");
         if (hasLength) {
           actions.add("workspace_insert_after_section");
         }
+        addCandidateReviewRepairAction(actions, runState);
         if (hasTodo) {
           actions.add("todo_advance");
           actions.add("todo_run_next");
@@ -18919,6 +19690,7 @@
       }
         if (hasStructureRepairSignal && !hasSource && !hasLength && hasTodo) {
           addWorkspacePatchRepairActions(actions, workspacePatchSurface);
+          addCandidateReviewRepairAction(actions, runState);
           actions.add("todo_advance");
           actions.add("todo_run_next");
           actions.add("todo_cancel");
@@ -18934,10 +19706,11 @@
         }
         if (hasSource || hasLength || hasObservableLengthDeficit || hasTodo || (hasReadinessOrTerminalLoop && hasObservableLengthDeficit)) {
         if (hasSource) {
-          if (!sourceHasUnreadCandidates && !readOnlyPlanningForbiddenActions.has("web_search")) {
-            actions.add("web_search");
-          }
-          actions.add("read_url");
+          addEvidenceRecoveryActions(actions, {
+            forbiddenActions: readOnlyPlanningForbiddenActions,
+            runtimeConfig,
+            sourceHasUnreadCandidates
+          });
         }
         if (hasStructureRepairSignal && !hasLength && !hasObservableLengthDeficit) {
           addWorkspacePatchRepairActions(actions, workspacePatchSurface);
@@ -18949,8 +19722,11 @@
           if (workspaceMutationGrowthHardVeto) {
             addWorkspacePatchRepairActions(actions, workspacePatchSurface);
           }
+          actions.add("workspace_read");
           actions.add("workspace_insert_after_section");
+          actions.add("workspace_multi_edit");
           actions.add("workspace_replace");
+          addCandidateReviewRepairAction(actions, runState);
         }
         if (hasTodo) {
           actions.add("todo_advance");
@@ -19006,6 +19782,43 @@
         "workspace_read"
       ];
     }
+    if (!hasSource && !hasLength && !hasStructure && !hasTodo && publishProtocolReason === "missing_latest_candidate_review") {
+      actions.add("workspace_review_candidate");
+      if (hasObservableLengthDeficit) {
+        actions.add("workspace_insert_after_section");
+        actions.add("workspace_multi_edit");
+        if (lengthLimitedPublishAllowed) {
+          actions.add("workspace_publish_candidate");
+        }
+      }
+      return applyMultiWriteIterationNudge(Array.from(actions), {
+        activeDeficits: deficits,
+        budgetState,
+        observableDeficits,
+        runState
+      }).slice(0, 16);
+    }
+    if (!hasSource && !hasLength && !hasStructure && !hasTodo && publishProtocolReason === "candidate_quality_blocked") {
+      actions.add("workspace_read");
+      actions.add("workspace_review_candidate");
+      addEvidenceRecoveryActions(actions, {
+        forbiddenActions: readOnlyPlanningForbiddenActions,
+        runtimeConfig,
+        sourceHasUnreadCandidates
+      });
+      addWorkspacePatchRepairActions(actions, workspacePatchSurface, {
+        allowBlockedRetry: true
+      });
+      actions.add("workspace_replace");
+      actions.add("workspace_insert_after_section");
+      actions.add("workspace_write");
+      return filterReadOnlyPlanningChurnActions(Array.from(actions), {
+        deficits,
+        forbiddenActions: readOnlyPlanningForbiddenActions,
+        protocolRequiredAction,
+        sourceHasUnreadCandidates
+      }).slice(0, 16);
+    }
     const readinessOnly = hasReadiness &&
       !hasSource &&
       !hasLength &&
@@ -19021,10 +19834,11 @@
     }
 
       if (hasSource || (hasReadinessOrTerminalLoop && !hasLength && !hasStructureRepairSignal && !hasTodo)) {
-      if (!sourceHasUnreadCandidates && !readOnlyPlanningForbiddenActions.has("web_search")) {
-        actions.add("web_search");
-      }
-      actions.add("read_url");
+      addEvidenceRecoveryActions(actions, {
+        forbiddenActions: readOnlyPlanningForbiddenActions,
+        runtimeConfig,
+        sourceHasUnreadCandidates
+      });
       if (hasObservableLengthDeficit && isSourceReadQuotaSatisfied(observableDeficits)) {
         actions.add("workspace_insert_after_section");
         if (!lowBudget) {
@@ -19044,6 +19858,7 @@
           actions.add("todo_run_next");
           actions.add("todo_cancel");
         }
+        addCandidateReviewRepairAction(actions, runState);
           if (lowBudget) {
             if (protocolRequiredAction || protocolRecoveryAction) {
               actions.add(protocolRequiredAction || protocolRecoveryAction);
@@ -19066,6 +19881,7 @@
         if (hasLength || hasObservableLengthDeficit) {
           actions.add("workspace_insert_after_section");
         }
+        addCandidateReviewRepairAction(actions, runState);
         if (lowBudget) {
           if (protocolRequiredAction || protocolRecoveryAction) {
             actions.add(protocolRequiredAction || protocolRecoveryAction);
@@ -19095,6 +19911,8 @@
           addWorkspacePatchRepairActions(actions, workspacePatchSurface);
         }
         actions.add("workspace_insert_after_section");
+        actions.add("workspace_multi_edit");
+        addCandidateReviewRepairAction(actions, runState);
         if (!lowBudget) {
           actions.add("workspace_read");
           if (!workspaceMutationGrowthHardVeto) {
@@ -19112,12 +19930,20 @@
         actions.add("workspace_replace");
       }
       actions.add("workspace_insert_after_section");
+      addCandidateReviewRepairAction(actions, runState);
     }
       if (hasTodo && !hasSource && !hasLength && !hasStructureRepairSignal) {
       actions.add("todo_advance");
       actions.add("todo_run_next");
       actions.add("todo_cancel");
     }
+      if (hasObservableLengthDeficit && hasReadinessOrTerminalLoop) {
+        actions.add("workspace_insert_after_section");
+        addCandidateReviewRepairAction(actions, runState);
+        if (lengthLimitedPublishAllowed) {
+          actions.add("workspace_publish_candidate");
+        }
+      }
       if (
         !hasStructureRepairSignal &&
         lowBudget &&
@@ -19142,16 +19968,44 @@
       ).slice(0, 16);
   }
 
+  function addEvidenceRecoveryActions(actions, options = {}) {
+    const recoveryActions = readEvidenceRecoveryActions(options.runtimeConfig);
+    const forbiddenActions = options.forbiddenActions instanceof Set
+      ? options.forbiddenActions
+      : new Set();
+    for (const actionName of recoveryActions) {
+      if (!actionName || forbiddenActions.has(actionName)) continue;
+      if (actionName === "web_search" && options.sourceHasUnreadCandidates) continue;
+      actions.add(actionName);
+    }
+  }
+
+  function addCandidateReviewRepairAction(actions, runState) {
+    if (!actions || typeof actions.add !== "function") return;
+    if (shouldExposeCandidateReviewAction(runState)) {
+      actions.add("workspace_review_candidate");
+    }
+  }
+
+  function shouldExposeCandidateReviewAction(runState) {
+    const protocol = readCurrentPublishProtocol(runState);
+    if (!protocol) return true;
+    return !(protocol.reviewAfterLatestContentChange === true && protocol.reviewAfterRead === true);
+  }
+
   function shouldExposeLimitedPublishForBudget({
     budgetState,
     hardVetoActive,
     hasLengthDeficit,
+    readOnlyPlanningHardVeto,
     workspaceMutationGrowthHardVeto
   }) {
     if (budgetState === "exhausted" || hardVetoActive) return true;
+    if (readOnlyPlanningHardVeto === true && hasLengthDeficit) return true;
+    if (workspaceMutationGrowthHardVeto === true && hasLengthDeficit) return true;
     if (budgetState !== "low") return false;
     if (!hasLengthDeficit) return true;
-    return workspaceMutationGrowthHardVeto === true;
+    return false;
   }
 
   function hasEmptyFinalCandidateDeficit(observableDeficits, runState) {
@@ -19163,7 +20017,7 @@
     const workspace = readRecord(runState && runState.virtualWorkspace);
     if (!workspace) return false;
     const quality = readRecord(workspace && workspace.quality);
-    const finalCandidateStatus = readString$1z(quality && quality.finalCandidateStatus);
+    const finalCandidateStatus = readString$1A(quality && quality.finalCandidateStatus);
     if (finalCandidateStatus === "candidate_empty" || finalCandidateStatus === "missing_candidate_content") {
       return true;
     }
@@ -19175,8 +20029,8 @@
     if (file && typeof file === "object") {
       const content = typeof file.content === "string" ? file.content : "";
       const stats = readRecord(file && file.textStats);
-      const chars = readNumber$d(stats && stats.chars);
-      const words = readNumber$d(stats && stats.words);
+      const chars = readNumber$e(stats && stats.chars);
+      const words = readNumber$e(stats && stats.words);
       return content.trim().length === 0 && chars === 0 && words === 0;
     }
     return issueCodes.includes("candidate_empty");
@@ -19190,7 +20044,7 @@
   function isWorkspaceMutationGrowthHardVetoActive(runState) {
     const convergence = readRecord(runState && runState.actionPatternConvergence);
     const state = readRecord(convergence && convergence.workspaceMutationGrowthConvergence);
-    return Boolean(state && state.active === true && readString$1z(state.escalation) === "hard_veto");
+    return Boolean(state && state.active === true && readString$1A(state.escalation) === "hard_veto");
   }
 
   function addWorkspacePatchRepairActions(actions, surface, options = {}) {
@@ -19218,12 +20072,12 @@
     const pendingPatch = readRecord(workspace && workspace.pendingPatch);
     if (!pendingPatch) return "fresh";
     const file = readRecord(workspace && workspace.files && workspace.files[pendingPatch.path]);
-    const currentVersion = readNumber$d(file && file.version);
-    const baseVersion = readNumber$d(pendingPatch && pendingPatch.baseVersion);
+    const currentVersion = readNumber$e(file && file.version);
+    const baseVersion = readNumber$e(pendingPatch && pendingPatch.baseVersion);
     if (file && currentVersion !== baseVersion) {
       return "stale_preview";
     }
-    const status = readString$1z(pendingPatch.status);
+    const status = readString$1A(pendingPatch.status);
     if (pendingPatch.valid === true && status === "preview_ready") {
       return "apply_ready";
     }
@@ -19236,14 +20090,14 @@
   function resolveWorkspacePatchRepairSurface(runState, reason) {
     const surface = getWorkspacePatchRepairSurface(runState);
     if (surface !== "fresh") return surface;
-    return readString$1z(reason) === "preview_blocked" ? "blocked_preview" : surface;
+    return readString$1A(reason) === "preview_blocked" ? "blocked_preview" : surface;
   }
 
   function readOnlyPlanningHardVetoForbiddenActions(runState) {
     const convergence = readRecord(runState && runState.actionPatternConvergence);
     const state = readRecord(convergence && convergence.readOnlyPlanningState);
     if (!state || state.active !== true) return new Set();
-    if (readString$1z(state.escalation) !== "hard_veto") return new Set();
+    if (readString$1A(state.escalation) !== "hard_veto") return new Set();
     return new Set(readStringArray$6(state.forbiddenActions));
   }
 
@@ -19268,9 +20122,9 @@
   function isSourceReadQuotaSatisfied(observableDeficits) {
     const source = observableDeficitsRecord(observableDeficits, "source");
     if (!source) return false;
-    const minReadSources = readNumber$d(source.minReadSources);
+    const minReadSources = readNumber$e(source.minReadSources);
     if (!minReadSources) return false;
-    return readNumber$d(source.readSources) >= minReadSources;
+    return readNumber$e(source.readSources) >= minReadSources;
   }
 
   function readSearchPassItems(searchPasses) {
@@ -19286,11 +20140,11 @@
   function readCandidateUrl(candidate) {
     const source = readRecord(candidate);
     if (!source) return "";
-    return readString$1z(source.url) || readString$1z(source.link) || readString$1z(source.href);
+    return readString$1A(source.url) || readString$1A(source.link) || readString$1A(source.href);
   }
 
   function normalizeUrlKey$1(value) {
-    const url = readString$1z(value);
+    const url = readString$1A(value);
     if (!url) return "";
     try {
       const parsed = new URL(url);
@@ -19319,7 +20173,7 @@
     if (remove.size === 0) return source;
     const filtered = source.filter((actionName) => {
       if (!remove.has(actionName)) return true;
-      if (actionName === readString$1z(options.protocolRequiredAction)) return true;
+      if (actionName === readString$1A(options.protocolRequiredAction)) return true;
       return !forbidden.has(actionName);
     });
     return filtered.length > 0 ? filtered : source;
@@ -19327,16 +20181,19 @@
 
   function applyMultiWriteIterationNudge(actions, options = {}) {
     const hasStructureRepairSignal = Boolean(observableDeficitsRecord(options.observableDeficits, "structure"));
-    const source = readStringArray$6(actions).filter((actionName) => (
+    const source = applyWorkspaceRepairInspectionNudge(
+      readStringArray$6(actions).filter((actionName) => (
       !hasStructureRepairSignal || actionName !== "workspace_multi_edit"
-    ));
+      )),
+      options
+    );
     if (!shouldSurfaceMultiWriteIterationNudge(options)) return source;
     const workspace = readRecord(options.runState && options.runState.virtualWorkspace);
     const finalPath = readFinalCandidatePathFromWorkspace(options.runState);
     const finalFile = readRecord(workspace && workspace.files && workspace.files[finalPath]);
-    const hasCandidateContent = readString$1z(finalFile && finalFile.content).length > 0 ||
-      readNumber$d(finalFile && finalFile.textStats && finalFile.textStats.words) > 0 ||
-      readNumber$d(finalFile && finalFile.textStats && finalFile.textStats.chars) > 0;
+    const hasCandidateContent = readString$1A(finalFile && finalFile.content).length > 0 ||
+      readNumber$e(finalFile && finalFile.textStats && finalFile.textStats.words) > 0 ||
+      readNumber$e(finalFile && finalFile.textStats && finalFile.textStats.chars) > 0;
     const preferred = hasCandidateContent
       ? (hasStructureRepairSignal
           ? ["workspace_insert_after_section", "workspace_replace", "workspace_write"]
@@ -19346,22 +20203,75 @@
     for (const actionName of preferred) {
       if (!withPreferred.includes(actionName)) withPreferred.push(actionName);
     }
+    const inspectedPreferred = applyWorkspaceRepairInspectionNudge(withPreferred, options);
     const preferredSet = new Set(preferred);
     return [
-      ...preferred.filter((actionName) => withPreferred.includes(actionName)),
-      ...withPreferred.filter((actionName) => !preferredSet.has(actionName))
+      ...inspectedPreferred.filter((actionName) => actionName === "workspace_read"),
+      ...preferred.filter((actionName) => inspectedPreferred.includes(actionName)),
+      ...inspectedPreferred.filter((actionName) => actionName !== "workspace_read" && !preferredSet.has(actionName))
     ];
   }
 
+  function applyWorkspaceRepairInspectionNudge(actions, options = {}) {
+    const source = readStringArray$6(actions);
+    if (source.includes("workspace_read")) return source;
+    if (!shouldRequireWorkspaceRepairInspection({
+      activeDeficits: options.activeDeficits,
+      allowedActions: source,
+      observableDeficits: options.observableDeficits,
+      runState: options.runState
+    })) {
+      return source;
+    }
+    return ["workspace_read", ...source];
+  }
+
+  function shouldRequireWorkspaceRepairInspection(options = {}) {
+    const actions = readStringArray$6(options.allowedActions);
+    const hasRepairMutation = actions.some((actionName) => (
+      actionName === "workspace_apply_patch" ||
+      actionName === "workspace_insert_after_section" ||
+      actionName === "workspace_multi_edit" ||
+      actionName === "workspace_propose_patch" ||
+      actionName === "workspace_replace" ||
+      actionName === "workspace_write"
+    ));
+    if (!hasRepairMutation) return false;
+    const hasCandidate = hasSelectedFinalCandidateContent(options.runState);
+    if (!hasCandidate) return false;
+    const protocol = readCurrentPublishProtocol(options.runState);
+    if (!protocol) return false;
+    if (protocol.readAfterLatestContentChange === true) return false;
+    const hasObservableRepairFact = Boolean(observableDeficitsRecord(options.observableDeficits, "length")) ||
+      Boolean(observableDeficitsRecord(options.observableDeficits, "structure"));
+    const activeDeficits = Array.isArray(options.activeDeficits) ? options.activeDeficits : [];
+    return hasObservableRepairFact || activeDeficits.includes("terminal_loop") || activeDeficits.includes("readiness");
+  }
+
+  function hasSelectedFinalCandidateContent(runState) {
+    const workspace = readRecord(runState && runState.virtualWorkspace);
+    const path = readFinalCandidatePathFromWorkspace(runState);
+    const files = workspace && workspace.files && typeof workspace.files === "object"
+      ? workspace.files
+      : null;
+    const file = files && path ? files[path] : null;
+    if (!file || typeof file !== "object") return false;
+    if (readString$1A(file.content)) return true;
+    const stats = readRecord(file.textStats);
+    return readNumber$e(stats && stats.words) > 0 ||
+      readNumber$e(stats && stats.chars) > 0 ||
+      readNumber$e(stats && stats.cjkChars) > 0;
+  }
+
   function shouldSurfaceMultiWriteIterationNudge(options = {}) {
-    const budgetState = readString$1z(options.budgetState);
+    const budgetState = readString$1A(options.budgetState);
     if (budgetState === "exhausted") return false;
     const activeDeficits = Array.isArray(options.activeDeficits) ? options.activeDeficits : [];
     if (activeDeficits.includes("source")) return false;
     const length = observableDeficitsRecord(options.observableDeficits, "length");
     if (!length) return false;
-    const observed = readNumber$d(length.observed);
-    const requested = readNumber$d(length.requested);
+    const observed = readNumber$e(length.observed);
+    const requested = readNumber$e(length.requested);
     if (!requested || observed >= requested) return false;
     return countWorkspaceWriteOperations(options.runState) < 3;
   }
@@ -19369,7 +20279,7 @@
   function countWorkspaceWriteOperations(runState) {
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const operations = Array.isArray(workspace && workspace.operations) ? workspace.operations : [];
-    return operations.filter((operation) => readString$1z(operation && operation.action) === "write").length;
+    return operations.filter((operation) => readString$1A(operation && operation.action) === "write").length;
   }
 
   function countWorkspaceExpansionIterations(runState) {
@@ -19382,7 +20292,7 @@
       "replace",
       "write"
     ]);
-    return operations.filter((operation) => expansionActions.has(readString$1z(operation && operation.action))).length;
+    return operations.filter((operation) => expansionActions.has(readString$1A(operation && operation.action))).length;
   }
 
   function readFinalCandidateContent(runState) {
@@ -19392,21 +20302,21 @@
       ? workspace.files
       : null;
     const file = files && finalPath ? files[finalPath] : null;
-    return readString$1z(file && file.content);
+    return readString$1A(file && file.content);
   }
 
   function buildPerSectionLengthDeltas(content, options = {}) {
-    const text = readString$1z(content);
+    const text = readString$1A(content);
     if (!text) return [];
-    const requested = readNumber$d(options.requested);
+    const requested = readNumber$e(options.requested);
     if (!requested) return [];
-    const unit = readString$1z(options.unit) || "words";
+    const unit = readString$1A(options.unit) || "words";
     const sections = splitMarkdownSections(text);
     if (sections.length === 0) return [];
     const target = Math.ceil(requested / sections.length);
     return sections.map((section) => {
       const stats = summarizeTextStats$1(section.content);
-      const observed = readNumber$d(stats[unit]);
+      const observed = readNumber$e(stats[unit]);
       return {
         heading: section.heading.slice(0, 120),
         observed,
@@ -19417,7 +20327,7 @@
   }
 
   function splitMarkdownSections(text) {
-    const lines = readString$1z(text).split(/\r?\n/);
+    const lines = readString$1A(text).split(/\r?\n/);
     const sections = [];
     let current = null;
     for (const line of lines) {
@@ -19440,22 +20350,22 @@
 
   function averagePositiveGap(perSectionDelta, fallbackGap) {
     const gaps = (Array.isArray(perSectionDelta) ? perSectionDelta : [])
-      .map((entry) => readNumber$d(entry && entry.gap))
+      .map((entry) => readNumber$e(entry && entry.gap))
       .filter((gap) => gap > 0);
-    if (gaps.length === 0) return readNumber$d(fallbackGap);
+    if (gaps.length === 0) return readNumber$e(fallbackGap);
     return Math.round(gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length);
   }
 
   function resolveActiveRepairReason(previous, facts, actionName, context) {
-    const previousReason = readString$1z(previous && previous.reason);
-    const factReason = readString$1z(facts && facts.reason);
-    const name = readString$1z(actionName);
-    const status = readString$1z(context && context.status);
+    const previousReason = readString$1A(previous && previous.reason);
+    const factReason = readString$1A(facts && facts.reason);
+    const name = readString$1A(actionName);
+    const status = readString$1A(context && context.status);
     const output = readRecord(context && context.output);
     if (
       previousReason === "missing_finalize_after_latest_write" &&
       name === "workspace_finalize_candidate" &&
-      (readString$1z(output && output.kind) === "virtual_workspace_finalize_candidate" || status === "after_workspace_finalize_candidate")
+      (readString$1A(output && output.kind) === "virtual_workspace_finalize_candidate" || status === "after_workspace_finalize_candidate")
     ) {
       const publishProtocol = readRecord(output && output.publishProtocol);
       if (publishProtocol && publishProtocol.readAfterLatestContentChange === true) {
@@ -19466,7 +20376,7 @@
     if (
       previousReason === "missing_latest_workspace_read" &&
       name === "workspace_read" &&
-      (readString$1z(output && output.kind) === "virtual_workspace_read" || status === "after_workspace_read")
+      (readString$1A(output && output.kind) === "virtual_workspace_read" || status === "after_workspace_read")
     ) {
       return factReason || "terminal_repair_required";
     }
@@ -19477,28 +20387,33 @@
   }
 
   function isPublishProtocolRepairReason(value) {
-    const reason = readString$1z(value);
-    return reason === "missing_finalize_after_latest_write" || reason === "missing_latest_workspace_read";
+    const reason = readString$1A(value);
+    return reason === "missing_finalize_after_latest_write" ||
+      reason === "missing_latest_workspace_read" ||
+      reason === "missing_latest_candidate_review";
   }
 
   function isPublishProtocolStillBlockedForReason(runState, reason) {
     const protocol = readCurrentPublishProtocol(runState);
     if (!protocol) return false;
-    const value = readString$1z(reason);
+    const value = readString$1A(reason);
     if (value === "missing_finalize_after_latest_write") {
       return protocol.finalizedAfterLatestWrite !== true;
     }
     if (value === "missing_latest_workspace_read") {
       return protocol.readAfterLatestContentChange !== true;
     }
+    if (value === "missing_latest_candidate_review") {
+      return protocol.reviewAfterLatestContentChange !== true;
+    }
     return false;
   }
 
   function isPublishProtocolRequiredActionCompleted(reason, actionName, output, status) {
-    const repairReason = readString$1z(reason);
-    const name = readString$1z(actionName);
-    const outputKind = readString$1z(output && output.kind);
-    const phase = readString$1z(status);
+    const repairReason = readString$1A(reason);
+    const name = readString$1A(actionName);
+    const outputKind = readString$1A(output && output.kind);
+    const phase = readString$1A(status);
     if (repairReason === "missing_finalize_after_latest_write") {
       return name === "workspace_finalize_candidate" &&
         (outputKind === "virtual_workspace_finalize_candidate" || phase === "after_workspace_finalize_candidate");
@@ -19507,12 +20422,16 @@
       return name === "workspace_read" &&
         (outputKind === "virtual_workspace_read" || phase === "after_workspace_read");
     }
+    if (repairReason === "missing_latest_candidate_review") {
+      return name === "workspace_review_candidate" &&
+        (outputKind === "virtual_workspace_review_candidate" || phase === "after_workspace_review_candidate");
+    }
     return false;
   }
 
   function readOutputRepairReason(output) {
-    const status = readString$1z(output && output.status);
-    const reason = readString$1z(output && output.reason);
+    const status = readString$1A(output && output.status);
+    const reason = readString$1A(output && output.reason);
     for (const value of [status, reason]) {
       if (!value) continue;
       if (value === "ok" || value === "complete" || value === "completed") continue;
@@ -19527,10 +20446,10 @@
     return value
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
-        const label = readString$1z(entry[key]);
+        const label = readString$1A(entry[key]);
         if (!label) return null;
         return {
-          count: readNumber$d(entry.count),
+          count: readNumber$e(entry.count),
           [key]: label.slice(0, 160)
         };
       })
@@ -19557,7 +20476,7 @@
     // ADR-0033 Tier A.8 (X1 fix) — hard_veto state counts as constrained so the
     // contract surface stops insisting on structure repair when AI can't make
     // progress. AI must still mention structure in remainingGaps to publish.
-    const hardVetoActive = readString$1z(escalation) === "hard_veto";
+    const hardVetoActive = readString$1A(escalation) === "hard_veto";
     const constrained = budgetState === "low" || budgetState === "exhausted" || hardVetoActive;
     const todoRequiresSyncFirst = deficits.includes("todo") && !constrained;
     return {
@@ -19592,8 +20511,8 @@
       ? observableDeficits.readiness
       : null;
     const issues = Array.isArray(readiness && readiness.issues) ? readiness.issues : [];
-    const observedLengthIssue = issues.find((issue) => readString$1z(issue && issue.code) === "observed_length_mismatch");
-    const sourceCountIssue = issues.find((issue) => readString$1z(issue && issue.code) === "successful_read_url_count_mismatch");
+    const observedLengthIssue = issues.find((issue) => readString$1A(issue && issue.code) === "observed_length_mismatch");
+    const sourceCountIssue = issues.find((issue) => readString$1A(issue && issue.code) === "successful_read_url_count_mismatch");
     return {
       finalReadiness: {
         decision: "ready",
@@ -19637,7 +20556,7 @@
     if (structure) {
       const issueCodes = Array.isArray(structure.issueCodes) && structure.issueCodes.length > 0
         ? structure.issueCodes.join(",")
-        : (readString$1z(structure.reason) || "structure_not_ready");
+        : (readString$1A(structure.reason) || "structure_not_ready");
       remainingGaps.push(`Structure is still not ready: ${issueCodes}.`);
     }
     if (todo) {
@@ -19674,7 +20593,7 @@
     };
   }
 
-  function buildRequiredRepair(deficits, observableDeficits, allowedActions, budgetState, reason) {
+  function buildRequiredRepair(deficits, observableDeficits, allowedActions, budgetState, reason, runtimeConfig) {
     const parts = [];
     const readiness = observableDeficits && observableDeficits.readiness && typeof observableDeficits.readiness === "object"
       ? observableDeficits.readiness
@@ -19691,7 +20610,7 @@
     const todo = observableDeficits && observableDeficits.todo && typeof observableDeficits.todo === "object"
       ? observableDeficits.todo
       : null;
-    const protocolReason = readString$1z(reason);
+    const protocolReason = readString$1A(reason);
     if (protocolReason === "missing_finalize_after_latest_write") {
       parts.push("Publish protocol deficit: workspace content changed after the last finalized candidate; run workspace_finalize_candidate for the selected path before publishing.");
     } else if (protocolReason === "missing_latest_workspace_read") {
@@ -19699,7 +20618,8 @@
     }
     if (deficits.includes("source") && source) {
       const exhausted = budgetState === "exhausted";
-      parts.push(`Source deficit: need ${source.readSourceDeficit || 0} more read source(s) and ${source.relevantSourceDeficit || 0} more relevant source(s); use web_search/read_url before clean publish.${exhausted ? " Budget is exhausted: if you cannot improve source relevance immediately, publish only valid limited finalReadiness now with decision=limited, evidenceSatisfied=false, requirementSatisfied=false, and remainingGaps naming the source relevance gap." : ""}`);
+      const recoveryActions = formatEvidenceRecoveryActions(runtimeConfig);
+      parts.push(`Evidence deficit: need ${source.readSourceDeficit || 0} more evidence artifact(s) and ${source.relevantSourceDeficit || 0} more relevant evidence artifact(s); use ${recoveryActions} before clean publish.${exhausted ? " Budget is exhausted: if you cannot improve evidence relevance immediately, publish only valid limited finalReadiness now with decision=limited, evidenceSatisfied=false, requirementSatisfied=false, and remainingGaps naming the evidence relevance gap." : ""}`);
     }
       if ((deficits.includes("structure") || structure) && structure) {
         const constrained = budgetState === "low" || budgetState === "exhausted";
@@ -19753,13 +20673,13 @@
     if (deficits.includes("readiness") && readiness) {
       const issueSummary = Array.isArray(readiness.issues) && readiness.issues.length > 0
         ? readiness.issues.map((issue) => {
-            const field = readString$1z(issue.field);
-            const code = readString$1z(issue.code) || "readiness_payload_mismatch";
+            const field = readString$1A(issue.field);
+            const code = readString$1A(issue.code) || "readiness_payload_mismatch";
             const declared = issue.declared != null ? ` declared=${issue.declared}` : "";
             const observed = issue.observed != null ? ` observed=${issue.observed}` : "";
             return `${code}${field ? ` field=${field}` : ""}${declared}${observed}`;
           }).join(" | ")
-        : readString$1z(readiness.message) || "readiness payload mismatch";
+        : readString$1A(readiness.message) || "readiness payload mismatch";
       parts.push(`Readiness payload deficit: prior finalReadiness did not match observable runtime facts (${issueSummary}). Correct only the listed finalReadiness fields and retry with the allowed actions; do not add source or workspace work unless source, length, structure, or Todo deficits are also active.`);
     }
     if (Array.isArray(allowedActions) && allowedActions.length > 0) {
@@ -19769,9 +20689,9 @@
   }
 
   function readBudgetState(runState, context) {
-    const cycle = readNumber$d(runState && runState.cycleCount);
-    const maxSteps = readNumber$d(runState && runState.maxSteps) ||
-      readNumber$d(context && context.runtimeConfig && context.runtimeConfig.maxSteps);
+    const cycle = readNumber$e(runState && runState.cycleCount);
+    const maxSteps = readNumber$e(runState && runState.maxSteps) ||
+      readNumber$e(context && context.runtimeConfig && context.runtimeConfig.maxSteps);
     if (!maxSteps) return "unknown";
     const remaining = Math.max(maxSteps - cycle, 0);
     if (remaining === 0) return "exhausted";
@@ -19794,27 +20714,27 @@
 
   function readLengthStatus(packet, runState) {
     const requested = readRecord(packet && packet.requestedLength);
-    const statsKey = readString$1z(requested && requested.statsKey) ||
-      (readString$1z(requested && requested.unit) === "words" ? "words" : "chars");
-    const requestedValue = readNumber$d(requested && requested.value);
+    const statsKey = readString$1A(requested && requested.statsKey) ||
+      (readString$1A(requested && requested.unit) === "words" ? "words" : "chars");
+    const requestedValue = readNumber$e(requested && requested.value);
     if (!requestedValue || !statsKey) return null;
     const candidate = readRecord(packet && packet.candidate) ||
       readRecord(packet && packet.workspace && packet.workspace.candidate);
     const stats = readRecord(candidate && candidate.textStats) || readRecord(candidate && candidate.stats) ||
       readCandidateStatsFromWorkspace(runState);
     return {
-      observed: readNumber$d(stats && stats[statsKey]),
-      path: readString$1z(candidate && candidate.path) || readFinalCandidatePathFromWorkspace(runState),
+      observed: readNumber$e(stats && stats[statsKey]),
+      path: readString$1A(candidate && candidate.path) || readFinalCandidatePathFromWorkspace(runState),
       requested: requestedValue,
       statsKey,
-      unit: readString$1z(requested && requested.unit) || statsKey
+      unit: readString$1A(requested && requested.unit) || statsKey
     };
   }
 
   function readFinalCandidatePathFromWorkspace(runState) {
     const workspace = readRecord(runState && runState.virtualWorkspace);
     const quality = readRecord(workspace && workspace.quality);
-    return readString$1z(quality && quality.finalCandidatePath) || "final_candidate.md";
+    return readString$1A(quality && quality.finalCandidatePath) || "final_candidate.md";
   }
 
   function readCurrentPublishProtocol(runState) {
@@ -19838,13 +20758,13 @@
       ? workspace.files
       : null;
     if (!files) return null;
-    const selectedPath = readString$1z(currentPath) || readFinalCandidatePathFromWorkspace(runState);
+    const selectedPath = readString$1A(currentPath) || readFinalCandidatePathFromWorkspace(runState);
     let best = null;
     for (const [path, file] of Object.entries(files)) {
-      const safePath = readString$1z(path);
+      const safePath = readString$1A(path);
       if (!safePath || safePath === selectedPath) continue;
       const stats = readRecord(file && file.textStats);
-      const value = readNumber$d(stats && stats[statsKey]);
+      const value = readNumber$e(stats && stats[statsKey]);
       if (value < requested || value <= observed) continue;
       if (!best || value > best.observed) {
         best = {
@@ -19870,27 +20790,27 @@
     const protocol = inspectWorkspacePublishProtocol(workspace, readFinalCandidatePathFromWorkspace(runState));
     return quality && (
       quality.finalCandidateReady === true ||
-      readString$1z(quality.finalCandidateStatus) === "needs_structure_repair" ||
-      readString$1z(quality.finalCandidateStatus) === "ready" ||
+      readString$1A(quality.finalCandidateStatus) === "needs_structure_repair" ||
+      readString$1A(quality.finalCandidateStatus) === "ready" ||
       (protocol && protocol.finalizedAfterLatestWrite === true)
     );
   }
 
   function readTodoStatus(runState) {
     const todoState = readRecord(runState && runState.todoState);
-    if (!todoState || readString$1z(todoState.status) !== "active") {
+    if (!todoState || readString$1A(todoState.status) !== "active") {
       return { unfinishedCount: 0, activeItemId: null };
     }
     const items = Array.isArray(todoState.items) ? todoState.items : [];
     const unfinished = items.filter((item) => {
-      const status = readString$1z(item && item.status);
+      const status = readString$1A(item && item.status);
       return status === "active" || status === "pending" || status === "blocked";
     });
     return {
-      activeItemId: readString$1z(todoState.activeItemId) || null,
+      activeItemId: readString$1A(todoState.activeItemId) || null,
       unfinishedCount: unfinished.length,
-      pendingCount: unfinished.filter((item) => readString$1z(item.status) === "pending").length,
-      blockedCount: unfinished.filter((item) => readString$1z(item.status) === "blocked").length
+      pendingCount: unfinished.filter((item) => readString$1A(item.status) === "pending").length,
+      blockedCount: unfinished.filter((item) => readString$1A(item.status) === "blocked").length
     };
   }
 
@@ -19903,13 +20823,13 @@
     const workspace = readRecord(runState && runState.virtualWorkspace);
     return {
       successfulReadUrlCount: readSuccessfulReadUrlCount(runState, packet),
-      readSources: readNumber$d(sourceMinimum && sourceMinimum.readSources),
-      relevantSources: readNumber$d(sourceMinimum && sourceMinimum.relevantSources),
+      readSources: readNumber$e(sourceMinimum && sourceMinimum.readSources),
+      relevantSources: readNumber$e(sourceMinimum && sourceMinimum.relevantSources),
       sourceMinimumPassed: sourceMinimum && sourceMinimum.passed === true,
-      candidateWords: lengthStatus && lengthStatus.statsKey === "words" ? lengthStatus.observed : readNumber$d(readCandidateStatsFromWorkspace(runState)?.words),
-      candidateChars: lengthStatus && lengthStatus.statsKey === "chars" ? lengthStatus.observed : readNumber$d(readCandidateStatsFromWorkspace(runState)?.chars),
-      candidateCjkChars: lengthStatus && lengthStatus.statsKey === "cjkChars" ? lengthStatus.observed : readNumber$d(readCandidateStatsFromWorkspace(runState)?.cjkChars),
-      workspaceVersion: readNumber$d(workspace && workspace.version),
+      candidateWords: lengthStatus && lengthStatus.statsKey === "words" ? lengthStatus.observed : readNumber$e(readCandidateStatsFromWorkspace(runState)?.words),
+      candidateChars: lengthStatus && lengthStatus.statsKey === "chars" ? lengthStatus.observed : readNumber$e(readCandidateStatsFromWorkspace(runState)?.chars),
+      candidateCjkChars: lengthStatus && lengthStatus.statsKey === "cjkChars" ? lengthStatus.observed : readNumber$e(readCandidateStatsFromWorkspace(runState)?.cjkChars),
+      workspaceVersion: readNumber$e(workspace && workspace.version),
       structureOk: structure ? structure.ok === true : false,
       todoUnfinishedCount: todo.unfinishedCount
     };
@@ -19918,22 +20838,22 @@
   function normalizeProgressSnapshot(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
-      successfulReadUrlCount: readNumber$d(source.successfulReadUrlCount),
-      readSources: readNumber$d(source.readSources),
-      relevantSources: readNumber$d(source.relevantSources),
+      successfulReadUrlCount: readNumber$e(source.successfulReadUrlCount),
+      readSources: readNumber$e(source.readSources),
+      relevantSources: readNumber$e(source.relevantSources),
       sourceMinimumPassed: source.sourceMinimumPassed === true,
-      candidateWords: readNumber$d(source.candidateWords),
-      candidateChars: readNumber$d(source.candidateChars),
-      candidateCjkChars: readNumber$d(source.candidateCjkChars),
-      workspaceVersion: readNumber$d(source.workspaceVersion),
+      candidateWords: readNumber$e(source.candidateWords),
+      candidateChars: readNumber$e(source.candidateChars),
+      candidateCjkChars: readNumber$e(source.candidateCjkChars),
+      workspaceVersion: readNumber$e(source.workspaceVersion),
       structureOk: source.structureOk === true,
-      todoUnfinishedCount: readNumber$d(source.todoUnfinishedCount)
+      todoUnfinishedCount: readNumber$e(source.todoUnfinishedCount)
     };
   }
 
   function readSuccessfulReadUrlCount(runState, packet) {
     const packetCount = packet && packet.evidence && Number.isFinite(Number(packet.evidence.successfulReadUrlCount))
-      ? readNumber$d(packet.evidence.successfulReadUrlCount)
+      ? readNumber$e(packet.evidence.successfulReadUrlCount)
       : 0;
     return Math.max(packetCount, countSuccessfulReadUrlArtifacts(runState));
   }
@@ -19975,6 +20895,10 @@
       forbiddenDecisions: [],
       requiredRepair: null,
       validPublishContract: normalizeValidPublishContract(null),
+      lengthExpansionSignal: null,
+      workspaceRepairSignal: null,
+      advisoryPersistenceSignal: null,
+      actionOrderingSignals: [],
       ignoredCount: 0,
       lastUpdatedAtCycle: cycle,
       progressSnapshot: normalizeProgressSnapshot(snapshot),
@@ -19983,31 +20907,31 @@
   }
 
   function isTerminalAttempt(actionName, context) {
-    const name = readString$1z(actionName);
+    const name = readString$1A(actionName);
     if (name === "workspace_publish_candidate" || name === "finalize" || name === "final") return true;
-    const type = readString$1z(context && context.decision && context.decision.type);
+    const type = readString$1A(context && context.decision && context.decision.type);
     return type === "finalize" || type === "final";
   }
 
   function isTerminalCompleted(actionName, context) {
     if (!isTerminalAttempt(actionName, context)) return false;
     const output = readRecord(context && context.output);
-    if (readString$1z(output && output.kind) === "final_response") return true;
-    if (readString$1z(output && output.control) === "complete") return true;
-    return readString$1z(context && context.status) === "complete";
+    if (readString$1A(output && output.kind) === "final_response") return true;
+    if (readString$1A(output && output.control) === "complete") return true;
+    return readString$1A(context && context.status) === "complete";
   }
 
   function isNoProgressRecoveryAttempt(actionName, output, facts) {
-    const name = readString$1z(actionName);
+    const name = readString$1A(actionName);
     const result = readRecord(output);
     if (
-      readString$1z(result && result.kind) === "terminal_repair_preflight_block" ||
-      readString$1z(result && result.reason).startsWith("terminal_repair_")
+      readString$1A(result && result.kind) === "terminal_repair_preflight_block" ||
+      readString$1A(result && result.reason).startsWith("terminal_repair_")
     ) {
       return true;
     }
     if (name !== "workspace_propose_patch") return false;
-    if (readString$1z(result && result.status) !== "preview_blocked") return false;
+    if (readString$1A(result && result.status) !== "preview_blocked") return false;
     const deficits = Array.isArray(facts && facts.activeDeficits) ? facts.activeDeficits : [];
     const observable = facts && facts.observableDeficits && typeof facts.observableDeficits === "object"
       ? facts.observableDeficits
@@ -20036,39 +20960,129 @@
   function normalizeValidPublishContract(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
-      decision: readString$1z(source.decision) || "limited",
-      remainingGaps: readString$1z(source.remainingGaps) || "non-empty string array with concrete blockers",
-      evidenceSatisfied: source.evidenceSatisfied === false ? false : readString$1z(source.evidenceSatisfied) || "match observed evidence facts",
-      lengthSatisfied: source.lengthSatisfied === false ? false : readString$1z(source.lengthSatisfied) || "match observed candidate stats",
-      requirementSatisfied: source.requirementSatisfied === false ? false : readString$1z(source.requirementSatisfied) || "match observed facts",
-      structureRequirement: readString$1z(source.structureRequirement) || "not blocking",
-      todoRequirement: readString$1z(source.todoRequirement) || "not blocking",
-      budgetState: readString$1z(source.budgetState) || "unknown",
+      decision: readString$1A(source.decision) || "limited",
+      remainingGaps: readString$1A(source.remainingGaps) || "non-empty string array with concrete blockers",
+      evidenceSatisfied: source.evidenceSatisfied === false ? false : readString$1A(source.evidenceSatisfied) || "match observed evidence facts",
+      lengthSatisfied: source.lengthSatisfied === false ? false : readString$1A(source.lengthSatisfied) || "match observed candidate stats",
+      requirementSatisfied: source.requirementSatisfied === false ? false : readString$1A(source.requirementSatisfied) || "match observed facts",
+      structureRequirement: readString$1A(source.structureRequirement) || "not blocking",
+      todoRequirement: readString$1A(source.todoRequirement) || "not blocking",
+      budgetState: readString$1A(source.budgetState) || "unknown",
       observableDeficits: normalizeObservableDeficits(source.observableDeficits),
       requiredArgsExample: source.requiredArgsExample && typeof source.requiredArgsExample === "object" && !Array.isArray(source.requiredArgsExample)
         ? cloneValue$1(source.requiredArgsExample)
         : null,
-      validTerminalException: readString$1z(source.validTerminalException) || DEFAULT_VALID_PUBLISH_EXCEPTION
+      validTerminalException: readString$1A(source.validTerminalException) || DEFAULT_VALID_PUBLISH_EXCEPTION
       };
   }
 
   function normalizeLengthExpansionSignal(value) {
     const source = readRecord(value);
     if (!source) return null;
-    const observed = readNumber$d(source.observed);
-    const requested = readNumber$d(source.requested);
+    const observed = readNumber$e(source.observed);
+    const requested = readNumber$e(source.requested);
     if (!requested || observed >= requested) return null;
     return {
-      kind: readString$1z(source.kind) || "lengthExpansionSignal",
+      kind: readString$1A(source.kind) || "lengthExpansionSignal",
       observed,
       requested,
-      unit: readString$1z(source.unit) || "words",
-      gap: readNumber$d(source.gap) || Math.max(requested - observed, 0),
+      unit: readString$1A(source.unit) || "words",
+      gap: readNumber$e(source.gap) || Math.max(requested - observed, 0),
       perSectionDelta: Array.isArray(source.perSectionDelta)
         ? source.perSectionDelta.map(normalizeSectionDelta).filter(Boolean).slice(0, 8)
         : [],
-      averageSectionGap: readNumber$d(source.averageSectionGap),
-      iterationCount: readNumber$d(source.iterationCount)
+      averageSectionGap: readNumber$e(source.averageSectionGap),
+      iterationCount: readNumber$e(source.iterationCount)
+    };
+  }
+
+  function normalizeWorkspaceRepairSignal(value) {
+    const source = readRecord(value);
+    if (!source) return null;
+    const path = readString$1A(source.path);
+    if (!path) return null;
+    const candidate = readRecord(source.candidate);
+    const latestReadStatus = readRecord(source.latestReadStatus);
+    const structure = readRecord(source.structure);
+    const sourceSummary = readRecord(source.sourceSummary);
+    return {
+      kind: readString$1A(source.kind) || "workspace_repair_signal",
+      path,
+      reason: readString$1A(source.reason) || "workspace_repair_required",
+      budgetState: readString$1A(source.budgetState) || "unknown",
+      escalation: readString$1A(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+      latestReadStatus: latestReadStatus ? {
+        latestWriteIndex: readNumber$e(latestReadStatus.latestWriteIndex),
+        latestFinalizeIndex: readNumber$e(latestReadStatus.latestFinalizeIndex),
+        latestReadIndex: readNumber$e(latestReadStatus.latestReadIndex),
+        readAfterLatestContentChange: latestReadStatus.readAfterLatestContentChange === true,
+        readAfterFinalize: latestReadStatus.readAfterFinalize === true
+      } : null,
+      mustInspectCandidate: source.mustInspectCandidate === true,
+      destructiveMutationRequiresInspection: source.destructiveMutationRequiresInspection === true,
+      candidate: candidate ? {
+        path: readString$1A(candidate.path) || path,
+        textStats: normalizeTextStats$1(candidate.textStats),
+        requestedLength: candidate.requestedLength == null ? null : readNumber$e(candidate.requestedLength),
+        requestedLengthUnit: readString$1A(candidate.requestedLengthUnit) || null,
+        lengthDeficit: readNumber$e(candidate.lengthDeficit),
+        headingOutline: Array.isArray(candidate.headingOutline)
+          ? candidate.headingOutline.map(normalizeHeadingOutlineEntry).filter(Boolean).slice(0, 24)
+          : []
+      } : null,
+      structure: structure ? {
+        issueCodes: readStringArray$6(structure.issueCodes).slice(0, 8),
+        reason: readString$1A(structure.reason) || null,
+        status: readString$1A(structure.status) || "unknown",
+        repeatedHeadingSamples: normalizeStructureSamples(structure.repeatedHeadingSamples, "heading"),
+        repeatedNumberSamples: normalizeStructureSamples(structure.repeatedNumberSamples, "number"),
+        repeatedHeadingContexts: normalizeStructureContexts(structure.repeatedHeadingContexts, "heading"),
+        repeatedNumberContexts: normalizeStructureContexts(structure.repeatedNumberContexts, "number"),
+        sectionNumberRepairHints: normalizeSectionNumberRepairHints(structure.sectionNumberRepairHints),
+        sectionSequenceRepairHints: normalizeSectionNumberRepairHints(structure.sectionSequenceRepairHints)
+      } : null,
+      sourceSummary: sourceSummary ? {
+        readSources: readNumber$e(sourceSummary.readSources),
+        relevantSources: readNumber$e(sourceSummary.relevantSources),
+        minReadSources: readNumber$e(sourceSummary.minReadSources),
+        minRelevantSources: readNumber$e(sourceSummary.minRelevantSources),
+        successfulReadUrlCount: readNumber$e(sourceSummary.successfulReadUrlCount),
+        samples: Array.isArray(sourceSummary.samples)
+          ? sourceSummary.samples.map((sample) => {
+              const item = readRecord(sample);
+              if (!item) return null;
+              const title = readString$1A(item.title);
+              return title ? {
+                title: title.slice(0, 120),
+                url: readString$1A(item.url).slice(0, 200) || null
+              } : null;
+            }).filter(Boolean).slice(0, 5)
+          : []
+      } : null,
+      recommendedActionOrder: readStringArray$6(source.recommendedActionOrder).slice(0, 10)
+    };
+  }
+
+  function normalizeTextStats$1(value) {
+    const source = readRecord(value) || {};
+    return {
+      chars: readNumber$e(source.chars),
+      cjkChars: readNumber$e(source.cjkChars),
+      words: readNumber$e(source.words)
+    };
+  }
+
+  function normalizeHeadingOutlineEntry(value) {
+    const source = readRecord(value);
+    if (!source) return null;
+    const lineNumber = readNumber$e(source.lineNumber);
+    const text = readString$1A(source.text);
+    if (!lineNumber || !text) return null;
+    return {
+      level: readNumber$e(source.level),
+      lineNumber,
+      number: readString$1A(source.number) || null,
+      text: text.slice(0, 160)
     };
   }
 
@@ -20076,23 +21090,23 @@
     const source = readRecord(value);
     if (!source) return null;
     return {
-      heading: readString$1z(source.heading).slice(0, 120),
-      observed: readNumber$d(source.observed),
-      target: readNumber$d(source.target),
-      gap: readNumber$d(source.gap)
+      heading: readString$1A(source.heading).slice(0, 120),
+      observed: readNumber$e(source.observed),
+      target: readNumber$e(source.target),
+      gap: readNumber$e(source.gap)
     };
   }
 
   function normalizeAdvisoryPersistenceSignal(value) {
     const source = readRecord(value);
     if (!source) return null;
-    const ignoredCount = readNumber$d(source.ignoredCount);
+    const ignoredCount = readNumber$e(source.ignoredCount);
     if (ignoredCount < TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD) return null;
     return {
-      kind: readString$1z(source.kind) || "terminal_repair_advisory_persistence_signal",
+      kind: readString$1A(source.kind) || "terminal_repair_advisory_persistence_signal",
       ignoredCount,
-      vetoThreshold: readNumber$d(source.vetoThreshold) || TERMINAL_REPAIR_HIGH_WATER_MARK,
-      stepsRemainingBeforeHardVeto: readNumber$d(source.stepsRemainingBeforeHardVeto)
+      vetoThreshold: readNumber$e(source.vetoThreshold) || TERMINAL_REPAIR_HIGH_WATER_MARK,
+      stepsRemainingBeforeHardVeto: readNumber$e(source.stepsRemainingBeforeHardVeto)
     };
   }
 
@@ -20105,13 +21119,13 @@
   function normalizeActionOrderingSignal(value) {
     const source = readRecord(value);
     if (!source) return null;
-    const kind = readString$1z(source.kind);
+    const kind = readString$1A(source.kind);
     if (!kind) return null;
     return {
       kind,
       preferredActions: readStringArray$6(source.preferredActions).slice(0, 8),
-      reason: readString$1z(source.reason) || null,
-      workspaceWriteCount: readNumber$d(source.workspaceWriteCount)
+      reason: readString$1A(source.reason) || null,
+      workspaceWriteCount: readNumber$e(source.workspaceWriteCount)
     };
   }
 
@@ -20124,15 +21138,15 @@
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   }
 
-  function readString$1z(value) {
+  function readString$1A(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readStringArray$6(value) {
-    return Array.isArray(value) ? value.map(readString$1z).filter(Boolean) : [];
+    return Array.isArray(value) ? value.map(readString$1A).filter(Boolean) : [];
   }
 
-  function readNumber$d(value) {
+  function readNumber$e(value) {
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
   }
@@ -20182,7 +21196,7 @@
   function refreshInvalidActionConvergence(runState, options = {}) {
     if (!runState || typeof runState !== "object") return null;
     const previous = normalizeState(runState.invalidActionConvergence);
-    const event = readString$1y(options.event);
+    const event = readString$1z(options.event);
     const cycle = readNullableNumber$1(runState.cycleCount);
 
     let next;
@@ -20237,7 +21251,7 @@
 
   function applyInvalidEvent(previous, options, cycle, event) {
     const actionName = readActionName$2(options.actionName);
-    const reason = readString$1y(options.reason) || null;
+    const reason = readString$1z(options.reason) || null;
     const sameName = actionName && actionName === previous.lastInvalidActionName;
 
     const consecutiveInvalidCount = event === "planner_invalid_action"
@@ -20315,25 +21329,25 @@
       consecutiveInvalidCount: readNonNegativeInteger$4(value.consecutiveInvalidCount),
       consecutiveRepairFailureCount: readNonNegativeInteger$4(value.consecutiveRepairFailureCount),
       lastInvalidActionName: readActionName$2(value.lastInvalidActionName) || null,
-      lastInvalidReason: readString$1y(value.lastInvalidReason) || null,
+      lastInvalidReason: readString$1z(value.lastInvalidReason) || null,
       disabledActionsEncountered: readStringArray$5(value.disabledActionsEncountered).slice(0, 12),
       availableActions: readStringArray$5(value.availableActions).slice(0, 24),
       availableAgentSkillIds: readStringArray$5(value.availableAgentSkillIds).slice(0, 32),
       firstObservedAtCycle: readNullableNumber$1(value.firstObservedAtCycle),
       lastObservedAtCycle: readNullableNumber$1(value.lastObservedAtCycle),
       escalation: value.escalation === "hard_signal" ? "hard_signal" : "advisory",
-      status: readString$1y(value.status) || "tracking",
-      clearedReason: readString$1y(value.clearedReason) || null,
+      status: readString$1z(value.status) || "tracking",
+      clearedReason: readString$1z(value.clearedReason) || null,
       version: 1
     };
   }
 
-  function readString$1y(value) {
+  function readString$1z(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readActionName$2(value) {
-    const text = readString$1y(value).toLowerCase();
+    const text = readString$1z(value).toLowerCase();
     return text || null;
   }
 
@@ -20387,7 +21401,7 @@
   }
 
   function classifyVisibility(type, _mode) {
-    const value = readString$1x(type);
+    const value = readString$1y(type);
     if (!value) return "debug";
 
     // Explicit agent allowlist wins first — action-execute-error matches the
@@ -20409,7 +21423,7 @@
   }
 
   function classifyPhase(type) {
-    const value = readString$1x(type);
+    const value = readString$1y(type);
     if (!value) return null;
 
     const phaseMatch = PHASE_FROM_PHASE_PREFIX_RE.exec(value);
@@ -20426,7 +21440,7 @@
     return null;
   }
 
-  function readString$1x(value) {
+  function readString$1y(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20453,7 +21467,7 @@
 
     return {
       appendEvent({ type, detail, mode } = {}) {
-        const eventType = readString$1w(type);
+        const eventType = readString$1x(type);
         if (!eventType) return null;
         const normalizedMode = normalizeMode(mode);
         const classification = classifyEvent({ type: eventType, mode: normalizedMode });
@@ -20523,19 +21537,19 @@
       },
 
       appendEvent({ type, detail, mode, runId, sessionId, parentSessionId, cycle } = {}) {
-        const eventType = readString$1w(type);
+        const eventType = readString$1x(type);
         if (!eventType) return null;
         const normalizedMode = normalizeMode(mode);
         const classification = classifyEvent({ type: eventType, mode: normalizedMode });
         const sequence = nextSequence(state);
-        const resolvedRunId = readString$1w(runId) || "anonymous";
+        const resolvedRunId = readString$1x(runId) || "anonymous";
         const event = Object.freeze({
           schemaVersion: RUNTIME_EVENT_LEDGER_SCHEMA_VERSION,
           id: buildEventId(resolvedRunId, sequence),
           sequence,
           runId: resolvedRunId,
-          sessionId: readString$1w(sessionId) || null,
-          parentSessionId: readString$1w(parentSessionId) || null,
+          sessionId: readString$1x(sessionId) || null,
+          parentSessionId: readString$1x(parentSessionId) || null,
           cycle: Number.isInteger(cycle) ? cycle : null,
           ts: Date.now(),
           mode: normalizedMode,
@@ -20648,10 +21662,10 @@
 
   function normalizeFilterValue(value) {
     if (Array.isArray(value)) {
-      const items = value.map(readString$1w).filter(Boolean);
+      const items = value.map(readString$1x).filter(Boolean);
       return items.length > 0 ? items : null;
     }
-    const text = readString$1w(value);
+    const text = readString$1x(value);
     return text || null;
   }
 
@@ -20674,8 +21688,8 @@
   }
 
   function matchesTypePattern(value, pattern) {
-    const eventType = readString$1w(value);
-    const normalizedPattern = readString$1w(pattern);
+    const eventType = readString$1x(value);
+    const normalizedPattern = readString$1x(pattern);
     if (!normalizedPattern) return true;
     if (!normalizedPattern.includes("*")) return eventType === normalizedPattern;
     const expression = new RegExp(`^${escapeRegExp$2(normalizedPattern).replaceAll("\\*", ".*")}$`);
@@ -20774,7 +21788,7 @@
     return `evt_${runId}_${sequence}`;
   }
 
-  function readString$1w(value) {
+  function readString$1x(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -20833,11 +21847,11 @@
   const CONTINUATION_FINAL_SOURCE = "continuation_required";
   const CONTINUATION_TERMINALIZER = "max_steps_continuation";
 
-  function readString$1v(value) {
+  function readString$1w(value) {
     return typeof value === "string" && value.trim() ? value.trim() : "";
   }
 
-  function readNumber$c(value, fallback) {
+  function readNumber$d(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) ? value : fallback;
   }
 
@@ -20887,28 +21901,28 @@
       total: items.length
     };
     const status = deriveLifecycleStatus(todoState, state, counts);
-    const threadId = readString$1v(state.threadId) || "default";
-    const todoId = readString$1v(todoState.id) || "todo";
-    const activeItemId = readString$1v(activeItem?.id) || null;
+    const threadId = readString$1w(state.threadId) || "default";
+    const todoId = readString$1w(todoState.id) || "todo";
+    const activeItemId = readString$1w(activeItem?.id) || null;
     const hasUnfinishedWork = counts.active > 0 || counts.pending > 0;
 
     return {
       activeItemId,
-      activeItemLabel: readString$1v(activeItem?.label) || null,
+      activeItemLabel: readString$1w(activeItem?.label) || null,
       activePosition: readActivePosition(todoState, activeItemId),
       canCancel: status === "running" || status === "paused" || status === "blocked",
       canContinue: status === "paused" && hasUnfinishedWork && !state.pendingApproval,
       counts,
-      goal: readString$1v(todoState.goal) || null,
+      goal: readString$1w(todoState.goal) || null,
       reason: status === "paused"
         ? CONTINUATION_FINAL_SOURCE
         : (state.pendingApproval ? "pending_approval" : null),
-      runId: readString$1v(state.runId) || null,
+      runId: readString$1w(state.runId) || null,
       status,
       taskId: `todo-task:${threadId}:${todoId}`,
       threadId,
       todoStateId: todoId,
-      updatedAt: readNumber$c(todoState.updatedAt, null),
+      updatedAt: readNumber$d(todoState.updatedAt, null),
       version: Number.isInteger(todoState.version) ? todoState.version : 0
     };
   }
@@ -20929,9 +21943,9 @@
 
     return {
       signal,
-      source: readString$1u(options.source) || null,
+      source: readString$1v(options.source) || null,
       cycle: readNonNegativeInteger$3(options.cycle),
-      actionName: readString$1u(options.actionName) || null,
+      actionName: readString$1v(options.actionName) || null,
       pendingApproval: sanitizePendingApproval(options.pendingApproval),
       handoff: cloneRecordOrNull(options.handoff),
       output: cloneRecordOrNull(options.output),
@@ -20974,33 +21988,33 @@
   function summarizeOutput(output) {
     if (!output) return null;
     return {
-      kind: readString$1u(output.kind) || null,
-      text: readString$1u(output.text) || null
+      kind: readString$1v(output.kind) || null,
+      text: readString$1v(output.text) || null
     };
   }
 
   function summarizeObservation(observation) {
     if (!observation) return null;
     return {
-      actionName: readString$1u(observation.actionName) || null,
-      kind: readString$1u(observation.kind) || null,
-      policy: readString$1u(observation.policy) || null,
-      resolution: readString$1u(observation.resolution) || null,
-      message: readString$1u(observation.message) || null
+      actionName: readString$1v(observation.actionName) || null,
+      kind: readString$1v(observation.kind) || null,
+      policy: readString$1v(observation.policy) || null,
+      resolution: readString$1v(observation.resolution) || null,
+      message: readString$1v(observation.message) || null
     };
   }
 
   function sanitizePendingApproval(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const actionName = readString$1u(value.actionName);
-    const policy = readString$1u(value.policy);
+    const actionName = readString$1v(value.actionName);
+    const policy = readString$1v(value.policy);
     if (!actionName || !policy) return null;
     return {
       actionName,
       policy,
-      reason: readString$1u(value.reason) || null,
+      reason: readString$1v(value.reason) || null,
       resumable: value.resumable === true,
-      resolution: readString$1u(value.resolution) || "pending"
+      resolution: readString$1v(value.resolution) || "pending"
     };
   }
 
@@ -21018,7 +22032,7 @@
     return Number.isInteger(value) && value >= 0 ? value : null;
   }
 
-  function readString$1u(value) {
+  function readString$1v(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -21519,7 +22533,7 @@
   const CLAIM_LINE_RE = /^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+)$/;
 
   function analyzeClaimCoverage(text, context = {}) {
-    const value = readString$1t(text);
+    const value = readString$1u(text);
     const sourceNotes = readSourceNotes(context);
     const sourceQuality = readSourceQuality(context);
     const gaps = readGaps(context);
@@ -21558,7 +22572,7 @@
   }
 
   function ensureClaimCoverageSection(text, context = {}) {
-    const value = readString$1t(text);
+    const value = readString$1u(text);
     if (!value) return "";
     const analysis = analyzeClaimCoverage(value, context);
     if (!analysis.claimCoverageRequired || analysis.hasClaimCoverageSection) return value;
@@ -21566,7 +22580,7 @@
   }
 
   function normalizeConstrainedEvidenceClaims(text, context = {}) {
-    const value = readString$1t(text);
+    const value = readString$1u(text);
     if (!value) return "";
     if (looksLikeCompiledEvidenceReport(value)) return value;
     const analysis = analyzeClaimCoverage(value, context);
@@ -21708,17 +22722,17 @@
     const loop = context && context.researchReportLoop && typeof context.researchReportLoop === "object"
       ? context.researchReportLoop
       : null;
-    const status = loop ? readString$1t(loop.status) : "";
+    const status = loop ? readString$1u(loop.status) : "";
     return Boolean(
       loop &&
-      (loop.enabled === true || readString$1t(loop.finalMode) || (status && status !== "idle"))
+      (loop.enabled === true || readString$1u(loop.finalMode) || (status && status !== "idle"))
     );
   }
 
 
 
   function extractClaimCandidates(text) {
-    const lines = readString$1t(text).split(/\r?\n/);
+    const lines = readString$1u(text).split(/\r?\n/);
     const claims = [];
     for (const line of lines) {
       const trimmed = line.trim();
@@ -21738,7 +22752,7 @@
   }
 
   function cleanupClaim(value) {
-    return readString$1t(value)
+    return readString$1u(value)
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/[*_`]/g, "")
       .replace(/\s+/g, " ")
@@ -21759,11 +22773,11 @@
       : {};
     const quality = state.sourceQuality && typeof state.sourceQuality === "object" ? state.sourceQuality : {};
     return {
-      medium: readNumber$b(quality.medium),
-      strong: readNumber$b(quality.strong),
-      weak: readNumber$b(quality.weak),
-      thin: readNumber$b(quality.thin),
-      rejected: readNumber$b(quality.rejected)
+      medium: readNumber$c(quality.medium),
+      strong: readNumber$c(quality.strong),
+      weak: readNumber$c(quality.weak),
+      thin: readNumber$c(quality.thin),
+      rejected: readNumber$c(quality.rejected)
     };
   }
 
@@ -21775,13 +22789,13 @@
       []
         .concat(Array.isArray(state.gaps) ? state.gaps : [])
         .concat(Array.isArray(readiness.remainingGaps) ? readiness.remainingGaps : [])
-        .map(readString$1t)
+        .map(readString$1u)
         .filter(Boolean)
     ));
   }
 
   function insertBeforeSources$1(text, section) {
-    const value = readString$1t(text);
+    const value = readString$1u(text);
     const marker = /\n(?:#{1,6}\s*)?Sources\s*:?\s*\n/i.exec(value);
     if (!marker) return [value, section].filter(Boolean).join("\n\n");
     const sourceStart = marker.index + 1;
@@ -21790,16 +22804,16 @@
     return [before, section, sources].filter(Boolean).join("\n\n");
   }
 
-  function readString$1t(value) {
+  function readString$1u(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
-  function readNumber$b(value) {
+  function readNumber$c(value) {
     return Number.isFinite(value) ? value : 0;
   }
 
   function normalizeBlankLines$1(text) {
-    return readString$1t(text)
+    return readString$1u(text)
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n");
   }
@@ -21950,21 +22964,21 @@
       ? workspace.finalReadiness
       : {};
     const workspaceGaps = Array.isArray(readiness.remainingGaps)
-      ? readiness.remainingGaps.map(readString$1s).filter(Boolean)
+      ? readiness.remainingGaps.map(readString$1t).filter(Boolean)
       : [];
     const stateGaps = researchState && Array.isArray(researchState.gaps)
-      ? researchState.gaps.map(readString$1s).filter(Boolean)
+      ? researchState.gaps.map(readString$1t).filter(Boolean)
       : [];
     const sourceQuality = researchState && researchState.sourceQuality && typeof researchState.sourceQuality === "object"
       ? researchState.sourceQuality
       : {};
-    const weakCount = readNumber$a(sourceQuality.weak) + readNumber$a(sourceQuality.thin) + readNumber$a(sourceQuality.rejected);
-    const noStrong = readNumber$a(sourceQuality.strong) === 0 && readNumber$a(sourceQuality.medium) === 0;
+    const weakCount = readNumber$b(sourceQuality.weak) + readNumber$b(sourceQuality.thin) + readNumber$b(sourceQuality.rejected);
+    const noStrong = readNumber$b(sourceQuality.strong) === 0 && readNumber$b(sourceQuality.medium) === 0;
     return sourceNotes.length > 0 || workspaceGaps.length > 0 || stateGaps.length > 0 || weakCount > 0 || noStrong;
   }
 
   function hasResearchQualitySections(text) {
-    const value = readString$1s(text);
+    const value = readString$1t(text);
     const hasSourceQuality = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:source\s+quality|source\s+assessment|evidence\s+quality|quality\s+of\s+sources)\b/i.test(value);
     const hasGaps = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:evidence\s+gaps?|limitations?|limits\s+of\s+the\s+evidence)\b/i.test(value);
     return hasSourceQuality && hasGaps;
@@ -21974,21 +22988,21 @@
     const loop = context && context.researchReportLoop && typeof context.researchReportLoop === "object"
       ? context.researchReportLoop
       : null;
-    const status = loop ? readString$1s(loop.status) : "";
+    const status = loop ? readString$1t(loop.status) : "";
     return Boolean(
       loop &&
-      (loop.enabled === true || readString$1s(loop.finalMode) || (status && status !== "idle"))
+      (loop.enabled === true || readString$1t(loop.finalMode) || (status && status !== "idle"))
     );
   }
 
   function buildSourceQualityText(context) {
     const state = context && context.researchState && typeof context.researchState === "object" ? context.researchState : {};
     const sourceQuality = state.sourceQuality && typeof state.sourceQuality === "object" ? state.sourceQuality : {};
-    const strong = readNumber$a(sourceQuality.strong);
-    const medium = readNumber$a(sourceQuality.medium);
-    const weak = readNumber$a(sourceQuality.weak);
-    const thin = readNumber$a(sourceQuality.thin);
-    const rejected = readNumber$a(sourceQuality.rejected);
+    const strong = readNumber$b(sourceQuality.strong);
+    const medium = readNumber$b(sourceQuality.medium);
+    const weak = readNumber$b(sourceQuality.weak);
+    const thin = readNumber$b(sourceQuality.thin);
+    const rejected = readNumber$b(sourceQuality.rejected);
     const parts = [];
     if (strong > 0 || medium > 0) {
       parts.push(`This run found ${strong} strong and ${medium} medium source(s).`);
@@ -22009,7 +23023,7 @@
     const gaps = []
       .concat(Array.isArray(state.gaps) ? state.gaps : [])
       .concat(Array.isArray(readiness.remainingGaps) ? readiness.remainingGaps : [])
-      .map(readString$1s)
+      .map(readString$1t)
       .filter(Boolean);
     const unique = Array.from(new Set(gaps)).slice(0, 6);
     if (unique.length === 0) {
@@ -22019,7 +23033,7 @@
   }
 
   function ensureAnalystReportScaffold(text, context = {}) {
-    const value = readString$1s(text);
+    const value = readString$1t(text);
     if (!value || !isResearchReportLoopActive(context)) return value;
 
     const withoutLeadingCaveats = shouldStripStandaloneVerificationCaveats(context)
@@ -22051,7 +23065,7 @@
   // like "# Research Report: I'm doing competitor research. Can you write..."
   // Drop the suffix in those cases and fall back to a bare "# Research Report".
   function readCleanScaffoldTopic(topic) {
-    const value = readString$1s(topic);
+    const value = readString$1t(topic);
     if (!value) return "";
     if (value.length > 80) return "";
     if (/[.!?](?:\s|$)/.test(value)) return "";
@@ -22059,7 +23073,7 @@
   }
 
   function stripUserFacingResearchDiagnostics(text) {
-    const lines = readString$1s(text).split(/\r?\n/);
+    const lines = readString$1t(text).split(/\r?\n/);
     const output = [];
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index];
@@ -22078,11 +23092,11 @@
   }
 
   function isResearchDiagnosticLine(line) {
-    return /\b(?:final answer with explicit limitations|source minimum|relevant source|read source|authority coverage|source-authority gate|quality gate|structured evidence gate|workspace|OODAE|TodoState|debug)\b/i.test(readString$1s(line));
+    return /\b(?:final answer with explicit limitations|source minimum|relevant source|read source|authority coverage|source-authority gate|quality gate|structured evidence gate|workspace|OODAE|TodoState|debug)\b/i.test(readString$1t(line));
   }
 
   function stripStandaloneVerificationCaveats(text) {
-    const lines = readString$1s(text).split(/\r?\n/);
+    const lines = readString$1t(text).split(/\r?\n/);
     return lines
       .filter((line) => !/^\s*(?:[-*+]\s*)?(?:Employment \/ company|Education \/ profile-directory) claims: not directly verified from the read source\(s\) in this run\.\s*$/i.test(line))
       .join("\n")
@@ -22108,11 +23122,11 @@
     const workspace = context && context.researchWorkspace && typeof context.researchWorkspace === "object"
       ? context.researchWorkspace
       : {};
-    return readString$1s(graph.topic) || readString$1s(loop.topic) || readString$1s(workspace.topic);
+    return readString$1t(graph.topic) || readString$1t(loop.topic) || readString$1t(workspace.topic);
   }
 
   function insertBeforeSources(text, sections) {
-    const value = readString$1s(text);
+    const value = readString$1t(text);
     const marker = /\n(?:#{1,6}\s*)?Sources\s*:?\s*\n/i.exec(value);
     if (!marker) return [value, sections].filter(Boolean).join("\n\n");
     const sourceStart = marker.index + 1;
@@ -22154,11 +23168,11 @@
       .trim();
   }
 
-  function readNumber$a(value) {
+  function readNumber$b(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1s(value) {
+  function readString$1t(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22172,20 +23186,20 @@
     const state = runState && typeof runState === "object" ? runState : {};
     return readNonResumePrompt(state.observationSummary && state.observationSummary.prompt) ||
       readNonResumePrompt(state.originalQuery) ||
-      readString$1r(state.todoState && state.todoState.goal) ||
+      readString$1s(state.todoState && state.todoState.goal) ||
       readNonResumePrompt(state.threadGoalAnchorText) ||
       readNonResumePrompt(request && request.prompt);
   }
 
   function readNonResumePrompt(value) {
-    const text = readString$1r(value);
+    const text = readString$1s(value);
     if (/^resume\s+the\s+paused\s+long[-\s]?running\s+task\b/i.test(text)) {
       return "";
     }
     return text;
   }
 
-  function readString$1r(value) {
+  function readString$1s(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22200,16 +23214,16 @@
   // a follow-up task; this removes the language bias as the minimum viable fix.
 
   function isExternalSourceCoveragePrompt(value) {
-    const prompt = readString$1q(value);
+    const prompt = readString$1r(value);
     return prompt.length > 0;
   }
 
   function isNewsLikeSourceCoveragePrompt(value) {
-    const prompt = readString$1q(value);
+    const prompt = readString$1r(value);
     return prompt.length > 0;
   }
 
-  function readString$1q(value) {
+  function readString$1r(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22320,7 +23334,7 @@
   function extractCandidateListSegments(prompt) {
     const segments = [];
     for (const match of prompt.matchAll(LIST_INTRO_PATTERN)) {
-      const raw = readString$1p(match[1]);
+      const raw = readString$1q(match[1]);
       if (!raw) continue;
       const stopped = raw.split(SEGMENT_STOP_PATTERN)[0] || raw;
       segments.push(stopped);
@@ -22339,7 +23353,7 @@
   }
 
   function normalizeTarget(raw) {
-    const cleaned = collapseWhitespace$1(readString$1p(raw)
+    const cleaned = collapseWhitespace$1(readString$1q(raw)
       .replace(/^the\s+/i, "")
       .replace(/\b(?:for|on|at)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{4}).*$/i, "")
       .replace(/\b(?:news|headlines?|report|research|briefing|roundup)\b.*$/i, ""));
@@ -22380,11 +23394,11 @@
         aliases.add(alias);
       }
     }
-    return Array.from(aliases).map((alias) => readString$1p(alias)).filter(Boolean);
+    return Array.from(aliases).map((alias) => readString$1q(alias)).filter(Boolean);
   }
 
   function normalizeComparableText$3(value) {
-    return readString$1p(value)
+    return readString$1q(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -22394,10 +23408,10 @@
   }
 
   function collapseWhitespace$1(value) {
-    return readString$1p(value).replace(/\s+/g, " ").trim();
+    return readString$1q(value).replace(/\s+/g, " ").trim();
   }
 
-  function readString$1p(value) {
+  function readString$1q(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22450,17 +23464,17 @@
   };
 
   function normalizeSearchPassItems(items, options = {}) {
-    const query = readString$1o(options.query);
-    const baseQuery = readString$1o(options.baseQuery) || query;
+    const query = readString$1p(options.query);
+    const baseQuery = readString$1p(options.baseQuery) || query;
     const passIndex = typeof options.passIndex === "number" ? options.passIndex : 0;
     const entityTokens = extractEntityTokens(baseQuery);
 
     return (Array.isArray(items) ? items : []).map((item, index) => {
-      const url = readString$1o(item && item.url);
-      const title = readString$1o(item && item.title) || `Result ${index + 1}`;
-      const snippet = readString$1o(item && item.snippet) || readString$1o(item && item.content);
+      const url = readString$1p(item && item.url);
+      const title = readString$1p(item && item.title) || `Result ${index + 1}`;
+      const snippet = readString$1p(item && item.snippet) || readString$1p(item && item.content);
       const domain = readDomain$5(url);
-      const engine = readString$1o(item && item.engine) || readString$1o(item && item.source);
+      const engine = readString$1p(item && item.engine) || readString$1p(item && item.source);
       const sourceCategory = classifySearchSourceCategory({
         domain,
         entityTokens,
@@ -22511,10 +23525,10 @@
   }
 
   function classifySearchSourceCategory(options = {}) {
-    const domain = readString$1o(options.domain).toLowerCase();
-    const title = readString$1o(options.title).toLowerCase();
-    const snippet = readString$1o(options.snippet).toLowerCase();
-    const url = readString$1o(options.url).toLowerCase();
+    const domain = readString$1p(options.domain).toLowerCase();
+    const title = readString$1p(options.title).toLowerCase();
+    const snippet = readString$1p(options.snippet).toLowerCase();
+    const url = readString$1p(options.url).toLowerCase();
     const haystack = `${domain} ${title} ${snippet} ${url}`;
     const entityTokens = Array.isArray(options.entityTokens) ? options.entityTokens : [];
 
@@ -22551,7 +23565,7 @@
       return 0;
     }
 
-    const normalizedHaystack = readString$1o(haystack).toLowerCase();
+    const normalizedHaystack = readString$1p(haystack).toLowerCase();
     let count = 0;
 
     for (const token of queryTokens) {
@@ -22568,25 +23582,25 @@
       if (!item || typeof item !== "object") return false;
 
       // Synthetic items (grounded model answer, no URL) count as usable evidence.
-      if (!readString$1o(item.url) && readString$1o(item.snippet)) return true;
+      if (!readString$1p(item.url) && readString$1p(item.snippet)) return true;
 
-      return readString$1o(item.url) &&
-        readString$1o(item.sourceCategory) !== "community" &&
-        readString$1o(item.sourceCategory) !== "marketplace" &&
+      return readString$1p(item.url) &&
+        readString$1p(item.sourceCategory) !== "community" &&
+        readString$1p(item.sourceCategory) !== "marketplace" &&
         typeof item.sourceScore === "number" &&
-        (typeof item.queryOverlap !== "number" || readNumber$9(item.queryOverlap) >= 2) &&
+        (typeof item.queryOverlap !== "number" || readNumber$a(item.queryOverlap) >= 2) &&
         item.sourceScore >= 3;
     });
   }
 
   function scoreSearchResult(options) {
-    const domain = readString$1o(options.domain);
-    const title = readString$1o(options.title);
-    const snippet = readString$1o(options.snippet);
-    readString$1o(options.url);
-    const category = readString$1o(options.sourceCategory) || "unknown";
-    const overlap = readNumber$9(options.queryOverlap);
-    const exactPhraseMatches = readNumber$9(options.exactPhraseMatches);
+    const domain = readString$1p(options.domain);
+    const title = readString$1p(options.title);
+    const snippet = readString$1p(options.snippet);
+    readString$1p(options.url);
+    const category = readString$1p(options.sourceCategory) || "unknown";
+    const overlap = readNumber$a(options.queryOverlap);
+    const exactPhraseMatches = readNumber$a(options.exactPhraseMatches);
     let score = CATEGORY_WEIGHTS[category] || CATEGORY_WEIGHTS.unknown;
 
     score += overlap * 2;
@@ -22612,11 +23626,11 @@
     const syntheticItems = [];
 
     for (const item of items) {
-      const url = readString$1o(item && item.url);
+      const url = readString$1p(item && item.url);
 
       // Synthetic items (no URL but have snippet) are kept as-is, not deduped.
       if (!url) {
-        if (readString$1o(item && item.snippet)) {
+        if (readString$1p(item && item.snippet)) {
           syntheticItems.push({ ...item });
         }
         continue;
@@ -22625,10 +23639,10 @@
       const current = bestByUrl.get(url);
       if (
         !current ||
-        readNumber$9(item.sourceScore) > readNumber$9(current.sourceScore) ||
+        readNumber$a(item.sourceScore) > readNumber$a(current.sourceScore) ||
         (
-          readNumber$9(item.sourceScore) === readNumber$9(current.sourceScore) &&
-          readNumber$9(item.passIndex) < readNumber$9(current.passIndex)
+          readNumber$a(item.sourceScore) === readNumber$a(current.sourceScore) &&
+          readNumber$a(item.passIndex) < readNumber$a(current.passIndex)
         )
       ) {
         bestByUrl.set(url, { ...item });
@@ -22641,8 +23655,8 @@
 
   function diversifyByDomain(items) {
     const remaining = items.slice().sort((left, right) => (
-      readNumber$9(right.sourceScore) - readNumber$9(left.sourceScore)
-        || readNumber$9(left.passIndex) - readNumber$9(right.passIndex)
+      readNumber$a(right.sourceScore) - readNumber$a(left.sourceScore)
+        || readNumber$a(left.passIndex) - readNumber$a(right.passIndex)
     ));
     const ordered = [];
     const domainCounts = new Map();
@@ -22653,9 +23667,9 @@
 
       for (let index = 0; index < remaining.length; index += 1) {
         const item = remaining[index];
-        const domain = readString$1o(item && item.domain);
+        const domain = readString$1p(item && item.domain);
         const domainPenalty = (domainCounts.get(domain) || 0) * 1.5;
-        const diversifiedScore = readNumber$9(item && item.sourceScore) - domainPenalty;
+        const diversifiedScore = readNumber$a(item && item.sourceScore) - domainPenalty;
 
         if (diversifiedScore > bestScore) {
           bestIndex = index;
@@ -22664,7 +23678,7 @@
       }
 
       const next = remaining.splice(bestIndex, 1)[0];
-      const domain = readString$1o(next && next.domain);
+      const domain = readString$1p(next && next.domain);
       domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
       ordered.push(next);
     }
@@ -22673,7 +23687,7 @@
   }
 
   function looksOfficialDomain(domain, entityTokens) {
-    const normalizedDomain = readString$1o(domain).replace(/^www\./i, "");
+    const normalizedDomain = readString$1p(domain).replace(/^www\./i, "");
     if (!normalizedDomain) {
       return false;
     }
@@ -22696,7 +23710,7 @@
   }
 
   function tokenize$2(value) {
-    return splitMixedScriptBoundaries(readString$1o(value))
+    return splitMixedScriptBoundaries(readString$1p(value))
       .toLowerCase()
       .split(/[^a-z0-9\u4e00-\u9fff]+/i)
       .filter((token) => token.length >= 2);
@@ -22705,7 +23719,7 @@
   function countExactQueryPhraseMatches(query, haystack) {
     const phrases = extractQueryPhrases(query);
     if (phrases.length === 0) return 0;
-    const normalizedHaystack = splitMixedScriptBoundaries(readString$1o(haystack))
+    const normalizedHaystack = splitMixedScriptBoundaries(readString$1p(haystack))
       .toLowerCase()
       .replace(/[^a-z0-9\u4e00-\u9fff]+/gi, " ")
       .replace(/\s+/g, " ")
@@ -22740,7 +23754,7 @@
   ]);
 
   function splitMixedScriptBoundaries(value) {
-    return readString$1o(value)
+    return readString$1p(value)
       .replace(/([\u4e00-\u9fff])([a-z0-9])/gi, "$1 $2")
       .replace(/([a-z0-9])([\u4e00-\u9fff])/gi, "$1 $2");
   }
@@ -22753,17 +23767,17 @@
 
   function readDomain$5(value) {
     try {
-      return new URL(readString$1o(value)).hostname.toLowerCase();
+      return new URL(readString$1p(value)).hostname.toLowerCase();
     } catch {
       return "";
     }
   }
 
-  function readNumber$9(value) {
+  function readNumber$a(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
-  function readString$1o(value) {
+  function readString$1p(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -22773,8 +23787,8 @@
   // via item.sourceCategory and judges relevance itself.
 
   function createSearchVerification(options = {}) {
-    const strategy = readString$1n(options.strategy) || "general_lookup";
-    const query = readString$1n(options.query);
+    const strategy = readString$1o(options.strategy) || "general_lookup";
+    const query = readString$1o(options.query);
     const rankedItems = Array.isArray(options.rankedItems) ? options.rankedItems : [];
     const readSources = Array.isArray(options.readSources) ? options.readSources : [];
     const supportiveSources = collectSupportiveSources(rankedItems, readSources, query);
@@ -22827,8 +23841,8 @@
 
   function readVerificationState(value) {
     const state = value && typeof value === "object"
-      ? readString$1n(value.state)
-      : readString$1n(value);
+      ? readString$1o(value.state)
+      : readString$1o(value);
 
     return state || "none";
   }
@@ -22853,15 +23867,15 @@
   }
 
   function normalizeSupportiveSource(item, query) {
-    const url = readString$1n(item && item.url);
+    const url = readString$1o(item && item.url);
     if (!url) {
       return null;
     }
 
     const domain = readDomain$4(url);
-    const title = readString$1n(item && item.title);
-    const snippet = readString$1n(item && (item.snippet || item.text));
-    const sourceCategory = readString$1n(item && item.sourceCategory) || classifySearchSourceCategory({
+    const title = readString$1o(item && item.title);
+    const snippet = readString$1o(item && (item.snippet || item.text));
+    const sourceCategory = readString$1o(item && item.sourceCategory) || classifySearchSourceCategory({
       domain,
       snippet,
       title,
@@ -22912,7 +23926,7 @@
   }
 
   function extractEntityTuple(text, entityHint) {
-    const normalizedText = readString$1n(text);
+    const normalizedText = readString$1o(text);
     if (!normalizedText) {
       return null;
     }
@@ -22944,7 +23958,7 @@
   }
 
   function extractEntityHint(query) {
-    return readString$1n(query)
+    return readString$1o(query)
       .toLowerCase()
       .replace(/\b(boss|ceo|director|founder|owner|managing director|who|is|the|of)\b/g, " ")
       .replace(/[^a-z0-9]+/g, " ")
@@ -22955,7 +23969,7 @@
   }
 
   function normalizeEntityValue(value) {
-    return readString$1n(value)
+    return readString$1o(value)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
@@ -22967,13 +23981,13 @@
 
   function readDomain$4(value) {
     try {
-      return new URL(readString$1n(value)).hostname.toLowerCase();
+      return new URL(readString$1o(value)).hostname.toLowerCase();
     } catch {
       return "";
     }
   }
 
-  function readString$1n(value) {
+  function readString$1o(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23060,7 +24074,7 @@
     const targetAwareSources = selectTargetAwareSources({
       requireConcreteArticle: isArticleLikePrompt(options && options.prompt),
       limit,
-      prompt: readString$1m(options && options.prompt),
+      prompt: readString$1n(options && options.prompt),
       readSources,
       searchResults,
       verificationState,
@@ -23072,7 +24086,7 @@
     }
 
     for (const item of readSources) {
-      const url = readString$1m(item.url);
+      const url = readString$1n(item.url);
       if (!url || seenUrls.has(url) || !isReadableEvidenceSource(item) || !isDirectEvidenceUrl(url)) {
         continue;
       }
@@ -23083,7 +24097,7 @@
       seenUrls.add(url);
       sources.push({
         kind: "read_url",
-        title: readString$1m(item.title) || readString$1m(matchingSearchByUrl.get(url)?.title) || url,
+        title: readString$1n(item.title) || readString$1n(matchingSearchByUrl.get(url)?.title) || url,
         url
       });
 
@@ -23101,7 +24115,7 @@
       : searchResults;
 
     for (const item of searchCandidates) {
-      const url = readString$1m(item.url);
+      const url = readString$1n(item.url);
       if (!url || seenUrls.has(url) || !isDirectEvidenceUrl(url)) {
         continue;
       }
@@ -23120,7 +24134,7 @@
       seenUrls.add(url);
       sources.push({
         kind: "web_search",
-        title: readString$1m(item.title) || url,
+        title: readString$1n(item.title) || url,
         url
       });
 
@@ -23133,7 +24147,7 @@
   }
 
   function appendSourcesSection(text, sources) {
-    const normalizedText = stripGenericSourceLabels(readString$1m(text));
+    const normalizedText = stripGenericSourceLabels(readString$1n(text));
     const sourceList = Array.isArray(sources) ? sources.filter(Boolean) : [];
     const textWithoutModelSources = stripSourcesSection(normalizedText);
 
@@ -23181,8 +24195,8 @@
   }
 
   function formatSourceLine(item) {
-    const title = readString$1m(item && item.title);
-    const url = readString$1m(item && item.url);
+    const title = readString$1n(item && item.title);
+    const url = readString$1n(item && item.url);
 
     if (!title || title === url) {
       return `[${url}](${url})`;
@@ -23192,7 +24206,7 @@
   }
 
   function stripSourcesSection(text) {
-    const normalized = readString$1m(text);
+    const normalized = readString$1n(text);
     if (!normalized) return "";
 
     const lines = normalized.split(/\r?\n/);
@@ -23212,7 +24226,7 @@
   }
 
   function stripGenericSourceLabels(text) {
-    const normalized = readString$1m(text);
+    const normalized = readString$1n(text);
     if (!normalized) return "";
 
     return normalized
@@ -23223,21 +24237,21 @@
   }
 
   function isGenericSourceLabelLine(line) {
-    return /^\s*(?:[-*+]\s*)?(?:[*_]{0,2})?Sources?\s*:\s*(?:Web\s+Search(?:\s+Results?)?|Search(?:\s+Results?)?|web_search|Provider|Grounding|Model|Planned\s+Tool\s+Results?|Tool\s+Results?|Search\s+Data)(?:[*_]{0,2})?\s*$/i.test(readString$1m(line));
+    return /^\s*(?:[-*+]\s*)?(?:[*_]{0,2})?Sources?\s*:\s*(?:Web\s+Search(?:\s+Results?)?|Search(?:\s+Results?)?|web_search|Provider|Grounding|Model|Planned\s+Tool\s+Results?|Tool\s+Results?|Search\s+Data)(?:[*_]{0,2})?\s*$/i.test(readString$1n(line));
   }
 
   function isSourcesHeadingLine(line) {
-    return /^\s*(?:#{1,6}\s*)?(?:[*_]{1,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\s*:?\s*(?:[*_]{1,2})?\s*$/i.test(readString$1m(line));
+    return /^\s*(?:#{1,6}\s*)?(?:[*_]{1,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\s*:?\s*(?:[*_]{1,2})?\s*$/i.test(readString$1n(line));
   }
 
   function isUnsupportedInlineSourcesLine(line) {
-    const normalized = readString$1m(line);
+    const normalized = readString$1n(line);
     if (!normalized || /https?:\/\//i.test(normalized)) return false;
     return /^\s*(?:#{1,6}\s*)?(?:[*_]{0,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\b\s+.{1,180}$/i.test(normalized);
   }
 
   function escapeMarkdownLinkText(value) {
-    return readString$1m(value).replace(/[[\]]/g, "");
+    return readString$1n(value).replace(/[[\]]/g, "");
   }
 
   function normalizeSearchResults(value) {
@@ -23256,8 +24270,8 @@
         item && typeof item === "object" && !Array.isArray(item)
           ? {
               ...item,
-              title: readString$1m(item.title),
-              url: readString$1m(item.url)
+              title: readString$1n(item.title),
+              url: readString$1n(item.url)
             }
           : null
       ))
@@ -23265,7 +24279,7 @@
   }
 
   function selectTargetAwareSources(options) {
-    const targets = extractResearchCoverageTargets(readString$1m(options && options.prompt));
+    const targets = extractResearchCoverageTargets(readString$1n(options && options.prompt));
     if (targets.length < 2) return null;
 
     const candidates = collectSourceCandidates(options);
@@ -23295,11 +24309,11 @@
     const readSources = Array.isArray(options && options.readSources) ? options.readSources : [];
     const searchResults = Array.isArray(options && options.searchResults) ? options.searchResults : [];
     const verifiedUrls = options && options.verifiedUrls instanceof Set ? options.verifiedUrls : new Set();
-    const verificationState = readString$1m(options && options.verificationState);
+    const verificationState = readString$1n(options && options.verificationState);
     const candidates = [];
     const seenUrls = new Set();
     const push = (item, kind) => {
-      const url = readString$1m(item && item.url);
+      const url = readString$1n(item && item.url);
       if (!url || seenUrls.has(url) || !isDirectEvidenceUrl(url)) return;
       if (kind === "read_url" && !isReadableEvidenceSource(item)) return;
       if (kind === "web_search" && verificationState !== "none" && verifiedUrls.size > 0 && !verifiedUrls.has(url)) return;
@@ -23307,8 +24321,8 @@
       candidates.push({
         domain: readDomain$3(url),
         kind,
-        snippet: readString$1m(item && item.snippet) || readString$1m(item && item.content),
-        title: readString$1m(item && item.title) || url,
+        snippet: readString$1n(item && item.snippet) || readString$1n(item && item.content),
+        title: readString$1n(item && item.title) || url,
         url
       });
     };
@@ -23319,11 +24333,11 @@
   }
 
   function isConcreteArticleSource(source) {
-    const url = readString$1m(source && source.url);
+    const url = readString$1n(source && source.url);
     if (!isDirectEvidenceUrl(url)) return false;
 
-    const title = readString$1m(source && source.title);
-    const snippet = readString$1m(source && source.snippet) || readString$1m(source && source.content);
+    const title = readString$1n(source && source.title);
+    const snippet = readString$1n(source && source.snippet) || readString$1n(source && source.content);
     if (isNonNewsEvidenceSource({ title, snippet, url })) {
       return false;
     }
@@ -23342,9 +24356,9 @@
   }
 
   function isNonNewsEvidenceSource(source) {
-    const url = readString$1m(source && source.url);
-    const title = readString$1m(source && source.title);
-    const snippet = readString$1m(source && source.snippet);
+    const url = readString$1n(source && source.url);
+    const title = readString$1n(source && source.title);
+    const snippet = readString$1n(source && source.snippet);
     try {
       const parsed = new URL(url);
       const pathname = decodeURIComponent(parsed.pathname).toLowerCase();
@@ -23360,7 +24374,7 @@
       source.snippet,
       source.url,
       source.domain
-    ].map(readString$1m).join(" ");
+    ].map(readString$1n).join(" ");
     return Array.isArray(target && target.aliases)
       && target.aliases.some((alias) => hasComparablePhrase$1(haystack, alias));
   }
@@ -23377,7 +24391,7 @@
 
   function hasSpecificPath(url) {
     try {
-      const parsed = new URL(readString$1m(url));
+      const parsed = new URL(readString$1n(url));
       const segments = parsed.pathname
         .split("/")
         .map((segment) => decodeURIComponent(segment).toLowerCase().replace(/[^a-z0-9-]+/g, ""))
@@ -23392,7 +24406,7 @@
 
   function isHomepageOrGenericSection(url) {
     try {
-      const parsed = new URL(readString$1m(url));
+      const parsed = new URL(readString$1n(url));
       const segments = parsed.pathname
         .split("/")
         .map((segment) => decodeURIComponent(segment).toLowerCase().replace(/[^a-z0-9-]+/g, ""))
@@ -23405,7 +24419,7 @@
   }
 
   function normalizeComparableText$2(value) {
-    return readString$1m(value)
+    return readString$1n(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -23415,7 +24429,7 @@
   }
 
   function extractPromptFocusTerms(value) {
-    const text = readString$1m(value).toLowerCase();
+    const text = readString$1n(value).toLowerCase();
     if (!text) return [];
 
     const terms = [];
@@ -23447,7 +24461,7 @@
       source && source.content,
       source && source.text,
       source && source.url
-    ].map(readString$1m).join(" "));
+    ].map(readString$1n).join(" "));
 
     return terms.some((term) => haystack.includes(term));
   }
@@ -23465,7 +24479,7 @@
   }
 
   function addDirectUrl(sink, value) {
-    const url = readString$1m(value);
+    const url = readString$1n(value);
     if (isDirectEvidenceUrl(url)) {
       sink.add(url);
     }
@@ -23473,7 +24487,7 @@
 
   function readDomain$3(url) {
     try {
-      return new URL(readString$1m(url)).hostname.replace(/^www\./i, "");
+      return new URL(readString$1n(url)).hostname.replace(/^www\./i, "");
     } catch (error) {
       return "";
     }
@@ -23500,8 +24514,8 @@
       };
     }
 
-    const allowed = new Set(urls.map((url) => readString$1m(url)).filter(Boolean));
-    const kept = sources.filter((item) => allowed.has(readString$1m(item && item.url)));
+    const allowed = new Set(urls.map((url) => readString$1n(url)).filter(Boolean));
+    const kept = sources.filter((item) => allowed.has(readString$1n(item && item.url)));
     return {
       citations: kept.map((item) => item.url),
       sources: kept
@@ -23523,7 +24537,7 @@
 
     // Evidence citations take priority.
     for (const url of evidence) {
-      const normalized = readString$1m(url);
+      const normalized = readString$1n(url);
       if (normalized && !seen.has(normalized)) {
         seen.add(normalized);
         merged.push(normalized);
@@ -23531,7 +24545,7 @@
     }
 
     for (const citation of planner) {
-      const normalized = readString$1m(citation);
+      const normalized = readString$1n(citation);
       if (!normalized || /^https?:\/\//i.test(normalized) || seen.has(normalized)) continue;
       seen.add(normalized);
       merged.push(normalized);
@@ -23541,7 +24555,7 @@
   }
 
   function isDirectEvidenceUrl(value) {
-    const normalized = readString$1m(value);
+    const normalized = readString$1n(value);
     if (!isHttpUrl$1(normalized)) return false;
 
     try {
@@ -23561,10 +24575,10 @@
   }
 
   function isHttpUrl$1(value) {
-    return /^https?:\/\//i.test(readString$1m(value));
+    return /^https?:\/\//i.test(readString$1n(value));
   }
 
-  function readString$1m(value) {
+  function readString$1n(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23639,13 +24653,13 @@
     const seen = new Set();
     const pushSource = (item, fallback = {}) => {
       if (!item || typeof item !== "object") return;
-      const url = readString$1l(item.url);
+      const url = readString$1m(item.url);
       if (!url || !isDirectEvidenceUrl(url) || seen.has(url)) return;
       const source = {
-        domain: readString$1l(item.domain) || readDomain$2(url),
-        query: readString$1l(item.query) || readString$1l(fallback.query),
-        snippet: readString$1l(item.snippet) || readString$1l(item.content) || readString$1l(fallback.snippet),
-        title: readString$1l(item.title) || readString$1l(fallback.title) || url,
+        domain: readString$1m(item.domain) || readDomain$2(url),
+        query: readString$1m(item.query) || readString$1m(fallback.query),
+        snippet: readString$1m(item.snippet) || readString$1m(item.content) || readString$1m(fallback.snippet),
+        title: readString$1m(item.title) || readString$1m(fallback.title) || url,
         url
       };
       if (requireConcreteArticle && !isConcreteArticleSource(source)) return;
@@ -23657,7 +24671,7 @@
     for (const item of readArray$2(context.aggregatedSearchResults)) pushSource(item);
     for (const item of readArray$2(context.searchResults)) pushSource(item);
     for (const pass of readArray$2(context.searchPasses)) {
-      const query = readString$1l(pass && pass.query);
+      const query = readString$1m(pass && pass.query);
       for (const item of readArray$2(pass && pass.items)) {
         pushSource(item, { query });
       }
@@ -23673,7 +24687,7 @@
       source && source.snippet,
       source && source.url,
       source && source.domain
-    ].map(readString$1l).join(" ");
+    ].map(readString$1m).join(" ");
     return aliases.some((alias) => hasComparablePhrase(haystack, alias));
   }
 
@@ -23693,14 +24707,14 @@
 
   function readDomain$2(url) {
     try {
-      return new URL(readString$1l(url)).hostname.replace(/^www\./i, "");
+      return new URL(readString$1m(url)).hostname.replace(/^www\./i, "");
     } catch (error) {
       return "";
     }
   }
 
   function normalizeComparableText$1(value) {
-    return readString$1l(value)
+    return readString$1m(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -23709,7 +24723,7 @@
       .trim();
   }
 
-  function readString$1l(value) {
+  function readString$1m(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -23726,8 +24740,8 @@
   const VIRTUAL_WORKSPACE_LEAK_RE = /^(?:#{1,6}\s*)?(?:\*\*)?\s*(virtual\s+workspace|workspace\s+(?:draft|files?|operations?|quality)|draft\s+workspace|final\s+candidate|critique\s+notes?)\s*(?:\*\*)?\s*:?\s*$/im;
 
   function analyzeFinalResponseQuality(text, context = {}) {
-    const value = readString$1k(text);
-    const prompt = readString$1k(context.prompt);
+    const value = readString$1l(text);
+    const prompt = readString$1l(context.prompt);
     const targets = extractResearchCoverageTargets(prompt);
     const issues = [];
 
@@ -23831,7 +24845,7 @@
   // (alias removed in PR 2).
   function noteFinalResponseQualityIssues(runState, context = {}) {
     const decision = context && context.decision && typeof context.decision === "object" ? context.decision : null;
-    const answer = readString$1k(decision && decision.answer);
+    const answer = readString$1l(decision && decision.answer);
     if (!answer) return null;
 
     const prompt = readPrompt$3(runState);
@@ -23849,16 +24863,16 @@
     runState.finalResponseQuality = {
       ...state,
       lastIssues: analysis.ok ? [] : analysis.issues.map((issue) => issue.code),
-      lastSource: readString$1k(context && context.source) || null,
+      lastSource: readString$1l(context && context.source) || null,
       vetoCount: analysis.ok ? noteCount : noteCount + 1
     };
     return null;
   }
 
   function normalizeFinalResponseStructure(text, context = {}) {
-    const value = readString$1k(text);
+    const value = readString$1l(text);
     if (!value) return "";
-    const prompt = readString$1k(context.prompt);
+    const prompt = readString$1l(context.prompt);
     const targets = extractResearchCoverageTargets(prompt);
     const sourceCleaned = shouldEnforceSourceLinkQuality(prompt, targets)
       ? stripTrailingSourcesBlock(stripUnsupportedSourceLabelLines(value))
@@ -23883,7 +24897,7 @@
 
     const output = [];
     for (const target of targets) {
-      const body = readString$1k(segments.get(target.key));
+      const body = readString$1l(segments.get(target.key));
       if (!body) continue;
       output.push(`${target.label}\n${body}`);
     }
@@ -23894,7 +24908,7 @@
 
   function findDuplicateTargetHeadings(text, targets) {
     if (!Array.isArray(targets) || targets.length < 2) return [];
-    const lines = readString$1k(text).split(/\r?\n/);
+    const lines = readString$1l(text).split(/\r?\n/);
     return targets.filter((target) => {
       const aliases = Array.isArray(target && target.aliases) ? target.aliases : [target && target.label];
       const count = lines.filter((line) => aliases.some((alias) => isHeadingForTarget(line, alias))).length;
@@ -23903,10 +24917,10 @@
   }
 
   function isHeadingForTarget(line, alias) {
-    const heading = readString$1k(line)
+    const heading = readString$1l(line)
       .replace(/^#{1,6}\s*/, "")
       .replace(/[:：]\s*$/, "");
-    const needle = readString$1k(alias);
+    const needle = readString$1l(alias);
     if (!heading || !needle) return false;
     const normalizedHeading = normalizeComparableText(heading);
     const normalizedNeedle = normalizeComparableText(needle);
@@ -23920,13 +24934,13 @@
   }
 
   function hasBareSourcesSection(text) {
-    const lines = readString$1k(text).split(/\r?\n/);
+    const lines = readString$1l(text).split(/\r?\n/);
     for (let index = 0; index < lines.length; index += 1) {
       if (!SOURCE_HEADING_RE.test(lines[index])) continue;
       const body = [];
       for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
         const line = lines[cursor];
-        if (!readString$1k(line)) {
+        if (!readString$1l(line)) {
           if (body.length > 0) break;
           continue;
         }
@@ -23935,7 +24949,7 @@
         if (body.length >= 6) break;
       }
       const bodyText = body.join("\n");
-      if (readString$1k(bodyText) && !MARKDOWN_LINK_RE.test(bodyText)) {
+      if (readString$1l(bodyText) && !MARKDOWN_LINK_RE.test(bodyText)) {
         return true;
       }
     }
@@ -23951,22 +24965,22 @@
   }
 
   function hasUnsupportedSourceLabel(text) {
-    return readString$1k(text).split(/\r?\n/).some((line) => {
+    return readString$1l(text).split(/\r?\n/).some((line) => {
       const match = line.match(SOURCE_LABEL_RE);
       if (!match) return false;
-      const value = readString$1k(match[1]);
+      const value = readString$1l(match[1]);
       if (!value) return false;
       return !MARKDOWN_LINK_RE.test(value);
     });
   }
 
   function stripUnsupportedSourceLabelLines(text) {
-    return readString$1k(text)
+    return readString$1l(text)
       .split(/\r?\n/)
       .filter((line) => {
         const match = line.match(SOURCE_LABEL_RE);
         if (!match) return true;
-        return MARKDOWN_LINK_RE.test(readString$1k(match[1]));
+        return MARKDOWN_LINK_RE.test(readString$1l(match[1]));
       })
       .join("\n")
       .replace(/\n{3,}/g, "\n\n")
@@ -23974,17 +24988,17 @@
   }
 
   function stripTrailingSourcesBlock(text) {
-    const lines = readString$1k(text).split(/\r?\n/);
+    const lines = readString$1l(text).split(/\r?\n/);
     for (let index = lines.length - 1; index >= 0; index -= 1) {
       if (SOURCE_HEADING_RE.test(lines[index])) {
         return lines.slice(0, index).join("\n").trim();
       }
     }
-    return readString$1k(text);
+    return readString$1l(text);
   }
 
   function stripInternalArtifactLines(text) {
-    return readString$1k(text)
+    return readString$1l(text)
       .split(/\r?\n/)
       .filter((line) => !isInternalArtifactLine(line))
       .join("\n")
@@ -23993,7 +25007,7 @@
   }
 
   function isInternalArtifactLine(line) {
-    const normalized = readString$1k(line).replace(/^`+|`+$/g, "").trim();
+    const normalized = readString$1l(line).replace(/^`+|`+$/g, "").trim();
     if (!normalized) return false;
     return /^\[\s*"[^"]*\b(?:search|read|analy[sz]e|todo|plan|fetch|inspect)\b[^"]*"\s*(?:,\s*"[^"]*")*\s*\]$/i.test(normalized);
   }
@@ -24010,15 +25024,15 @@
       ? workspace.finalReadiness
       : {};
     const workspaceGaps = Array.isArray(readiness.remainingGaps)
-      ? readiness.remainingGaps.map(readString$1k).filter(Boolean)
+      ? readiness.remainingGaps.map(readString$1l).filter(Boolean)
       : [];
     const stateGaps = researchState && Array.isArray(researchState.gaps)
-      ? researchState.gaps.map(readString$1k).filter(Boolean)
+      ? researchState.gaps.map(readString$1l).filter(Boolean)
       : [];
     const sourceQuality = researchState && researchState.sourceQuality && typeof researchState.sourceQuality === "object"
       ? researchState.sourceQuality
       : {};
-    const weakOrRejected = readNumber$8(sourceQuality.weak) + readNumber$8(sourceQuality.thin) + readNumber$8(sourceQuality.rejected);
+    const weakOrRejected = readNumber$9(sourceQuality.weak) + readNumber$9(sourceQuality.thin) + readNumber$9(sourceQuality.rejected);
     const hasWorkspaceEvidence = sourceNotes.length > 0 || workspaceGaps.length > 0;
     // AGRUN-246-B (C2.5): removed promptRequestsQuality prompt regex gate — research
     // sections required when runtime state shows actual workspace evidence or research
@@ -24027,28 +25041,28 @@
   }
 
   function hasResearchReportSections(text) {
-    const value = readString$1k(text);
+    const value = readString$1l(text);
     if (!value) return false;
     const hasSourceQuality = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:source\s+quality|source\s+assessment|evidence\s+quality|quality\s+of\s+sources)\b/i.test(value);
     const hasGaps = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:evidence\s+gaps?|limitations?|limits\s+of\s+the\s+evidence)\b/i.test(value);
     return hasSourceQuality && hasGaps;
   }
 
-  function readNumber$8(value) {
+  function readNumber$9(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
   function stripUnsupportedEvidenceLinks(text, context = {}) {
-    const prompt = readString$1k(context.prompt);
+    const prompt = readString$1l(context.prompt);
     if (!shouldEnforceSourceLinkQuality(prompt, context.targets)) {
-      return readString$1k(text);
+      return readString$1l(text);
     }
 
-    return readString$1k(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+[^)]*)\)/gi, (match, label, url) => {
-      const cleanLabel = readString$1k(label).replace(/^source\s*:\s*/i, "");
+    return readString$1l(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+[^)]*)\)/gi, (match, label, url) => {
+      const cleanLabel = readString$1l(label).replace(/^source\s*:\s*/i, "");
       return isConcreteArticleSource({ title: cleanLabel, url })
-        ? `[${cleanLabel || readString$1k(label)}](${url})`
-        : cleanLabel || readString$1k(label);
+        ? `[${cleanLabel || readString$1l(label)}](${url})`
+        : cleanLabel || readString$1l(label);
     });
   }
 
@@ -24059,13 +25073,13 @@
 
     function flush() {
       if (!activeTarget) return;
-      const body = readString$1k(buffer.join("\n"));
+      const body = readString$1l(buffer.join("\n"));
       if (body) {
         byKey.set(activeTarget.key, body);
       }
     }
 
-    for (const line of readString$1k(text).split(/\r?\n/)) {
+    for (const line of readString$1l(text).split(/\r?\n/)) {
       const nextTarget = targets.find((target) => {
         const aliases = Array.isArray(target && target.aliases) ? target.aliases : [target && target.label];
         return aliases.some((alias) => isHeadingForTarget(line, alias));
@@ -24090,7 +25104,7 @@
   }
 
   function normalizeComparableText(value) {
-    return readString$1k(value)
+    return readString$1l(value)
       .toLowerCase()
       .replace(/\bu\.s\.a\.\b/g, "usa")
       .replace(/\bu\.s\.\b/g, "us")
@@ -24098,7 +25112,7 @@
       .trim();
   }
 
-  function readString$1k(value) {
+  function readString$1l(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -24290,12 +25304,12 @@
     const sources = [];
     const seenUrls = new Set();
     for (const source of sourceArtifacts) {
-      const url = readString$1j(source && source.url);
+      const url = readString$1k(source && source.url);
       if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
       seenUrls.add(url);
       sources.push({
         kind: "research_evidence_graph",
-        title: readString$1j(source && source.title) || url,
+        title: readString$1k(source && source.title) || url,
         url
       });
       if (sources.length >= 8) break;
@@ -24371,7 +25385,7 @@
     }
   }
 
-  function readString$1j(value) {
+  function readString$1k(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -24427,8 +25441,8 @@
       ? projection.researchReportLoop
       : null;
     if (!loop) return false;
-    const status = readString$1j(loop.status);
-    return loop.enabled === true || Boolean(readString$1j(loop.finalMode)) || Boolean(status && status !== "idle");
+    const status = readString$1k(loop.status);
+    return loop.enabled === true || Boolean(readString$1k(loop.finalMode)) || Boolean(status && status !== "idle");
   }
 
   function recordObservation$1(runState, pushStep, observation, detail) {
@@ -24746,10 +25760,10 @@
     const count = Number.isInteger(options.count) && options.count > 0
       ? options.count
       : 0;
-    const reason = readString$1i(options.reason) || "invalid_planner_output";
-    const source = readString$1i(options.source) || "planner";
+    const reason = readString$1j(options.reason) || "invalid_planner_output";
+    const source = readString$1j(options.source) || "planner";
     const forbiddenMoves = Array.isArray(options.forbiddenMoves)
-      ? options.forbiddenMoves.map(readString$1i).filter(Boolean)
+      ? options.forbiddenMoves.map(readString$1j).filter(Boolean)
       : [];
     if (count > 2 && !forbiddenMoves.includes("repeat_invalid_envelope")) {
       forbiddenMoves.push("repeat_invalid_envelope");
@@ -24759,7 +25773,7 @@
       count,
       escalation: count > 2 ? "hard_veto" : "advisory",
       forbiddenMoves: forbiddenMoves.slice(0, 8),
-      lastResponsePreview: readString$1i(options.lastResponsePreview).slice(0, 600),
+      lastResponsePreview: readString$1j(options.lastResponsePreview).slice(0, 600),
       reason,
       repairMode: "planner_owned_retry",
       requiredEnvelope: "valid planner JSON envelope only",
@@ -24768,7 +25782,7 @@
     };
   }
 
-  function readString$1i(value) {
+  function readString$1j(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -24882,16 +25896,16 @@
     const count = Number.isInteger(runState && runState.plannerInvalidCount)
       ? runState.plannerInvalidCount
       : 0;
-    const responseText = readString$1h(plannerResult && plannerResult.response && plannerResult.response.text);
+    const responseText = readString$1i(plannerResult && plannerResult.response && plannerResult.response.text);
     return buildPlannerRepairSignal({
       count,
       lastResponsePreview: responseText,
-      reason: readString$1h(plannerResult && plannerResult.invalidKind) || "invalid_planner_output",
+      reason: readString$1i(plannerResult && plannerResult.invalidKind) || "invalid_planner_output",
       source: "planner"
     });
   }
 
-  function readString$1h(value) {
+  function readString$1i(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -24936,7 +25950,7 @@
   }
 
   function isExecutableTopicLikeTurn(prompt, turnIntent) {
-    const text = readString$1g(prompt);
+    const text = readString$1h(prompt);
 
     if (!text) {
       return false;
@@ -24945,7 +25959,7 @@
     if (
       !turnIntent ||
       typeof turnIntent !== "object" ||
-      readString$1g(turnIntent.kind) !== "new_task"
+      readString$1h(turnIntent.kind) !== "new_task"
     ) {
       return false;
     }
@@ -24958,34 +25972,70 @@
       return false;
     }
 
-    return /\b\d+\b/.test(text) || countWords(text) >= 5;
+    return hasDigit(text) || countWords(text) >= 5;
   }
 
+  // AGRUN-246-K: a topic-shaped prompt is a SHORT, NON-QUESTION turn — a pure
+  // language-neutral structural primitive (token count + trailing-"?" only). The
+  // final English action-verb exclusion (isActionLikeText) was removed: it
+  // misclassified Mandarin / non-English / indirect commands, and "command vs
+  // bare topic" is a SEMANTIC distinction the AI owns via turnIntent.kind /
+  // divergentIntent — not something a structural shape check can decide. A
+  // command-shaped prompt now reads as topic-like; the routing/continuity layers
+  // rely on the AI signal (or their own conservative default) to tell follow-up
+  // from new topic. See ADR-0047.
   function looksLikeTopicPrompt(value) {
     const words = trimTrailingPunctuation$2(value).split(/\s+/).filter(Boolean);
-    return words.length > 0 && words.length <= 10 && !isQuestionLikeText(value) && !isActionLikeText(value);
+    return words.length > 0 && words.length <= 10 && !isQuestionLikeText(value);
   }
 
+  // AGRUN-246-D C2.2: question detection is universal trailing-"?" punctuation
+  // only. The English question-word lexicon (what|which|who|...) was removed — it
+  // misclassified Mandarin / non-English / indirect prompts (audit
+  // non-ai-first-2026-05-23 §C2.2). The real question-vs-task intent is now
+  // AI/router-owned via `turnIntent.kind`; this structural helper only feeds
+  // `looksLikeTopicPrompt`'s no-LLM thread-routing fallback and the assistant-
+  // prose loop-risk scan in clarification-state.js (assistant text, not a user
+  // prompt). "?" is language-neutral punctuation, not an intent lexicon.
   function isQuestionLikeText(value) {
-    const text = readString$1g(value);
-    return /\?$/.test(text) || /^(what|which|who|when|where|why|how|do|does|did|can|could|would|should|is|are|am|will)\b/i.test(text);
+    return readString$1h(value).endsWith("?");
   }
 
-  function isActionLikeText(value) {
-    const text = trimTrailingPunctuation$2(value).toLowerCase();
-    return /^(go|look|find|search|check|read|open|fetch|show|list|tell|reply|respond|answer|continue|explain|review|summarize|repeat|scrub)\b/.test(text)
-      || /\b(search|lookup)\b/.test(text);
-  }
+  // AGRUN-246-K: isActionLikeText (the last English action-verb lexicon, B1/B2)
+  // is DELETED. It was the final regex-on-prompt in this file, surviving only as
+  // a no-LLM structural fallback for (1) topic-router thread routing and (2)
+  // inquiry-context follow_up_command continuity. Both are now AI-owned:
+  // thread routing relies on turnIntent.divergentIntent/pivotIntent (with a
+  // conservative continue/topic-shape default), and inquiry-context preserves the
+  // prior topic anchor by default (turnIntent.kind === "new_task" is the AI's
+  // reset override). The lexicon was i18n-broken (English-only) and "command vs
+  // topic" is a semantic judgement the AI makes — no structural primitive can.
+  // See ADR-0047 (closes audit C2.2; topic-like-task.js allowlist 2 → 0).
 
   function countWords(value) {
     return trimTrailingPunctuation$2(value).split(/\s+/).filter(Boolean).length;
   }
 
-  function trimTrailingPunctuation$2(value) {
-    return readString$1g(value).replace(/[.?!]+$/g, "").trim();
+  // AGRUN-246-D C2.2: digit presence via a language-neutral character scan
+  // (replaces the prior `/\b\d+\b/` regex-on-prompt). A number in a short topic
+  // signals specificity ("Q3 2024", "...2026"); this is a structural primitive,
+  // not an intent lexicon.
+  function hasDigit(value) {
+    const text = readString$1h(value);
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i];
+      if (ch >= "0" && ch <= "9") {
+        return true;
+      }
+    }
+    return false;
   }
 
-  function readString$1g(value) {
+  function trimTrailingPunctuation$2(value) {
+    return readString$1h(value).replace(/[.?!]+$/g, "").trim();
+  }
+
+  function readString$1h(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25005,7 +26055,7 @@
 
   function deriveOpenAmbiguity(pendingClarification) {
     return isPendingClarification(pendingClarification)
-      ? readString$1f(pendingClarification.question)
+      ? readString$1g(pendingClarification.question)
       : "";
   }
 
@@ -25025,22 +26075,22 @@
     }
 
     if (
-      readString$1f(options && options.currentGoal).length === 0 ||
-      readString$1f(options && options.currentTopic).length === 0 ||
-      readString$1f(options && options.goalQuality) !== "stable"
+      readString$1g(options && options.currentGoal).length === 0 ||
+      readString$1g(options && options.currentTopic).length === 0 ||
+      readString$1g(options && options.goalQuality) !== "stable"
     ) {
       return "unresolved";
     }
 
-    if (readString$1f(options && options.evidenceState) !== "none") {
+    if (readString$1g(options && options.evidenceState) !== "none") {
       return "inferable";
     }
 
-    if (readString$1f(options && options.promptSignal) !== "low") {
+    if (readString$1g(options && options.promptSignal) !== "low") {
       return "unresolved";
     }
 
-    if (readString$1f(options && options.semanticHint) === "inferable") {
+    if (readString$1g(options && options.semanticHint) === "inferable") {
       return "inferable";
     }
 
@@ -25053,7 +26103,7 @@
   }
 
   function detectClarificationLoopRisk(options) {
-    if (readString$1f(options && options.actionName) !== "ask_clarification") {
+    if (readString$1g(options && options.actionName) !== "ask_clarification") {
       return false;
     }
 
@@ -25071,8 +26121,8 @@
       return false;
     }
 
-    const currentGoal = readString$1f(options && options.currentGoal);
-    const currentTopic = readString$1f(options && options.currentTopic);
+    const currentGoal = readString$1g(options && options.currentGoal);
+    const currentTopic = readString$1g(options && options.currentTopic);
     if (!currentGoal || !currentTopic) {
       return false;
     }
@@ -25086,7 +26136,7 @@
       )
     );
 
-    if (readString$1f(options && options.promptSignal) !== "low" || !repeatedClarification) {
+    if (readString$1g(options && options.promptSignal) !== "low" || !repeatedClarification) {
       return false;
     }
 
@@ -25094,7 +26144,7 @@
       return true;
     }
 
-    return readString$1f(options && options.evidenceState) !== "none";
+    return readString$1g(options && options.evidenceState) !== "none";
   }
 
   function isPendingClarification(value) {
@@ -25102,22 +26152,22 @@
       value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
-      readString$1f(value.question)
+      readString$1g(value.question)
     );
   }
 
   function isResolvedResolution(value) {
-    const kind = readString$1f(value && value.kind);
+    const kind = readString$1g(value && value.kind);
     return RESOLVED_KINDS.has(kind);
   }
 
   function readClarificationStatus(value) {
-    const text = readString$1f(value);
+    const text = readString$1g(value);
     return text === "resolved" ? "resolved" : "none";
   }
 
   function readRecentTurnStats(text) {
-    const lines = readString$1f(text)
+    const lines = readString$1g(text)
       .split(/\r?\n+/)
       .map((line) => line.trim())
       .filter(Boolean);
@@ -25146,7 +26196,7 @@
   }
 
   function hasOptionStyleAmbiguity(value) {
-    return /\([A-Z]\)/.test(readString$1f(value));
+    return /\([A-Z]\)/.test(readString$1g(value));
   }
 
   function isLowSignalText(value) {
@@ -25155,10 +26205,10 @@
   }
 
   function trimTrailingPunctuation$1(value) {
-    return readString$1f(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1g(value).replace(/[.?!]+$/g, "").trim();
   }
 
-  function readString$1f(value) {
+  function readString$1g(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25191,7 +26241,13 @@
         };
       }
 
-      if (isActionLikeText(options && typeof options === "object" ? options.prompt : "")) {
+      // AGRUN-246-D C2.2: a follow-up command on the stable goal/topic is owned by
+      // the AI/router turnIntent.kind, not the English action-verb lexicon that
+      // formerly classified `options.prompt` (isActionLikeText). new_task is
+      // already handled by the research_loop branch above and the executable-topic
+      // branch below; approval_resolution by the branch below. This covers the
+      // remaining definite-relationship kinds.
+      if (readTurnIntentKind(options) === "follow_up" || readTurnIntentKind(options) === "drill_down") {
         return {
           goalEqualsTopic,
           goalLooksLikeQuestion,
@@ -25232,11 +26288,11 @@
   }
 
   function normalizeValue(value) {
-    return readString$1e(value).toLowerCase().replace(/\s+/g, " ");
+    return readString$1f(value).toLowerCase().replace(/\s+/g, " ");
   }
 
   function readTurnIntentKind(options) {
-    return readString$1e(
+    return readString$1f(
       options &&
       typeof options === "object" &&
       options.turnIntent &&
@@ -25247,7 +26303,7 @@
   }
 
   function readExecutionClass(options) {
-    return readString$1e(
+    return readString$1f(
       options &&
       typeof options === "object"
         ? options.executionClass
@@ -25255,7 +26311,7 @@
     );
   }
 
-  function readString$1e(value) {
+  function readString$1f(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25278,7 +26334,7 @@
     const inquiryContext = normalizedResolution.inquiryContext;
     const prompt = readPrompt$2(request, observationSummary);
     const turnIntent = normalizedResolution.turnIntent;
-    const executionClass = readString$1d(normalizedResolution.executionClass) || null;
+    const executionClass = readString$1e(normalizedResolution.executionClass) || null;
     const goalQuality = classifyGoalQuality(inquiryContext.activeGoal, inquiryContext.activeTopic, {
           executionClass,
           prompt,
@@ -25303,7 +26359,7 @@
     });
 
     return {
-      activeQuery: readString$1d(normalizedResolution.activeQuery),
+      activeQuery: readString$1e(normalizedResolution.activeQuery),
       activeTask: inquiryContext.activeGoal || prompt,
       ambiguityState,
       clarificationStatus,
@@ -25328,11 +26384,11 @@
   }
 
   function createEvaluationState(options) {
-    const actionName = readString$1d(options && options.actionName);
+    const actionName = readString$1e(options && options.actionName);
     const plannerState = options && typeof options === "object" ? options.plannerState : null;
     const turnState = options && typeof options === "object" ? options.turnState : null;
-    const evidenceState = readString$1d(plannerState && plannerState.evidenceState) || "none";
-    const promptSignal = readString$1d(plannerState && plannerState.promptSignal) || "empty";
+    const evidenceState = readString$1e(plannerState && plannerState.evidenceState) || "none";
+    const promptSignal = readString$1e(plannerState && plannerState.promptSignal) || "empty";
     const pendingClarification = plannerState && plannerState.pendingClarification
       ? plannerState.pendingClarification
       : null;
@@ -25345,11 +26401,11 @@
       plannerState && plannerState.clarificationStatus
     );
     const ambiguityState = deriveAmbiguityState({
-      currentGoal: readString$1d(plannerState && plannerState.currentGoal),
-      currentTopic: readString$1d(plannerState && plannerState.currentTopic),
+      currentGoal: readString$1e(plannerState && plannerState.currentGoal),
+      currentTopic: readString$1e(plannerState && plannerState.currentTopic),
       evidenceState,
       fallbackClarificationStatus: clarificationStatus,
-      goalQuality: readString$1d(plannerState && plannerState.goalQuality),
+      goalQuality: readString$1e(plannerState && plannerState.goalQuality),
       lastResolution,
       pendingClarification,
       promptSignal,
@@ -25357,13 +26413,13 @@
     });
     const clarificationLoopRisk = detectClarificationLoopRisk({
       actionName,
-      currentGoal: readString$1d(plannerState && plannerState.currentGoal),
-      currentTopic: readString$1d(plannerState && plannerState.currentTopic),
+      currentGoal: readString$1e(plannerState && plannerState.currentGoal),
+      currentTopic: readString$1e(plannerState && plannerState.currentTopic),
       evidenceState,
       lastResolution,
       pendingClarification,
       promptSignal,
-      recentTurns: readString$1d(options && options.sessionContext && options.sessionContext.recentTurns),
+      recentTurns: readString$1e(options && options.sessionContext && options.sessionContext.recentTurns),
       semanticHint: ""
     });
 
@@ -25377,9 +26433,9 @@
       hasUserClarification: Boolean(
         plannerState && plannerState.hasUserClarification
       ) || Boolean(turnState && turnState.hasUserClarification),
-      nextState: readString$1d(options && options.nextState) || null,
+      nextState: readString$1e(options && options.nextState) || null,
       openAmbiguity: deriveOpenAmbiguity(pendingClarification) || null,
-      outcome: readString$1d(options && options.outcome) || null
+      outcome: readString$1e(options && options.outcome) || null
     };
   }
 
@@ -25391,20 +26447,16 @@
     }
 
     if (isLowSignalPrompt(text)) {
-      return createPromptSignal("low", false, isQuestionLikeText(text), true);
+      return createPromptSignal("low", false, false, true);
     }
 
-    if (isActionLikeText(text)) {
-      return createPromptSignal("high", true, false, false);
-    }
-
-    if (isQuestionLikeText(text)) {
-      return createPromptSignal("high", false, true, false);
-    }
-
-    // AGRUN-246-D (C2.3): removed looksLikeTopicPrompt branch — "topic_like" is
-    // downstream-equivalent to "high" (all consumers only check "low" vs not-low).
-    // English word-splitter misclassified CJK prompts (no spaces → 1 "word" ≤ 10).
+    // AGRUN-246-D C2.2/C2.3: prompt-shape is no longer lexically classified here.
+    // The English action-verb / question-word lexicons (formerly isActionLikeText /
+    // isQuestionLikeText) misclassified non-English prompts, and the resulting
+    // isActionLike / isQuestionLike booleans were never read downstream — only
+    // "low" vs not-low matters (clarification-state.js low-signal gating), and
+    // that is owned by isLowSignalPrompt, a length/triviality check, not a
+    // lexicon. Real prompt intent is AI/router-owned via turnIntent.kind.
     return createPromptSignal("high", false, false, false);
   }
 
@@ -25435,15 +26487,15 @@
         };
 
     return {
-      activeQuery: readString$1d(source.activeQuery),
-      evidenceState: readString$1d(source.evidenceState) || "none",
+      activeQuery: readString$1e(source.activeQuery),
+      evidenceState: readString$1e(source.evidenceState) || "none",
       inquiryContext: normalizePlannerInquiryContext(
         source.inquiryContext && typeof source.inquiryContext === "object"
           ? source.inquiryContext
           : intentState
       ),
       shouldUseRecall: source.shouldUseRecall === true,
-      executionClass: readString$1d(source.executionClass) || null,
+      executionClass: readString$1e(source.executionClass) || null,
       turnIntent: source.turnIntent && typeof source.turnIntent === "object"
         ? source.turnIntent
         : null,
@@ -25473,7 +26525,7 @@
   }
 
   function trimTrailingPunctuation(value) {
-    return readString$1d(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1e(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function readPrompt$2(request, normalizedInput) {
@@ -25489,7 +26541,7 @@
   }
 
   function readPlannerPromptSignal(request, observationSummary) {
-    const explicit = readString$1d(observationSummary && observationSummary.promptSignal);
+    const explicit = readString$1e(observationSummary && observationSummary.promptSignal);
     return explicit || classifyPromptSignal(readPrompt$2(request, null)).signal;
   }
 
@@ -25497,9 +26549,9 @@
     const source = value && typeof value === "object" ? value : {};
 
     return {
-      activeGoal: readString$1d(source.activeGoal || source.goal),
-      activeQuery: readString$1d(source.activeQuery),
-      activeTopic: readString$1d(source.activeTopic || source.topic),
+      activeGoal: readString$1e(source.activeGoal || source.goal),
+      activeQuery: readString$1e(source.activeQuery),
+      activeTopic: readString$1e(source.activeTopic || source.topic),
       lastClarificationResolution: source.lastClarificationResolution || source.lastResolution || null,
       pendingClarification: source.pendingClarification && typeof source.pendingClarification === "object"
         ? source.pendingClarification
@@ -25507,7 +26559,7 @@
     };
   }
 
-  function readString$1d(value) {
+  function readString$1e(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25534,15 +26586,15 @@
   }
 
   function normalizeAnchorText(value) {
-    return readString$1c(value).replace(/[.?!]+$/g, "").trim();
+    return readString$1d(value).replace(/[.?!]+$/g, "").trim();
   }
 
   function looksLikeAffirmativePrompt(value) {
-    return /^(yes|yeah|yep|ok|okay|sure|go ahead|do it|just do it)\b/i.test(readString$1c(value));
+    return /^(yes|yeah|yep|ok|okay|sure|go ahead|do it|just do it)\b/i.test(readString$1d(value));
   }
 
   function inferClarifiedTopic(question) {
-    const text = readString$1c(question);
+    const text = readString$1d(question);
     const directMatch = text.match(/^do you mean\s+(.+?)(?:\s+specifically)?[?]?$/i);
 
     if (directMatch && directMatch[1]) {
@@ -25572,9 +26624,9 @@
     }
 
     return {
-      activeGoal: readString$1c(intentState.goal),
-      activeQuery: readString$1c(inputResolution && inputResolution.activeQuery),
-      activeTopic: readString$1c(intentState.topic),
+      activeGoal: readString$1d(intentState.goal),
+      activeQuery: readString$1d(inputResolution && inputResolution.activeQuery),
+      activeTopic: readString$1d(intentState.topic),
       continuityKind: "input_resolution",
       hasUserClarification: intentState.hasUserClarification === true,
       lastClarificationResolution: cloneResolution(intentState.lastResolution),
@@ -25584,12 +26636,12 @@
   }
 
   function matchClarificationOption(prompt, options) {
-    const normalizedPrompt = readString$1c(prompt).toLowerCase();
+    const normalizedPrompt = readString$1d(prompt).toLowerCase();
     const normalizedOptions = Array.isArray(options) ? options : [];
 
     for (const option of normalizedOptions) {
-      const key = readString$1c(option && option.key);
-      const text = readString$1c(option && option.text);
+      const key = readString$1d(option && option.key);
+      const text = readString$1d(option && option.text);
 
       if (!key || !text) {
         continue;
@@ -25669,14 +26721,14 @@
   }
 
   function tokenize$1(value) {
-    return readString$1c(value)
+    return readString$1d(value)
       .toLowerCase()
       .split(/[^a-z0-9]+/i)
       .map((token) => token.trim())
       .filter((token) => token.length > 1);
   }
 
-  function readString$1c(value) {
+  function readString$1d(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25685,9 +26737,9 @@
     const normalizedPrompt = normalizeAnchorText(prompt);
     if (!normalizedPrompt) {
       return {
-        activeGoal: readString$1b(context.activeGoal),
-        activeQuery: readString$1b(context.activeQuery),
-        activeTopic: readString$1b(context.activeTopic),
+        activeGoal: readString$1c(context.activeGoal),
+        activeQuery: readString$1c(context.activeQuery),
+        activeTopic: readString$1c(context.activeTopic),
         continuityKind: "preserve",
         hasUserClarification: false,
         lastClarificationResolution: cloneResolution(context.lastClarificationResolution),
@@ -25696,9 +26748,9 @@
       };
     }
 
-    const currentGoal = readString$1b(context.activeGoal);
-    const currentQuery = readString$1b(context.activeQuery);
-    const currentTopic = readString$1b(context.activeTopic);
+    const currentGoal = readString$1c(context.activeGoal);
+    const currentQuery = readString$1c(context.activeQuery);
+    const currentTopic = readString$1c(context.activeTopic);
     const pendingClarification = context.pendingClarification && typeof context.pendingClarification === "object"
       ? context.pendingClarification
       : null;
@@ -25706,7 +26758,7 @@
       && typeof options.turnIntent === "object"
       ? options.turnIntent
       : null;
-    const turnIntentKind = readString$1b(turnIntent && turnIntent.kind);
+    const turnIntentKind = readString$1c(turnIntent && turnIntent.kind);
 
     if (turnIntentKind === "new_task") {
       return {
@@ -25829,7 +26881,28 @@
       };
     }
 
-    if (currentTopic && isActionLikeText(normalizedPrompt)) {
+    // AGRUN-246-K: follow-up continuity is AI-owned, not lexicon-derived.
+    //
+    // We reach here when an ongoing session has a prior topic, the turn is not an
+    // AI-declared new_task (handled at the top), not a clarification flow, and
+    // shares no token overlap with the current direction (topic_refinement above
+    // already caught overlapping follow-ups). The old code used an English
+    // action-verb lexicon (isActionLikeText) to guess "is this a follow-up
+    // command?" — preserve the prior topic if so, else reset. That lexicon was
+    // i18n-broken (it preserved continuity only for English commands; Mandarin /
+    // non-English / indirect follow-ups silently reset to the bare prompt) and it
+    // stood in for a SEMANTIC judgement the AI owns.
+    //
+    // With a prior topic present we PRESERVE it by default (continuityKind
+    // "follow_up_command"): the active goal still anchors to the new prompt so the
+    // task is pursued correctly, while activeQuery/activeTopic keep the
+    // conversation's subject — the common, conversational case. A genuine no-
+    // overlap topic switch (structurally indistinguishable from a follow-up
+    // command without a lexicon) is the AI's call: when a classifier is configured
+    // it emits turnIntent.kind === "new_task" and resets at the top; in a no-
+    // classifier run the prior topic lags one turn and recovers via
+    // topic_refinement. Continuity is now language-neutral. See ADR-0047.
+    if (currentTopic) {
       return {
         activeGoal: normalizedPrompt,
         activeQuery: currentQuery || currentTopic,
@@ -25842,6 +26915,7 @@
       };
     }
 
+    // First turn / no prior topic to preserve — anchor everything to the prompt.
     return {
       activeGoal: normalizedPrompt,
       activeQuery: normalizedPrompt,
@@ -25855,9 +26929,9 @@
   }
 
   function syncPromptInquiryContext(runState, request, options) {
-    const prompt = readString$1b(request && request.prompt);
+    const prompt = readString$1c(request && request.prompt);
 
-    if (!runState || !prompt || readString$1b(request && request.type) === "approval_resolution") {
+    if (!runState || !prompt || readString$1c(request && request.type) === "approval_resolution") {
       return;
     }
 
@@ -25896,7 +26970,7 @@
     return snapshot;
   }
 
-  function readString$1b(value) {
+  function readString$1c(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -25944,18 +27018,18 @@
     const activeItem = findActiveItem(todoState, items);
     const unfinishedCount = counts.active + counts.pending + counts.blocked;
     const observation = {
-      activeItemId: readString$1a(activeItem && activeItem.id) || null,
-      activeItemLabel: readString$1a(activeItem && activeItem.label) || null,
+      activeItemId: readString$1b(activeItem && activeItem.id) || null,
+      activeItemLabel: readString$1b(activeItem && activeItem.label) || null,
       counts,
       items: items.map((item) => ({
-        id: readString$1a(item && item.id) || null,
-        label: readString$1a(item && item.label) || null,
-        status: readString$1a(item && item.status) || "pending"
+        id: readString$1b(item && item.id) || null,
+        label: readString$1b(item && item.label) || null,
+        status: readString$1b(item && item.status) || "pending"
       })),
       observedAt,
       source,
       status: unfinishedCount > 0 ? "unfinished_at_terminal" : "already_terminal_or_complete",
-      todoStateStatus: readString$1a(todoState.status) || null,
+      todoStateStatus: readString$1b(todoState.status) || null,
       unfinishedCount
     };
     runState.todoTerminalObservation = observation;
@@ -25998,7 +27072,7 @@
   }
 
   function findActiveItem(todoState, items) {
-    const activeItemId = readString$1a(todoState && todoState.activeItemId);
+    const activeItemId = readString$1b(todoState && todoState.activeItemId);
     if (activeItemId) {
       const byId = items.find((item) => item && item.id === activeItemId && item.status === "active");
       if (byId) return byId;
@@ -26006,7 +27080,7 @@
     return items.find((item) => item && item.status === "active") || null;
   }
 
-  function readString$1a(value) {
+  function readString$1b(value) {
     return typeof value === "string" && value.trim() ? value.trim() : "";
   }
 
@@ -26132,16 +27206,16 @@
       : null;
     const turnIntent = options && typeof options === "object" ? options.turnIntent : null;
     const executionClass = options && typeof options === "object"
-      ? readString$19(options.executionClass)
+      ? readString$1a(options.executionClass)
       : "";
-    const turnIntentKind = readString$19(turnIntent && turnIntent.kind);
-    const currentPrompt = readString$19(observationSummary && observationSummary.prompt)
-      || readString$19(options && options.originalQuery)
-      || readString$19(turnIntent && turnIntent.goal);
+    const turnIntentKind = readString$1a(turnIntent && turnIntent.kind);
+    const currentPrompt = readString$1a(observationSummary && observationSummary.prompt)
+      || readString$1a(options && options.originalQuery)
+      || readString$1a(turnIntent && turnIntent.goal);
     const goalAnchorText = turnIntentKind === "new_task" && currentPrompt
       ? currentPrompt
-      : readString$19(intentState && intentState.goal)
-      || readString$19(inquiryContext && inquiryContext.activeGoal);
+      : readString$1a(intentState && intentState.goal)
+      || readString$1a(inquiryContext && inquiryContext.activeGoal);
     // 2026-05-09 — Prefer `researchState.topic` (AI-authored via tool
     // calls) when available; fall through to `intentState.topic` /
     // `inquiryContext.activeTopic` raw values otherwise.
@@ -26157,11 +27231,11 @@
     // never benefited. AI-first replacement: trust whatever the
     // upstream pipeline produces; AI sees the full original prompt
     // elsewhere via `originalQuery`.
-    const researchTopic = readString$19(
+    const researchTopic = readString$1a(
       options && options.runState && options.runState.researchState && options.runState.researchState.topic
     );
-    const rawTopic = readString$19(intentState && intentState.topic)
-      || readString$19(inquiryContext && inquiryContext.activeTopic);
+    const rawTopic = readString$1a(intentState && intentState.topic)
+      || readString$1a(inquiryContext && inquiryContext.activeTopic);
     const topicAnchorText = researchTopic
       || extractStructuralTopic(rawTopic)
       || rawTopic;
@@ -26170,7 +27244,7 @@
       topicAnchorText,
       {
         executionClass,
-        prompt: readString$19(observationSummary && observationSummary.prompt),
+        prompt: readString$1a(observationSummary && observationSummary.prompt),
         turnIntent
       }
     ).quality;
@@ -26216,7 +27290,7 @@
   }
 
   function deriveTurnStateStatus(goalQuality, intentState, inquiryContext, pendingApprovalAction, turnIntent) {
-    if (readString$19(turnIntent && turnIntent.kind) === "approval_resolution") {
+    if (readString$1a(turnIntent && turnIntent.kind) === "approval_resolution") {
       return "running_control_step";
     }
 
@@ -26243,7 +27317,7 @@
       return "";
     }
 
-    return readString$19(pendingApproval.actionName);
+    return readString$1a(pendingApproval.actionName);
   }
 
   function cloneStructuredValue$1(value) {
@@ -26253,7 +27327,7 @@
   }
 
   function extractStructuralTopic(value) {
-    const text = readString$19(value);
+    const text = readString$1a(value);
     if (!text) return "";
     const topicPhrase = text.match(/\btopic\s*[:=]?\s*["'“”‘’`]([^"'“”‘’`]{2,160})["'“”‘’`]/i);
     if (topicPhrase) return topicPhrase[1].trim();
@@ -26261,7 +27335,7 @@
     return quoted ? quoted[1].trim() : "";
   }
 
-  function readString$19(value) {
+  function readString$1a(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -26323,8 +27397,8 @@
       ? projection.researchReportLoop
       : null;
     if (!loop) return false;
-    const status = readString$18(loop.status);
-    return loop.enabled === true || Boolean(readString$18(loop.finalMode)) || Boolean(status && status !== "idle");
+    const status = readString$19(loop.status);
+    return loop.enabled === true || Boolean(readString$19(loop.finalMode)) || Boolean(status && status !== "idle");
   }
 
   function normalizeTerminalFinalText(rawText, runState, request, options = {}) {
@@ -26382,12 +27456,12 @@
     const sources = [];
     const seenUrls = new Set();
     for (const source of sourceArtifacts) {
-      const url = readString$18(source && source.url);
+      const url = readString$19(source && source.url);
       if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
       seenUrls.add(url);
       sources.push({
         kind: "research_evidence_graph",
-        title: readString$18(source && source.title) || url,
+        title: readString$19(source && source.title) || url,
         url
       });
       if (sources.length >= 8) break;
@@ -26398,7 +27472,7 @@
     };
   }
 
-  function readString$18(value) {
+  function readString$19(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -27054,8 +28128,8 @@
   }
 
   function sanitizeSkillToolArgs(rawArgs) {
-    const skillName = readString$17(rawArgs.skillName) || undefined;
-    const toolName = readString$17(rawArgs.toolName) || undefined;
+    const skillName = readString$18(rawArgs.skillName) || undefined;
+    const toolName = readString$18(rawArgs.toolName) || undefined;
 
     const nested = rawArgs.args && typeof rawArgs.args === "object" && !Array.isArray(rawArgs.args)
       ? rawArgs.args
@@ -27171,7 +28245,7 @@
     return String(value);
   }
 
-  function readString$17(value) {
+  function readString$18(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -27345,7 +28419,7 @@
     const readSources = Array.isArray(context.readSources) ? context.readSources.slice() : [];
     const aggregatedSearchResults = aggregateRankedSearchResults(combinedPasses);
     const verification = createSearchVerification({
-      query: readString$16(output && output.query) || readString$16(context && context.lastQuery),
+      query: readString$17(output && output.query) || readString$17(context && context.lastQuery),
       rankedItems: aggregatedSearchResults,
       readSources,
       strategy: output && output.searchPlan ? output.searchPlan.strategy : ""
@@ -27354,7 +28428,7 @@
 
     return {
       aggregatedSearchResults: cloneValue$1(aggregatedSearchResults),
-      lastQuery: readString$16(output && output.lastExecutedQuery) || readString$16(output && output.query) || null,
+      lastQuery: readString$17(output && output.lastExecutedQuery) || readString$17(output && output.query) || null,
       readSources,
       searchPasses: combinedPasses,
       searchPlan: cloneValue$1(output && output.searchPlan) || null,
@@ -27383,7 +28457,7 @@
     return [];
   }
 
-  function readString$16(value) {
+  function readString$17(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -27446,31 +28520,31 @@
       : {};
     const type = normalizeType$1(source.type);
     const event = {
-      actionName: readString$15(source.actionName) || readString$15(context.actionName) || undefined,
-      callId: readString$15(source.callId) || readString$15(context.callId) || undefined,
-      control: readString$15(source.control) || undefined,
+      actionName: readString$16(source.actionName) || readString$16(context.actionName) || undefined,
+      callId: readString$16(source.callId) || readString$16(context.callId) || undefined,
+      control: readString$16(source.control) || undefined,
       delta: typeof source.delta === "string" ? source.delta : undefined,
       durationMs: Number.isFinite(source.durationMs) ? source.durationMs : undefined,
       error: typeof source.error === "string" ? source.error : undefined,
       final: source.final === true,
-      kind: readString$15(source.kind) || undefined,
-      model: readString$15(source.model) || readString$15(context.model) || null,
+      kind: readString$16(source.kind) || undefined,
+      model: readString$16(source.model) || readString$16(context.model) || null,
       preliminary: source.preliminary === true,
-      provider: readString$15(source.provider) || readString$15(context.provider) || null,
+      provider: readString$16(source.provider) || readString$16(context.provider) || null,
       resultCount: Number.isFinite(source.resultCount) ? source.resultCount : undefined,
       sequence: Number.isInteger(source.sequence) && source.sequence > 0 ? source.sequence : null,
-      skillName: readString$15(source.skillName) || undefined,
-      source: readString$15(source.source) || readString$15(context.source) || undefined,
-      status: readString$15(source.status) || undefined,
+      skillName: readString$16(source.skillName) || undefined,
+      source: readString$16(source.source) || readString$16(context.source) || undefined,
+      status: readString$16(source.status) || undefined,
       timestamp: Number.isFinite(source.timestamp) ? source.timestamp : Date.now(),
-      toolName: readString$15(source.toolName) || undefined,
+      toolName: readString$16(source.toolName) || undefined,
       type
     };
     return stripUndefined$1(event);
   }
 
   function normalizeType$1(value) {
-    const type = readString$15(value);
+    const type = readString$16(value);
     if (type === "provider_stream_start") return type;
     if (type === "provider_text_delta") return type;
     if (type === "provider_stream_finish") return type;
@@ -27491,7 +28565,7 @@
     return output;
   }
 
-  function readString$15(value) {
+  function readString$16(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -27845,7 +28919,7 @@
   // including host-provided corePattern/extendedPattern hooks, are deliberately
   // removed so the runtime cannot reclassify user intent from raw prompt text.
 
-  function readString$14(value) {
+  function readString$15(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -27882,7 +28956,7 @@
    *     additive, not positional.
    */
 
-  function readString$13(value) {
+  function readString$14(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -28022,7 +29096,7 @@
         const fn = readFunction(overrideValue);
         merged[key] = fn || defaultValue;
       } else {
-        const str = readString$13(overrideValue);
+        const str = readString$14(overrideValue);
         merged[key] = str || defaultValue;
       }
     }
@@ -28117,7 +29191,7 @@
   function maybeCreateTodoInspectLoopGuard(runState, config, context) {
     const normalized = normalizeTodoAutopilotConfig(config);
     if (!normalized.enabled) return null;
-    const actionName = readString$14(context && context.actionName);
+    const actionName = readString$15(context && context.actionName);
     if (actionName !== "todo_inspect") return null;
 
     const history = Array.isArray(context && context.actionHistory) ? context.actionHistory : [];
@@ -28181,7 +29255,7 @@
       return null;
     }
 
-    const actionName = readString$14(context && context.actionName);
+    const actionName = readString$15(context && context.actionName);
     if (isTodoPlanningAction(actionName)) return null;
 
     return {
@@ -28200,7 +29274,7 @@
     const normalized = normalizeTodoAutopilotConfig(config);
     if (!normalized.enabled) return null;
 
-    const actionName = readString$14(context && context.actionName);
+    const actionName = readString$15(context && context.actionName);
     const rules = normalized.actionProgressRules || {};
     const rule = rules[actionName];
     if (!rule) return null;
@@ -28228,7 +29302,7 @@
     const activeItem = findActiveTodoItem$2(todoState);
     if (!activeItem) return null;
 
-    const label = readString$14(activeItem.label);
+    const label = readString$15(activeItem.label);
     if (!label) return null;
     if (actionName === "workspace_finalize_candidate") {
       if (!(normalized.finalizationPattern instanceof RegExp)) return null;
@@ -28279,9 +29353,9 @@
     if (plan && plan.allowedInPlan === false) {
       return {
         allowedInPlan: false,
-        code: readString$12(plan.code) || "skill_mutator_in_plan",
-        detail: readString$12(plan.detail) || createStandaloneActionDetail(action),
-        reason: readString$12(plan.reason) || "state_mutation"
+        code: readString$13(plan.code) || "skill_mutator_in_plan",
+        detail: readString$13(plan.detail) || createStandaloneActionDetail(action),
+        reason: readString$13(plan.reason) || "state_mutation"
       };
     }
     return {
@@ -28295,17 +29369,17 @@
   function formatStandalonePlanActionNames(actions) {
     const names = (Array.isArray(actions) ? actions : [])
       .filter((action) => readPlanActionContract(action).allowedInPlan === false)
-      .map((action) => readString$12(action && action.name))
+      .map((action) => readString$13(action && action.name))
       .filter(Boolean);
     return names.length > 0 ? names.join(", ") : "actions marked standalone-only";
   }
 
   function createStandaloneActionDetail(action) {
-    const actionName = readString$12(action && action.name) || "This action";
+    const actionName = readString$13(action && action.name) || "This action";
     return `${actionName} is marked standalone-only by its action metadata because it mutates planner/run state. Emit it as its own type:"action" envelope instead of placing it inside plan.actions. If you need more work after it runs, wait for the observation and choose the next action in the following OODAE cycle.`;
   }
 
-  function readString$12(value) {
+  function readString$13(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -28338,14 +29412,14 @@
   // plans, the verifier nudge is not worth the loop cost.
   const VERIFIER_NUDGE_MIN_ITEMS = 3;
 
-  function readString$11(value) {
+  function readString$12(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function readProvenance(runState) {
     if (!runState || typeof runState !== "object") return null;
-    const threadId = readString$11(runState.threadId);
-    const turnId = readString$11(runState.runId);
+    const threadId = readString$12(runState.threadId);
+    const turnId = readString$12(runState.runId);
     if (!threadId && !turnId) return null;
     return { threadId: threadId || "default", turnId: turnId || null };
   }
@@ -28437,7 +29511,7 @@
     const validItems = items.filter((item) => (
       item &&
       typeof item === "object" &&
-      readString$11(item.label)
+      readString$12(item.label)
     ));
     if (validItems.length === 0) {
       throw new Error("todo_plan requires at least one item with a non-empty label in native_tools mode.");
@@ -28531,9 +29605,9 @@
    * re-anchor the goal because the planner forgot to.
    */
   function readGoalForPlan(args, runState, context) {
-    const explicit = readString$11(args && args.goal);
+    const explicit = readString$12(args && args.goal);
     if (explicit) return explicit;
-    const prompt = readString$11(
+    const prompt = readString$12(
       runState && runState.observationSummary && runState.observationSummary.prompt
     );
     if (prompt) {
@@ -28598,11 +29672,11 @@
       throw new Error("todo_advance: runState is required");
     }
     const opts = args && typeof args === "object" ? args : {};
-    const itemId = readString$11(opts.itemId);
+    const itemId = readString$12(opts.itemId);
     if (!itemId) {
       throw new Error("todo_advance: itemId is required");
     }
-    const nextStatus = readString$11(opts.nextStatus);
+    const nextStatus = readString$12(opts.nextStatus);
     if (!nextStatus) {
       throw new Error("todo_advance: nextStatus is required");
     }
@@ -28693,14 +29767,14 @@
     runState.todoState = next;
     emitTodoStateMutation(context, "cancel", next, {
       cancelledItemCount: next === current ? 0 : cancellableBefore,
-      reason: readString$11(opts.reason || opts.note) || null
+      reason: readString$12(opts.reason || opts.note) || null
     });
     return {
       control: "continue",
       output: {
         cancelledItemCount: next === current ? 0 : cancellableBefore,
         kind: "todo_cancel_result",
-        reason: readString$11(opts.reason || opts.note) || null,
+        reason: readString$12(opts.reason || opts.note) || null,
         todoState: serializeTodoState(next)
       },
       summary: `todo_cancel(items=${next === current ? 0 : cancellableBefore}, status=${next.status})`
@@ -28947,10 +30021,10 @@
 
     const hasVerificationItem = items.some((item) => {
       if (!item) return false;
-      const label = readString$11(item.label);
+      const label = readString$12(item.label);
       if (label && pattern.test(label)) return true;
       const notes = Array.isArray(item.notes) ? item.notes : [];
-      return notes.some((note) => note && pattern.test(readString$11(note.text)));
+      return notes.some((note) => note && pattern.test(readString$12(note.text)));
     });
     if (hasVerificationItem) return null;
 
@@ -28960,7 +30034,7 @@
         reason: "plan completed without any verify/test/check item"
       });
     }
-    return readString$11(nudgeFn({ itemCount: items.length })) || null;
+    return readString$12(nudgeFn({ itemCount: items.length })) || null;
   }
 
   function countCancellableTodoItems(todoState) {
@@ -28994,12 +30068,12 @@
 
     pushStep("read-url-requested", {
       maxBytes: typeof actionArgs?.maxBytes === "number" ? actionArgs.maxBytes : null,
-      method: readString$1Y(actionArgs && actionArgs.method) || "GET",
-      mode: readString$1Y(actionArgs && actionArgs.mode) || "auto",
+      method: readString$1_(actionArgs && actionArgs.method) || "GET",
+      mode: readString$1_(actionArgs && actionArgs.mode) || "auto",
       textLength: typeof actionArgs?.textLength === "number" ? actionArgs.textLength : null,
       textStart: typeof actionArgs?.textStart === "number" ? actionArgs.textStart : null,
       timeoutMs: typeof actionArgs?.timeoutMs === "number" ? actionArgs.timeoutMs : null,
-      url: readString$1Y(actionArgs && actionArgs.url)
+      url: readString$1_(actionArgs && actionArgs.url)
     });
   }
 
@@ -29010,12 +30084,12 @@
 
     if (output.ok === false) {
       pushStep("read-url-failed", {
-        error: readString$1Y(output.error),
-        message: readString$1Y(output.message),
+        error: readString$1_(output.error),
+        message: readString$1_(output.message),
         originStatus: typeof output.originStatus === "number" ? output.originStatus : null,
-        reason: readString$1Y(output.reason),
+        reason: readString$1_(output.reason),
         status: typeof output.status === "number" ? output.status : null,
-        url: readString$1Y(output.url)
+        url: readString$1_(output.url)
       });
       return;
     }
@@ -29023,8 +30097,8 @@
     const quality = explainReadSourceQuality(output, { query });
     pushStep("read-url-completed", {
       bytes: typeof output.bytes === "number" ? output.bytes : 0,
-      contentType: readString$1Y(output.contentType),
-      mode: readString$1Y(output.mode),
+      contentType: readString$1_(output.contentType),
+      mode: readString$1_(output.mode),
       originStatus: typeof output.originStatus === "number" ? output.originStatus : null,
       qualityReason: quality.reason,
       qualitySignals: quality.signals,
@@ -29032,7 +30106,7 @@
       textRange: normalizeTextRange$3(output.textRange),
       tier: quality.tier,
       truncated: output.truncated === true,
-      url: readString$1Y(output.url)
+      url: readString$1_(output.url)
     });
   }
 
@@ -29043,24 +30117,24 @@
 
     return {
       bytes: typeof source.bytes === "number" ? source.bytes : 0,
-      contentType: readString$1Y(source.contentType),
-      error: readString$1Y(source.error),
-      message: readString$1Y(source.message),
-      mode: readString$1Y(source.mode),
+      contentType: readString$1_(source.contentType),
+      error: readString$1_(source.error),
+      message: readString$1_(source.message),
+      mode: readString$1_(source.mode),
       ok: source.ok !== false,
       originStatus: typeof source.originStatus === "number" ? source.originStatus : null,
-      platform: readString$1Y(source.platform),
-      reason: readString$1Y(source.reason),
-      screenshotDataUrl: readString$1Y(source.screenshotDataUrl),
-      screenshotMimeType: readString$1Y(source.screenshotMimeType),
+      platform: readString$1_(source.platform),
+      reason: readString$1_(source.reason),
+      screenshotDataUrl: readString$1_(source.screenshotDataUrl),
+      screenshotMimeType: readString$1_(source.screenshotMimeType),
       sourceQualityDetail,
       status: typeof source.status === "number" ? source.status : null,
-      text: readString$1Y(source.text),
+      text: readString$1_(source.text),
       textRange: normalizeTextRange$3(source.textRange),
       tier,
-      title: readString$1Y(source.title),
+      title: readString$1_(source.title),
       truncated: source.truncated === true,
-      url: readString$1Y(source.url)
+      url: readString$1_(source.url)
     };
   }
 
@@ -29090,7 +30164,7 @@
     const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
     const candidateSources = createSearchInquirySources(output);
 
-    inquiryContext.activeQuery = readString$1Y(output && output.query) || inquiryContext.activeQuery;
+    inquiryContext.activeQuery = readString$1_(output && output.query) || inquiryContext.activeQuery;
     inquiryContext.candidateSources = candidateSources;
     inquiryContext.lastSearchResults = candidateSources.slice();
 
@@ -29135,15 +30209,15 @@
         ? runState.contextSnapshot.inquiryContext
         : null;
 
-    return readString$1Y(inquiryContext && inquiryContext.activeQuery)
-      || readString$1Y(runState && runState.researchContext && runState.researchContext.lastQuery)
-      || readString$1Y(request && request.prompt);
+    return readString$1_(inquiryContext && inquiryContext.activeQuery)
+      || readString$1_(runState && runState.researchContext && runState.researchContext.lastQuery)
+      || readString$1_(request && request.prompt);
   }
 
   function syncPendingClarification(runState, output) {
     const snapshot = ensureContextSnapshot(runState);
     const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
-    const question = readString$1Y(output && output.question) || readString$1Y(output && output.text);
+    const question = readString$1_(output && output.question) || readString$1_(output && output.text);
 
     if (!question) {
       return;
@@ -29176,7 +30250,7 @@
   }
 
   function findCandidateSource(candidateSources, url) {
-    const normalizedUrl = readString$1Y(url);
+    const normalizedUrl = readString$1_(url);
 
     if (!normalizedUrl) {
       return null;
@@ -29185,7 +30259,7 @@
     return (Array.isArray(candidateSources) ? candidateSources : []).find((item) => (
       item &&
       typeof item === "object" &&
-      readString$1Y(item.url) === normalizedUrl
+      readString$1_(item.url) === normalizedUrl
     )) || null;
   }
 
@@ -29194,12 +30268,12 @@
 
   function readSkillIdentity(skill) {
     if (typeof skill === "string") {
-      return readString$10(skill);
+      return readString$11(skill);
     }
     if (!skill || typeof skill !== "object" || Array.isArray(skill)) {
       return null;
     }
-    return readString$10(skill.skillId) || readString$10(skill.name) || null;
+    return readString$11(skill.skillId) || readString$11(skill.name) || null;
   }
 
   function normalizeHandoffChain(value, currentSkill) {
@@ -29248,28 +30322,28 @@
 
   function createHandoffCycleDetail({ fromSkill, requestedSkillName, targetSkill, cycle }) {
     const safeCycle = cycle && typeof cycle === "object" ? cycle : {};
-    const target = readSkillIdentity(targetSkill) || readString$10(safeCycle.targetSkill) || readString$10(requestedSkillName) || null;
+    const target = readSkillIdentity(targetSkill) || readString$11(safeCycle.targetSkill) || readString$11(requestedSkillName) || null;
     return {
       cycleChain: normalizeHandoffChain(safeCycle.cycleChain, null),
-      fromSkill: readString$10(fromSkill) || null,
+      fromSkill: readString$11(fromSkill) || null,
       handoffChain: normalizeHandoffChain(safeCycle.handoffChain, null),
       reason: "handoff_cycle_detected",
-      repeatedSkill: readString$10(safeCycle.repeatedSkill) || target,
+      repeatedSkill: readString$11(safeCycle.repeatedSkill) || target,
       repeatedSkillIndex: Number.isInteger(safeCycle.repeatedSkillIndex)
         ? safeCycle.repeatedSkillIndex
         : null,
-      requestedSkillName: readString$10(requestedSkillName) || null,
+      requestedSkillName: readString$11(requestedSkillName) || null,
       targetSkill: target
     };
   }
 
   function sameSkillIdentity(a, b) {
-    const left = readString$10(a).toLowerCase();
-    const right = readString$10(b).toLowerCase();
+    const left = readString$11(a).toLowerCase();
+    const right = readString$11(b).toLowerCase();
     return !!left && left === right;
   }
 
-  function readString$10(value) {
+  function readString$11(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -29291,9 +30365,9 @@
 
     const filters = {};
     for (const [rawName, filter] of Object.entries(value)) {
-      const name = readString$$(rawName);
+      const name = readString$10(rawName);
       if (!name) continue;
-      if (typeof filter === "function" || isFilterSpec(filter) || readString$$(filter)) {
+      if (typeof filter === "function" || isFilterSpec(filter) || readString$10(filter)) {
         filters[name] = filter;
       }
     }
@@ -29457,7 +30531,7 @@
       return { name: null, spec: inputFilter, type: "spec" };
     }
 
-    const name = readString$$(inputFilter);
+    const name = readString$10(inputFilter);
     if (!name) return null;
     if (seen.has(name)) return null;
     seen.add(name);
@@ -29469,8 +30543,8 @@
     if (isFilterSpec(filter)) {
       return { name, spec: filter, type: "spec" };
     }
-    if (readString$$(filter)) {
-      return resolveHandoffInputFilter(readString$$(filter), registry, seen);
+    if (readString$10(filter)) {
+      return resolveHandoffInputFilter(readString$10(filter), registry, seen);
     }
     return null;
   }
@@ -29538,14 +30612,14 @@
       }
       const maxChars = readMaxChars(fieldRule);
       if (maxChars != null) {
-        memory[field] = keepLastChars(readString$$(memory[field]), maxChars);
+        memory[field] = keepLastChars(readString$10(memory[field]), maxChars);
       }
     }
     packet.contextSnapshot.sessionMemory = memory;
   }
 
   function readKeepLastRule(rule) {
-    if (rule == null || rule === true || readString$$(rule) === "keep") return null;
+    if (rule == null || rule === true || readString$10(rule) === "keep") return null;
     if (isClearRule(rule)) return 0;
     if (Number.isInteger(rule) && rule >= 0) return rule;
     if (!isFilterSpec(rule)) return null;
@@ -29566,7 +30640,7 @@
   }
 
   function keepLastChars(value, maxChars) {
-    const text = readString$$(value);
+    const text = readString$10(value);
     if (maxChars <= 0) return "";
     return text.length > maxChars ? text.slice(-maxChars) : text;
   }
@@ -29580,8 +30654,8 @@
       actionHistoryCount: packet.actionHistory.length,
       readSourceCount: packet.readSources.length,
       searchResultCount: packet.searchResults.length,
-      sessionHistoryChars: readString$$(memory.history).length,
-      sessionRecentTurnsChars: readString$$(memory.recentTurns).length,
+      sessionHistoryChars: readString$10(memory.history).length,
+      sessionRecentTurnsChars: readString$10(memory.recentTurns).length,
       toolHistoryCount: packet.toolHistory.length
     };
   }
@@ -29593,12 +30667,12 @@
   }
 
   function summarizeInputFilter(value) {
-    if (readString$$(value)) return readString$$(value);
+    if (readString$10(value)) return readString$10(value);
     return isFilterSpec(value) ? cloneValue$1(value) : null;
   }
 
   function hasInputFilter(value) {
-    return Boolean(readString$$(value)) || isFilterSpec(value);
+    return Boolean(readString$10(value)) || isFilterSpec(value);
   }
 
   function isFilterSpec(value) {
@@ -29606,19 +30680,19 @@
   }
 
   function isClearRule(value) {
-    const text = readString$$(value);
+    const text = readString$10(value);
     return value === false || text === "clear" || text === "drop" || text === "remove";
   }
 
   function toSnakeCase(value) {
-    return readString$$(value).replace(/([A-Z])/g, (_, char) => `_${char.toLowerCase()}`);
+    return readString$10(value).replace(/([A-Z])/g, (_, char) => `_${char.toLowerCase()}`);
   }
 
   function toCamelCase(value) {
-    return readString$$(value).replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+    return readString$10(value).replace(/_([a-z])/g, (_, char) => char.toUpperCase());
   }
 
-  function readString$$(value) {
+  function readString$10(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -29660,11 +30734,11 @@
       });
     }
 
-    const control = readString$_(rawResult.control);
+    const control = readString$$(rawResult.control);
     const body = rawResult.output && typeof rawResult.output === "object" && !Array.isArray(rawResult.output)
       ? rawResult.output
       : {};
-    const summary = readString$_(rawResult.summary) || `${actionName} executed`;
+    const summary = readString$$(rawResult.summary) || `${actionName} executed`;
     const schema = action && action.outputSchema && typeof action.outputSchema === "object"
       ? action.outputSchema
       : null;
@@ -29692,7 +30766,7 @@
       }
 
       const allowedKinds = readKindArray(schema.kinds);
-      const bodyKind = readString$_(body.kind);
+      const bodyKind = readString$$(body.kind);
       if (bodyKind && allowedKinds.length > 0 && !allowedKinds.includes(bodyKind)) {
         return createProtocolErrorEnvelope({
           actionName,
@@ -29724,7 +30798,7 @@
     }
 
     // outputSchema:null waiver path — body kind passes through unchanged.
-    const envelopeKind = readString$_(body.kind) || actionName;
+    const envelopeKind = readString$$(body.kind) || actionName;
     return finalizeEnvelope({
       actionName,
       control,
@@ -29738,7 +30812,7 @@
 
   function createExecuteErrorEnvelope({ action, error, durationMs }) {
     const actionName = readActionName$1(action);
-    const errorMessage = readString$_(error && error.message) || "action_execute_error";
+    const errorMessage = readString$$(error && error.message) || "action_execute_error";
     return finalizeEnvelopeRaw({
       actionName,
       control: "continue",
@@ -29780,10 +30854,10 @@
   function envelopeToObservation(envelope) {
     if (!envelope || typeof envelope !== "object") return null;
     if (envelope.status === "protocol_error") {
-      const message = readString$_(envelope.summary)
-        || readString$_(envelope.body && envelope.body.error)
+      const message = readString$$(envelope.summary)
+        || readString$$(envelope.body && envelope.body.error)
         || `${envelope.actionName} protocol_error`;
-      const stage = readString$_(envelope.body && envelope.body.errorStage)
+      const stage = readString$$(envelope.body && envelope.body.errorStage)
         || (envelope.reason === "execute_threw" ? "execute" : "envelope");
       return {
         actionName: envelope.actionName,
@@ -29809,7 +30883,7 @@
       status,
       kind,
       summary,
-      reason: status === "blocked" ? readString$_(body && body.reason) || readString$_(body && body.status) || null : null,
+      reason: status === "blocked" ? readString$$(body && body.reason) || readString$$(body && body.status) || null : null,
       metrics,
       body
     });
@@ -29845,7 +30919,7 @@
   function deriveStatusFromBody(body) {
     if (!body || typeof body !== "object") return "success";
     if (body.ok === false) return "blocked";
-    const status = readString$_(body.status).toLowerCase();
+    const status = readString$$(body.status).toLowerCase();
     if (status && FALLBACK_BLOCKED_STATUS_VALUES.has(status)) return "blocked";
     return "success";
   }
@@ -29882,11 +30956,11 @@
 
   function readKindArray(value) {
     if (!Array.isArray(value)) return [];
-    return value.map((entry) => readString$_(entry)).filter(Boolean);
+    return value.map((entry) => readString$$(entry)).filter(Boolean);
   }
 
   function readActionName$1(action) {
-    return readString$_(action && action.name) || "unknown_action";
+    return readString$$(action && action.name) || "unknown_action";
   }
 
   function readDurationMs(value) {
@@ -29894,7 +30968,7 @@
     return value;
   }
 
-  function readString$_(value) {
+  function readString$$(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -30074,6 +31148,7 @@
         output: actionPatternBlock.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "action_pattern_preflight_block"
       });
       return { done: false };
@@ -30085,6 +31160,7 @@
       output: null,
       pushStep,
       runState,
+      runtimeConfig,
       status: "before_action"
     });
 
@@ -30123,6 +31199,7 @@
         output: terminalRepairBlock.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "terminal_repair_preflight_block"
       });
       return { done: false };
@@ -30163,6 +31240,7 @@
         output: terminalCorrectionBlock.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: "terminal_correction_preflight_block"
       });
       return { done: false };
@@ -30462,10 +31540,10 @@
             }
           }
         }
-        runState.toolContext.lastResult = cloneValue$1(actionResult.output || null);
-        runState.toolContext.history.push(
-          stampThreadProvenance(cloneValue$1(actionResult.output || null), runState)
-        );
+      }
+
+      if (actionName === "execute_skill_tool" || isHostCustomEvidenceAction(actionName, runtimeConfig)) {
+        recordStructuredToolEvidence(runState, actionResult.output);
       }
 
       if (actionName !== "web_search" && actionName !== "read_url") {
@@ -30496,6 +31574,7 @@
         output: actionResult.output,
         pushStep,
         runState,
+        runtimeConfig,
         status: `after_${actionName}`
       });
 
@@ -30581,6 +31660,30 @@
     }
   }
 
+  function isHostCustomEvidenceAction(actionName, runtimeConfig) {
+    const policy = runtimeConfig && runtimeConfig.evidencePolicy && typeof runtimeConfig.evidencePolicy === "object"
+      ? runtimeConfig.evidencePolicy
+      : null;
+    if (policy && policy.enabled === false) return false;
+    if (policy && policy.structuredToolEvidence === false) return false;
+    const customActions = Array.isArray(runtimeConfig && runtimeConfig.customActions)
+      ? runtimeConfig.customActions
+      : [];
+    return customActions.some((action) => action && action.name === actionName);
+  }
+
+  function recordStructuredToolEvidence(runState, output) {
+    if (!runState || typeof runState !== "object") return;
+    if (!runState.toolContext || typeof runState.toolContext !== "object") return;
+    if (!Array.isArray(runState.toolContext.history)) {
+      runState.toolContext.history = [];
+    }
+    runState.toolContext.lastResult = cloneValue$1(output || null);
+    runState.toolContext.history.push(
+      stampThreadProvenance(cloneValue$1(output || null), runState)
+    );
+  }
+
   function maybeBlockActionGuardrail(options) {
     const runtimeConfig = options && options.runtimeConfig;
     const guardrailConfig = runtimeConfig && runtimeConfig.actionGuardrail;
@@ -30646,17 +31749,17 @@
       return undefined;
     }
 
-    const explicitOutput = readString$1Y(output && output.skill);
+    const explicitOutput = readString$1_(output && output.skill);
     if (explicitOutput) {
       return explicitOutput;
     }
 
-    const explicitDecision = readString$1Y(decision && decision.args && decision.args.skillName);
+    const explicitDecision = readString$1_(decision && decision.args && decision.args.skillName);
     if (explicitDecision) {
       return explicitDecision;
     }
 
-    return readString$1Y(runState.agentSkillContext && runState.agentSkillContext.activeSkill && runState.agentSkillContext.activeSkill.name) || undefined;
+    return readString$1_(runState.agentSkillContext && runState.agentSkillContext.activeSkill && runState.agentSkillContext.activeSkill.name) || undefined;
   }
 
   function readToolName$1(actionName, output, decision) {
@@ -30664,8 +31767,8 @@
       return undefined;
     }
 
-    return readString$1Y(output && output.tool) ||
-      readString$1Y(decision && decision.args && decision.args.toolName) ||
+    return readString$1_(output && output.tool) ||
+      readString$1_(decision && decision.args && decision.args.toolName) ||
       undefined;
   }
 
@@ -30680,8 +31783,8 @@
 
   function refreshLongRunAcceptanceGate(options) {
     if (!options || typeof options !== "object") return null;
-    const actionName = readString$1Y(options && options.actionName);
-    const status = readString$1Y(options && options.status);
+    const actionName = readString$1_(options && options.actionName);
+    const status = readString$1_(options && options.status);
     if (!shouldRefreshLongRunAcceptanceGate$1(actionName, status)) return null;
     const loop = refreshResearchReportLoopGate(
       options.runState,
@@ -30690,6 +31793,7 @@
         actionName,
         prompt: options.request && options.request.prompt,
         request: options.request,
+        runtimeConfig: options.runtimeConfig,
         status
       }
     );
@@ -30833,6 +31937,7 @@
       actionName: options.actionName,
       decision: options.decision,
       output: options.output,
+      runtimeConfig: options.runtimeConfig,
       status: options.status
     });
       if (repair && typeof options.pushStep === "function") {
@@ -30849,6 +31954,9 @@
           allowedActions: Array.isArray(repair.allowedActions) ? repair.allowedActions.slice(0, 10) : [],
           ignoredCount: repair.ignoredCount || 0,
           lengthExpansionSignal: repair.lengthExpansionSignal || null,
+          workspaceRepairSignal: repair.workspaceRepairSignal
+            ? cloneValue$1(repair.workspaceRepairSignal)
+            : null,
           reason: repair.reason || null,
           status: repair.mode || "none"
         });
@@ -30868,10 +31976,10 @@
       ? runState.terminalRepairState
       : null;
     if (!repair || repair.active !== true) return null;
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (!actionName) return null;
     const allowedActions = Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1Y).filter(Boolean)
+      ? repair.allowedActions.map(readString$1_).filter(Boolean)
       : [];
     const allowed = allowedActions.includes(actionName);
     const isPublish = actionName === "workspace_publish_candidate";
@@ -30884,11 +31992,11 @@
       isReadinessOnlyPublishRetryAllowed(repair);
     if (allowed && (!isPublish || validPublish || readinessOnlyPublishRetry)) return null;
 
-    const ignoredCount = readFiniteNumber$2(repair.ignoredCount) + 1;
+    const ignoredCount = readFiniteNumber$3(repair.ignoredCount) + 1;
     const reason = isPublish && !validPublish
       ? "terminal_repair_invalid_publish"
       : "terminal_repair_action_not_allowed";
-    const escalation = readString$1Y(repair.escalation);
+    const escalation = readString$1_(repair.escalation);
       const isHardVeto = escalation === "hard_veto" && reason === "terminal_repair_action_not_allowed";
       const protocolHint = buildTerminalRepairProtocolHint(repair);
       const budgetExpansionSignal = isHardVeto
@@ -30945,7 +32053,7 @@
   }
 
   function buildTerminalRepairProtocolHint(repair) {
-    const reason = readString$1Y(repair && repair.reason);
+    const reason = readString$1_(repair && repair.reason);
     if (reason === "missing_finalize_after_latest_write") {
       return " Current publish protocol blocker requires workspace_finalize_candidate for the candidate, then workspace_read, before another publish attempt.";
     }
@@ -30957,7 +32065,7 @@
 
   function isReadinessOnlyPublishRetryAllowed(repair) {
     const deficits = Array.isArray(repair && repair.activeDeficits)
-      ? repair.activeDeficits.map(readString$1Y).filter(Boolean)
+      ? repair.activeDeficits.map(readString$1_).filter(Boolean)
       : [];
     if (!deficits.includes("readiness")) return false;
     return !deficits.some((name) => [
@@ -30970,7 +32078,7 @@
   }
 
   function maybeBlockTerminalCorrectionRetry(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (actionName !== "workspace_publish_candidate") return null;
     const runState = options && options.runState;
     const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
@@ -30983,8 +32091,8 @@
       ? convergence.terminalRetryCooldown
       : null;
     const ignoredCount = Math.max(
-      readFiniteNumber$2(convergence && convergence.ignoredTerminalCorrectionCount),
-      readFiniteNumber$2(correction && correction.ignoredTerminalCorrectionCount)
+      readFiniteNumber$3(convergence && convergence.ignoredTerminalCorrectionCount),
+      readFiniteNumber$3(correction && correction.ignoredTerminalCorrectionCount)
     );
     const cooldownActive = cooldown && cooldown.active === true;
     const correctionActive = correction && correction.active === true;
@@ -30994,7 +32102,7 @@
       : { active: true, activeDeficits: ["terminal_loop"] };
     const publishValidation = explainTerminalRepairPublishArgs(options.actionArgs, repairState, { runState });
     if (publishValidation.valid) return null;
-    const blockedTerminalRetryCount = readFiniteNumber$2(cooldown && cooldown.blockedTerminalRetryCount) + 1;
+    const blockedTerminalRetryCount = readFiniteNumber$3(cooldown && cooldown.blockedTerminalRetryCount) + 1;
     const message = "Terminal correction is escalated: do not repeat clean ready or plain workspace_publish_candidate after repeated publish/finalize no-progress. Do evidence/workspace/TodoState recovery first, or publish only a valid limited finalReadiness with non-empty remainingGaps and false flags for failed dimensions.";
     const output = {
       ok: false,
@@ -31014,12 +32122,12 @@
         forbiddenTerminalActions: Array.isArray(cooldown && cooldown.forbiddenTerminalActions)
           ? cooldown.forbiddenTerminalActions.slice(0, 8)
           : ["workspace_publish_candidate", "finalize"],
-        validTerminalException: readString$1Y(cooldown && cooldown.validTerminalException) ||
+        validTerminalException: readString$1_(cooldown && cooldown.validTerminalException) ||
           "workspace_publish_candidate with decision=limited + non-empty remainingGaps + false failed-dimension flags",
         blockedTerminalRetryCount,
-        executedPublishCount: readFiniteNumber$2(cooldown && cooldown.executedPublishCount),
-        consecutiveExecutedPublishCount: readFiniteNumber$2(cooldown && cooldown.consecutiveExecutedPublishCount),
-        reason: readString$1Y(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
+        executedPublishCount: readFiniteNumber$3(cooldown && cooldown.executedPublishCount),
+        consecutiveExecutedPublishCount: readFiniteNumber$3(cooldown && cooldown.consecutiveExecutedPublishCount),
+        reason: readString$1_(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
       },
       invalidPublishReasons: publishValidation.reasons.slice(0, 8),
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
@@ -31038,7 +32146,7 @@
   }
 
   function maybeBlockActionPatternRepeat(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (!actionName || actionName === "workspace_publish_candidate" || actionName === "finalize") return null;
     const runState = options && options.runState;
     const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
@@ -31048,7 +32156,7 @@
       ? runState.terminalRepairState
       : null;
     const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1Y).filter(Boolean)
+      ? repair.allowedActions.map(readString$1_).filter(Boolean)
       : [];
     const unnecessaryClarificationBlock = maybeBlockUnnecessaryLongResearchClarification({
       actionName,
@@ -31071,7 +32179,7 @@
       convergence,
       pushStep: options && options.pushStep
     });
-    if (earlyMutationGrowthBlock && readString$1Y(earlyMutationGrowthBlock.output && earlyMutationGrowthBlock.output.escalation) === "hard_veto") {
+    if (earlyMutationGrowthBlock && readString$1_(earlyMutationGrowthBlock.output && earlyMutationGrowthBlock.output.escalation) === "hard_veto") {
       return earlyMutationGrowthBlock;
     }
     const lengthRewriteBlock = maybeBlockLengthDeficitRewrite({
@@ -31131,11 +32239,11 @@
       ? convergence.convergenceSignal
       : null;
     if (!signal) return null;
-    if (readString$1Y(signal.patternKind) !== "exact_action") return null;
-    if (readString$1Y(signal.forbiddenMove) !== "repeat_same_action_args") return null;
+    if (readString$1_(signal.patternKind) !== "exact_action") return null;
+    if (readString$1_(signal.forbiddenMove) !== "repeat_same_action_args") return null;
     const currentFingerprint = fingerprintAction(options.decision);
-    if (!currentFingerprint || currentFingerprint !== readString$1Y(signal.fingerprint)) return null;
-    const repeatCount = readFiniteNumber$2(signal.repeatCount) || readFiniteNumber$2(convergence.repeatedFingerprintCount);
+    if (!currentFingerprint || currentFingerprint !== readString$1_(signal.fingerprint)) return null;
+    const repeatCount = readFiniteNumber$3(signal.repeatCount) || readFiniteNumber$3(convergence.repeatedFingerprintCount);
     const message = `Action pattern convergence is active: do not repeat ${actionName} with the same arguments after ${repeatCount} no-progress attempt(s). Change arguments, choose a different recovery action, mutate the workspace meaningfully, gather evidence, or publish only a valid limited result when allowed.`;
     const output = {
       ok: false,
@@ -31150,7 +32258,7 @@
         ? signal.allowedNextMoves.slice(0, 8)
         : ["change_arguments", "choose_different_action", "valid_limited_with_remainingGaps"],
       repeatCount,
-      stepsWithoutObservableProgress: readFiniteNumber$2(convergence.stepsWithoutObservableProgress),
+      stepsWithoutObservableProgress: readFiniteNumber$3(convergence.stepsWithoutObservableProgress),
       message
     };
     if (typeof options.pushStep === "function") {
@@ -31166,11 +32274,11 @@
   }
 
   function maybeBlockUnnecessaryLongResearchClarification(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (actionName !== "ask_clarification") return null;
     const runState = options && options.runState;
     if (!isLongResearchHarnessActive(runState, {
-      prompt: readString$1Y(options && options.request && options.request.prompt)
+      prompt: readString$1_(options && options.request && options.request.prompt)
     })) {
       return null;
     }
@@ -31214,11 +32322,11 @@
   }
 
   function maybeBlockLongResearchSearchWithoutRead(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (actionName !== "web_search") return null;
     const runState = options && options.runState;
     if (!isLongResearchHarnessActive(runState, {
-      prompt: readString$1Y(options && options.request && options.request.prompt)
+      prompt: readString$1_(options && options.request && options.request.prompt)
     })) return null;
     const searchPassCount = countSearchPasses(runState);
     if (searchPassCount < 2) return null;
@@ -31226,10 +32334,10 @@
     const candidateCount = countResearchCandidateUrls(runState);
     if (candidateCount === 0) return null;
     const sourceMinimum = sourceFacts.sourceMinimum;
-    const readSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.readSources);
-    const minReadSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.minReadSources);
-    const relevantSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.relevantSources);
-    const minRelevantSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.minRelevantSources);
+    const readSources = readFiniteNumber$3(sourceMinimum && sourceMinimum.readSources);
+    const minReadSources = readFiniteNumber$3(sourceMinimum && sourceMinimum.minReadSources);
+    const relevantSources = readFiniteNumber$3(sourceMinimum && sourceMinimum.relevantSources);
+    const minRelevantSources = readFiniteNumber$3(sourceMinimum && sourceMinimum.minRelevantSources);
     const sourceMinimumUnmet = Boolean(
       sourceMinimum &&
       sourceMinimum.passed !== true &&
@@ -31289,7 +32397,7 @@
       : null;
     if (!loop) return false;
     if (loop.enabled === true) return true;
-    const status = readString$1Y(loop.status);
+    const status = readString$1_(loop.status);
     if (status && status !== "idle" && status !== "none") return true;
     return Boolean(
       loop.gateSignal &&
@@ -31306,10 +32414,10 @@
       ? runState.inquiryContext
       : {};
     if (plannerState.hasOpenAmbiguity === true) return true;
-    if (readString$1Y(plannerState.openAmbiguity)) return true;
+    if (readString$1_(plannerState.openAmbiguity)) return true;
     if (plannerState.pendingClarification && typeof plannerState.pendingClarification === "object") return true;
     if (inquiryContext.pendingClarification && typeof inquiryContext.pendingClarification === "object") return true;
-    if (readString$1Y(inquiryContext.openAmbiguity)) return true;
+    if (readString$1_(inquiryContext.openAmbiguity)) return true;
     return false;
   }
 
@@ -31326,7 +32434,7 @@
     const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
       ? workspace.files
       : {};
-    return Object.values(files).some((file) => readString$1Y(file && file.content));
+    return Object.values(files).some((file) => readString$1_(file && file.content));
   }
 
   function countSearchPasses(runState) {
@@ -31359,7 +32467,7 @@
     }
     const urls = new Set();
     for (const item of candidates) {
-      const url = readString$1Y(item && item.url);
+      const url = readString$1_(item && item.url);
       if (url) urls.add(url);
     }
     return urls.size;
@@ -31386,15 +32494,15 @@
       : loop.sourceMinimum && typeof loop.sourceMinimum === "object"
         ? loop.sourceMinimum
         : null;
-    const packetSuccessful = readFiniteNumber$2(packet.evidence && packet.evidence.successfulReadUrlCount);
+    const packetSuccessful = readFiniteNumber$3(packet.evidence && packet.evidence.successfulReadUrlCount);
     return {
       successfulReadUrlCount: Math.max(successfulReadUrlCount, packetSuccessful),
       sourceMinimum: sourceMinimum ? {
-        minReadSources: readFiniteNumber$2(sourceMinimum.minReadSources) || readFiniteNumber$2(sourceMinimum.minReads),
-        minRelevantSources: readFiniteNumber$2(sourceMinimum.minRelevantSources) || readFiniteNumber$2(sourceMinimum.minRelevant),
+        minReadSources: readFiniteNumber$3(sourceMinimum.minReadSources) || readFiniteNumber$3(sourceMinimum.minReads),
+        minRelevantSources: readFiniteNumber$3(sourceMinimum.minRelevantSources) || readFiniteNumber$3(sourceMinimum.minRelevant),
         passed: sourceMinimum.passed === true,
-        readSources: readFiniteNumber$2(sourceMinimum.readSources) || readFiniteNumber$2(sourceMinimum.reads),
-        relevantSources: readFiniteNumber$2(sourceMinimum.relevantSources) || readFiniteNumber$2(sourceMinimum.relevant)
+        readSources: readFiniteNumber$3(sourceMinimum.readSources) || readFiniteNumber$3(sourceMinimum.reads),
+        relevantSources: readFiniteNumber$3(sourceMinimum.relevantSources) || readFiniteNumber$3(sourceMinimum.relevant)
       } : null
     };
   }
@@ -31413,13 +32521,13 @@
   }
 
   function maybeBlockReadOnlyPlanningLoop(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     const runState = options && options.runState;
     const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
       ? runState.terminalRepairState
       : null;
     const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
-      ? repair.allowedActions.map(readString$1Y).filter(Boolean)
+      ? repair.allowedActions.map(readString$1_).filter(Boolean)
       : [];
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
@@ -31433,18 +32541,18 @@
       // for this specific action. Hard_veto means the model has repeatedly ignored the advisory
       // and the action is demonstrably causing churn — override the repair allowance.
       const isHardVetoForAction = state && state.active === true &&
-        readString$1Y(state.escalation) === "hard_veto" &&
+        readString$1_(state.escalation) === "hard_veto" &&
         Array.isArray(state.forbiddenActions) &&
-        state.forbiddenActions.map(readString$1Y).filter(Boolean).includes(actionName);
+        state.forbiddenActions.map(readString$1_).filter(Boolean).includes(actionName);
       if (!isHardVetoForAction) return null;
     }
     if (!state || state.active !== true) return null;
-    if (readString$1Y(state.escalation) !== "hard_veto") return null;
+    if (readString$1_(state.escalation) !== "hard_veto") return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1Y).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1_).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
-    const ignoredCount = readFiniteNumber$2(state.ignoredCount) + 1;
+    const ignoredCount = readFiniteNumber$3(state.ignoredCount) + 1;
     const allowedMoves = readStateAllowedNextMovesWithSignal(state, 12, "readOnlyPlanningState");
     const message = `HARD VETO — read-only planning has blocked ${actionName} ${ignoredCount} time(s) without source or workspace progress. The harness will reject any further ${actionName} calls. Choose any action from allowedNextMoves when populated. If no recovery is feasible, workspace_publish_candidate with finalReadiness.decision='limited' and concrete remainingGaps is valid.`;
     const output = {
@@ -31459,7 +32567,7 @@
       allowedNextMoves: allowedMoves.allowedNextMoves,
       allowedNextMovesSignal: allowedMoves.signal,
       ignoredCount,
-      stepsWithoutProductiveProgress: readFiniteNumber$2(state.stepsWithoutProductiveProgress),
+      stepsWithoutProductiveProgress: readFiniteNumber$3(state.stepsWithoutProductiveProgress),
       message
     };
     if (typeof options.pushStep === "function") {
@@ -31478,7 +32586,7 @@
 
   function readStateAllowedNextMovesWithSignal(state, limit, source) {
     const allowedNextMoves = Array.isArray(state && state.allowedNextMoves)
-      ? state.allowedNextMoves.map(readString$1Y).filter(Boolean).slice(0, limit)
+      ? state.allowedNextMoves.map(readString$1_).filter(Boolean).slice(0, limit)
       : [];
     return {
       allowedNextMoves,
@@ -31493,12 +32601,12 @@
   }
 
   function maybeBlockWorkspaceNoProgressLoop(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (actionName !== "workspace_read" && actionName !== "workspace_replace") return null;
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
       : null;
-    const stepsWithoutObservableProgress = readFiniteNumber$2(convergence && convergence.stepsWithoutObservableProgress);
+    const stepsWithoutObservableProgress = readFiniteNumber$3(convergence && convergence.stepsWithoutObservableProgress);
     const structureDeficit = hasWorkspaceStructureDeficit(options && options.runState);
     const repairActive = options &&
       options.runState &&
@@ -31601,7 +32709,7 @@
   }
 
   function maybeBlockSatisfiedCandidateMutation(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (![
       "workspace_write",
       "workspace_insert_after_section",
@@ -31651,7 +32759,7 @@
   }
 
   function maybeBlockLengthDeficitRewrite(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (actionName !== "workspace_write" && actionName !== "workspace_replace") return null;
     const runState = options && options.runState;
     const deficit = readWorkspaceLengthDeficit(runState);
@@ -31661,7 +32769,7 @@
       ? options.actionArgs
       : {};
     const proposedText = actionName === "workspace_write"
-      ? readString$1Y(args.content || args.text || args.markdown)
+      ? readString$1_(args.content || args.text || args.markdown)
       : "";
     const proposedLength = actionName === "workspace_replace"
       ? estimateWorkspaceReplaceLength(runState, args, deficit)
@@ -31715,7 +32823,7 @@
   }
 
   function maybeBlockLateBudgetWorkspaceProtocolWindow(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     const isPatchPreview = LATE_BUDGET_PATCH_PREVIEW_ACTIONS.has(actionName);
     const isWorkspaceMutation = LATE_BUDGET_WORKSPACE_MUTATION_ACTIONS.has(actionName);
     if (!isPatchPreview && !isWorkspaceMutation) return null;
@@ -31783,12 +32891,12 @@
     const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
       ? workspace.files[path]
       : null;
-    return Boolean(readString$1Y(file && file.content));
+    return Boolean(readString$1_(file && file.content));
   }
 
   function readRemainingCyclesAfterCurrentAction(runState) {
-    const maxSteps = readFiniteNumber$2(runState && runState.maxSteps);
-    const cycleCount = readFiniteNumber$2(runState && runState.cycleCount);
+    const maxSteps = readFiniteNumber$3(runState && runState.maxSteps);
+    const cycleCount = readFiniteNumber$3(runState && runState.cycleCount);
     if (maxSteps <= 0 || cycleCount <= 0) return null;
     return Math.max(maxSteps - cycleCount, 0);
   }
@@ -31804,9 +32912,9 @@
       ? runState.virtualWorkspace.pendingPatch
       : null;
     const firstOperationWithPath = Array.isArray(args.operations)
-      ? args.operations.find((operation) => readString$1Y(operation && operation.path))
+      ? args.operations.find((operation) => readString$1_(operation && operation.path))
       : null;
-    const operationPath = readString$1Y(firstOperationWithPath && firstOperationWithPath.path);
+    const operationPath = readString$1_(firstOperationWithPath && firstOperationWithPath.path);
     const workspaceQuality = runState &&
       runState.virtualWorkspace &&
       runState.virtualWorkspace.quality &&
@@ -31825,12 +32933,12 @@
       : packet.candidate && typeof packet.candidate === "object"
         ? packet.candidate
         : {};
-    return readString$1Y(args.path) ||
-      readString$1Y(args.to) ||
-      readString$1Y(pendingPatch && pendingPatch.path) ||
+    return readString$1_(args.path) ||
+      readString$1_(args.to) ||
+      readString$1_(pendingPatch && pendingPatch.path) ||
       operationPath ||
-      readString$1Y(workspaceQuality.finalCandidatePath) ||
-      readString$1Y(candidate.path) ||
+      readString$1_(workspaceQuality.finalCandidatePath) ||
+      readString$1_(candidate.path) ||
       "final_candidate.md";
   }
 
@@ -31860,7 +32968,7 @@
     }
     const items = Array.isArray(todoState.items) ? todoState.items : [];
     const unfinished = items.filter((item) => {
-      const status = readString$1Y(item && item.status) || "pending";
+      const status = readString$1_(item && item.status) || "pending";
       return status === "active" || status === "pending" || status === "blocked";
     });
     return {
@@ -31880,7 +32988,7 @@
       total: Array.isArray(items) ? items.length : 0
     };
     for (const item of Array.isArray(items) ? items : []) {
-      const status = readString$1Y(item && item.status) || "pending";
+      const status = readString$1_(item && item.status) || "pending";
       if (Object.prototype.hasOwnProperty.call(counts, status)) {
         counts[status] += 1;
       }
@@ -31889,7 +32997,7 @@
   }
 
   function maybeBlockStructureRepairLoop(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
       : null;
@@ -31898,11 +33006,11 @@
       : null;
     if (!state || state.active !== true) return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1Y).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1_).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
-    const repeatedStructureNoProgressCount = readFiniteNumber$2(state.repeatedStructureNoProgressCount);
-    const isHardVeto = readString$1Y(state.escalation) === "hard_veto";
+    const repeatedStructureNoProgressCount = readFiniteNumber$3(state.repeatedStructureNoProgressCount);
+    const isHardVeto = readString$1_(state.escalation) === "hard_veto";
     const allowedMoves = readStateAllowedNextMovesWithSignal(state, 12, "structureRepairConvergence");
     const message = isHardVeto
       ? `HARD VETO — structure repair convergence has blocked ${actionName} ${repeatedStructureNoProgressCount} time(s) without improving the structure audit. allowedNextMoves is the recovery surface when populated. A coherent repair can use workspace_write or workspace_replace to produce a deduplicated outline with unique headings and section numbers, then workspace_finalize_candidate. If recovery is not feasible, workspace_publish_candidate with finalReadiness.decision='limited' is valid when remainingGaps names every structure issue.`
@@ -31923,7 +33031,7 @@
       activeIssueCodes: Array.isArray(state.activeIssueCodes) ? state.activeIssueCodes.slice(0, 8) : [],
       repeatedHeadingSamples: Array.isArray(state.repeatedHeadingSamples) ? state.repeatedHeadingSamples.slice(0, 5) : [],
       repeatedNumberSamples: Array.isArray(state.repeatedNumberSamples) ? state.repeatedNumberSamples.slice(0, 5) : [],
-      requiredCorrection: readString$1Y(state.requiredCorrection) || null,
+      requiredCorrection: readString$1_(state.requiredCorrection) || null,
       message
     };
     if (typeof options.pushStep === "function") {
@@ -31941,42 +33049,39 @@
   }
 
   function maybeBlockWorkspaceMutationGrowthLoop(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     const convergence = options && options.convergence && typeof options.convergence === "object"
       ? options.convergence
       : null;
     const state = convergence && convergence.workspaceMutationGrowthConvergence && typeof convergence.workspaceMutationGrowthConvergence === "object"
       ? convergence.workspaceMutationGrowthConvergence
       : null;
-    if (!state || state.active !== true) return null;
+    if (!state || state.active !== true || readString$1_(state.escalation) !== "hard_veto") return null;
     const forbiddenActions = Array.isArray(state.forbiddenActions)
-      ? state.forbiddenActions.map(readString$1Y).filter(Boolean)
+      ? state.forbiddenActions.map(readString$1_).filter(Boolean)
       : [];
     if (!forbiddenActions.includes(actionName)) return null;
-    const stallCount = readFiniteNumber$2(state.stallCount);
-    const isHardVeto = readString$1Y(state.escalation) === "hard_veto";
+    const stallCount = readFiniteNumber$3(state.stallCount);
     const allowedMoves = readStateAllowedNextMovesWithSignal(state, 8, "workspaceMutationGrowthConvergence");
-    const message = isHardVeto
-      ? `HARD VETO — workspace mutation has stalled ${stallCount} time(s) with tiny deltas while a length deficit persists. workspace_write overwrites the file, and workspace_replace can loop without growing the report. allowedNextMoves is the recovery surface when populated; valid recovery can use workspace_propose_patch then workspace_apply_patch for a validated repair, workspace_insert_after_section to add content, or workspace_finalize_candidate / workspace_publish_candidate_limited_with_remainingGaps if the target cannot be met.`
-      : `Workspace mutation oscillation detected: ${stallCount} consecutive mutation(s) added too little while the length target is unmet. Avoid overwrite/replace loops; use workspace_propose_patch/workspace_apply_patch or workspace_insert_after_section to accumulate content instead.`;
+    const message = `Workspace mutation hard veto: repeated ${actionName} attempts are not growing the candidate while a length deficit remains. Use an allowed non-overwrite recovery action such as workspace_insert_after_section, workspace_multi_edit, workspace_propose_patch/workspace_apply_patch, or a valid limited publish with concrete remainingGaps.`;
     const output = {
       ok: false,
       control: "continue",
-      kind: isHardVeto ? "workspace_mutation_growth_hard_veto_block" : "workspace_mutation_growth_preflight_block",
+      kind: "workspace_mutation_growth_hard_veto_block",
       status: "blocked",
       reason: "workspace_write_not_accumulating",
       actionName,
-      escalation: isHardVeto ? "hard_veto" : "advisory",
+      escalation: "hard_veto",
       forbiddenMove: "repeat_workspace_write_without_growth",
       forbiddenActions,
       allowedNextMoves: allowedMoves.allowedNextMoves,
       allowedNextMovesSignal: allowedMoves.signal,
       stallCount,
-      requiredCorrection: readString$1Y(state.requiredCorrection) || null,
+      requiredCorrection: readString$1_(state.requiredCorrection) || null,
       message
     };
     if (typeof options.pushStep === "function") {
-      options.pushStep(isHardVeto ? "workspace-mutation-growth-hard-veto-blocked" : "workspace-mutation-growth-action-blocked", {
+      options.pushStep("workspace-mutation-growth-hard-veto-blocked", {
         actionName,
         escalation: output.escalation,
         forbiddenMove: output.forbiddenMove,
@@ -31989,7 +33094,7 @@
   }
 
   function maybeBlockWorkspaceSourceDeficitAfterPublishBlock(options) {
-    const actionName = readString$1Y(options && options.actionName);
+    const actionName = readString$1_(options && options.actionName);
     if (![
       "workspace_finalize_candidate",
       "workspace_insert_after_section",
@@ -32020,8 +33125,8 @@
       ],
       observableDeficit: sourceDeficit,
       publishBlockSignal: {
-        count: readFiniteNumber$2(runState.publishBlockSignal.count),
-        lastStatus: readString$1Y(runState.publishBlockSignal.lastStatus) || null
+        count: readFiniteNumber$3(runState.publishBlockSignal.count),
+        lastStatus: readString$1_(runState.publishBlockSignal.lastStatus) || null
       },
       requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
       message
@@ -32068,9 +33173,9 @@
       : candidate.textStats && typeof candidate.textStats === "object"
         ? candidate.textStats
         : {};
-    const statsKey = readString$1Y(requested.statsKey) || "words";
-    const observed = readFiniteNumber$2(stats[statsKey]);
-    const requestedLength = readFiniteNumber$2(requested.value);
+    const statsKey = readString$1_(requested.statsKey) || "words";
+    const observed = readFiniteNumber$3(stats[statsKey]);
+    const requestedLength = readFiniteNumber$3(requested.value);
     const lengthSatisfied = requestedLength > 0 ? observed >= requestedLength : false;
     const evidence = packet.evidence && typeof packet.evidence === "object" ? packet.evidence : {};
     return {
@@ -32084,11 +33189,11 @@
           evidenceSatisfied: false,
           lengthSatisfied,
           observedLength: observed,
-          observedLengthUnit: readString$1Y(requested.unit) || statsKey,
+          observedLengthUnit: readString$1_(requested.unit) || statsKey,
           remainingGaps: ["Source minimum / read_url evidence is still insufficient."],
           requestedLength: requestedLength || null,
           requirementSatisfied: false,
-          successfulReadUrlCount: readFiniteNumber$2(evidence.successfulReadUrlCount),
+          successfulReadUrlCount: readFiniteNumber$3(evidence.successfulReadUrlCount),
           summary: "Publish limited only if evidence recovery is exhausted or cannot improve within budget."
         }
       }
@@ -32112,10 +33217,10 @@
         ? runState.researchReportLoop.sourceMinimum
         : null;
     if (!sourceMinimum || sourceMinimum.passed === true) return null;
-    const minReadSources = readFiniteNumber$2(sourceMinimum.minReadSources);
-    const minRelevantSources = readFiniteNumber$2(sourceMinimum.minRelevantSources);
-    const readSources = readFiniteNumber$2(sourceMinimum.readSources);
-    const relevantSources = readFiniteNumber$2(sourceMinimum.relevantSources);
+    const minReadSources = readFiniteNumber$3(sourceMinimum.minReadSources);
+    const minRelevantSources = readFiniteNumber$3(sourceMinimum.minRelevantSources);
+    const readSources = readFiniteNumber$3(sourceMinimum.readSources);
+    const relevantSources = readFiniteNumber$3(sourceMinimum.relevantSources);
     const readSourceDeficit = Math.max(minReadSources - readSources, 0);
     const relevantSourceDeficit = Math.max(minRelevantSources - relevantSources, 0);
     if (readSourceDeficit <= 0 && relevantSourceDeficit <= 0) return null;
@@ -32131,7 +33236,7 @@
       readSources,
       relevantSourceDeficit,
       relevantSources,
-      successfulReadUrlCount: readFiniteNumber$2(evidence.successfulReadUrlCount)
+      successfulReadUrlCount: readFiniteNumber$3(evidence.successfulReadUrlCount)
     };
   }
 
@@ -32139,8 +33244,8 @@
     const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
-    const statsKey = readString$1Y(requested && requested.statsKey);
-    const requestedValue = readFiniteNumber$2(requested && requested.value);
+    const statsKey = readString$1_(requested && requested.statsKey);
+    const requestedValue = readFiniteNumber$3(requested && requested.value);
     if (!statsKey || requestedValue <= 0) return null;
     const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
       ? packet.workspace.candidate
@@ -32152,13 +33257,13 @@
       : candidate && candidate.textStats && typeof candidate.textStats === "object"
         ? candidate.textStats
         : null;
-    const observed = readFiniteNumber$2(stats && stats[statsKey]);
+    const observed = readFiniteNumber$3(stats && stats[statsKey]);
     return {
       observed,
       requested: requestedValue,
       satisfied: observed >= requestedValue,
       statsKey,
-      unit: readString$1Y(requested.unit) || statsKey
+      unit: readString$1_(requested.unit) || statsKey
     };
   }
 
@@ -32178,10 +33283,10 @@
     if (!structure || structure.ok !== false) return null;
     return {
       ok: false,
-      status: readString$1Y(structure.status) || "fail",
-      reason: readString$1Y(structure.reason) || "candidate structure is not publishable",
+      status: readString$1_(structure.status) || "fail",
+      reason: readString$1_(structure.reason) || "candidate structure is not publishable",
       issueCodes: Array.isArray(structure.issueCodes)
-        ? structure.issueCodes.map(readString$1Y).filter(Boolean).slice(0, 8)
+        ? structure.issueCodes.map(readString$1_).filter(Boolean).slice(0, 8)
         : []
     };
   }
@@ -32194,7 +33299,7 @@
 
   function estimateWorkspaceReplaceLength(runState, args, deficit) {
     const source = args && typeof args === "object" && !Array.isArray(args) ? args : {};
-    const path = readString$1Y(source.path);
+    const path = readString$1_(source.path);
     const find = typeof source.find === "string" ? source.find : "";
     const replace = typeof source.replace === "string"
       ? source.replace
@@ -32227,8 +33332,8 @@
     // is never a "no-growth rewrite" merely because it is small relative to a
     // requested length; only a write that shrinks or barely changes the draft is.
     const source = deficit && typeof deficit === "object" ? deficit : {};
-    const statsKey = readString$1Y(source.statsKey);
-    const unit = readString$1Y(source.unit);
+    const statsKey = readString$1_(source.statsKey);
+    const unit = readString$1_(source.unit);
     if (statsKey !== "words" && unit !== "words") return 1;
     return 30;
   }
@@ -32244,8 +33349,8 @@
     const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
       ? packet.requestedLength
       : null;
-    const statsKey = readString$1Y(requested && requested.statsKey);
-    const requestedValue = readFiniteNumber$2(requested && requested.value);
+    const statsKey = readString$1_(requested && requested.statsKey);
+    const requestedValue = readFiniteNumber$3(requested && requested.value);
     if (!statsKey || requestedValue <= 0) return null;
     const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
       ? packet.workspace.candidate
@@ -32257,40 +33362,40 @@
       : candidate && candidate.textStats && typeof candidate.textStats === "object"
         ? candidate.textStats
         : null;
-    const observed = readFiniteNumber$2(stats && stats[statsKey]);
+    const observed = readFiniteNumber$3(stats && stats[statsKey]);
     return {
       observed,
       requested: requestedValue,
       statsKey,
-      unit: readString$1Y(requested.unit) || statsKey
+      unit: readString$1_(requested.unit) || statsKey
     };
   }
 
-  function readFiniteNumber$2(value) {
+  function readFiniteNumber$3(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   }
 
   function countLatinWords(value) {
-    const text = readString$1Y(value);
+    const text = readString$1_(value);
     if (!text) return 0;
     const words = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g);
     return Array.isArray(words) ? words.length : 0;
   }
 
   function countTextByLengthUnit(value, deficit) {
-    const statsKey = readString$1Y(deficit && deficit.statsKey);
-    const unit = readString$1Y(deficit && deficit.unit);
+    const statsKey = readString$1_(deficit && deficit.statsKey);
+    const unit = readString$1_(deficit && deficit.unit);
     if (statsKey === "cjkChars" || unit === "cjk_chars" || unit === "cjkChars" || unit === "cjk") {
       return countCjkChars(value);
     }
     if (statsKey === "chars" || unit === "chars" || unit === "characters") {
-      return readString$1Y(value).length;
+      return readString$1_(value).length;
     }
     return countLatinWords(value);
   }
 
   function countCjkChars(value) {
-    const text = readString$1Y(value);
+    const text = readString$1_(value);
     if (!text) return 0;
     const chars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g);
     return Array.isArray(chars) ? chars.length : 0;
@@ -32435,6 +33540,7 @@
         output: { error: errorMessage, ok: false, errorStage: stage },
         pushStep,
         runState,
+        runtimeConfig,
         status: refreshStatus
       });
     }
@@ -32531,8 +33637,8 @@
     const actionValue = readPolicyAction(source.action) || (source.isReadOnly === true ? "allow" : "ask");
     return createDecision$1(
       actionValue,
-      readString$Z(source.reason) || (actionValue === "allow" ? "permission_judge_read_only" : "permission_judge_uncertain"),
-      readString$Z(source.source) || "classifier",
+      readString$_(source.reason) || (actionValue === "allow" ? "permission_judge_read_only" : "permission_judge_uncertain"),
+      readString$_(source.source) || "classifier",
       action
     );
   }
@@ -32540,7 +33646,7 @@
   function createDecision$1(actionValue, reason, source, action) {
     return {
       action: readPolicyAction(actionValue) || "ask",
-      actionName: readString$Z(action && action.name) || null,
+      actionName: readString$_(action && action.name) || null,
       cacheHit: false,
       permission: action && action.permission && typeof action.permission === "object" ? { ...action.permission } : null,
       reason,
@@ -32569,7 +33675,7 @@
       if (hasMatchTier && rule.matchTier !== actionTier) continue;
       const hasPattern = typeof rule.pattern === "string" && rule.pattern.length > 0;
       if (hasPattern && (argPath === null || !argPath.includes(rule.pattern))) continue;
-      last = { policyAction, reason: readString$Z(rule.reason) || `permission_rule_${policyAction}` };
+      last = { policyAction, reason: readString$_(rule.reason) || `permission_rule_${policyAction}` };
     }
     if (!last) return null;
     return createDecision$1(last.policyAction, last.reason, "permission_rules", action);
@@ -32588,19 +33694,19 @@
 
   function projectActionForJudge(action) {
     return {
-      description: readString$Z(action && action.description),
-      name: readString$Z(action && action.name),
+      description: readString$_(action && action.description),
+      name: readString$_(action && action.name),
       permission: action && action.permission && typeof action.permission === "object" ? { ...action.permission } : null,
       tier: Number.isInteger(action && action.tier) ? action.tier : null
     };
   }
 
   function readPolicyAction(value) {
-    const text = readString$Z(value);
+    const text = readString$_(value);
     return text === "allow" || text === "ask" || text === "deny" ? text : "";
   }
 
-  function readString$Z(value) {
+  function readString$_(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -32630,7 +33736,7 @@
   });
 
   async function executeAskClarificationAction(context, args) {
-    const question = readString$Y(args && args.question) || "Could you clarify what information you want?";
+    const question = readString$Z(args && args.question) || "Could you clarify what information you want?";
 
     return {
       control: "complete",
@@ -32644,7 +33750,7 @@
     };
   }
 
-  function readString$Y(value) {
+  function readString$Z(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -32668,10 +33774,10 @@
       : {};
     const policy = runtimeConfig.skillPolicy || normalizeSkillPolicy(null);
     const manifest = normalizeSkillPolicyManifest(options.manifest || options.skill || {});
-    const skillKey = readString$X(options.skillId) || readString$X(manifest && manifest.skillId) || readString$X(manifest && manifest.name);
-    const skillName = readString$X(options.skillName) || readString$X(manifest && manifest.name) || skillKey;
-    const toolName = readString$X(options.toolName) || readString$X(options.tool && options.tool.name);
-    const operation = readString$X(options.operation) || "unknown";
+    const skillKey = readString$Y(options.skillId) || readString$Y(manifest && manifest.skillId) || readString$Y(manifest && manifest.name);
+    const skillName = readString$Y(options.skillName) || readString$Y(manifest && manifest.name) || skillKey;
+    const toolName = readString$Y(options.toolName) || readString$Y(options.tool && options.tool.name);
+    const operation = readString$Y(options.operation) || "unknown";
 
     const explicitToolPolicy = lookupToolPolicy(policy.tools, skillKey, skillName, toolName);
     if (explicitToolPolicy) {
@@ -32749,7 +33855,7 @@
   }
 
   async function getPolicyManifestForSkill(context, skillIdOrName) {
-    const target = readString$X(skillIdOrName);
+    const target = readString$Y(skillIdOrName);
     if (!target) return null;
 
     const local = findManifest$1(context && context.agentSkills, target);
@@ -32786,11 +33892,11 @@
       : {};
     const safe = {
       action: readPolicy(source.action) || "allow",
-      operation: readString$X(source.operation) || null,
-      reason: readString$X(source.reason) || "default_allow",
-      skillId: readString$X(source.skillId) || null,
-      skillName: readString$X(source.skillName) || null,
-      toolName: readString$X(source.toolName) || null
+      operation: readString$Y(source.operation) || null,
+      reason: readString$Y(source.reason) || "default_allow",
+      skillId: readString$Y(source.skillId) || null,
+      skillName: readString$Y(source.skillName) || null,
+      toolName: readString$Y(source.toolName) || null
     };
     if (Number.isInteger(source.tier)) safe.tier = source.tier;
     if (Array.isArray(source.missingFeatures)) safe.missingFeatures = source.missingFeatures.slice();
@@ -32805,7 +33911,7 @@
     const result = {};
 
     for (const [key, policy] of Object.entries(source)) {
-      const normalizedKey = readString$X(key).toLowerCase();
+      const normalizedKey = readString$Y(key).toLowerCase();
       const normalizedPolicy = readPolicy(policy);
       if (!normalizedKey) continue;
       if (!normalizedPolicy) {
@@ -32870,10 +33976,10 @@
   }
 
   function lookupToolPolicy(tools, skillId, skillName, toolName) {
-    const toolKey = readString$X(toolName).toLowerCase();
+    const toolKey = readString$Y(toolName).toLowerCase();
     if (!toolKey) return null;
     for (const skillKey of [skillId, skillName]) {
-      const key = readString$X(skillKey).toLowerCase();
+      const key = readString$Y(skillKey).toLowerCase();
       if (!key) continue;
       const exact = tools[`${key}.${toolKey}`];
       if (exact) return exact;
@@ -32883,7 +33989,7 @@
 
   function lookupSkillPolicy(skills, skillId, skillName) {
     for (const key of [skillId, skillName]) {
-      const normalized = readString$X(key).toLowerCase();
+      const normalized = readString$Y(key).toLowerCase();
       if (normalized && skills[normalized]) return skills[normalized];
     }
     return null;
@@ -32894,12 +34000,12 @@
       action: readPolicy(action) || "allow",
       missingFeatures: Array.isArray(detail.missingFeatures) ? detail.missingFeatures.slice() : undefined,
       missingInputTypes: Array.isArray(detail.missingInputTypes) ? detail.missingInputTypes.slice() : undefined,
-      operation: readString$X(detail.operation) || null,
+      operation: readString$Y(detail.operation) || null,
       reason,
-      skillId: readString$X(detail.skillId) || null,
-      skillName: readString$X(detail.skillName) || null,
+      skillId: readString$Y(detail.skillId) || null,
+      skillName: readString$Y(detail.skillName) || null,
       tier: Number.isInteger(detail.tier) ? detail.tier : undefined,
-      toolName: readString$X(detail.toolName) || null
+      toolName: readString$Y(detail.toolName) || null
     };
   }
 
@@ -32908,13 +34014,13 @@
   }
 
   function findManifest$1(manifests, skillIdOrName) {
-    const target = readString$X(skillIdOrName).toLowerCase();
+    const target = readString$Y(skillIdOrName).toLowerCase();
     if (!target) return null;
 
     for (const item of Array.isArray(manifests) ? manifests : []) {
       const manifest = normalizeSkillPolicyManifest(item);
       if (!manifest) continue;
-      if (readString$X(manifest.skillId).toLowerCase() === target || readString$X(manifest.name).toLowerCase() === target) {
+      if (readString$Y(manifest.skillId).toLowerCase() === target || readString$Y(manifest.name).toLowerCase() === target) {
         return manifest;
       }
     }
@@ -32924,22 +34030,22 @@
 
   function normalizeSkillPolicyManifest(skill) {
     if (!skill || typeof skill !== "object" || Array.isArray(skill)) return null;
-    const name = readString$X(skill.name);
-    const skillId = readString$X(skill.skillId) || readString$X(skill.id) || name;
+    const name = readString$Y(skill.name);
+    const skillId = readString$Y(skill.skillId) || readString$Y(skill.id) || name;
     if (!name || !skillId) return null;
     return {
       availability: normalizeManifestAvailability(skill.availability),
-      checksum: readString$X(skill.checksum),
-      description: readString$X(skill.description),
+      checksum: readString$Y(skill.checksum),
+      description: readString$Y(skill.description),
       inputTypes: normalizeStringArray$1(skill.inputTypes),
       name,
       requires: normalizeStringArray$1(skill.requires),
       riskTier: readRiskTier(skill),
       skillId,
-      sourcePath: readString$X(skill.sourcePath),
+      sourcePath: readString$Y(skill.sourcePath),
       tags: normalizeStringArray$1(skill.tags),
       tools: normalizeToolSummaries(skill.tools),
-      version: readString$X(skill.version)
+      version: readString$Y(skill.version)
     };
   }
 
@@ -32971,8 +34077,8 @@
     return (Array.isArray(tools) ? tools : [])
       .map((tool) => {
         if (!tool || typeof tool !== "object" || Array.isArray(tool)) return null;
-        const name = readString$X(tool.name);
-        const description = readString$X(tool.description);
+        const name = readString$Y(tool.name);
+        const description = readString$Y(tool.description);
         if (!name || !description) return null;
         return {
           description,
@@ -32996,7 +34102,7 @@
       required: Array.isArray(source.required)
         ? source.required.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
         : [],
-      type: readString$X(source.type) || "object"
+      type: readString$Y(source.type) || "object"
     };
   }
 
@@ -33049,7 +34155,7 @@
   }
 
   function readPolicy(value) {
-    const policy = readString$X(value);
+    const policy = readString$Y(value);
     return SUPPORTED_POLICY_ACTIONS.has(policy) ? policy : null;
   }
 
@@ -33059,7 +34165,7 @@
       .map((item) => item.trim());
   }
 
-  function readString$X(value) {
+  function readString$Y(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -33180,8 +34286,8 @@
   }
 
   async function assertEarlyExecuteSkillPolicy(context, args) {
-    const requestedSkillName = readString$W(args && args.skillName);
-    const toolName = readString$W(args && args.toolName);
+    const requestedSkillName = readString$X(args && args.skillName);
+    const toolName = readString$X(args && args.toolName);
     if (!requestedSkillName && !toolName) return;
 
     const manifest = await getPolicyManifestForSkill(context, requestedSkillName);
@@ -33234,15 +34340,15 @@
     const normalizedArgs = args && typeof args === "object" && !Array.isArray(args)
       ? { ...args }
       : {};
-    let requestedSkillName = readString$W(normalizedArgs.skillName);
-    let toolName = readString$W(normalizedArgs.toolName);
+    let requestedSkillName = readString$X(normalizedArgs.skillName);
+    let toolName = readString$X(normalizedArgs.toolName);
 
     if (debug && debug.enabled) {
       debug.log("execute_skill_tool | resolve start", {
         providedSkillName: requestedSkillName || null,
         providedToolName: toolName || null,
         hasActiveSkill: !!activeSkill,
-        activeSkillName: readString$W(activeSkill && activeSkill.name) || null,
+        activeSkillName: readString$X(activeSkill && activeSkill.name) || null,
         argsKeys: Object.keys(normalizedArgs),
         availableSkills: (context.agentSkills || []).map((s) => ({
           name: s && s.name,
@@ -33289,7 +34395,7 @@
     const resolvedSkill = requestedSkillName
       ? findSkillByName(context.agentSkills, requestedSkillName)
       : activeSkill;
-    const resolvedSkillName = readString$W(resolvedSkill && resolvedSkill.name) || requestedSkillName;
+    const resolvedSkillName = readString$X(resolvedSkill && resolvedSkill.name) || requestedSkillName;
 
     if (!resolvedSkill || !resolvedSkillName) {
       if (context.agentSkillIndexProvider && requestedSkillName && toolName) {
@@ -33386,27 +34492,27 @@
 
   function findSkillByName(agentSkills, requestedSkillName) {
     const skills = Array.isArray(agentSkills) ? agentSkills : [];
-    const target = readString$W(requestedSkillName).toLowerCase();
+    const target = readString$X(requestedSkillName).toLowerCase();
 
     if (!target) {
       return null;
     }
 
     return skills.find((skill) => (
-      readString$W(skill && skill.name).toLowerCase() === target ||
-      readString$W(skill && skill.skillId).toLowerCase() === target
+      readString$X(skill && skill.name).toLowerCase() === target ||
+      readString$X(skill && skill.skillId).toLowerCase() === target
     )) || null;
   }
 
   function findSkillByToolName(agentSkills, toolName) {
     const skills = Array.isArray(agentSkills) ? agentSkills : [];
-    const target = readString$W(toolName).toLowerCase();
+    const target = readString$X(toolName).toLowerCase();
 
     if (!target) return null;
 
     for (const skill of skills) {
       if (!skill || !Array.isArray(skill.tools)) continue;
-      if (skill.tools.some((t) => t && readString$W(t.name).toLowerCase() === target)) {
+      if (skill.tools.some((t) => t && readString$X(t.name).toLowerCase() === target)) {
         return skill;
       }
     }
@@ -33420,9 +34526,9 @@
       return executableTool;
     }
 
-    const target = readString$W(toolName).toLowerCase();
+    const target = readString$X(toolName).toLowerCase();
     const tools = skill && Array.isArray(skill.tools) ? skill.tools : [];
-    return tools.find((tool) => readString$W(tool && tool.name).toLowerCase() === target) || null;
+    return tools.find((tool) => readString$X(tool && tool.name).toLowerCase() === target) || null;
   }
 
   function inferSkillTool(agentSkills, args, debug) {
@@ -33576,7 +34682,7 @@
         continue;
       }
 
-      const expectedType = readString$W(schema.properties[key] && schema.properties[key].type);
+      const expectedType = readString$X(schema.properties[key] && schema.properties[key].type);
       if (!expectedType || matchesExpectedType(value, expectedType)) {
         continue;
       }
@@ -33626,7 +34732,7 @@
     return typeof value === expectedType;
   }
 
-  function readString$W(value) {
+  function readString$X(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -33830,7 +34936,7 @@
         controls: ["continue"]
       },
       execute: async (context, args) => {
-        const requestedSkill = readString$V(args && (args.skillName || args.name));
+        const requestedSkill = readString$W(args && (args.skillName || args.name));
         const manifest = await getPolicyManifestForSkill(context, requestedSkill);
         const policyDecision = evaluateSkillPolicy({
           manifest,
@@ -33864,7 +34970,7 @@
     });
   }
 
-  function readString$V(value) {
+  function readString$W(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -34188,7 +35294,7 @@
           "x-agrun-read-url-message": readServiceErrorMessage(payload, failureStatus),
           "x-agrun-read-url-platform": "read_url_service",
           "x-agrun-read-url-reason": readServiceReason(payload),
-          "x-agrun-read-url-url": readString$U(payload && (payload.finalUrl || payload.url)) || requestUrl,
+          "x-agrun-read-url-url": readString$V(payload && (payload.finalUrl || payload.url)) || requestUrl,
           "x-agrun-read-url-origin-status": originStatus ? String(originStatus) : ""
         }),
         status: failureStatus
@@ -34202,7 +35308,7 @@
     const successResponse = new Response(method === "HEAD" ? "" : buildReadableBody(payload), {
       headers: new Headers({
         "content-type": "text/markdown; charset=utf-8",
-        "x-agrun-read-url-final-url": readString$U(payload && (payload.finalUrl || payload.url)) || requestUrl,
+        "x-agrun-read-url-final-url": readString$V(payload && (payload.finalUrl || payload.url)) || requestUrl,
         "x-agrun-read-url-from-cache": String(Boolean(payload && payload.meta && payload.meta.fromCache)),
         "x-agrun-read-url-load-time-ms": readPositiveInteger$h(payload && payload.meta && payload.meta.loadTimeMs)
           ? String(payload.meta.loadTimeMs)
@@ -34217,7 +35323,7 @@
         "x-agrun-read-url-text-range-start": textRange ? String(textRange.start) : "",
         "x-agrun-read-url-text-range-total": textRange ? String(textRange.totalChars) : "",
         "x-agrun-read-url-window-applied": textRange ? "true" : "",
-        "x-agrun-read-url-title": readString$U(payload && payload.title)
+        "x-agrun-read-url-title": readString$V(payload && payload.title)
       }),
       status: successStatus
     });
@@ -34227,14 +35333,14 @@
   }
 
   function buildReadableBody(payload) {
-    const markdown = readString$U(payload && payload.contentMarkdown);
+    const markdown = readString$V(payload && payload.contentMarkdown);
     if (markdown) {
       return markdown;
     }
 
-    const title = readString$U(payload && payload.title);
-    const excerpt = readString$U(payload && payload.textExcerpt);
-    const finalUrl = readString$U(payload && (payload.finalUrl || payload.url));
+    const title = readString$V(payload && payload.title);
+    const excerpt = readString$V(payload && payload.textExcerpt);
+    const finalUrl = readString$V(payload && (payload.finalUrl || payload.url));
 
     return [
       title ? `# ${title}` : "",
@@ -34275,7 +35381,7 @@
   }
 
   function normalizeServiceEndpoint(value) {
-    const endpoint = readString$U(value);
+    const endpoint = readString$V(value);
     if (!endpoint) {
       return "";
     }
@@ -34290,7 +35396,7 @@
   }
 
   function normalizeMethod(value) {
-    const method = readString$U(value).toUpperCase();
+    const method = readString$V(value).toUpperCase();
     return method || "GET";
   }
 
@@ -34324,17 +35430,17 @@
 
   function readServiceErrorCode(payload) {
     const error = readServiceError(payload);
-    return readString$U(error && error.code) || readString$U(payload && payload.error) || "READ_URL_SERVICE_ERROR";
+    return readString$V(error && error.code) || readString$V(payload && payload.error) || "READ_URL_SERVICE_ERROR";
   }
 
   function readServiceReason(payload) {
-    return readString$U(payload && payload.reason) || readServiceErrorCode(payload);
+    return readString$V(payload && payload.reason) || readServiceErrorCode(payload);
   }
 
   function readServiceErrorMessage(payload, status) {
     const error = readServiceError(payload);
-    return readString$U(error && error.message) ||
-      readString$U(payload && payload.message) ||
+    return readString$V(error && error.message) ||
+      readString$V(payload && payload.message) ||
       `Read URL service failed with status ${status}.`;
   }
 
@@ -34356,8 +35462,8 @@
 
   function hasReadablePayloadContent(payload) {
     return Boolean(
-      readString$U(payload && payload.contentMarkdown) ||
-      readString$U(payload && payload.textExcerpt)
+      readString$V(payload && payload.contentMarkdown) ||
+      readString$V(payload && payload.textExcerpt)
     );
   }
 
@@ -34432,7 +35538,7 @@
     }
   }
 
-  function readString$U(value) {
+  function readString$V(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -34443,13 +35549,13 @@
   function createReadUrlServiceFetch(options = {}) {
     const endpoint = normalizeServiceEndpoint(options.endpoint);
     const authMode = normalizeAuthMode(options.authMode);
-    const apiKey = readString$T(options.apiKey);
+    const apiKey = readString$U(options.apiKey);
     const baseFetch = resolveBaseFetch(options.baseFetch);
     const includeScreenshot = options.includeScreenshot === true;
     const passthroughUrls = Array.isArray(options.passthroughUrls)
-      ? options.passthroughUrls.map(readString$T).filter(Boolean)
+      ? options.passthroughUrls.map(readString$U).filter(Boolean)
       : [];
-    const waitUntil = readString$T(options.waitUntil) || DEFAULT_WAIT_UNTIL;
+    const waitUntil = readString$U(options.waitUntil) || DEFAULT_WAIT_UNTIL;
 
     if (!endpoint) {
       throw new Error('Read URL service fetch requires a non-empty "endpoint".');
@@ -34515,8 +35621,8 @@
       return;
     }
 
-    const screenshotBase64 = readString$T(payload && payload.screenshotBase64);
-    const screenshotMimeType = readString$T(payload && payload.screenshotMimeType) || "image/jpeg";
+    const screenshotBase64 = readString$U(payload && payload.screenshotBase64);
+    const screenshotMimeType = readString$U(payload && payload.screenshotMimeType) || "image/jpeg";
     const textRange = normalizeTextRange$1(
       (payload && payload.textRange) || (payload && payload.meta && payload.meta.textRange)
     );
@@ -34531,7 +35637,7 @@
       screenshotMimeType,
       textRange,
       textWindowApplied: Boolean(textRange),
-      title: readString$T(payload && payload.title)
+      title: readString$U(payload && payload.title)
     });
   }
 
@@ -34558,7 +35664,7 @@
     return "Read URL service request failed before a response was available.";
   }
 
-  function readString$T(value) {
+  function readString$U(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -34590,18 +35696,18 @@
       bytes: options.bytes,
       contentType: options.contentType || "",
       kind: "read_url_result",
-      message: readString$S(options.meta && options.meta.message),
+      message: readString$T(options.meta && options.meta.message),
       mode: options.mode,
       ok: true,
       originStatus: typeof options.meta?.originStatus === "number" ? options.meta.originStatus : null,
-      platform: readString$S(options.meta && options.meta.platform),
-      screenshotDataUrl: readString$S(options.meta && options.meta.screenshotDataUrl),
-      screenshotMimeType: readString$S(options.meta && options.meta.screenshotMimeType),
+      platform: readString$T(options.meta && options.meta.platform),
+      screenshotDataUrl: readString$T(options.meta && options.meta.screenshotDataUrl),
+      screenshotMimeType: readString$T(options.meta && options.meta.screenshotMimeType),
       status: typeof options.response.status === "number" ? options.response.status : null,
       statusText: typeof options.response.statusText === "string" ? options.response.statusText : "",
       text: options.text,
       textRange: normalizeTextRange(options.textRange),
-      title: readString$S(options.meta && options.meta.title),
+      title: readString$T(options.meta && options.meta.title),
       truncated: options.truncated === true,
       url: options.url
     };
@@ -34684,12 +35790,12 @@
         readHeaderValue(response && response.headers, "x-agrun-read-url-origin-status")
       ) || (typeof meta.originStatus === "number" ? meta.originStatus : null),
       platform: platform || "browser",
-      screenshotDataUrl: readString$S(meta.screenshotDataUrl),
-      screenshotMimeType: readString$S(meta.screenshotMimeType),
+      screenshotDataUrl: readString$T(meta.screenshotDataUrl),
+      screenshotMimeType: readString$T(meta.screenshotMimeType),
       textRange: normalizeTextRange(meta.textRange) || headerTextRange,
       textWindowApplied: meta.textWindowApplied === true ||
         readHeaderValue(response && response.headers, "x-agrun-read-url-window-applied") === "true",
-      title: readString$S(meta.title)
+      title: readString$T(meta.title)
     };
   }
 
@@ -34746,7 +35852,7 @@
     return null;
   }
 
-  function readString$S(value) {
+  function readString$T(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -35152,9 +36258,9 @@
 
   function normalizeReadUrlArgs(args, request) {
     const prompt = request && typeof request.prompt === "string" ? request.prompt : "";
-    const rawMethod = readString$R(args && args.method).toUpperCase();
+    const rawMethod = readString$S(args && args.method).toUpperCase();
     const url = normalizeHttpUrl(
-      readString$R(args && args.url) ||
+      readString$S(args && args.url) ||
       extractFirstUrl(prompt) ||
       readSnapshotSelectedUrl(request)
     );
@@ -35219,7 +36325,7 @@
 
   function createReadUrlRecovery(output, args) {
     const classification = classifyReadUrlFailure(output);
-    const reason = readString$R(output && (output.reason || output.error));
+    const reason = readString$S(output && (output.reason || output.error));
     return {
       kind: "read_url_recovery",
       retryable: classification.retryable === true,
@@ -35250,7 +36356,7 @@
     if (typeof context?.pushStep === "function") {
       context.pushStep("read-url-fallback-attempt", {
         fromUrl: normalizedArgs.url,
-        reason: readString$R(output && (output.reason || output.error)) || "read_url_failed",
+        reason: readString$S(output && (output.reason || output.error)) || "read_url_failed",
         url: candidate.url
       });
     }
@@ -35263,7 +36369,7 @@
       selectedTitle: candidate.title || "",
       selectedDomain: candidate.domain || "",
       result: {
-        error: readString$R(fallbackOutput && fallbackOutput.error),
+        error: readString$S(fallbackOutput && fallbackOutput.error),
         ok: fallbackOutput && fallbackOutput.ok !== false,
         status: typeof fallbackOutput?.status === "number" ? fallbackOutput.status : null,
         originStatus: typeof fallbackOutput?.originStatus === "number" ? fallbackOutput.originStatus : null
@@ -35299,7 +36405,7 @@
     // Approval resumes should execute exactly the approved URL. Alternate-source
     // recovery belongs to autonomous runs where the host has already allowed
     // tier-1 research actions.
-    return readString$R(context?.request?.type) !== "approval_resolution";
+    return readString$S(context?.request?.type) !== "approval_resolution";
   }
 
   function findAlternateCandidate(context, failedUrl) {
@@ -35346,17 +36452,17 @@
 
   function normalizeCandidate(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const url = normalizeHttpUrl(readString$R(value.url));
+    const url = normalizeHttpUrl(readString$S(value.url));
     if (!url) return null;
     return {
-      domain: readString$R(value.domain) || readDomain$1(url),
-      title: readString$R(value.title) || url,
+      domain: readString$S(value.domain) || readDomain$1(url),
+      title: readString$S(value.title) || url,
       url
     };
   }
 
   function normalizeUrlKey(value) {
-    const url = normalizeHttpUrl(readString$R(value));
+    const url = normalizeHttpUrl(readString$S(value));
     if (!url) return "";
     try {
       const parsed = new URL(url);
@@ -35379,7 +36485,7 @@
     return Array.isArray(value) ? value : [];
   }
 
-  function readString$R(value) {
+  function readString$S(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
@@ -35415,7 +36521,7 @@
       ? inquiryContext.candidateSources[0]
       : null;
 
-    return readString$R(selectedSource && selectedSource.url) || readString$R(singleCandidate && singleCandidate.url);
+    return readString$S(selectedSource && selectedSource.url) || readString$S(singleCandidate && singleCandidate.url);
   }
 
   function createUseAgentSkillAction(agentSkills, agentSkillIndexProvider) {
@@ -35446,7 +36552,7 @@
         controls: ["continue"]
       },
       execute: async (context, args) => {
-        const requestedSkill = readString$Q(args && (args.skillName || args.name));
+        const requestedSkill = readString$R(args && (args.skillName || args.name));
         const lastReadSkill = context.agentSkillContext && context.agentSkillContext.lastReadSkill;
         const normalizedLastReadSkill = normalizeAgentSkill(lastReadSkill);
         let selectedSkill = !requestedSkill || matchesSkillName(normalizedLastReadSkill, requestedSkill)
@@ -35471,7 +36577,7 @@
         if (!selectedSkill && context.agentSkillIndexProvider) {
           selectedSkill = await loadAgentSkillFromProvider(
             context.agentSkillIndexProvider,
-            requestedSkill || readString$Q(lastReadSkill && (lastReadSkill.skillId || lastReadSkill.name))
+            requestedSkill || readString$R(lastReadSkill && (lastReadSkill.skillId || lastReadSkill.name))
           );
         }
 
@@ -35516,15 +36622,584 @@
     });
   }
 
-  function readString$Q(value) {
+  function readString$R(value) {
     return typeof value === "string" ? value.trim() : "";
   }
 
   function matchesSkillName(skill, requestedSkill) {
-    const target = readString$Q(requestedSkill).toLowerCase();
+    const target = readString$R(requestedSkill).toLowerCase();
     if (!skill || !target) return false;
-    return readString$Q(skill.name).toLowerCase() === target ||
-      readString$Q(skill.skillId).toLowerCase() === target;
+    return readString$R(skill.name).toLowerCase() === target ||
+      readString$R(skill.skillId).toLowerCase() === target;
+  }
+
+  const ISSUE_BLOCKING = "blocking";
+  const ISSUE_ADVISORY = "advisory";
+
+  function buildCandidateQualitySignal(options = {}) {
+    const context = options.context && typeof options.context === "object" ? options.context : {};
+    const runState = options.runState && typeof options.runState === "object"
+      ? options.runState
+      : context.runState && typeof context.runState === "object"
+        ? context.runState
+        : {};
+    const workspace = options.workspace && typeof options.workspace === "object"
+      ? options.workspace
+      : runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+        ? runState.virtualWorkspace
+        : {};
+    const file = options.file && typeof options.file === "object" ? options.file : {};
+    const path = readString$Q(file.path || options.path) || "final_candidate.md";
+    const content = typeof file.content === "string" ? file.content : "";
+    const finalReadiness = options.finalReadiness && typeof options.finalReadiness === "object"
+      ? options.finalReadiness
+      : null;
+    const reviewRequired = options.reviewRequired === true;
+    const issues = [];
+    const publishProtocol = inspectWorkspacePublishProtocol(workspace, path);
+    const review = readCandidateReview(workspace, path);
+    const requirementsChecklist = normalizeRequirementsChecklist(review && review.requirementsChecklist);
+    const textStats = readTextStats(file.textStats, content);
+    const requestedLength = readRequestedLength({ context, finalReadiness, options });
+    const requestedCitations = readRequestedCitationContract({ options });
+    const publishDecision = readString$Q(finalReadiness && finalReadiness.decision).toLowerCase();
+
+    if (reviewRequired) {
+      const reviewFresh = Boolean(
+        review &&
+        review.path === path &&
+        review.fileVersion === readNumber$8(file.version) &&
+        publishProtocol.reviewAfterLatestContentChange === true
+      );
+      if (!reviewFresh) {
+        issues.push(createIssue({
+          code: "missing_latest_candidate_review",
+          message: "Candidate must be reviewed by AI after the latest content change before publish.",
+          severity: ISSUE_BLOCKING,
+          status: review ? "stale" : "missing",
+          path,
+          expectedAction: "workspace_review_candidate"
+        }));
+      }
+    }
+
+    if (review && review.readyToPublish !== true) {
+      issues.push(createIssue({
+        code: "ai_review_not_ready",
+        message: "AI self-review did not mark the candidate ready to publish.",
+        severity: publishDecision === "ready" ? ISSUE_BLOCKING : ISSUE_ADVISORY,
+        path,
+        status: "not_ready"
+      }));
+    }
+
+    for (const item of requirementsChecklist) {
+      if (item.kind !== "objective") continue;
+      if (item.status !== "partial" && item.status !== "unmet") continue;
+      issues.push(createIssue({
+        code: "objective_requirement_unmet",
+        message: `AI self-review marked objective requirement as ${item.status}: ${item.requirement}`,
+        requirementId: item.id,
+        severity: publishDecision === "ready" ? ISSUE_BLOCKING : ISSUE_ADVISORY,
+        path,
+        status: item.status
+      }));
+    }
+
+    const structure = inspectWorkspaceCandidateStructure(content);
+    if (structure && structure.ok === false) {
+      const codes = Array.isArray(structure.issueCodes) ? structure.issueCodes : [];
+      for (const code of codes) {
+        issues.push(createIssue({
+          code,
+          message: `Candidate structure issue: ${code}.`,
+          severity: isHardStructureIssue(code) ? ISSUE_BLOCKING : ISSUE_ADVISORY,
+          path,
+          samples: readStructureSamples(structure, code)
+        }));
+      }
+    }
+
+    const finalSectionTitle = readFinalSectionTitle({ review, options });
+    const contentAfterFinalSection = finalSectionTitle
+      ? inspectContentAfterFinalSection(content, finalSectionTitle)
+      : null;
+    if (contentAfterFinalSection && contentAfterFinalSection.hasContentAfterFinalSection) {
+      issues.push(createIssue({
+        code: "content_after_final_section",
+        message: `Candidate has major section headings after final section "${finalSectionTitle}".`,
+        severity: ISSUE_BLOCKING,
+        path,
+        finalSectionTitle,
+        followingHeadings: contentAfterFinalSection.followingHeadings
+      }));
+    }
+
+    const citationAudit = inspectCitedUrlEvidence(content, runState);
+    if (
+      requestedCitations &&
+      requestedCitations.minUrlCount > 0 &&
+      citationAudit.citedUrlCount < requestedCitations.minUrlCount
+    ) {
+      issues.push(createIssue({
+        code: "missing_required_cited_urls",
+        message: `Candidate cites ${citationAudit.citedUrlCount}/${requestedCitations.minUrlCount} requested URL(s).`,
+        severity: ISSUE_BLOCKING,
+        path,
+        citedUrlCount: citationAudit.citedUrlCount,
+        minUrlCount: requestedCitations.minUrlCount
+      }));
+    }
+    for (const cited of citationAudit.citedUrls) {
+      if (cited.status === "blocked") {
+        issues.push(createIssue({
+          code: "blocked_source_cited",
+          message: `Candidate cites a blocked or unreadable URL: ${cited.url}`,
+          severity: ISSUE_BLOCKING,
+          path,
+          qualityTier: cited.qualityTier,
+          qualityReason: cited.qualityReason,
+          url: cited.url
+        }));
+      } else if (cited.status === "unread") {
+        issues.push(createIssue({
+          code: "unread_cited_url",
+          message: `Candidate cites a URL that is not backed by successful evidence: ${cited.url}`,
+          severity: ISSUE_BLOCKING,
+          path,
+          url: cited.url
+        }));
+      }
+    }
+
+    const wordCountAudit = inspectWordCountAgreement(content, textStats, requestedLength);
+    if (wordCountAudit && wordCountAudit.belowRequested === true) {
+      issues.push(createIssue({
+        code: "external_word_count_below_target",
+        message: `Candidate is below requested word count by whitespace-token count: ${wordCountAudit.externalWords}/${wordCountAudit.requestedWords}.`,
+        severity: ISSUE_ADVISORY,
+        path,
+        externalWords: wordCountAudit.externalWords,
+        requestedWords: wordCountAudit.requestedWords,
+        runtimeWords: wordCountAudit.runtimeWords
+      }));
+    }
+
+    const blockingIssues = issues.filter((issue) => issue.severity === ISSUE_BLOCKING);
+    const advisoryIssues = issues.filter((issue) => issue.severity !== ISSUE_BLOCKING);
+    return {
+      advisoryIssueCodes: advisoryIssues.map((issue) => issue.code),
+      blockingIssueCodes: blockingIssues.map((issue) => issue.code),
+      blockingIssues,
+      citationAudit,
+      finalSectionTitle: finalSectionTitle || null,
+      hasBlockingIssues: blockingIssues.length > 0,
+      issueCodes: issues.map((issue) => issue.code),
+      issues,
+      kind: "candidate_quality_signal",
+      ok: blockingIssues.length === 0,
+      path,
+      publishProtocol,
+      requestedCitations,
+      requestedLength,
+      requirementsChecklist,
+      review,
+      reviewRequired,
+      status: blockingIssues.length > 0 ? "blocked" : advisoryIssues.length > 0 ? "warn" : "pass",
+      structure: summarizeStructure(structure),
+      textStats,
+      version: 1,
+      wordCountAudit
+    };
+  }
+
+  function normalizeCandidateQualitySignal(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const issues = Array.isArray(source.issues) ? source.issues.map(normalizeIssue).filter(Boolean).slice(0, 24) : [];
+    const blockingIssues = issues.filter((issue) => issue.severity === ISSUE_BLOCKING);
+    const advisoryIssues = issues.filter((issue) => issue.severity !== ISSUE_BLOCKING);
+    return {
+      advisoryIssueCodes: advisoryIssues.map((issue) => issue.code),
+      blockingIssueCodes: blockingIssues.map((issue) => issue.code),
+      blockingIssues,
+      citationAudit: source.citationAudit && typeof source.citationAudit === "object" ? source.citationAudit : null,
+      finalSectionTitle: readString$Q(source.finalSectionTitle) || null,
+      hasBlockingIssues: blockingIssues.length > 0,
+      issueCodes: issues.map((issue) => issue.code),
+      issues,
+      kind: "candidate_quality_signal",
+      ok: source.ok === true && blockingIssues.length === 0,
+      path: readString$Q(source.path) || null,
+      publishProtocol: source.publishProtocol && typeof source.publishProtocol === "object" ? source.publishProtocol : null,
+      requestedCitations: source.requestedCitations && typeof source.requestedCitations === "object" ? source.requestedCitations : null,
+      requestedLength: source.requestedLength && typeof source.requestedLength === "object" ? source.requestedLength : null,
+      requirementsChecklist: normalizeRequirementsChecklist(source.requirementsChecklist),
+      review: source.review && typeof source.review === "object" ? source.review : null,
+      reviewRequired: source.reviewRequired === true,
+      status: readString$Q(source.status) || (blockingIssues.length > 0 ? "blocked" : advisoryIssues.length > 0 ? "warn" : "pass"),
+      structure: source.structure && typeof source.structure === "object" ? source.structure : null,
+      textStats: source.textStats && typeof source.textStats === "object" ? source.textStats : null,
+      version: 1,
+      wordCountAudit: source.wordCountAudit && typeof source.wordCountAudit === "object" ? source.wordCountAudit : null
+    };
+  }
+
+  function readCandidateReview(workspace, path) {
+    const quality = workspace && workspace.quality && typeof workspace.quality === "object"
+      ? workspace.quality
+      : {};
+    const review = quality.candidateReview && typeof quality.candidateReview === "object"
+      ? quality.candidateReview
+      : null;
+    if (!review || readString$Q(review.path) !== path) return null;
+    return review;
+  }
+
+  function readRequestedLength({ context, finalReadiness, options }) {
+    const assessment = finalReadiness && finalReadiness.requirementsAssessment && typeof finalReadiness.requirementsAssessment === "object"
+      ? finalReadiness.requirementsAssessment
+      : {};
+    const requestedFromReadiness = readFiniteNumber$2(assessment.requestedLength);
+    const unitFromReadiness = normalizeLengthUnit(assessment.observedLengthUnit);
+    if (requestedFromReadiness != null && requestedFromReadiness > 0) {
+      return {
+        statsKey: unitToStatsKey(unitFromReadiness),
+        unit: unitFromReadiness,
+        value: requestedFromReadiness
+      };
+    }
+    const explicit = options.requestedLength && typeof options.requestedLength === "object"
+      ? options.requestedLength
+      : null;
+    if (explicit && readFiniteNumber$2(explicit.value) > 0) {
+      const unit = normalizeLengthUnit(explicit.unit);
+      return {
+        statsKey: readString$Q(explicit.statsKey) || unitToStatsKey(unit),
+        unit,
+        value: readFiniteNumber$2(explicit.value)
+      };
+    }
+    return extractRequestedLengthContract(readTerminalContractText(context)) || null;
+  }
+
+  // AI-first: the runtime never invents a citation requirement by lexical-parsing
+  // the user prompt. A minimum cited-URL count is honored only when the host
+  // declares it via options (an explicit numeric contract). The AI-declared case
+  // is owned by requirementsChecklist and surfaces through objective_requirement_unmet.
+  function readRequestedCitationContract({ options }) {
+    const explicit = options.requestedCitations && typeof options.requestedCitations === "object"
+      ? options.requestedCitations
+      : null;
+    const explicitMin = readFiniteNumber$2(explicit && (explicit.minUrlCount || explicit.minUrls || explicit.minSources));
+    if (explicitMin && explicitMin > 0) {
+      return {
+        minUrlCount: Math.floor(explicitMin),
+        source: "options"
+      };
+    }
+    return null;
+  }
+
+  function inspectWordCountAgreement(content, textStats, requestedLength) {
+    if (!requestedLength || requestedLength.unit !== "words") return null;
+    const requestedWords = readFiniteNumber$2(requestedLength.value);
+    if (!requestedWords || requestedWords <= 0) return null;
+    const externalWords = countWhitespaceWords(content);
+    const runtimeWords = readNumber$8(textStats && textStats.words);
+    return {
+      belowRequested: externalWords < requestedWords,
+      externalWords,
+      requestedWords,
+      runtimeWords,
+      delta: runtimeWords - externalWords
+    };
+  }
+
+  function inspectCitedUrlEvidence(content, runState) {
+    const urls = extractUrls(content);
+    const evidence = collectReadSourceEvidence(runState);
+    return {
+      citedUrls: urls.map((url) => {
+        const source = evidence.byUrl.get(normalizeUrl(url));
+        if (!source) {
+          return { status: "unread", url };
+        }
+        const detail = explainReadSourceQuality(source);
+        return {
+          ok: isReadableEvidenceSource(source),
+          qualityReason: detail.reason,
+          qualityTier: detail.tier,
+          status: isReadableEvidenceSource(source) ? "readable" : "blocked",
+          url
+        };
+      }).slice(0, 24),
+      citedUrlCount: urls.length,
+      readableEvidenceUrlCount: evidence.readableCount,
+      readSourceUrlCount: evidence.totalCount
+    };
+  }
+
+  function collectReadSourceEvidence(runState) {
+    const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
+      ? runState.researchContext.readSources
+      : [];
+    const byUrl = new Map();
+    let readableCount = 0;
+    for (const source of readSources) {
+      const url = readString$Q(source && source.url);
+      if (!url) continue;
+      byUrl.set(normalizeUrl(url), source);
+      if (isReadableEvidenceSource(source)) readableCount += 1;
+    }
+    return {
+      byUrl,
+      readableCount,
+      totalCount: readSources.filter((source) => readString$Q(source && source.url)).length
+    };
+  }
+
+  function inspectContentAfterFinalSection(content, finalSectionTitle) {
+    const target = normalizeHeadingLabel(finalSectionTitle);
+    if (!target) return null;
+    const headings = collectHeadingLines(content);
+    const finalIndex = headings.findIndex((heading) => normalizeHeadingLabel(heading.text) === target);
+    if (finalIndex < 0) return {
+      finalSectionFound: false,
+      followingHeadings: [],
+      hasContentAfterFinalSection: false
+    };
+    const finalHeading = headings[finalIndex];
+    const followingHeadings = headings
+      .slice(finalIndex + 1)
+      .filter((heading) => heading.level <= finalHeading.level)
+      .map((heading) => ({
+        level: heading.level,
+        lineNumber: heading.lineNumber,
+        text: heading.text
+      }))
+      .slice(0, 8);
+    return {
+      finalSectionFound: true,
+      followingHeadings,
+      hasContentAfterFinalSection: followingHeadings.length > 0
+    };
+  }
+
+  function readFinalSectionTitle({ review, options }) {
+    const reviewTitle = readString$Q(review && review.finalSectionTitle);
+    if (reviewTitle) return reviewTitle;
+    const optionTitle = readString$Q(options && options.finalSectionTitle);
+    if (optionTitle) return optionTitle;
+    return "";
+  }
+
+  function collectHeadingLines(content) {
+    const value = typeof content === "string" ? content : "";
+    if (!value.trim()) return [];
+    const lines = value.split(/\r?\n/);
+    const headings = [];
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = readString$Q(lines[index]);
+      const match = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
+      if (!match) continue;
+      headings.push({
+        level: match[1].length,
+        lineNumber: index + 1,
+        text: readString$Q(match[2])
+      });
+    }
+    return headings;
+  }
+
+  function extractUrls(content) {
+    const sourceContent = typeof content === "string" ? content : "";
+    const seen = new Set();
+    const urls = [];
+    const re = /https?:\/\/[^\s<>)\]}"]+/gi;
+    let match;
+    while ((match = re.exec(sourceContent)) !== null) {
+      const url = cleanupUrl(match[0]);
+      const key = normalizeUrl(url);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      urls.push(url);
+    }
+    return urls.slice(0, 48);
+  }
+
+  function cleanupUrl(value) {
+    return readString$Q(value).replace(/[.,;:!?]+$/g, "");
+  }
+
+  function normalizeUrl(value) {
+    try {
+      const url = new URL(cleanupUrl(value));
+      url.hash = "";
+      if (url.pathname !== "/") url.pathname = url.pathname.replace(/\/+$/g, "");
+      return url.toString();
+    } catch {
+      return cleanupUrl(value).toLowerCase();
+    }
+  }
+
+  function readStructureSamples(structure, code) {
+    if (code === "duplicate_headings") {
+      return Array.isArray(structure.repeatedHeadingSamples) ? structure.repeatedHeadingSamples.slice(0, 5) : [];
+    }
+    if (code === "duplicate_section_numbers") {
+      return Array.isArray(structure.repeatedNumberSamples) ? structure.repeatedNumberSamples.slice(0, 5) : [];
+    }
+    return [];
+  }
+
+  function isHardStructureIssue(code) {
+    return code === "duplicate_headings" ||
+      code === "duplicate_section_numbers" ||
+      code === "non_monotonic_section_numbers" ||
+      code === "gapped_section_numbers";
+  }
+
+  function summarizeStructure(structure) {
+    const source = structure && typeof structure === "object" ? structure : {};
+    return {
+      duplicateHeadingCount: readNumber$8(source.duplicateHeadingCount),
+      duplicateNumberCount: readNumber$8(source.duplicateNumberCount),
+      headingCount: readNumber$8(source.headingCount),
+      issueCodes: Array.isArray(source.issueCodes) ? source.issueCodes.map(readString$Q).filter(Boolean).slice(0, 12) : [],
+      ok: source.ok === true,
+      reason: readString$Q(source.reason) || null,
+      status: readString$Q(source.status) || "unknown"
+    };
+  }
+
+  function createIssue(value) {
+    return normalizeIssue(value);
+  }
+
+  function normalizeIssue(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const code = readString$Q(source.code);
+    if (!code) return null;
+    return {
+      code,
+      expectedAction: readString$Q(source.expectedAction) || null,
+      field: readString$Q(source.field) || null,
+      finalSectionTitle: readString$Q(source.finalSectionTitle) || null,
+      followingHeadings: Array.isArray(source.followingHeadings) ? source.followingHeadings.slice(0, 8) : [],
+      message: readString$Q(source.message) || code,
+      path: readString$Q(source.path) || null,
+      qualityReason: readString$Q(source.qualityReason) || null,
+      qualityTier: readString$Q(source.qualityTier) || null,
+      requirementId: readString$Q(source.requirementId) || null,
+      samples: Array.isArray(source.samples) ? source.samples.slice(0, 8) : [],
+      severity: readString$Q(source.severity) === ISSUE_ADVISORY ? ISSUE_ADVISORY : ISSUE_BLOCKING,
+      status: readString$Q(source.status) || null,
+      url: readString$Q(source.url) || null,
+      citedUrlCount: readFiniteNumber$2(source.citedUrlCount),
+      externalWords: readFiniteNumber$2(source.externalWords),
+      minUrlCount: readFiniteNumber$2(source.minUrlCount),
+      requestedWords: readFiniteNumber$2(source.requestedWords),
+      runtimeWords: readFiniteNumber$2(source.runtimeWords)
+    };
+  }
+
+  function normalizeRequirementsChecklist(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry, index) => normalizeRequirement(entry, index))
+      .filter(Boolean)
+      .slice(0, 24);
+  }
+
+  function normalizeRequirement(value, index) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const requirement = readString$Q(source.requirement || source.summary || source.text);
+    if (!requirement) return null;
+    const id = readString$Q(source.id) || `requirement_${index + 1}`;
+    return {
+      evidence: readString$Q(source.evidence).slice(0, 360) || null,
+      id: id.slice(0, 80),
+      kind: normalizeRequirementKind(source.kind || source.type),
+      remainingGap: readString$Q(source.remainingGap || source.gap).slice(0, 360) || null,
+      repairAction: readString$Q(source.repairAction || source.repairPlan).slice(0, 360) || null,
+      requirement: requirement.slice(0, 360),
+      status: normalizeRequirementStatus(source.status || source.result)
+    };
+  }
+
+  function normalizeRequirementKind(value) {
+    const text = readString$Q(value).toLowerCase();
+    if (text === "objective" || text === "fact" || text === "measurable") return "objective";
+    if (text === "subjective" || text === "editorial" || text === "quality") return "subjective";
+    return "unknown";
+  }
+
+  function normalizeRequirementStatus(value) {
+    const text = readString$Q(value).toLowerCase();
+    if (text === "met" || text === "pass" || text === "passed" || text === "done") return "met";
+    if (text === "partial" || text === "partially_met" || text === "partly_met") return "partial";
+    if (text === "unmet" || text === "fail" || text === "failed" || text === "missing") return "unmet";
+    return "unknown";
+  }
+
+  function readTextStats(stats, content) {
+    const source = stats && typeof stats === "object" ? stats : {};
+    const text = readString$Q(content);
+    const words = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
+    const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
+    return {
+      chars: readNumber$8(source.chars) || text.length,
+      cjkChars: readNumber$8(source.cjkChars) || cjkChars.length,
+      nonWhitespaceChars: readNumber$8(source.nonWhitespaceChars) || text.replace(/\s/g, "").length,
+      words: readNumber$8(source.words) || words.length
+    };
+  }
+
+  function countWhitespaceWords(value) {
+    const text = readString$Q(value);
+    if (!text) return 0;
+    return text.split(/\s+/).filter(Boolean).length;
+  }
+
+  function normalizeHeadingLabel(value) {
+    return readString$Q(value)
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/\s+#+\s*$/, "")
+      .replace(/^\d{1,3}(?:\.\d{1,3})*\.?\s+/, "")
+      .replace(/[`*_]/g, "")
+      .replace(/[^\p{L}\p{N}\s-]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function normalizeLengthUnit(value) {
+    const text = readString$Q(value).toLowerCase();
+    if (text === "words" || text === "word") return "words";
+    if (text === "cjk_chars" || text === "cjkchars" || text === "\u5b57" || text === "\u5b57\u6570") return "cjk_chars";
+    if (text === "chars" || text === "char" || text === "characters") return "chars";
+    return "chars";
+  }
+
+  function unitToStatsKey(unit) {
+    if (unit === "words") return "words";
+    if (unit === "cjk_chars") return "cjkChars";
+    return "chars";
+  }
+
+  function readFiniteNumber$2(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  function readNumber$8(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  }
+
+  function readString$Q(value) {
+    return typeof value === "string" ? value.trim() : "";
   }
 
   const workspaceListAction = Object.freeze({
@@ -35575,7 +37250,7 @@
       argsExample: {
         content: "...",
         path: "draft.md",
-        summary: "drafted report body"
+        summary: "drafted response body"
       },
       argsSchema: {
         content: { type: "string", required: true },
@@ -35583,7 +37258,7 @@
         summary: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_write to CREATE or fully REPLACE a virtual draft file. CAUTION: workspace_write REPLACES ALL existing content — calling it again on a path that already has substantial content erases that work. Use workspace_write only to start a new file or for a deliberate full rewrite. To expand or improve an existing draft, read it first, then make targeted edits: workspace_insert_after_section to deepen an existing section, workspace_replace to revise text. If a section is thin because you lack real material, web_search/read_url for sources before editing. Do not pad to reach a length."
+      guidance: "Use workspace_write to CREATE or fully REPLACE a virtual draft file. CAUTION: workspace_write REPLACES ALL existing content — calling it again on a path that already has substantial content erases that work. Use workspace_write only to start a new file or for a deliberate full rewrite. To expand or improve an existing draft, read it first, then make targeted edits: workspace_insert_after_section to deepen an existing section, workspace_replace to revise text. If a section is thin because you lack real material, gather evidence with the configured host actions before editing. Do not pad to reach a length."
     },
     tier: 0,
     execute: executeWorkspaceWriteAction,
@@ -35651,7 +37326,7 @@
         summary: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_propose_patch before risky report repair. Valid operations are exactly: {type:\"append\",content:\"...\"}, {type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}, {type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}, or {type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate headings/section numbers shown in duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context; runtime changes only those Markdown heading lines and validates structure. For heading-only normalize_headings repair, set applyIfValid:true to avoid a separate workspace_apply_patch cycle; if the preview has blocking riskFlags it will not apply. If length is already satisfied and the visible issue is duplicate heading/section-number context, send exactly one normalize_headings operation. Do not mix normalize_headings with replace unless the exact current find text is visible in the prompt and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not send {type:\"replace\",content:\"full document\"}; replace needs find+replace and will be blocked without a non-empty find. If riskFlags include no_growth, not_found, ambiguous, or structure_maybe_worse, revise the patch or use workspace_insert_after_section/workspace_replace only when those actions are currently allowed instead of finalizing."
+      guidance: "Use workspace_propose_patch before risky candidate repair. Valid operations are exactly: {type:\"append\",content:\"...\"}, {type:\"insert_after_section\",heading:\"Existing Heading\",content:\"...\"}, {type:\"replace\",find:\"exact current text\",replace:\"new text\",replace_all?:true}, or {type:\"normalize_headings\",headings:[{\"lineNumber\":42,\"text\":\"## 4. Unique Heading\"}]}. Use normalize_headings alone first for duplicate headings/section numbers shown in duplicate_heading_context, duplicate_section_number_context, or section_number_repair_context; runtime changes only those Markdown heading lines and validates structure. For heading-only normalize_headings repair, set applyIfValid:true to avoid a separate workspace_apply_patch cycle; if the preview has blocking riskFlags it will not apply. If length is already satisfied and the visible issue is duplicate heading/section-number context, send exactly one normalize_headings operation. Do not mix normalize_headings with replace unless the exact current find text is visible in the prompt and heading-only repair cannot improve structure. The JSON key must be \"lineNumber\" with a numeric value, not \"lineNumber:42\". Do not send {type:\"replace\",content:\"full document\"}; replace needs find+replace and will be blocked without a non-empty find. If riskFlags include no_growth, not_found, ambiguous, or structure_maybe_worse, revise the patch or use workspace_insert_after_section/workspace_replace only when those actions are currently allowed instead of finalizing."
     },
     tier: 0,
     execute: executeWorkspaceProposePatchAction,
@@ -35829,7 +37504,7 @@
       aliases: ["finalize_workspace_candidate", "workspace_ready"],
       argsExample: {
         path: "final_candidate.md",
-        summary: "final report candidate ready"
+        summary: "final response candidate ready"
       },
       argsSchema: {
         path: { type: "string" },
@@ -35847,6 +37522,56 @@
     },
     outputSchema: {
       kinds: ["virtual_workspace_finalize_candidate"],
+      controls: ["continue"]
+    }
+  });
+
+  const workspaceReviewCandidateAction = Object.freeze({
+    description: "Record the AI's self-review of a virtual workspace final candidate after reading it. This never edits candidate content.",
+    name: "workspace_review_candidate",
+    plan: STANDALONE_PLAN_ACTION,
+    planner: {
+      aliases: ["review_workspace_candidate", "candidate_self_review", "workspace_self_review"],
+      argsExample: {
+        issues: [],
+        path: "final_candidate.md",
+        readyToPublish: true,
+        repairPlan: "No blocking gaps after reading the latest candidate.",
+        requirementsChecklist: [
+          {
+            id: "length",
+            kind: "objective",
+            requirement: "Meet the requested length",
+            status: "met",
+            evidence: "workspace_read textStats matches the requested target"
+          },
+          {
+            id: "format",
+            kind: "objective",
+            requirement: "Use the format requested by the user",
+            status: "met",
+            evidence: "workspace_read shows the requested sections are present"
+          }
+        ],
+        summary: "reviewed final candidate against user request, evidence, structure, and citations"
+      },
+      argsSchema: {
+        finalSectionTitle: { type: "string" },
+        issues: { type: "array" },
+        path: { type: "string", required: true },
+        readyToPublish: { type: "boolean" },
+        repairPlan: { type: "string" },
+        requirementsChecklist: { type: "array" },
+        summary: { type: "string", required: true }
+      },
+      decisionType: "action",
+      guidance: "Use workspace_review_candidate after workspace_read of the selected final candidate and before workspace_publish_candidate for long-form/research answers. This is your AI-authored self-review checkpoint: break the user's request into requirementsChecklist items, mark each item met/partial/unmet, report issues you saw, name finalSectionTitle only if the user or your structure declares a final section, and set readyToPublish only after checking the latest candidate text, citations, structure, and requested depth. Mark requirements as objective when the latest workspace_read text can prove them, such as requested length, required sections/headings, required files, cited URL count, or stated data fields. Use subjective only for editorial judgment such as clarity, tone, or depth. Do not invent admin artifacts as requirements unless the user, host, or task policy explicitly asked for them. The runtime records your checklist/review and separately exposes candidateQualitySignal facts; it does not rewrite content for you."
+    },
+    tier: 0,
+    execute: executeWorkspaceReviewCandidateAction,
+    preflight: preflightWorkspacePath,
+    outputSchema: {
+      kinds: ["virtual_workspace_review_candidate"],
       controls: ["continue"]
     }
   });
@@ -35869,10 +37594,11 @@
       argsExample: {
         finalReadiness: {
           decision: "limited",
-          evidenceMode: "read_sources",
-          limitations: "Source minimum unmet and length below target; publishing what is grounded so far.",
+          evidenceMode: "configured_evidence",
+          limitations: "Evidence minimum unmet and length below target; publishing what is grounded so far.",
           requirementsAssessment: {
             checkedReadinessAgainstUserRequest: true,
+            checkedEvidence: true,
             checkedReadUrlEvidence: true,
             checkedWorkspaceStats: true,
             evidenceSatisfied: false,
@@ -35886,8 +37612,9 @@
             ],
             requestedLength: 3000,
             requirementSatisfied: false,
+            successfulEvidenceCount: 2,
             successfulReadUrlCount: 2,
-            userRequirementSummary: "user-facing report with the requested depth"
+            userRequirementSummary: "user-facing answer with the requested depth"
           }
         },
         path: "final_candidate.md"
@@ -35907,6 +37634,7 @@
               type: "object",
               properties: {
                 checkedReadinessAgainstUserRequest: { type: "boolean" },
+                checkedEvidence: { type: "boolean" },
                 checkedReadUrlEvidence: { type: "boolean" },
                 checkedWorkspaceStats: { type: "boolean" },
                 evidenceSatisfied: { type: "boolean" },
@@ -35916,6 +37644,7 @@
                 remainingGaps: { type: "array", items: { type: "string" } },
                 requestedLength: { type: "number" },
                 requirementSatisfied: { type: "boolean" },
+                successfulEvidenceCount: { type: "number" },
                 successfulReadUrlCount: { type: "number" },
                 summary: { type: "string" },
                 userRequirementSummary: { type: "string" }
@@ -35927,8 +37656,7 @@
                 "observedLength",
                 "observedLengthUnit",
                 "remainingGaps",
-                "requirementSatisfied",
-                "successfulReadUrlCount"
+                "requirementSatisfied"
               ]
             }
           },
@@ -35937,7 +37665,7 @@
         path: { type: "string" }
       },
       decisionType: "action",
-      guidance: "Use workspace_publish_candidate after workspace_finalize_candidate and a workspace_read of the selected candidate when that candidate is the final user-facing answer. Always include finalReadiness with requirementsAssessment based on the latest workspace_read stats, read_url evidence count, requested length, and any concrete remainingGaps. If TerminalRepairState exposes a validPublishContract, do not send a plain or ready publish; either perform the allowed recovery action or publish with decision='limited' and false flags for the failed observable dimensions named in that contract. This terminal action publishes the candidate content directly; do not use finalize if you want to avoid LLM re-summarization. If a TodoState plan exists, update completed/blocked/abandoned phases before this terminal action because runtime only observes stale TodoState and will not mark items done."
+      guidance: "Use workspace_publish_candidate after workspace_finalize_candidate, workspace_read, and for long-form/research answers workspace_review_candidate on the selected candidate. Always include finalReadiness with requirementsAssessment based on the latest workspace_read stats, configured evidence facts, requested length, and any concrete remainingGaps. For web-research hosts, successfulReadUrlCount is accepted as a legacy evidence field; host-specific tools can use successfulEvidenceCount. If TerminalRepairState exposes a validPublishContract, do not send a plain or ready publish; either perform the allowed recovery action or publish with decision='limited' and false flags for the failed observable dimensions named in that contract. This terminal action publishes the candidate content directly; do not use finalize if you want to avoid LLM re-summarization. If a TodoState plan exists, update completed/blocked/abandoned phases before this terminal action because runtime only observes stale TodoState and will not mark items done."
     },
     tier: 0,
     execute: executeWorkspacePublishCandidateAction,
@@ -36550,6 +38278,60 @@
     };
   }
 
+  async function executeWorkspaceReviewCandidateAction(context, args) {
+    const workspace = ensureWorkspace(context);
+    const file = readWorkspaceFinalCandidate$1(workspace, args && args.path);
+    const publishProtocol = inspectWorkspacePublishProtocol(workspace, file.path);
+    const lastRead = workspace && workspace.quality && workspace.quality.lastRead;
+    if (!lastRead || lastRead.path !== file.path || publishProtocol.readAfterLatestContentChange !== true) {
+      const signal = buildAndStoreCandidateQualitySignal(context, workspace, file, null, {
+        reviewRequired: true
+      });
+      return {
+        control: "continue",
+        output: {
+          candidateQualitySignal: signal,
+          file: summarizeFile(file),
+          kind: "virtual_workspace_review_candidate",
+          message: `workspace_review_candidate requires workspace_read of ${file.path} after the latest content change before self-review.`,
+          publishProtocol,
+          status: "read_required"
+        },
+        summary: `workspace_review_candidate(${file.path}, status=read_required)`
+      };
+    }
+    const reviewWorkspace = recordWorkspaceCandidateReview(context.runState, file.path, {
+      finalSectionTitle: args && args.finalSectionTitle,
+      issues: args && args.issues,
+      readyToPublish: args && args.readyToPublish === true,
+      repairPlan: args && args.repairPlan,
+      requirementsChecklist: args && args.requirementsChecklist,
+      summary: args && args.summary
+    }, {
+      config: context.runtimeConfig && context.runtimeConfig.virtualWorkspace,
+      maxOperations: context.runtimeConfig && context.runtimeConfig.virtualWorkspace && context.runtimeConfig.virtualWorkspace.maxOperations,
+      prompt: context.request && context.request.prompt,
+      summary: args && args.summary
+    });
+    const reviewedFile = readWorkspaceFinalCandidate$1(reviewWorkspace, file.path);
+    const signal = buildAndStoreCandidateQualitySignal(context, reviewWorkspace, reviewedFile, null, {
+      reviewRequired: true
+    });
+    publishWorkspaceEvent(context.runState, { type: "workspace_review_candidate", path: file.path, status: "ok" });
+    return {
+      control: "continue",
+      output: {
+        candidateQualitySignal: signal,
+        candidateReview: reviewWorkspace.quality && reviewWorkspace.quality.candidateReview || null,
+        file: summarizeFile(reviewedFile),
+        kind: "virtual_workspace_review_candidate",
+        publishProtocol: inspectWorkspacePublishProtocol(reviewWorkspace, file.path),
+        status: "ok"
+      },
+      summary: `workspace_review_candidate(${file.path}, status=ok, blockingIssues=${signal.blockingIssueCodes.length})`
+    };
+  }
+
   async function executeWorkspacePublishCandidateAction(context, args) {
     const workspace = ensureWorkspace(context);
     const file = readWorkspaceFinalCandidate$1(workspace, args && args.path);
@@ -36587,12 +38369,17 @@
         actionName: "workspace_publish_candidate",
         prompt: context && context.request && context.request.prompt,
         request: context && context.request,
+        runtimeConfig: context && context.runtimeConfig,
         status: "before_workspace_publish_candidate"
       });
     }
     const readinessAudit = inspectPublishReadiness(context, workspace, file, finalReadiness);
+    const candidateQualitySignal = buildAndStoreCandidateQualitySignal(context, workspace, file, finalReadiness, {
+      reviewRequired: researchPublishRequired
+    });
     if (!publishProtocol.finalizedAfterLatestWrite) {
       return createWorkspacePublishBlockedResult({
+        candidateQualitySignal,
         context,
         file,
         finalReadiness,
@@ -36605,6 +38392,7 @@
     }
     if (!publishProtocol.readAfterLatestContentChange) {
       return createWorkspacePublishBlockedResult({
+        candidateQualitySignal,
         context,
         file,
         finalReadiness,
@@ -36619,6 +38407,7 @@
     }
     if (!readinessAudit.ok) {
       return createWorkspacePublishBlockedResult({
+        candidateQualitySignal,
         context,
         file,
         finalReadiness,
@@ -36629,9 +38418,24 @@
         status: "readiness_audit_failed"
       });
     }
+    const candidateQualityBlock = inspectCandidateQualityPublishReadiness(candidateQualitySignal, finalReadiness);
+    if (!candidateQualityBlock.ok) {
+      return createWorkspacePublishBlockedResult({
+        candidateQualitySignal,
+        context,
+        file,
+        finalReadiness,
+        message: candidateQualityBlock.message,
+        publishProtocol,
+        readinessAudit,
+        researchPublishRequired,
+        status: candidateQualityBlock.status
+      });
+    }
     const todoSyncAudit = inspectPublishTodoStateSync(context, finalReadiness, file.path);
     if (!todoSyncAudit.ok) {
       return createWorkspacePublishBlockedResult({
+        candidateQualitySignal,
         context,
         file,
         finalReadiness,
@@ -36665,6 +38469,7 @@
         finalReadinessAssessment: createFinalReadinessAssessment({
           finalReadiness,
           request: context.request,
+          runtimeConfig: context.runtimeConfig,
           runState: context.runState
         }),
         kind: "ai_first_research_contract_observation",
@@ -36682,6 +38487,7 @@
       control: "complete",
       output: {
         candidateAuditTrail: collectCandidateAuditTrail(workspace, file.path),
+        candidateQualitySignal,
         candidatePathMismatchSignal: publishedCandidatePathMismatchSignal,
         citations: sourcePayload.citations,
         finalReadiness,
@@ -36689,6 +38495,7 @@
           ? createFinalReadinessAssessment({
             finalReadiness,
             request: context.request,
+            runtimeConfig: context.runtimeConfig,
             runState: context.runState
           })
           : null,
@@ -36710,6 +38517,64 @@
       },
       summary: `workspace_publish_candidate(${file.path}, chars=${text.length}, finalize_after_write=${publishProtocol.finalizedAfterLatestWrite ? "yes" : "no"}, read_after_finalize=${publishProtocol.readAfterFinalize ? "yes" : "no"}, readiness_ok=${readinessAudit.ok ? "yes" : "no"}, suffix_normalized=${terminalContract.audit && terminalContract.audit.suffixAudit && terminalContract.audit.suffixAudit.normalized ? "yes" : "no"})`
     };
+  }
+
+  function buildAndStoreCandidateQualitySignal(context, workspace, file, finalReadiness, options = {}) {
+    const signal = normalizeCandidateQualitySignal(buildCandidateQualitySignal({
+      context,
+      file,
+      finalReadiness,
+      reviewRequired: options.reviewRequired === true,
+      runState: context && context.runState,
+      runtimeConfig: context && context.runtimeConfig,
+      workspace
+    }));
+    if (context && context.runState && typeof context.runState === "object") {
+      context.runState.candidateQualitySignal = signal;
+      const runWorkspace = context.runState.virtualWorkspace && typeof context.runState.virtualWorkspace === "object"
+        ? context.runState.virtualWorkspace
+        : null;
+      if (runWorkspace && runWorkspace.quality && typeof runWorkspace.quality === "object") {
+        runWorkspace.quality.candidateQualitySignal = signal;
+      }
+    }
+    if (workspace && workspace.quality && typeof workspace.quality === "object") {
+      workspace.quality.candidateQualitySignal = signal;
+    }
+    return signal;
+  }
+
+  function inspectCandidateQualityPublishReadiness(signal, finalReadiness) {
+    const quality = normalizeCandidateQualitySignal(signal);
+    if (!quality || quality.hasBlockingIssues !== true) return { ok: true };
+    const codes = Array.isArray(quality.blockingIssueCodes) ? quality.blockingIssueCodes : [];
+    if (codes.includes("missing_latest_candidate_review")) {
+      return {
+        ok: false,
+        status: "missing_latest_candidate_review",
+        message: "workspace_publish_candidate requires workspace_review_candidate after the latest workspace_read/content change before publishing this long-form candidate."
+      };
+    }
+    const hardContentCodes = codes.filter((code) => (
+      code === "blocked_source_cited" ||
+      code === "unread_cited_url" ||
+      code === "content_after_final_section"
+    ));
+    if (hardContentCodes.length > 0) {
+      return {
+        ok: false,
+        status: "candidate_quality_blocked",
+        message: `workspace_publish_candidate blocked by candidateQualitySignal issues: ${hardContentCodes.join(", ")}. Read/review the candidate and repair the content or publish limited only after removing invalid citations/structure blockers.`
+      };
+    }
+    if (finalReadiness && finalReadiness.decision === "ready") {
+      return {
+        ok: false,
+        status: "candidate_quality_blocked",
+        message: `workspace_publish_candidate ready publish blocked by candidateQualitySignal issues: ${codes.join(", ")}. Repair the candidate or publish limited with concrete remainingGaps when the blocker is an honest unmet requirement.`
+      };
+    }
+    return { ok: true };
   }
 
   function collectWorkspacePublishSources(context) {
@@ -36806,6 +38671,7 @@
       control: "continue",
       output: {
         candidateAuditTrail: collectCandidateAuditTrail(workspace, file.path),
+        candidateQualitySignal: options.candidateQualitySignal || null,
         candidatePathMismatchSignal,
         finalReadiness: options.finalReadiness || null,
         kind: "virtual_workspace_publish_blocked",
@@ -36936,10 +38802,23 @@
     }
     const statsKey = readStatsKeyForUnit(assessment.observedLengthUnit);
     const actualObserved = lastRead.textStats[statsKey];
+    const successfulEvidenceCount = typeof assessment.successfulEvidenceCount === "number" && Number.isFinite(assessment.successfulEvidenceCount)
+      ? assessment.successfulEvidenceCount
+      : null;
+    const actualSuccessfulEvidenceCount = countSuccessfulEvidenceArtifacts(context && context.runState, context && context.runtimeConfig);
     const successfulReadUrlCount = typeof assessment.successfulReadUrlCount === "number" && Number.isFinite(assessment.successfulReadUrlCount)
       ? assessment.successfulReadUrlCount
       : null;
     const actualSuccessfulReadUrlCount = countSuccessfulReadUrlArtifacts(context && context.runState);
+    if (successfulEvidenceCount != null && successfulEvidenceCount !== actualSuccessfulEvidenceCount) {
+      assessment.successfulEvidenceCount = actualSuccessfulEvidenceCount;
+      recordPublishAutoCorrection(context && context.runState, {
+        declared: successfulEvidenceCount,
+        field: "finalReadiness.requirementsAssessment.successfulEvidenceCount",
+        kind: "successful_evidence_count_auto_corrected",
+        observed: actualSuccessfulEvidenceCount
+      });
+    }
     if (successfulReadUrlCount != null && successfulReadUrlCount !== actualSuccessfulReadUrlCount) {
       // Fix C1 — auto-correct the AI's mis-declared count to the observed
       // value rather than blocking. Same pattern as Fix A (commit 32d4a7921):
@@ -36958,23 +38837,12 @@
       // readSources/relevantSources, not successfulReadUrlCount, so a
       // smaller successfulReadUrlCount does not falsely satisfy a gate.
       assessment.successfulReadUrlCount = actualSuccessfulReadUrlCount;
-      const runState = context && context.runState;
-      if (runState && typeof runState === "object") {
-        if (!Array.isArray(runState.publishAutoCorrections)) {
-          runState.publishAutoCorrections = [];
-        }
-        runState.publishAutoCorrections.push({
-          cycle: Number.isInteger(runState.cycleCount) ? runState.cycleCount : 0,
-          declared: successfulReadUrlCount,
-          field: "finalReadiness.requirementsAssessment.successfulReadUrlCount",
-          kind: "successful_read_url_count_auto_corrected",
-          observed: actualSuccessfulReadUrlCount
-        });
-        // Cap log at 20 entries so snapshots stay bounded.
-        if (runState.publishAutoCorrections.length > 20) {
-          runState.publishAutoCorrections.splice(0, runState.publishAutoCorrections.length - 20);
-        }
-      }
+      recordPublishAutoCorrection(context && context.runState, {
+        declared: successfulReadUrlCount,
+        field: "finalReadiness.requirementsAssessment.successfulReadUrlCount",
+        kind: "successful_read_url_count_auto_corrected",
+        observed: actualSuccessfulReadUrlCount
+      });
       // Fall through to the remaining audits with the corrected value.
     }
     const researchState = context && context.runState && context.runState.researchState && typeof context.runState.researchState === "object"
@@ -37006,9 +38874,10 @@
       };
     }
     if (finalReadiness.decision === "ready" && assessment.evidenceSatisfied === false) {
+      const recoveryActions = formatEvidenceRecoveryActions(context && context.runtimeConfig);
       return {
         ok: false,
-        message: "workspace_publish_candidate readiness is internally inconsistent: decision=ready but evidenceSatisfied is false. Continue evidence work (web_search/read_url), or publish as limited with concrete blockers."
+        message: `workspace_publish_candidate readiness is internally inconsistent: decision=ready but evidenceSatisfied is false. Continue evidence work (${recoveryActions}), or publish as limited with concrete blockers.`
       };
     }
     if (canPublishLimitedWithTerminalRepair(context, finalReadiness, file.path)) {
@@ -37018,6 +38887,7 @@
       assessment,
       finalReadiness,
       researchGateBlocked,
+      runtimeConfig: context && context.runtimeConfig,
       researchState,
       sourceMinimumFailed
     });
@@ -37035,6 +38905,24 @@
       };
     }
     return { ok: true };
+  }
+
+  function recordPublishAutoCorrection(runState, correction) {
+    if (!runState || typeof runState !== "object") return;
+    if (!Array.isArray(runState.publishAutoCorrections)) {
+      runState.publishAutoCorrections = [];
+    }
+    runState.publishAutoCorrections.push({
+      cycle: Number.isInteger(runState.cycleCount) ? runState.cycleCount : 0,
+      declared: correction && correction.declared,
+      field: readString$P(correction && correction.field),
+      kind: readString$P(correction && correction.kind) || "publish_auto_corrected",
+      observed: correction && correction.observed
+    });
+    // Cap log at 20 entries so snapshots stay bounded.
+    if (runState.publishAutoCorrections.length > 20) {
+      runState.publishAutoCorrections.splice(0, runState.publishAutoCorrections.length - 20);
+    }
   }
 
   function canPublishLimitedWithTerminalRepair(context, finalReadiness, publishPath) {
@@ -37095,6 +38983,7 @@
     const researchState = options && options.researchState;
     const blocked = Boolean(options && (options.researchGateBlocked || options.sourceMinimumFailed));
     if (!blocked) return null;
+    const recoveryActions = formatEvidenceRecoveryActions(options && options.runtimeConfig);
     const finalReason = readString$P(researchState && researchState.finalReason) || "research gate or source minimum still reports evidence gaps";
     if (
       finalReadiness &&
@@ -37103,7 +38992,7 @@
     ) {
       return {
         ok: false,
-        message: `workspace_publish_candidate limited publish needs concrete remainingGaps while evidence/source minimum is blocked (${finalReason}). Continue evidence gathering with web_search/read_url, or publish limited with evidenceSatisfied=false and non-empty requirementsAssessment.remainingGaps.`
+        message: `workspace_publish_candidate limited publish needs concrete remainingGaps while evidence/source minimum is blocked (${finalReason}). Continue evidence gathering with ${recoveryActions}, or publish limited with evidenceSatisfied=false and non-empty requirementsAssessment.remainingGaps.`
       };
     }
     if (
@@ -37114,7 +39003,7 @@
     ) {
       return {
         ok: false,
-        message: `workspace_publish_candidate limited publish must declare evidenceSatisfied=false while evidence/source minimum is blocked (${finalReason}). Continue web_search/read_url work, or publish limited with concrete evidence blockers in requirementsAssessment.remainingGaps.`
+        message: `workspace_publish_candidate limited publish must declare evidenceSatisfied=false while evidence/source minimum is blocked (${finalReason}). Continue configured evidence work (${recoveryActions}), or publish limited with concrete evidence blockers in requirementsAssessment.remainingGaps.`
       };
     }
     if (
@@ -37131,13 +39020,13 @@
     if (assessment && assessment.evidenceSatisfied === true) {
       return {
         ok: false,
-        message: `workspace_publish_candidate readiness conflicts with evidence/source facts: evidenceSatisfied=true while source minimum or Research Gate is blocked (${finalReason}). Continue evidence gathering with web_search/read_url, or publish limited with evidenceSatisfied=false and concrete remainingGaps.`
+        message: `workspace_publish_candidate readiness conflicts with evidence/source facts: evidenceSatisfied=true while source minimum or Research Gate is blocked (${finalReason}). Continue evidence gathering with ${recoveryActions}, or publish limited with evidenceSatisfied=false and concrete remainingGaps.`
       };
     }
     if (finalReadiness && finalReadiness.decision === "ready") {
       return {
         ok: false,
-        message: `workspace_publish_candidate readiness conflicts with evidence/source facts: decision=ready while source minimum or Research Gate is blocked (${finalReason}). Continue evidence gathering with web_search/read_url, or publish limited with concrete blockers.`
+        message: `workspace_publish_candidate readiness conflicts with evidence/source facts: decision=ready while source minimum or Research Gate is blocked (${finalReason}). Continue evidence gathering with ${recoveryActions}, or publish limited with concrete blockers.`
       };
     }
     return null;
@@ -39827,6 +41716,7 @@
       workspaceMoveAction,
       workspaceMultiEditAction,
       workspaceFinalizeCandidateAction,
+      workspaceReviewCandidateAction,
       workspacePublishCandidateAction,
       createRepoSearchAction(repoFileTools),
       createRepoReadFileAction(repoFileTools),
@@ -39901,6 +41791,7 @@
     workspace_read: readOnlyPermission("virtual_workspace", false),
     workspace_remove: virtualMutationPermission("virtual_workspace"),
     workspace_replace: virtualMutationPermission("virtual_workspace"),
+    workspace_review_candidate: virtualMutationPermission("virtual_workspace"),
     workspace_write: virtualMutationPermission("virtual_workspace")
   });
 
@@ -70910,10 +72801,12 @@ ${user}:`]
       if (
         readOnlyPlanningForbiddenActions &&
         readOnlyPlanningForbiddenActions.has(name) &&
-        !isPublishProtocolRequiredActionForRepair(terminalRepair, name)
+        !isPublishProtocolRequiredActionForRepair(terminalRepair, name) &&
+        !isWorkspaceRepairInspectionActionForRepair(terminalRepair, name)
       ) return false;
-      if (workspaceMutationGrowthForbiddenActions && workspaceMutationGrowthForbiddenActions.has(name)) return false;
-
+      if (workspaceMutationGrowthForbiddenActions && workspaceMutationGrowthForbiddenActions.has(name)) {
+        return false;
+      }
       if (allowedRepairActions) {
         return allowedRepairActions.has(name);
       }
@@ -71287,36 +73180,27 @@ ${user}:`]
       : DEFAULT_PLANNER_CAPABILITIES;
   }
 
-  // ADR-0033 Tier A — lite-tier model detection for compact-prompt policy.
-  // Name-string heuristic with explicit `modelTier` config override.
-  // Hosts can pass `request.modelTier: "lite"|"capable"` to force a tier when
-  // the heuristic is wrong (e.g. a future "*-mini" model that is actually
-  // capable, or a non-marker model that the host wants to treat as lite).
-  const LITE_TIER_MARKERS = Object.freeze([
-    "flash-lite",
-    "flash",
-    "mini",
-    "haiku",
-    "nano"
-  ]);
-
-  // Word-boundary regex prevents false positives like "mini" matching inside
-  // "gemini-3-pro-preview". `\b` treats `-`, `.`, ` ` and start/end of string
-  // as boundaries while keeping inner-segment markers (e.g. "haiku" in
-  // "claude-3-5-haiku-20241022") detectable.
-  const LITE_TIER_PATTERN = new RegExp(
-    `\\b(?:${LITE_TIER_MARKERS.join("|")})\\b`,
-    "i"
-  );
-
+  // ADR-0033 Tier A (revised AGRUN-294I, 2026-05-29) — lite tier is a
+  // HOST-DECLARED policy, not a model-name heuristic.
+  //
+  // The previous implementation matched a hardcoded marker list
+  // (flash / mini / haiku / nano / flash-lite) against the model string and
+  // forced the compact planner prompt for any match. Two problems:
+  //   1. It is exactly the model-name hardcode the project's "no hardcode"
+  //      mandate bans — harness behaviour branched on the literal model id.
+  //   2. Compact mode STRIPS skill/todo/workspace context. Auto-applying it by
+  //      name removed context from precisely the weak models that most need
+  //      decomposition support — the "blame the model for a harness gap"
+  //      anti-pattern.
+  //
+  // Now: lite tier is opt-in only. A host that genuinely wants compact prompts
+  // for a weak model declares `request.modelTier: "lite"`. The default is
+  // capable (full, state-based prompt). `modelTier: "capable"` is accepted for
+  // symmetry/explicitness. The `model` arg is kept for signature stability but
+  // no longer influences the result.
   function isLiteTierModel(model, options) {
     const opts = options && typeof options === "object" ? options : {};
-    const tierOverride = readModelTierOverride(opts.modelTier);
-    if (tierOverride === "lite") return true;
-    if (tierOverride === "capable") return false;
-    const id = readModelId(model);
-    if (!id) return false;
-    return LITE_TIER_PATTERN.test(id);
+    return readModelTierOverride(opts.modelTier) === "lite";
   }
 
   function normalizeConfiguredPlannerMode(value) {
@@ -71327,10 +73211,6 @@ ${user}:`]
   }
 
   function readProviderId(value) {
-    return typeof value === "string" ? value.trim().toLowerCase() : "";
-  }
-
-  function readModelId(value) {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
   }
 
@@ -72218,6 +74098,9 @@ ${user}:`]
       // Publish structural cleanliness (LOAD-BEARING — terminalRepair flags structure deficits)
       lines.push("Before publishing, make the report structurally clean: one coherent title, unique section headings/numbers, no repeated conclusion blocks, no raw user prompt copied into the title. If the workspace shows final_candidate_structure=fail, repair with workspace_read + workspace_replace only when workspace_read is currently allowed; under terminalRepairState hard_veto, follow terminalRepairState.allowedActions and valid limited contract.");
     }
+    if (hasAction("workspace_review_candidate")) {
+      lines.push("For long-form or research workspace answers, after workspace_finalize_candidate and workspace_read, call workspace_review_candidate before workspace_publish_candidate. This records YOUR self-review; runtime only exposes candidateQualitySignal facts such as stale review, invalid citations, word-count facts, and structure blockers.");
+    }
 
     if (!compactSystemPrompt && hasAction("workspace_write")) {
       lines.push("Virtual workspace tools (workspace_write, workspace_insert_after_section, workspace_read, workspace_replace, workspace_remove, workspace_list, workspace_finalize_candidate, workspace_publish_candidate) provide browser-safe draft artifacts. Filenames are free-form safe paths; the workspace is virtual and does not write real files. Follow standalone-only action metadata when choosing plan versus action envelopes.");
@@ -72819,10 +74702,15 @@ ${user}:`]
         : null;
       const actionOrderingSignals = Array.isArray(state.actionOrderingSignals) ? state.actionOrderingSignals.slice(0, 4) : [];
       const multiWriteSignal = actionOrderingSignals.find((signal) => signal && signal.kind === "multi_write_iteration_nudge");
+      const workspaceRepairSignal = state.workspaceRepairSignal && typeof state.workspaceRepairSignal === "object"
+        ? state.workspaceRepairSignal
+        : null;
       const preferredExpansionActions = multiWriteSignal && Array.isArray(multiWriteSignal.preferredActions)
         ? multiWriteSignal.preferredActions.map(readString$y).filter((actionName) => allowedActions.includes(actionName))
         : [];
-      const primaryAction = preferredExpansionActions[0] ||
+      const primaryAction = workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
+        ? "workspace_read"
+        : preferredExpansionActions[0] ||
         (allowedActions.includes("workspace_publish_candidate")
           ? "workspace_publish_candidate"
           : (allowedActions[0] || null));
@@ -72830,7 +74718,9 @@ ${user}:`]
         mode: "terminal_repair_hard_veto_focused",
         active: true,
         escalation: "hard_veto",
-        rule: preferredExpansionActions.length > 0
+        rule: workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
+          ? "Read the selected candidate first because workspaceRepairSignal says it was not inspected after the latest content change; then choose a targeted repair action."
+          : preferredExpansionActions.length > 0
           ? "A length expansion ordering signal is active. Choose one preferred expansion action before limited publish unless recovery is not feasible."
           : allowedActions.includes("workspace_publish_candidate")
             ? "workspace_publish_candidate is available for valid limited publish with validPublishContract.requiredArgsExample."
@@ -72846,6 +74736,7 @@ ${user}:`]
         lengthExpansionSignal: state.lengthExpansionSignal && typeof state.lengthExpansionSignal === "object"
           ? state.lengthExpansionSignal
           : null,
+      workspaceRepairSignal,
       patchOperationContract: allowedActions.includes("workspace_propose_patch") ? {
         validShapes: [
           "{type:\"append\",content:\"...\"}",
@@ -72911,10 +74802,26 @@ ${user}:`]
     // AGRUN-246-G (C5.1/C5.2 fix) — removed harness-computed phase + allowedNextMoveHints.
     // AI now sees raw evidence facts and selects its own next action.
     const hasDraft = length.observed > 0;
+    // AGRUN-246-E/J — continued-research-thread FACT. Read-only signal that
+    // replaced the deleted regex-driven force-finalize bypass
+    // (`maybeCreateFinalizeOnlyResearchRecoveryFinal`). It tells the AI the
+    // above evidence was carried in from earlier turns of this thread so it can
+    // finalize on existing evidence when asked, instead of re-gathering. The
+    // runtime never decides finalize-vs-more here — the AI's next action does.
+    const continuedThread = detectContinuedResearchThread(runState)
+      ? {
+        active: true,
+        existingReadSources: successfulReadUrlCount,
+        searchPassCount,
+        stableTopic: readStableResearchTopic(runState) || null,
+        choice: "Prior-turn evidence is already available this thread. You may finalize on this existing evidence, gather more, or refine — decide from the user's request; do not re-gather by default."
+      }
+      : { active: false };
     const contract = {
       mode: "research_phase_contract_focused",
       active: true,
       rule: "Use these as current research facts and choose the next action yourself. Runtime must not write the report or pick sources for you.",
+      continuedResearchThread: continuedThread,
       clarificationPolicy: hasOpenAmbiguity
         ? "An open ambiguity is recorded; ask only if it blocks the report scope."
         : "No open ambiguity is recorded. If a term is non-standard or evidence is thin, continue research/drafting and disclose the limitation; do not ask clarification just because coverage is weak.",
@@ -73102,12 +75009,21 @@ ${user}:`]
   }
 
   function isHardVetoTerminalRepairPromptState(value) {
+    const allowedActions = value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.allowedActions)
+      ? value.allowedActions.map(readString$y).filter(Boolean)
+      : [];
     return Boolean(
       value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
       value.active === true &&
-      readString$y(value.escalation) === "hard_veto"
+      (
+        readString$y(value.escalation) === "hard_veto" ||
+        (
+          allowedActions.length === 1 &&
+          allowedActions[0] === "workspace_publish_candidate"
+        )
+      )
     );
   }
 
@@ -73423,6 +75339,84 @@ ${user}:`]
     return envelope;
   }
 
+  function diagnosePlannerEnvelopeRejection(value, options = {}) {
+    const record = readObject$2(value);
+    if (!record) {
+      return {
+        reason: "not_object",
+        type: null
+      };
+    }
+
+    const type = normalizeType(record);
+    if (!type) {
+      return {
+        reason: "missing_type_or_action",
+        type: null,
+        rejectedActionName: readString$1_(record.name || record.action || record.tool || record.toolName) || null
+      };
+    }
+
+    if (type === "final") {
+      return readString$1_(record.answer) || readString$1_(record.text)
+        ? { reason: "accepted", type }
+        : { reason: "missing_final_answer", type };
+    }
+
+    if (type === "clarify") {
+      return readString$1_(record.question) || readString$1_(record.text)
+        ? { reason: "accepted", type }
+        : { reason: "missing_clarify_question", type };
+    }
+
+    if (type === "finalize") {
+      const envelope = normalizePlannerEnvelope(record, options);
+      return shouldRejectTerminalEnvelope(envelope, options)
+        ? { reason: "terminal_finalize_not_allowed", type }
+        : { reason: "accepted", type };
+    }
+
+    if (type === "plan") {
+      const invalidActions = [];
+      const actions = normalizePlanActions(record.actions, {
+        ...options,
+        onInvalidAction(detail) {
+          invalidActions.push(diagnosePlanAction(detail, options));
+        }
+      });
+      return actions.length > 0
+        ? { reason: "accepted", type, invalidActions: invalidActions.slice(0, 5) }
+        : {
+            reason: Array.isArray(record.actions) ? "plan_has_no_valid_actions" : "plan_actions_not_array",
+            type,
+            invalidActions: invalidActions.slice(0, 8)
+          };
+    }
+
+    const rejectedActionName = readString$1_(record.name || record.action || record.tool || record.toolName).toLowerCase();
+    const name = normalizeActionName(record, options);
+    if (!name) {
+      return {
+        reason: rejectedActionName ? "unknown_action_name" : "missing_action_name",
+        type,
+        rejectedActionName,
+        availableActionCount: Array.isArray(options.availableActions) ? options.availableActions.length : 0
+      };
+    }
+
+    const normalized = normalizePlannerEnvelope(record, options);
+    const guarded = applyDeterministicPlannerGuards(normalized, options);
+    if (!guarded) {
+      return {
+        reason: "deterministic_guard_rejected",
+        type,
+        rejectedActionName: name
+      };
+    }
+
+    return { reason: "accepted", type, rejectedActionName: name };
+  }
+
   async function requestPlannerEnvelopeRepair(options) {
     const envelopeOptions = {
       effectivePlannerMode: options && options.effectivePlannerMode,
@@ -73441,7 +75435,7 @@ ${user}:`]
         ? "If the answer should stop without tools, use final or finalize."
         : "If the answer should stop without tools, use final. Do not return finalize in this context."
     ].join("\n");
-    const hostSystemPrompt = readString$1Y(options && options.systemPrompt);
+    const hostSystemPrompt = readString$1_(options && options.systemPrompt);
     const systemPrompt = hostSystemPrompt
       ? [hostSystemPrompt, "", repairSystemPrompt].join("\n")
       : repairSystemPrompt;
@@ -73459,20 +75453,22 @@ ${user}:`]
       ...envelopeExamples,
       "",
       "Planner prompt:",
-      readString$1Y(options && options.plannerPrompt) || "None",
+      readString$1_(options && options.plannerPrompt) || "None",
       "",
       "Invalid planner output to repair:",
-      readString$1Y(options && options.responseText) || "None"
+      readString$1_(options && options.responseText) || "None"
     ].join("\n");
     const { response, text, value } = await requestSemanticJudge(options.request, {
       prompt,
       systemPrompt
     });
+    const decision = repairPlannerEnvelope(value, options);
 
     return {
+      decision,
+      rejection: decision ? null : diagnosePlannerEnvelopeRejection(value, options),
       response,
-      text,
-      decision: repairPlannerEnvelope(value, options)
+      text
     };
   }
 
@@ -73489,24 +75485,24 @@ ${user}:`]
     }
 
     if (type === "final") {
-      const answer = readString$1Y(record.answer) || readString$1Y(record.text);
+      const answer = readString$1_(record.answer) || readString$1_(record.text);
       return answer
         ? {
             answer,
             citations: Array.isArray(record.citations) ? record.citations : [],
             finalReadiness: normalizeFinalReadiness(record.finalReadiness),
-            reasoning: readString$1Y(record.reasoning),
+            reasoning: readString$1_(record.reasoning),
             type
           }
         : null;
     }
 
     if (type === "clarify") {
-      const question = readString$1Y(record.question) || readString$1Y(record.text);
+      const question = readString$1_(record.question) || readString$1_(record.text);
       return question
         ? {
             question,
-            reasoning: readString$1Y(record.reasoning),
+            reasoning: readString$1_(record.reasoning),
             type
           }
         : null;
@@ -73515,8 +75511,8 @@ ${user}:`]
     if (type === "finalize") {
       return {
         finalReadiness: normalizeFinalReadiness(record.finalReadiness),
-        instruction: readString$1Y(record.instruction) || readString$1Y(record.answer) || readString$1Y(record.text),
-        reasoning: readString$1Y(record.reasoning),
+        instruction: readString$1_(record.instruction) || readString$1_(record.answer) || readString$1_(record.text),
+        reasoning: readString$1_(record.reasoning),
         type
       };
     }
@@ -73528,10 +75524,10 @@ ${user}:`]
             actions,
             finalReadiness: normalizeFinalReadiness(record.finalReadiness),
             partial_ok: record.partial_ok === true,
-            reasoning: readString$1Y(record.reasoning),
+            reasoning: readString$1_(record.reasoning),
             stitch: normalizeStitch$1(record.stitch),
             synthesize_per_action: record.synthesize_per_action === true,
-            synthesize_instruction: readString$1Y(record.synthesize_instruction) || readString$1Y(record.instruction),
+            synthesize_instruction: readString$1_(record.synthesize_instruction) || readString$1_(record.instruction),
             type
           }
         : null;
@@ -73545,13 +75541,13 @@ ${user}:`]
     return {
       args: readPlannerArgs(record),
       name,
-      reasoning: readString$1Y(record.reasoning),
+      reasoning: readString$1_(record.reasoning),
       type
     };
   }
 
   function normalizeType(record) {
-    const explicitType = readString$1Y(record.type || record.kind || record.decisionType);
+    const explicitType = readString$1_(record.type || record.kind || record.decisionType);
 
     if (
       explicitType === "action" ||
@@ -73567,19 +75563,19 @@ ${user}:`]
       return "plan";
     }
 
-    if (readString$1Y(record.answer)) {
+    if (readString$1_(record.answer)) {
       return "final";
     }
 
-    if (readString$1Y(record.question)) {
+    if (readString$1_(record.question)) {
       return "clarify";
     }
 
-    if (readString$1Y(record.instruction)) {
+    if (readString$1_(record.instruction)) {
       return "finalize";
     }
 
-    if (readString$1Y(record.name || record.action || record.tool || record.toolName)) {
+    if (readString$1_(record.name || record.action || record.tool || record.toolName)) {
       return "action";
     }
 
@@ -73587,7 +75583,7 @@ ${user}:`]
   }
 
   function normalizeActionName(record, options) {
-    const candidate = readString$1Y(record.name || record.action || record.tool || record.toolName).toLowerCase();
+    const candidate = readString$1_(record.name || record.action || record.tool || record.toolName).toLowerCase();
     if (!candidate) {
       return "";
     }
@@ -73642,12 +75638,22 @@ ${user}:`]
       normalized.push({
         args: readPlannerArgs(record),
         name,
-        reasoning: readString$1Y(record.reasoning),
+        reasoning: readString$1_(record.reasoning),
         section: normalizeSection$1(record.section),
         type: "action"
       });
     }
     return normalized;
+  }
+
+  function diagnosePlanAction(detail, options) {
+    const record = readObject$2(detail && detail.record);
+    const rejectedActionName = readString$1_(record && (record.name || record.action || record.tool || record.toolName)).toLowerCase();
+    return {
+      reason: readString$1_(detail && detail.reason) || "invalid_plan_action",
+      rejectedActionName: rejectedActionName || null,
+      availableActionCount: Array.isArray(options && options.availableActions) ? options.availableActions.length : 0
+    };
   }
 
   function normalizeSection$1(section) {
@@ -73656,8 +75662,8 @@ ${user}:`]
       return null;
     }
     return {
-      prompt: readString$1Y(record.prompt),
-      title: readString$1Y(record.title)
+      prompt: readString$1_(record.prompt),
+      title: readString$1_(record.title)
     };
   }
 
@@ -73671,9 +75677,9 @@ ${user}:`]
       followups: Array.isArray(record.followups)
         ? record.followups.filter((item) => typeof item === "string")
         : [],
-      intro_prompt: readString$1Y(record.intro_prompt),
-      outro_prompt: readString$1Y(record.outro_prompt),
-      provenance: readString$1Y(record.provenance)
+      intro_prompt: readString$1_(record.intro_prompt),
+      outro_prompt: readString$1_(record.outro_prompt),
+      provenance: readString$1_(record.provenance)
     };
   }
 
@@ -73683,11 +75689,11 @@ ${user}:`]
     }
 
     if (value.type === "final") {
-      return readString$1Y(value.answer).length > 0;
+      return readString$1_(value.answer).length > 0;
     }
 
     if (value.type === "clarify") {
-      return readString$1Y(value.question).length > 0;
+      return readString$1_(value.question).length > 0;
     }
 
     if (value.type === "finalize") {
@@ -73698,7 +75704,7 @@ ${user}:`]
       return Array.isArray(value.actions) && value.actions.length > 0;
     }
 
-    return value.type === "action" && readString$1Y(value.name).length > 0;
+    return value.type === "action" && readString$1_(value.name).length > 0;
   }
 
   function shouldRejectTerminalEnvelope(envelope, options) {
@@ -73726,7 +75732,7 @@ ${user}:`]
     ) {
       return {
         instruction: "The requested skill is already active. Use the current active skill context to answer directly.",
-        reasoning: readString$1Y(envelope.reasoning) || "Requested bundled agent skill is already active.",
+        reasoning: readString$1_(envelope.reasoning) || "Requested bundled agent skill is already active.",
         type: "finalize"
       };
     }
@@ -73746,7 +75752,7 @@ ${user}:`]
     ) {
       return {
         instruction: "The requested bundled tool result is already available. Use the existing tool evidence to answer directly.",
-        reasoning: readString$1Y(envelope.reasoning) || "Requested bundled skill tool result is already available.",
+        reasoning: readString$1_(envelope.reasoning) || "Requested bundled skill tool result is already available.",
         type: "finalize"
       };
     }
@@ -73757,7 +75763,7 @@ ${user}:`]
     ) {
       return {
         instruction: "Read URL evidence is already available. Use the current source content to answer directly.",
-        reasoning: readString$1Y(envelope.reasoning) || "Requested URL content is already available.",
+        reasoning: readString$1_(envelope.reasoning) || "Requested URL content is already available.",
         type: "finalize"
       };
     }
@@ -73767,20 +75773,20 @@ ${user}:`]
 
   function isMissingRequiredSkillToolFields(args, activeAgentSkill) {
     // If an active skill exists, the action handler can resolve from it — allow.
-    if (activeAgentSkill && typeof activeAgentSkill === "object" && readString$1Y(activeAgentSkill.name)) {
+    if (activeAgentSkill && typeof activeAgentSkill === "object" && readString$1_(activeAgentSkill.name)) {
       return false;
     }
 
-    const skillName = readString$1Y(args && args.skillName);
-    const toolName = readString$1Y(args && args.toolName);
+    const skillName = readString$1_(args && args.skillName);
+    const toolName = readString$1_(args && args.toolName);
 
     // Both missing — inference fallback cannot reliably distinguish tools.
     return !skillName && !toolName;
   }
 
   function isAlreadyActiveSkill(requestedSkillName, activeAgentSkill) {
-    const requested = readString$1Y(requestedSkillName).toLowerCase();
-    const active = readString$1Y(activeAgentSkill && activeAgentSkill.name).toLowerCase();
+    const requested = readString$1_(requestedSkillName).toLowerCase();
+    const active = readString$1_(activeAgentSkill && activeAgentSkill.name).toLowerCase();
     return Boolean(requested && active && requested === active);
   }
 
@@ -73797,12 +75803,12 @@ ${user}:`]
       return false;
     }
 
-    const lastTool = readString$1Y(lastResult.tool).toLowerCase();
+    const lastTool = readString$1_(lastResult.tool).toLowerCase();
     if (!lastTool) {
       return false;
     }
 
-    const requestedTool = readString$1Y(args && args.toolName).toLowerCase();
+    const requestedTool = readString$1_(args && args.toolName).toLowerCase();
 
     // Exact match: planner explicitly requests the same tool that already ran.
     if (requestedTool && requestedTool === lastTool) {
@@ -73820,13 +75826,13 @@ ${user}:`]
   }
 
   function hasReadableSourceForUrl(url, readSources) {
-    const normalizedUrl = readString$1Y(url).toLowerCase();
+    const normalizedUrl = readString$1_(url).toLowerCase();
     if (!normalizedUrl) {
       return false;
     }
 
     return (Array.isArray(readSources) ? readSources : []).some((item) => {
-      const sourceUrl = readString$1Y(item && item.url).toLowerCase();
+      const sourceUrl = readString$1_(item && item.url).toLowerCase();
       return sourceUrl === normalizedUrl;
     });
   }
@@ -74694,6 +76700,9 @@ ${user}:`]
           "If a TodoState plan exists, keep it synchronized yourself: after completing a phase choose todo_run_next or todo_advance before moving to the next phase, and before any terminal publish/finalize mark completed phases done or honestly blocked/abandoned. Runtime will only observe stale TodoState; it will not mark items done for you.",
           hasAction("workspace_publish_candidate")
             ? "workspace_publish_candidate sends the selected candidate without a finalizer LLM. Before calling it, satisfy the action contract: finalize the candidate, read back the latest candidate, sync any active TodoState, include finalReadiness when the action or loaded skill requires it, and make the report structurally clean with one coherent title, unique section headings/numbers, no repeated conclusion blocks, and no raw user request copied into the title. If you drafted a long answer in a custom workspace path, pass that same path to workspace_finalize_candidate and workspace_publish_candidate, or copy it into final_candidate.md first; direct finalize may shorten or omit the workspace artifact."
+            : null,
+          hasAction("workspace_review_candidate")
+            ? "For long-form or research workspace answers, call workspace_review_candidate after reading the selected candidate and before workspace_publish_candidate. That review is YOUR self-review; runtime only exposes candidateQualitySignal facts for you to repair."
             : null
         ]
           .filter(Boolean)
@@ -74774,6 +76783,7 @@ ${user}:`]
       packetId: createPacketId(runState, options.mode || "planner"),
       parse: {
         parseError: readString$u(options.parseError) || null,
+        rejection: compactRejection(options.rejection),
         repairPath: readString$u(options.repairPath) || "none",
         responseType: readString$u(options.responseType) || inferResponseType(response, decision)
       },
@@ -74793,6 +76803,26 @@ ${user}:`]
       text: summarizeTextPayload(response.text),
       toolCalls: summarizeToolCallsForDebug(response.toolCalls)
     };
+  }
+
+  function compactRejection(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const compact = {
+      reason: readString$u(source.reason) || null,
+      type: readString$u(source.type) || null
+    };
+    const rejectedActionName = readString$u(source.rejectedActionName);
+    if (rejectedActionName) compact.rejectedActionName = rejectedActionName;
+    const message = readString$u(source.message);
+    if (message) compact.message = summarizeTraceText(message, 240);
+    if (Number.isFinite(source.availableActionCount)) {
+      compact.availableActionCount = source.availableActionCount;
+    }
+    if (Array.isArray(source.invalidActions) && source.invalidActions.length > 0) {
+      compact.invalidActions = source.invalidActions.slice(0, 5).map((item) => compactRejection(item));
+    }
+    return compact;
   }
 
   function createPacketId(runState, mode) {
@@ -75311,11 +77341,19 @@ ${user}:`]
     // invalid-action convergence slot can key on it. Reads JSON structure
     // only — no regex or prose detection.
     const rawRejectedName = readRejectedActionName(parsed.value);
+    const originalRejection = parsed.error
+      ? {
+          reason: "parse_error",
+          message: normalizeThrownError(parsed.error).message,
+          type: null
+        }
+      : diagnosePlannerEnvelopeRejection(parsed.value, options);
     let decision = repairPlannerEnvelope(parsed.value, {
       ...options,
       responseText: response.text
     });
     let repairResponse = null;
+    let repairRejection = null;
     let repairPath = decision ? "none" : "invalid";
 
     if (!decision) {
@@ -75342,11 +77380,18 @@ ${user}:`]
       });
       decision = repaired.decision;
       repairResponse = repaired.response;
+      repairRejection = repaired.rejection || null;
       repairPath = decision ? "repair" : "repair_failed";
       emitStep(options, decision ? "planner-repair-completed" : "planner-repair-failed", {
         attempt: 1,
         durationMs: Date.now() - repairStartedAt,
+        originalReason: originalRejection && originalRejection.reason,
         provider: options.request.provider,
+        rejectedActionName: (repairRejection && repairRejection.rejectedActionName)
+          || (originalRejection && originalRejection.rejectedActionName)
+          || rawRejectedName
+          || null,
+        rejection: repairRejection || originalRejection,
         responseType: readDecisionType(decision),
         text: repaired.text
       });
@@ -75366,6 +77411,7 @@ ${user}:`]
       parseError: parsed.error ? normalizeThrownError(parsed.error).message : null,
       repairPath,
       request: options.request,
+      rejection: repairRejection || (!decision ? originalRejection : null),
       response: repairResponse || response,
       responseType: decision ? readDecisionType(decision) : "invalid",
       runState: options.runState
@@ -75378,6 +77424,8 @@ ${user}:`]
       response: repairResponse || response,
       strictRetryResponse: null,
       rejectedActionName: decision ? null : rawRejectedName,
+      invalidKind: decision ? null : readString$t((repairRejection || originalRejection) && (repairRejection || originalRejection).reason),
+      invalidReason: decision ? null : (repairRejection || originalRejection),
       repairAttempted: repairPath === "repair" || repairPath === "repair_failed"
     };
   }
@@ -75771,7 +77819,7 @@ ${user}:`]
   function buildRecallPrompt(request) {
     return [
       "Latest user prompt:",
-      readString$1Y(request && request.prompt) || "None",
+      readString$1_(request && request.prompt) || "None",
       "",
       "Session context:",
       JSON.stringify(request && request.sessionContext ? request.sessionContext : null, null, 2)
@@ -75780,7 +77828,7 @@ ${user}:`]
 
   function normalizeRecallValue(value) {
     const record = readObject$2(value) || {};
-    const answer = readString$1Y(record.answer);
+    const answer = readString$1_(record.answer);
 
     return {
       answer,
@@ -75799,15 +77847,15 @@ ${user}:`]
       return null;
     }
 
-    const kind = readString$1Y(record.kind);
-    const text = readString$1Y(record.text);
+    const kind = readString$1_(record.kind);
+    const text = readString$1_(record.text);
     if (!kind || !text) {
       return null;
     }
 
     return {
       kind,
-      slot: readString$1Y(record.slot) || null,
+      slot: readString$1_(record.slot) || null,
       text
     };
   }
@@ -75863,8 +77911,8 @@ ${user}:`]
     if (!isTodoShapedRun(runState)) return null;
     if (!runState || typeof runState !== "object" || runState.todoState) return null;
 
-    const goal = readString$14(runState.observationSummary && runState.observationSummary.prompt)
-      || readString$14(runState.originalQuery)
+    const goal = readString$15(runState.observationSummary && runState.observationSummary.prompt)
+      || readString$15(runState.originalQuery)
       || "Complete the complex task";
     const message = readErrorMessage$3(error);
     const next = applyTodoPlan(createTodoState({ goal }), {
@@ -76278,6 +78326,9 @@ ${user}:`]
         allowedActions: Array.isArray(repair.allowedActions) ? repair.allowedActions.slice(0, 12) : [],
         budgetState: repair.budgetState || null,
         ignoredCount: repair.ignoredCount || 0,
+        workspaceRepairSignal: repair.workspaceRepairSignal
+          ? cloneValue$1(repair.workspaceRepairSignal)
+          : null,
         reason: repair.reason || null,
         status: "before_planner"
       });
@@ -77221,6 +79272,9 @@ ${user}:`]
         active: repair.active === true,
         activeDeficits: Array.isArray(repair.activeDeficits) ? repair.activeDeficits.slice(0, 8) : [],
         ignoredCount: repair.ignoredCount || 0,
+        workspaceRepairSignal: repair.workspaceRepairSignal
+          ? cloneValue$1(repair.workspaceRepairSignal)
+          : null,
         reason: repair.reason || null
       });
     }
@@ -77237,6 +79291,7 @@ ${user}:`]
         actionName,
         prompt: session.request && session.request.prompt,
         request: session.request,
+        runtimeConfig: session.runtimeConfig,
         status
       }
     );
@@ -78053,8 +80108,8 @@ ${user}:`]
     const items = buildPlanItems(decision, actions);
     if (items.length === 0) return null;
 
-    const goal = readString$14(runState.observationSummary && runState.observationSummary.prompt)
-      || readString$14(decision && decision.reasoning)
+    const goal = readString$15(runState.observationSummary && runState.observationSummary.prompt)
+      || readString$15(decision && decision.reasoning)
       || "Complete the planned multi-step task";
     const next = applyTodoPlan(createTodoState({ goal }), {
       activeItemId: items[0].id,
@@ -78077,7 +80132,7 @@ ${user}:`]
       items.push({ id: `plan-${items.length + 1}`, label, status: "pending" });
     }
 
-    if (readString$14(decision && decision.synthesize_instruction) !== "direct") {
+    if (readString$15(decision && decision.synthesize_instruction) !== "direct") {
       const synthLabel = "Synthesize the final user-facing answer";
       if (!seen.has(synthLabel)) {
         items.push({ id: `plan-${items.length + 1}`, label: synthLabel, status: "pending" });
@@ -78088,7 +80143,7 @@ ${user}:`]
   }
 
   function labelForAction(action) {
-    const name = readString$14(action && action.name);
+    const name = readString$15(action && action.name);
     if (name === "web_search") return "Search the web for relevant evidence";
     if (name === "read_url") return "Read selected source pages";
     if (name === "execute_skill_tool") return "Run the selected skill tool";
@@ -78099,7 +80154,7 @@ ${user}:`]
 
   function hasMultiActionPlan(planActions) {
     return Array.isArray(planActions) && planActions.filter((item) => {
-      const name = readString$14(item && item.name);
+      const name = readString$15(item && item.name);
       return name && !name.startsWith("todo_");
     }).length > 1;
   }
@@ -78145,7 +80200,7 @@ ${user}:`]
     const message = "Research finalize contract missing AI readiness: choose read_url/web_search/workspace work, or finalize again with finalReadiness.decision='limited'/'ready' plus optional finalReadiness.requirementsAssessment and honest limitations. Runtime is not judging source, length, or content sufficiency.";
     contract.status = "missing_ai_readiness";
     session.runState.researchFinalizeContract = contract;
-    const actionName = readString$1Y(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1_(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const output = {
       contract: cloneValue$1(contract),
       kind: "research_finalize_contract",
@@ -78179,7 +80234,7 @@ ${user}:`]
     const declaredUnsatisfied = readDeclaredUnsatisfied(contract);
     if (declaredUnsatisfied.length === 0) return null;
 
-    const actionName = readString$1Y(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1_(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const observed = contract.finalReadinessAssessment && typeof contract.finalReadinessAssessment === "object"
       ? contract.finalReadinessAssessment.observed
       : null;
@@ -78245,7 +80300,7 @@ ${user}:`]
       return null;
     }
 
-    const actionName = readString$1Y(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1_(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const evaluator = refreshResearchAcceptanceEvaluator(session.runState, {
       actionName,
       conflictIssues: audit.issues,
@@ -78354,7 +80409,7 @@ ${user}:`]
       : null;
     if (!candidate && !draft && !workspaceContract) return null;
 
-    const actionName = readString$1Y(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
+    const actionName = readString$1_(options && options.actionName) || readActionNameForTerminalSource(sourceLabel);
     const signal = {
       actionName,
       cycle: runState.cycleCount,
@@ -78463,7 +80518,7 @@ ${user}:`]
     if (!contract || typeof contract !== "object") return false;
     const value = readNumber$3(contract.value);
     if (value <= 0) return false;
-    const unit = readString$1Y(contract.unit).toLowerCase();
+    const unit = readString$1_(contract.unit).toLowerCase();
     if (unit === "words") return value >= 1000;
     if (unit === "chars" || unit === "characters") return value >= 3000;
     return false;
@@ -78808,7 +80863,7 @@ ${user}:`]
       if (session.actionRegistry.get("workspace_publish_candidate")) return true;
     }
     return (Array.isArray(session && session.availableActions) ? session.availableActions : [])
-      .some((action) => action && readString$1Y(action.name) === "workspace_publish_candidate");
+      .some((action) => action && readString$1_(action.name) === "workspace_publish_candidate");
   }
 
   function readWorkspaceCandidate(workspace) {
@@ -78817,10 +80872,10 @@ ${user}:`]
       ? workspace.files
       : {};
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const path = readString$1Y(quality.finalCandidatePath) || "final_candidate.md";
+    const path = readString$1_(quality.finalCandidatePath) || "final_candidate.md";
     if (path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
     const file = files[path];
-    const content = readString$1Y(file && file.content);
+    const content = readString$1_(file && file.content);
     if (!content) return null;
     const stats = quality.finalCandidateStats && typeof quality.finalCandidateStats === "object"
       ? quality.finalCandidateStats
@@ -78843,7 +80898,7 @@ ${user}:`]
       ? workspace.files
       : {};
     const file = files["draft.md"];
-    const content = readString$1Y(file && file.content);
+    const content = readString$1_(file && file.content);
     if (content) {
       return {
         path: "draft.md",
@@ -78856,7 +80911,7 @@ ${user}:`]
 
   function readWorkspaceCustomDraft(workspace, files) {
     const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-    const finalCandidatePath = readString$1Y(quality.finalCandidatePath) || "final_candidate.md";
+    const finalCandidatePath = readString$1_(quality.finalCandidatePath) || "final_candidate.md";
     const reserved = new Set([
       finalCandidatePath,
       "final_candidate.md",
@@ -78868,10 +80923,10 @@ ${user}:`]
     const contentActions = new Set(["write", "replace", "append", "insert_after_section"]);
     for (let i = operations.length - 1; i >= 0; i -= 1) {
       const operation = operations[i];
-      if (!operation || !contentActions.has(readString$1Y(operation.action))) continue;
-      const path = readString$1Y(operation.path);
+      if (!operation || !contentActions.has(readString$1_(operation.action))) continue;
+      const path = readString$1_(operation.path);
       if (!path || reserved.has(path) || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) continue;
-      const content = readString$1Y(files[path] && files[path].content);
+      const content = readString$1_(files[path] && files[path].content);
       if (!content) continue;
       return {
         path,
@@ -78882,9 +80937,9 @@ ${user}:`]
 
     let best = null;
     for (const [path, file] of Object.entries(files)) {
-      const safePath = readString$1Y(path);
+      const safePath = readString$1_(path);
       if (!safePath || reserved.has(safePath) || safePath.startsWith("/") || safePath.includes("..") || /[\\]/.test(safePath)) continue;
-      const content = readString$1Y(file && file.content);
+      const content = readString$1_(file && file.content);
       if (!content) continue;
       if (!best || content.length > best.content.length) {
         best = { content, path: safePath };
@@ -78899,7 +80954,7 @@ ${user}:`]
   }
 
   function summarizeTextForSignal(content) {
-    const text = readString$1Y(content);
+    const text = readString$1_(content);
     const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
     const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
     return {
@@ -78915,7 +80970,7 @@ ${user}:`]
   }
 
   function readActionNameForTerminalSource(sourceLabel) {
-    const source = readString$1Y(sourceLabel);
+    const source = readString$1_(sourceLabel);
     if (source === "planner_final") return "final";
     if (source === "planner_finalize") return "finalize";
     return source || "finalize";
@@ -79957,7 +82012,7 @@ ${user}:`]
       ...createOrientRecord(observeRecord, session.runtimeConfig),
       ambiguityState: inputResolution.ambiguityState,
       availableActions: cloneValue$1(session.availableActions.map((action) => action.name)),
-      clarificationStatus: readString$1Y(inputResolution && inputResolution.clarificationStatus) || "none",
+      clarificationStatus: readString$1_(inputResolution && inputResolution.clarificationStatus) || "none",
       executionClass: session.runState.executionClass,
       evidenceState: inputResolution.evidenceState,
       intentState: cloneValue$1(inputResolution.intentState || null),
@@ -80030,7 +82085,7 @@ ${user}:`]
     const intentState = inputResolution && typeof inputResolution.intentState === "object"
       ? inputResolution.intentState
       : null;
-    const activeQuery = readString$1Y(inputResolution && inputResolution.activeQuery);
+    const activeQuery = readString$1_(inputResolution && inputResolution.activeQuery);
 
     if (!inquiryContext && !intentState) {
       return createContextSnapshot(snapshot);
@@ -80038,12 +82093,12 @@ ${user}:`]
 
     const nextInquiryContext = normalizeInquiryContext({
       ...snapshot.inquiryContext,
-      activeGoal: readString$1Y(inquiryContext && inquiryContext.activeGoal)
-        || readString$1Y(intentState && intentState.goal)
+      activeGoal: readString$1_(inquiryContext && inquiryContext.activeGoal)
+        || readString$1_(intentState && intentState.goal)
         || snapshot.inquiryContext.activeGoal,
       activeQuery: activeQuery || snapshot.inquiryContext.activeQuery,
-      activeTopic: readString$1Y(inquiryContext && inquiryContext.activeTopic)
-        || readString$1Y(intentState && intentState.topic)
+      activeTopic: readString$1_(inquiryContext && inquiryContext.activeTopic)
+        || readString$1_(intentState && intentState.topic)
         || snapshot.inquiryContext.activeTopic,
       lastClarificationResolution: hasOwnValue(inquiryContext, "lastClarificationResolution")
         ? inquiryContext.lastClarificationResolution
@@ -80110,7 +82165,7 @@ ${user}:`]
   function evaluateCycleDrift(session, turnState) {
     const config = session.runtimeConfig && session.runtimeConfig.driftDetection;
     if (!config || config.enabled !== true) return null;
-    const goalAnchorText = readString$1Y(turnState && turnState.goalAnchorText);
+    const goalAnchorText = readString$1_(turnState && turnState.goalAnchorText);
     if (!goalAnchorText) return null;
     const trajectoryText = computeTrajectorySignal(session.runState, {
       maxEntries: config.maxTrajectoryEntries
@@ -80156,13 +82211,13 @@ ${user}:`]
       return false;
     }
 
-    const actionName = readString$1Y(decision.name);
+    const actionName = readString$1_(decision.name);
     if (!actionName) {
       return false;
     }
 
     return (Array.isArray(availableActions) ? availableActions : []).some(
-      (action) => action && typeof action === "object" && readString$1Y(action.name) === actionName
+      (action) => action && typeof action === "object" && readString$1_(action.name) === actionName
     );
   }
 
@@ -80208,7 +82263,7 @@ ${user}:`]
         break;
       }
       if (entry.kind === "action_error") {
-        candidateName = readString$1Y(entry.actionName) || null;
+        candidateName = readString$1_(entry.actionName) || null;
         break;
       }
       if (entry.kind === "planner_invalid_action") {
@@ -81287,8 +83342,8 @@ ${user}:`]
     if (!runState || typeof runState !== "object" || runState.todoState) return null;
     if (!isTodoShapedRun(runState)) return null;
 
-    const goal = readString$14(runState.observationSummary && runState.observationSummary.prompt)
-      || readString$14(runState.originalQuery)
+    const goal = readString$15(runState.observationSummary && runState.observationSummary.prompt)
+      || readString$15(runState.originalQuery)
       || "Complete the multi-step task";
     const next = applyTodoPlan(createTodoState({ goal }), {
       activeItemId: TODO_PLANNING_PLACEHOLDER_ID,
@@ -81318,38 +83373,15 @@ ${user}:`]
         throw createAbortError$1("Run aborted by caller during action loop.");
       }
       const cycleRecord = await beginActionLoopCycle(session, "planner");
-      const recoveryFinal = maybeCreateFinalizeOnlyResearchRecoveryFinal(session);
-      if (recoveryFinal) {
-        completePhase(cycleRecord, session.pushStep, "decide", {
-          actionName: "finalize_existing_evidence",
-          cycle: session.runState.cycleCount,
-          decisionSource: "research_recovery",
-          decisionType: "final",
-          outcome: "selected",
-          selectedSkill: null
-        });
-        startPhase(session.runState, session.pushStep, "act", {
-          cycle: session.runState.cycleCount,
-          selectedSkill: null
-        });
-        return handleDirectFinal({
-          cycleRecord,
-          directFinal: recoveryFinal,
-          memoryEntriesAdded: session.memoryEntriesAdded,
-          normalizedInput: session.normalizedInput,
-          onToken: session.onToken,
-          pushStep: session.pushStep,
-          rawInput: session.rawInput,
-          request: session.request,
-          runState: session.runState,
-          runtimeState: session.runtimeState,
-          steps: session.steps,
-          toolResult: {
-            skill: "long-web-research",
-            tool: "finalize_existing_evidence"
-          }
-        });
-      }
+      // AGRUN-246-E/J — the regex-driven force-finalize bypass
+      // (`maybeCreateFinalizeOnlyResearchRecoveryFinal`) was deleted here. It
+      // ran BEFORE the planner, regexed the follow-up prompt for "finalize"
+      // intent, refreshed research state with a finalize phase, and emitted a
+      // `research-recovery-mode-armed` step to pre-arm a finalize FOR the AI —
+      // push-mode forbidden by the harness contract ("runtime must not
+      // auto-finalize for the AI"). The continued-research-thread FACT is now
+      // surfaced read-only in the planner prompt (research phase contract); the
+      // AI owns the finalize-vs-more-research choice by picking its next action.
 
       // Advance the no-progress counter based on the cycle that just finished
       // before checking the budget, so a stalled run is caught on the next
@@ -81816,28 +83848,6 @@ ${user}:`]
       runtimeState: session.runtimeState,
       steps: session.steps
     });
-  }
-
-  function maybeCreateFinalizeOnlyResearchRecoveryFinal(session) {
-    const runState = session && session.runState;
-    if (!runState || !detectFinalizeOnlyResearchRecovery(runState, {
-      prompt: session.request && session.request.prompt
-    })) {
-      return null;
-    }
-    const state = refreshResearchState(runState, {
-      phase: "finalize_existing_evidence",
-      prompt: session.request && session.request.prompt
-    });
-    if (state.recoveryMode !== "finalize_existing_evidence") return null;
-    session.pushStep("research-recovery-mode-armed", {
-      sourceCount: Array.isArray(runState.researchContext && runState.researchContext.readSources)
-        ? runState.researchContext.readSources.length
-        : 0,
-      topic: state.topic || null
-    });
-    runState.researchRecoveryMode = "finalize_existing_evidence";
-    return null;
   }
 
   function createRepeatedWebSearchSkip(session, actionName, decision, reason) {
@@ -82547,36 +84557,26 @@ ${user}:`]
       outcome: "denied_continue"
     });
 
-    // Guard: if too many consecutive denials, force finalize instead of looping.
-    if (countConsecutiveDenials(session.actionHistory) >= MAX_CONSECUTIVE_DENIALS) {
-      session.pushStep("approval-denial-guard", {
-        consecutiveDenials: countConsecutiveDenials(session.actionHistory),
-        cycle: session.runState.cycleCount
-      });
-
-      return executeRuntimeFinalize({
-        agentRole: session.runtimeConfig.agentRole,
-        runtimeConfig: session.runtimeConfig,
-        cycleRecord,
-        decision: {
-          instruction: `The user has denied ${MAX_CONSECUTIVE_DENIALS} action approvals consecutively. Answer using whatever information is currently available. Do not attempt actions that require approval.`,
-          reasoning: `Consecutive denial guard: user denied ${MAX_CONSECUTIVE_DENIALS} actions.`,
-          type: "finalize"
-        },
-        memoryEntriesAdded: session.memoryEntriesAdded,
-        normalizedInput: session.normalizedInput,
-        onStreamEvent: session.onStreamEvent,
-        onToken: session.onToken,
-        pushStep: session.pushStep,
-        rawInput: session.rawInput,
-        request: session.request,
-        runState: session.runState,
-        runtimeState: session.runtimeState,
-        steps: session.steps
+    // AGRUN-294I — AI-owned denial handling. The runtime previously
+    // force-finalized after MAX_CONSECUTIVE_DENIALS consecutive denials. That was
+    // push-mode: the runtime decided to END the run for the AI. It is also
+    // redundant — the denied action is already recorded in deniedActions, and the
+    // planner-prompt deniedActions contract already instructs the AI that, once
+    // deniedActions is non-empty, its ONLY valid moves are a non-denied action,
+    // `finalize`, or an honest `final` explaining the limitation. So the runtime
+    // no longer finalizes here. It records an observability-only streak signal
+    // (so the Inspector/debug can see repeated denials) and lets the planner
+    // decide next cycle. The run-level step budget remains the liveness backstop.
+    const consecutiveDenials = countConsecutiveDenials(session.actionHistory);
+    if (consecutiveDenials >= MAX_CONSECUTIVE_DENIALS) {
+      session.pushStep("approval-denial-streak", {
+        consecutiveDenials,
+        cycle: session.runState.cycleCount,
+        note: "AI-owned: planner sees deniedActions and decides (finalize honestly or choose a non-approval action). Runtime no longer force-finalizes."
       });
     }
 
-    // Continue the action loop — planner will see deniedActions and pick an alternative.
+    // Continue the action loop — the planner sees deniedActions and decides.
     return continueActionLoop(session);
   }
 
@@ -86268,16 +88268,16 @@ ${user}:`]
       return null;
     }
 
-    const kind = readString$1Y(record.kind);
-    const slot = readString$1Y(record.slot);
-    const text = readString$1Y(record.text);
+    const kind = readString$1_(record.kind);
+    const slot = readString$1_(record.slot);
+    const text = readString$1_(record.text);
 
     if (!MEMORY_KINDS$1.has(kind) || !slot || !text) {
       return null;
     }
 
     return {
-      confidence: clampConfidence$1(readNumber$n(record.confidence, 0.8)),
+      confidence: clampConfidence$1(readNumber$o(record.confidence, 0.8)),
       kind,
       slot,
       text
@@ -87779,6 +89779,7 @@ ${user}:`]
         costPricing: normalizeCostPricingConfig(config.costPricing),
         defaultRunOptions: normalizeDefaultRunOptions(config.defaultRunOptions),
         debug: normalizeDebug(config.debug),
+        evidencePolicy: normalizeEvidencePolicyConfig(config.evidencePolicy),
         customActions: normalizeCustomActions(config.customActions),
         disabledActions: normalizeDisabledActions(config.disabledActions),
         globalMemory: normalizeGlobalMemory(config.globalMemory),
@@ -87811,6 +89812,7 @@ ${user}:`]
         // can pass `{ enabled: false }` to opt out.
         publishCandidateGate: normalizePublishCandidateGate(config.publishCandidateGate),
         researchCoverageGuard: config.researchCoverageGuard,
+        researchReportLoop: normalizeResearchReportLoopConfig(config.researchReportLoop),
         repoFileTools: normalizeRepoFileToolsConfig(config.repoFileTools),
         threads: normalizeThreadsConfig(config.threads),
         driftDetection: normalizeDriftDetectionConfig(config.driftDetection),
