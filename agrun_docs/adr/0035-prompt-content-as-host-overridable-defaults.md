@@ -230,6 +230,41 @@ When implemented, the following should hold:
 
 ## Status
 
-Draft. Pending: completion of Phase 1 inventory + Phase 2 snapshot
-infrastructure before implementation can begin. Both prerequisites
-are estimated under 4 hours combined.
+**Implemented (2026-06-04, AGRUN-262).** All six phases landed:
+
+1. **Inventory** — verified against current code; see the
+   [audit](../audits/prompt-content-leak-surface-2026-05-25.md)
+   "Phase 1 inventory — VERIFIED" addendum (push-order 0→14).
+2. **Safety net** — `test/unit/prompt-snapshot.test.js` locks full rendered
+   output of BOTH `buildSystemPromptLines` (7 configs) and
+   `buildNativeToolsSystemPrompt` (5 configs); held byte-identical through
+   every extraction.
+3. **Extraction** — 8 section files under `src/runtime/prompts/`
+   (`planner-base-directives`, `planner-compact-directives`, `skill-directives`,
+   `workspace-directives`, `research-directives`, `convergence-advisory`,
+   `todo-directives`, `planner-native-directives`) + `README.md`. One commit
+   per section, snapshot byte-identical after each. Two lines stay deliberately
+   inline (the standalone-only-actions line; the `preferFinalize`
+   execute_skill_tool line interleaved after research).
+4. **Override API** — `runtimeConfig.prompts` (per-section REPLACE; `null`/`false`
+   disables; array/function provides custom). `resolve.js` resolver +
+   `defaults.js` registry; `normalizeRuntimeConfig` validates (throws on unknown
+   key / bad shape) and exposes the full resolved set via
+   `getRuntimeConfig().prompts`. Differential + validation tests in
+   `prompt-override-api.test.js`. Docs in `prompts/README.md` +
+   `feature-toggles.md`.
+5. **Inspectable defaults** — `build/generate-prompt-docs.mjs` dumps every
+   default section to `dist/agrun_docs/prompts/*.md` during `npm run build`;
+   existence asserted by `dist:check`.
+6. **Leak lint** — `test/unit/prompt-action-name-leak.test.js` asserts 0 class-A
+   affirmative ungated action directives in `src/runtime/prompts/` (with a
+   negative control); inventory test updated to the principled contract.
+
+Scope note: "byte-identical default output" was the prime directive throughout,
+so the verification clause "zero affirmative `web_search`/`read_url` mentions"
+is realized as **zero class-A affirmative ungated directives** — class-B
+advisory (`loopState.X`) and class-C informational references remain in the
+default content by design. The pre-existing UNCONDITIONAL `web_search`/`read_url`
+lines in native mode (audit §3) are preserved for byte-identity and are now
+host-suppressible via the `nativePlannerDirectives` override; runtime-side native
+gating is a separate ticket (a content change out of this ADR's scope).

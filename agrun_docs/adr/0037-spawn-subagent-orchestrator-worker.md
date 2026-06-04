@@ -109,6 +109,16 @@ the same `subagent_result` envelope with `status: "failed"` and
 summary; the parent AI sees the failure envelope and decides whether to
 retry, use another tool, or explain the gap.
 
+> **AGRUN-296 (2026-06-04, [ADR-0049](./0049-spawn-subagent-empty-finalresponse-root-cause.md)):**
+> `finalResponse` is extracted from the child's terminal envelope OBJECT
+> (`runLoop` returns `output = { kind:"final_response"|"planner_final", text }`,
+> never a bare string). The original `normalizeChildResult` read it with
+> `readString(childResult.output)` → `""` for an object → every `finalize`-path
+> child was wrongly demoted to `SUBAGENT_EMPTY_RESPONSE` even after answering.
+> The fix reads `output.text` (kind-guarded so `approval_required.text` cannot
+> leak), keeping the demotion only for genuinely empty children. This was the
+> real root cause behind the "Gemini empty completion" symptom.
+
 ### Capability injection
 
 `runLoop` constructs a `spawnSubagent` callable bound to the active

@@ -4817,7 +4817,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "7c759787e"
+      "7e469a4c6-dirty"
         
     );
   }
@@ -5148,6 +5148,12 @@
           ? hydration.researchContext.searchResults.slice()
           : runState.researchContext.searchResults
       };
+    }
+    // qualityContext wiring — rehydrate the prior turn's finalize quality issue
+    // codes so this turn's planner can surface them via loopState.qualityContext.
+    // Mirrors the researchContext carry above; harmless when absent.
+    if (hydration.finalResponseQuality && typeof hydration.finalResponseQuality === "object") {
+      runState.finalResponseQuality = { ...hydration.finalResponseQuality };
     }
     // AGRUN-214m — apply the durable research slice (topic, evidence graph,
     // report-loop status, final envelope) before compaction trim so a
@@ -18810,6 +18816,51 @@
         ? "hard_veto"
         : "advisory";
       const allowedActions = buildAllowedActions(activeDeficits, facts.budgetState, activeReason, facts.observableDeficits, runState, escalation, context.runtimeConfig);
+      // Escape valve for an UN-RESOLVABLE source deficit. When the AI has
+      // repeatedly tried to terminate (ignoredCount >= hardVeto) yet has ZERO
+      // successful read sources — read_url genuinely cannot yield evidence (the
+      // service is down, or every candidate page is blocked) — the source
+      // deficit can never be cleared. Pinning the AI in the repair loop just
+      // burns the budget and returns a useless continuation stub. Instead, open
+      // `final`/`finalize` so the AI can answer with honest limitations. Narrow
+      // by design: requires real terminate attempts AND zero successful reads,
+      // so it never fires when evidence is merely thin-but-present.
+      const sourceUnresolvable =
+        activeDeficits.includes("source") &&
+        facts.observableDeficits.source &&
+        readNumber$e(facts.observableDeficits.source.successfulReadUrlCount) === 0 &&
+        ignoredCount >= thresholds.hardVeto;
+      // Escape valve for an UN-CONVERGEABLE workspace publish PROTOCOL loop
+      // (sibling of the source-deficit escape above). The publish path is a strict
+      // multi-step protocol — write -> finalize -> read -> review -> publish —
+      // whose finalReadiness facts must EXACTLY match the observed candidate stats
+      // AND clear every active deficit. A weak model that has drafted a real
+      // report keeps re-emitting a publish the validator rejects
+      // (terminal_repair_invalid_publish); ignoredCount climbs to hard_veto, yet
+      // — unlike the zero-evidence source case — NOTHING opens an exit, so the run
+      // burns the whole step budget and returns the generic "paused" continuation
+      // stub instead of the report the AI already wrote. Once hard_veto has fired
+      // AND a real final candidate with content exists, this flag tells the
+      // publish gate (terminal-repair preflight + the publish action) to ACCEPT
+      // the AI's workspace_publish_candidate as-is — publishing the full report
+      // ARTIFACT (NOT finalize, which would re-summarize/compress it) with the
+      // unmet protocol/readiness facts surfaced as observable limitations. Narrow
+      // by design: hard_veto means the AI has already ignored the advisory past
+      // the high-water mark (a genuinely convergeable publish lands in 1-2 steps,
+      // far below that), and a non-empty candidate must exist, so it never fires
+      // on a convergeable publish and never fabricates a report from nothing.
+      const publishLoopUnresolvable =
+        !sourceUnresolvable &&
+        escalation === "hard_veto" &&
+        hasSelectedFinalCandidateContent(runState);
+      // The source-deficit escape opens `final`/`finalize` because that case has
+      // NO candidate to publish — finalize is its only terminal. The publish-loop
+      // escape deliberately does NOT open finalize (it would compress the report);
+      // it routes through workspace_publish_candidate instead (see the publish
+      // gate's publishLoopEscapeGranted handling).
+      const effectiveAllowedActions = sourceUnresolvable
+        ? Array.from(new Set([...allowedActions, "final", "finalize"]))
+        : allowedActions;
       const validPublishContract = buildValidPublishContract(activeDeficits, facts.observableDeficits, facts.budgetState, escalation);
       const lengthExpansionSignal = buildLengthExpansionSignal(runState, facts.observableDeficits);
       const workspaceRepairSignal = buildWorkspaceRepairSignal(runState, facts.observableDeficits, activeDeficits, allowedActions, activeReason, facts.budgetState, escalation);
@@ -18823,10 +18874,14 @@
       reason: activeReason,
       activeDeficits,
       observableDeficits: facts.observableDeficits,
-      allowedActions,
+      allowedActions: effectiveAllowedActions,
       budgetState: facts.budgetState,
       escalation,
-        forbiddenDecisions: buildForbiddenDecisions(activeDeficits),
+      sourceDeficitEscapeGranted: sourceUnresolvable,
+      publishLoopEscapeGranted: publishLoopUnresolvable,
+        forbiddenDecisions: sourceUnresolvable
+          ? buildForbiddenDecisions(activeDeficits).filter((d) => d !== "finalize" && d !== "final_answer")
+          : buildForbiddenDecisions(activeDeficits),
         requiredRepair: buildRequiredRepair(activeDeficits, facts.observableDeficits, allowedActions, facts.budgetState, activeReason, context.runtimeConfig),
         validPublishContract,
         lengthExpansionSignal,
@@ -31983,6 +32038,15 @@
       : [];
     const allowed = allowedActions.includes(actionName);
     const isPublish = actionName === "workspace_publish_candidate";
+    // AGRUN publish-loop escape: once terminal-repair grants the publish-loop
+    // escape (hard_veto reached with a real drafted candidate — see
+    // terminal-repair-state.js publishLoopEscapeGranted), stop vetoing the AI's
+    // workspace_publish_candidate. The AI has demonstrably failed the brittle
+    // multi-gate publish protocol past the high-water mark; pinning it further
+    // just burns the budget and returns the "paused" stub. Let the publish reach
+    // the action, which publishes the real candidate ARTIFACT with the unmet
+    // facts recorded as limitations. Narrow: hard_veto + real candidate only.
+    if (isPublish && repair.publishLoopEscapeGranted === true) return null;
     const publishValidation = isPublish
       ? explainTerminalRepairPublishArgs(options.actionArgs, repair, { runState })
       : { valid: false, reasons: [] };
@@ -32100,6 +32164,12 @@
     const repairState = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
       ? runState.terminalRepairState
       : { active: true, activeDeficits: ["terminal_loop"] };
+    // AGRUN publish-loop escape: once the hard_veto publish-acceptance escape is
+    // granted (terminal-repair-state.js publishLoopEscapeGranted), the
+    // terminal-correction cooldown must NOT re-pin the publish — otherwise this
+    // sibling gate would block the very workspace_publish_candidate the escape
+    // exists to let through, and the run would still thrash to the maxSteps stub.
+    if (repairState.publishLoopEscapeGranted === true) return null;
     const publishValidation = explainTerminalRepairPublishArgs(options.actionArgs, repairState, { runState });
     if (publishValidation.valid) return null;
     const blockedTerminalRetryCount = readFiniteNumber$3(cooldown && cooldown.blockedTerminalRetryCount) + 1;
@@ -36544,7 +36614,7 @@
           skillName: { type: "string", aliases: ["name"] }
         },
         decisionType: "action",
-        guidance: "Use use_agent_skill only after read_agent_skill when the user explicitly wants that bundled skill or when its instructions must stay active across later planner steps."
+        guidance: "Use use_agent_skill only after read_agent_skill — it activates the LAST-read skill, so without a prior read there is nothing to activate. Use it when the user explicitly wants that bundled skill or when its instructions must stay active across later planner steps. This only loads instructions in place — it does NOT transfer control or start a new phase. To hand the wheel to a different skill for the next phase, use handoff_to_skill instead (which does its own skill lookup and needs no prior read)."
       },
       tier: 0,
       outputSchema: {
@@ -36636,6 +36706,45 @@
   const ISSUE_BLOCKING = "blocking";
   const ISSUE_ADVISORY = "advisory";
 
+  // AGRUN-297 — structure issue severity is host-configurable (policy/mechanism
+  // SSOT). The runtime DETECTS structure facts (a sensor) and exposes them; how
+  // strictly each fact gates a clean `ready` publish is a host policy, not a
+  // runtime opinion baked into code. Defaults: hard correctness errors stay
+  // blocking; cosmetic section-numbering issues default to advisory so the
+  // runtime no longer holds a numbering-aesthetics opinion as a publish blocker.
+  // Hosts override via runtimeConfig.candidateQuality.structureIssueSeverity:
+  //   { non_monotonic_section_numbers: "blocking", ... }
+  const DEFAULT_STRUCTURE_ISSUE_SEVERITY = Object.freeze({
+    duplicate_headings: ISSUE_BLOCKING,
+    duplicate_section_numbers: ISSUE_BLOCKING,
+    non_monotonic_section_numbers: ISSUE_ADVISORY,
+    gapped_section_numbers: ISSUE_ADVISORY
+  });
+
+  function resolveStructureIssueSeverity(runtimeConfig) {
+    const merged = { ...DEFAULT_STRUCTURE_ISSUE_SEVERITY };
+    const override = runtimeConfig
+      && typeof runtimeConfig === "object"
+      && runtimeConfig.candidateQuality
+      && typeof runtimeConfig.candidateQuality === "object"
+      && runtimeConfig.candidateQuality.structureIssueSeverity
+      && typeof runtimeConfig.candidateQuality.structureIssueSeverity === "object"
+      ? runtimeConfig.candidateQuality.structureIssueSeverity
+      : null;
+    if (override) {
+      for (const [code, severity] of Object.entries(override)) {
+        if (severity === ISSUE_BLOCKING || severity === ISSUE_ADVISORY) {
+          merged[code] = severity;
+        }
+      }
+    }
+    return merged;
+  }
+
+  function structureIssueSeverity(code, severityMap) {
+    return severityMap && severityMap[code] === ISSUE_BLOCKING ? ISSUE_BLOCKING : ISSUE_ADVISORY;
+  }
+
   function buildCandidateQualitySignal(options = {}) {
     const context = options.context && typeof options.context === "object" ? options.context : {};
     const runState = options.runState && typeof options.runState === "object"
@@ -36663,6 +36772,7 @@
     const requestedLength = readRequestedLength({ context, finalReadiness, options });
     const requestedCitations = readRequestedCitationContract({ options });
     const publishDecision = readString$Q(finalReadiness && finalReadiness.decision).toLowerCase();
+    const structureSeverity = resolveStructureIssueSeverity(options.runtimeConfig);
 
     if (reviewRequired) {
       const reviewFresh = Boolean(
@@ -36713,7 +36823,7 @@
         issues.push(createIssue({
           code,
           message: `Candidate structure issue: ${code}.`,
-          severity: isHardStructureIssue(code) ? ISSUE_BLOCKING : ISSUE_ADVISORY,
+          severity: structureIssueSeverity(code, structureSeverity),
           path,
           samples: readStructureSamples(structure, code)
         }));
@@ -37051,13 +37161,6 @@
       return Array.isArray(structure.repeatedNumberSamples) ? structure.repeatedNumberSamples.slice(0, 5) : [];
     }
     return [];
-  }
-
-  function isHardStructureIssue(code) {
-    return code === "duplicate_headings" ||
-      code === "duplicate_section_numbers" ||
-      code === "non_monotonic_section_numbers" ||
-      code === "gapped_section_numbers";
   }
 
   function summarizeStructure(structure) {
@@ -38377,7 +38480,18 @@
     const candidateQualitySignal = buildAndStoreCandidateQualitySignal(context, workspace, file, finalReadiness, {
       reviewRequired: researchPublishRequired
     });
-    if (!publishProtocol.finalizedAfterLatestWrite) {
+    // AGRUN publish-loop escape: terminal-repair grants publishLoopEscapeGranted
+    // once the run hits hard_veto with a real drafted candidate (the AI has
+    // failed the brittle write->finalize->read->review->publish protocol past the
+    // high-water mark). Rather than block forever and return the maxSteps "paused"
+    // stub, publish the candidate ARTIFACT as-is: skip the protocol / readiness /
+    // candidate-quality / todo-sync gates below (their unmet facts remain
+    // observable on this output's publishProtocol + readinessAudit) so the full
+    // report the AI already wrote is delivered with honest limitations. Narrow:
+    // requires the hard_veto escape flag AND non-empty candidate content (checked
+    // above), so it never fires on a convergeable publish.
+    const publishLoopEscape = isPublishLoopEscapeGranted(context && context.runState);
+    if (!publishLoopEscape && !publishProtocol.finalizedAfterLatestWrite) {
       return createWorkspacePublishBlockedResult({
         candidateQualitySignal,
         context,
@@ -38390,7 +38504,7 @@
         status: "missing_finalize_after_latest_write"
       });
     }
-    if (!publishProtocol.readAfterLatestContentChange) {
+    if (!publishLoopEscape && !publishProtocol.readAfterLatestContentChange) {
       return createWorkspacePublishBlockedResult({
         candidateQualitySignal,
         context,
@@ -38405,7 +38519,7 @@
         status: "missing_latest_workspace_read"
       });
     }
-    if (!readinessAudit.ok) {
+    if (!publishLoopEscape && !readinessAudit.ok) {
       return createWorkspacePublishBlockedResult({
         candidateQualitySignal,
         context,
@@ -38419,7 +38533,7 @@
       });
     }
     const candidateQualityBlock = inspectCandidateQualityPublishReadiness(candidateQualitySignal, finalReadiness);
-    if (!candidateQualityBlock.ok) {
+    if (!publishLoopEscape && !candidateQualityBlock.ok) {
       return createWorkspacePublishBlockedResult({
         candidateQualitySignal,
         context,
@@ -38433,7 +38547,7 @@
       });
     }
     const todoSyncAudit = inspectPublishTodoStateSync(context, finalReadiness, file.path);
-    if (!todoSyncAudit.ok) {
+    if (!publishLoopEscape && !todoSyncAudit.ok) {
       return createWorkspacePublishBlockedResult({
         candidateQualitySignal,
         context,
@@ -38445,6 +38559,31 @@
         researchPublishRequired,
         status: todoSyncAudit.status
       });
+    }
+    // ADR-0051 — host-defined output guardrails run AFTER all built-in runtime
+    // gates pass, as the LAST check before terminalizing. Validation-only: a
+    // host guardrail may BLOCK (returns a re-plan observation to the AI) but
+    // never authors content. Respects publishLoopEscape so the budget-exhaustion
+    // anti-infinite-loop terminal still delivers the artifact.
+    if (!publishLoopEscape) {
+      const guardrailBlock = await runOutputGuardrails(context, {
+        candidateQualitySignal,
+        file,
+        finalReadiness
+      });
+      if (guardrailBlock) {
+        return createWorkspacePublishBlockedResult({
+          candidateQualitySignal,
+          context,
+          file,
+          finalReadiness,
+          message: `Output guardrail "${guardrailBlock.name}" blocked publish: ${guardrailBlock.reason}`,
+          publishProtocol,
+          readinessAudit,
+          researchPublishRequired,
+          status: "output_guardrail_blocked"
+        });
+      }
     }
     const sourcePayload = collectWorkspacePublishSources(context);
     const candidateTextWithSources = appendSourcesSection(candidateText, sourcePayload.sources);
@@ -38642,6 +38781,13 @@
     return loop.enabled === true || Boolean(readString$P(loop.finalMode)) || Boolean(status && status !== "idle");
   }
 
+  function isPublishLoopEscapeGranted(runState) {
+    const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
+      ? runState.terminalRepairState
+      : null;
+    return Boolean(repair && repair.publishLoopEscapeGranted === true);
+  }
+
   function createWorkspacePublishBlockedResult(options) {
     const file = options.file || {};
     const status = options.status || "blocked";
@@ -38686,6 +38832,48 @@
       },
       summary: `workspace_publish_candidate blocked(status=${status}, sameStatusCount=${sameStatusCount}, totalBlocks=${totalCount}${cyclesRemaining != null ? `, cycles_remaining=${cyclesRemaining}` : ""})`
     };
+  }
+
+  // ADR-0051 — run host-defined output guardrails over the publish-readiness
+  // FACTS. Returns the first { name, reason, info } block, or null if all pass.
+  // A guardrail is validation-only: it returns { block, reason?, info? } and
+  // never authors content. A throwing host guardrail must NOT crash the run —
+  // it is recorded (observable) and treated as non-blocking.
+  async function runOutputGuardrails(context, options) {
+    const guardrails = context
+      && context.runtimeConfig
+      && Array.isArray(context.runtimeConfig.outputGuardrails)
+      ? context.runtimeConfig.outputGuardrails
+      : [];
+    if (guardrails.length === 0) return null;
+    const file = options.file || {};
+    const args = {
+      candidate: typeof file.content === "string" ? file.content : "",
+      candidateQualitySignal: options.candidateQualitySignal || null,
+      finalReadiness: options.finalReadiness || null,
+      runState: context && context.runState ? context.runState : null
+    };
+    for (const guardrail of guardrails) {
+      let result = null;
+      try {
+        result = await guardrail.execute(args);
+      } catch (error) {
+        if (context && typeof context.pushStep === "function") {
+          context.pushStep("output-guardrail-error", {
+            name: guardrail.name,
+            error: error && error.message ? String(error.message) : String(error)
+          });
+        }
+        continue;
+      }
+      if (result && typeof result === "object" && result.block === true) {
+        const reason = typeof result.reason === "string" && result.reason.trim()
+          ? result.reason.trim()
+          : `Output guardrail "${guardrail.name}" blocked publish.`;
+        return { name: guardrail.name, reason, info: result.info != null ? result.info : null };
+      }
+    }
+    return null;
   }
 
   // Pure read-only projection of the workspace operations log filtered
@@ -39717,7 +39905,7 @@
     name: "handoff_to_skill",
     plan: STANDALONE_PLAN_ACTION,
     planner: {
-      aliases: ["transfer_to_skill", "switch_skill", "delegate_to_skill"],
+      aliases: ["transfer_to_skill", "switch_skill"],
       argsExample: {
         skillName: "expert-coder",
         handoffContext: "Research phase complete. 3 sources found. Now implement the fix.",
@@ -39734,7 +39922,7 @@
         }
       },
       decisionType: "action",
-      guidance: "Use handoff_to_skill to pass control to a different skill when the current phase is complete and the next phase needs a different skill. Provide handoffContext to give the receiving skill a concise summary of what was accomplished and what to do next. Optionally include inputFilter as a named host filter or a declarative object such as {\"actionHistory\":{\"keepLast\":3},\"toolHistory\":{\"keepLast\":0}} to trim prior history before the receiving skill sees it. Do NOT use this for parallel sub-tasks — use spawn_subagent for those."
+      guidance: "Use handoff_to_skill to pass control to a different skill when the current phase is complete and the next phase needs a different skill. Provide handoffContext to give the receiving skill a concise summary of what was accomplished and what to do next. Optionally include inputFilter as a named host filter or a declarative object such as {\"actionHistory\":{\"keepLast\":3},\"toolHistory\":{\"keepLast\":0}} to trim prior history before the receiving skill sees it. Do NOT use this for parallel sub-tasks — use spawn_subagent for those. Do NOT confuse with use_agent_skill, which only activates a skill's instructions in place WITHOUT transferring control or starting a new phase."
     },
     tier: 0,
     outputSchema: {
@@ -41993,7 +42181,16 @@
 
   function createStepRunStateDebugSnapshot(state, options) {
     const snapshot = {};
+    // AGRUN-266 — the convergence/terminal-repair family is part of the
+    // host-facing run-state SSOT. It must ride the per-step debug snapshot
+    // (read live via onStep / the browser Inspector through
+    // projectInspectorRunState) using the SAME raw `cloneValue` shape the
+    // result snapshot (snapshotRunState) and lastRun summary carry — so hosts
+    // read `actionPatternConvergence.readOnlyPlanningState` (active / escalation
+    // / ignoredCount / stepsWithoutProductiveProgress) directly instead of
+    // parsing `terminalRepairState.reason` strings.
     const copyFields = [
+      "actionPatternConvergence",
       "agentSkillContext",
       "approvalResumeFallbackUsed",
       "availableActions",
@@ -42007,6 +42204,7 @@
       "executionClass",
       "finalAnswerSource",
       "intentState",
+      "invalidActionConvergence",
       "lastAction",
       "mode",
       "observation",
@@ -42038,6 +42236,7 @@
       "status",
       "stepCount",
       "strongReadSourceCount",
+      "terminalRepairState",
       "terminalizedBy",
       "toolContext",
       "turnState",
@@ -71994,6 +72193,58 @@ ${user}:`]
   const SUBAGENT_ACTION_NAME = "spawn_subagent";
   const DEFAULT_CHILD_MAX_STEPS = 15;
 
+  // 2026-06-03 isolation hardening — parent run-state fields that must NEVER
+  // reach the child via the `{ ...parentOptions }` spread. The child is a
+  // fresh, focused worker (ADR-0037, context-attention-budget-and-subagents.md):
+  // it must start with a clean per-run state, not the parent's.
+  //
+  // `threadHydration` is a CONFIRMED present leak (not merely latent): the
+  // session handle (src/session/handle.js) sets `threadHydration` on the run
+  // options, it carries the active thread's `todoState` + `researchContext`,
+  // and `createActionLoopSession` calls `hydrateRunStateWithThread` on the
+  // child's fresh runState (because the child has no `runState`) — so without
+  // this blank the worker inherits the parent thread's TodoState and research
+  // sources. `turnIntent` is likewise set on parent options by the handle.
+  //
+  // The remaining keys are `options.X || rebuild(...)` reads in
+  // action-loop-session.js: leaving them on the child would make it reuse the
+  // parent's array/sink/registry instead of building its own. They are not all
+  // set on parent options today, but blanking them is the default-deny posture
+  // the multi-agent audit asked for — and it is a no-op when absent.
+  //
+  // NOTE on posture: a full allowlist of "fields the child keeps" was evaluated
+  // and rejected — the child's option consumption is sprawling (~30+ piecemeal
+  // `options.X` reads across action-loop-session.js / run-loop.js / approval.js
+  // / finalize), so an allowlist would silently break the child if one infra
+  // field were missed. This explicit blank-list targets exactly the parent
+  // run-state category and is guarded by a regression test.
+  const CHILD_PARENT_STATE_BLANKLIST = Object.freeze([
+    "threadHydration",
+    "turnIntent",
+    "runState",
+    "todoState",
+    "contextSnapshot",
+    "sessionContext",
+    "sessionRecord",
+    "researchContext",
+    "researchState",
+    "evidenceState",
+    "actionHistory",
+    "steps",
+    "pushStep",
+    "memoryEntriesAdded",
+    "availableActions",
+    "plannerActions"
+  ]);
+
+  function blankParentRunState() {
+    const out = {};
+    for (const key of CHILD_PARENT_STATE_BLANKLIST) {
+      out[key] = undefined;
+    }
+    return out;
+  }
+
   // Capability factory. Bound once per parent runLoop invocation; injected
   // into action.execute(context) by action-loop-action.js. The `runLoop`
   // parameter is the function reference (not the runtime), so this module
@@ -72133,6 +72384,11 @@ ${user}:`]
 
     return {
       ...parentOptions,
+      // 2026-06-03 — strip parent run-state BEFORE the explicit overrides so a
+      // future field added to parent options cannot silently leak into the
+      // child. Fixes a CONFIRMED threadHydration leak (parent thread todoState
+      // + researchContext). See CHILD_PARENT_STATE_BLANKLIST above.
+      ...blankParentRunState(),
       rawInput: childRawInput,
       runtimeConfig: childRuntimeConfig,
       disabledActions: childDisabledActions,
@@ -72331,9 +72587,7 @@ ${user}:`]
     const usage = childResult && childResult.lastTokenUsage
       ? childResult.lastTokenUsage
       : (runState.metrics && runState.metrics.usage) || null;
-    const finalResponse = readString$E(childResult && childResult.output)
-      || readString$E(runState.lastPlannerFinalText)
-      || "";
+    const finalResponse = readChildFinalResponse(childResult, runState);
     const errorDetail = runState.error || (childResult && childResult.error) || null;
     const emptySuccessError = !errorDetail && isSuccessfulChildStatus(status) && !finalResponse
       ? {
@@ -72372,6 +72626,29 @@ ${user}:`]
 
   function isSuccessfulChildStatus(status) {
     return status === "success" || status === "completed";
+  }
+
+  // AGRUN-296 — extract the child's final answer from the runLoop result
+  // envelope. ROOT CAUSE of the empty-finalResponse demotion (mis-attributed
+  // to "Gemini empty completion"): `runLoop` returns `result.output` as a
+  // TERMINAL OBJECT ({ kind, text, ... }) for every successful finalize/final
+  // terminal, never a bare string. The previous `readString(childResult.output)`
+  // therefore ALWAYS returned "" for the finalize path (readString of an object
+  // is ""), so a child that finalized "PONG" was demoted to
+  // SUBAGENT_EMPTY_RESPONSE even though it answered. We now read `output.text`
+  // for genuine terminal kinds, keep a string fallback for back-compat, then
+  // fall back to lastPlannerFinalText.
+  //
+  // The kind-guard is deliberate: a blocked child returns
+  // output.kind === "approval_required" with text "Approval required before
+  // running X" — that is NOT a final answer and must not leak as a finalResponse.
+  function readChildFinalResponse(childResult, runState) {
+    const output = childResult && childResult.output;
+    const outputText = output && typeof output === "object" && !Array.isArray(output)
+      && (output.kind === "final_response" || output.kind === "planner_final")
+      ? readString$E(output.text)
+      : readString$E(output);
+    return outputText || readString$E(runState && runState.lastPlannerFinalText) || "";
   }
 
   function failureEnvelope({ code, message, childSessionId, childRunId }) {
@@ -73121,22 +73398,6 @@ ${user}:`]
 
   function readString$A(value) {
     return typeof value === "string" ? value.trim() : "";
-  }
-
-  function buildTodoAutoPlannerGuidance(availableActions) {
-    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
-    const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
-
-    if (!hasAction("todo_plan") || !hasAction("todo_advance")) {
-      return [];
-    }
-
-    return [
-      "Use TodoState as the default harness for semantically complex or long-running tasks. If the user asks for work that naturally has multiple ordered steps, deep research, auditing, implementation, debugging, comparison, rollout planning, or progress that should stay visible across turns, and no ACTIVE TODO PLAN is present, choose todo_plan before doing the task. The plan must set the first item that will be worked on to active and leave later items pending.",
-      "If ACTIVE TODO PLAN says it is a planning placeholder, your next decision must be todo_plan. Replace the placeholder with a task-specific todo list generated from the user's actual request. Do not use a generic research/checklist template unless it truly matches the task.",
-      "Do not satisfy visible progress by writing a checklist, progress tracker, TodoState Progress, or todo list inside the final prose answer. TodoState is internal runtime state for the host UI; the user-facing answer should focus on the actual result, evidence, and conclusions. The host UI renders task progress separately.",
-      "When an ACTIVE TODO PLAN is present, use todo_advance as work progresses: mark completed active items done, promote the next concrete item to active, and use todo_plan only when the plan itself must change. After completing a visible work action such as web_search, read_url, workspace_write, workspace_replace, or workspace_finalize_candidate for the active item, your next decision should usually be todo_advance or todo_run_next before unrelated work. If todo_run_next is available and TodoState autopilot says not to finalize yet, choose todo_run_next to advance the plan. Do not create TodoState for simple greetings, one-shot factual answers, or clearly single-step requests."
-    ];
   }
 
   const DEFAULT_PLANNER_CAPABILITIES = Object.freeze({
@@ -73929,7 +74190,16 @@ ${user}:`]
     return Number.isInteger(value) && value > 0 ? value : 0;
   }
 
-  const BASE_SYSTEM_LINES = [
+  // ADR-0035 (AGRUN-262) — base-mode planner system directives.
+  // Extracted verbatim from planner-prompt.js `BASE_SYSTEM_LINES`. Default
+  // content is byte-identical to the pre-refactor build (locked by
+  // test/unit/prompt-snapshot.test.js). Host override key: `basePlannerDirectives`.
+  //
+  // Line referencing DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS keeps the
+  // SSOT template literal so the read-only-planning forbidden list stays in
+  // sync with action-pattern-convergence.js (single source of truth).
+
+  const basePlannerDirectives = Object.freeze([
     "[agrun:planner-contract]",
     "Internal contract: pick the next step for an action loop and return exactly one JSON envelope per cycle.",
     "User-visible text inside `final.answer` and `finalize.instruction` must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
@@ -73967,9 +74237,14 @@ ${user}:`]
     "Never re-select an action listed in deniedActions. The user has explicitly denied approval for those actions.",
     "When deniedActions is non-empty, your ONLY valid decisions are (1) another tool action whose name is NOT in deniedActions, (2) `finalize`, or (3) `final`. `clarify` is forbidden after a denial. If the request is now unanswerable without the denied capability, choose `final` with an honest answer that explains the limitation — do NOT ask the user for permission to retry, for an alternative method, for a URL to read, or for what they want instead. Asking any of these counts as clarify and is forbidden in this state.",
     "Return JSON only."
-  ];
+  ]);
 
-  const COMPACT_SYSTEM_LINES = [
+  // ADR-0035 (AGRUN-262) — compact-mode planner system directives (lite-tier).
+  // Extracted verbatim from planner-prompt.js `COMPACT_SYSTEM_LINES`. Default
+  // content is byte-identical to the pre-refactor build (locked by
+  // test/unit/prompt-snapshot.test.js). Host override key: `compactPlannerDirectives`.
+
+  const compactPlannerDirectives = Object.freeze([
     "[agrun:planner-contract]",
     "Internal contract: pick the next step for an action loop. Choose exactly one next JSON envelope: action, plan, finalize, final, or clarify.",
     "User-visible text inside `final.answer` and `finalize.instruction` must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
@@ -74000,58 +74275,18 @@ ${user}:`]
     "If loopState.terminalRepairState.active=true, terminal repair mode filters the next action surface. Use only terminalRepairState.allowedActions. If escalation=hard_veto and workspace_publish_candidate is in allowedActions, publish limited now with the focused block's requiredArgsExample; direct final/finalize is invalid.",
     "If the user explicitly asks the visible answer to include finalReadiness.decision, your finalize.finalReadiness.decision and finalize.instruction must match, and the instruction should include one plain-text line like `finalReadiness.decision: ready` or `finalReadiness.decision: limited`.",
     "Return JSON only."
-  ];
+  ]);
 
-  function buildPlannerSystemPrompt(availableActions, options) {
+  // ADR-0035 (AGRUN-262) — skill-discovery planner directives.
+  // Extracted verbatim from planner-prompt.js buildSystemPromptLines (the
+  // list_agent_skills / execute_skill_tool / use_agent_skill blocks). Each line
+  // is gated on the action's presence, so a host that disables a skill action
+  // never sees a directive naming it. Host override key: `skillDirectives`.
+  // Default output is byte-identical (locked by test/unit/prompt-snapshot.test.js).
+  function buildLines$5({ availableActions, compactSystemPrompt } = {}) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
-    const opts = options && typeof options === "object" ? options : {};
-    const roleBlock = buildRoleSystemPromptBlock$1(opts.agentRole || null);
-    const dynamicSystemPrompt = typeof opts.systemPrompt === "string" ? opts.systemPrompt.trim() : "";
-    // AGRUN-142 — verbatim anchor block (ORIGINAL USER QUERY + GOAL ANCHOR).
-    // Injected right after roleBlock so it stays stable across cycles and can
-    // be prompt-cached alongside system-level guidance. Empty when disabled
-    // or when no anchor text is available.
-    const goalAnchorBlock = compactDuplicateGoalAnchorBlock(
-      typeof opts.goalAnchorBlock === "string"
-      ? opts.goalAnchorBlock.trim()
-        : "",
-      opts.request && opts.request.prompt
-    );
-    const extraDirectives = Array.isArray(opts.plannerDirectives)
-      ? opts.plannerDirectives.filter((line) => typeof line === "string" && line.trim())
-      : [];
-    const compactSystemPrompt = opts.compactSystemPrompt === true;
-
-    return [
-      ...(roleBlock ? [roleBlock, ""] : []),
-      ...(goalAnchorBlock ? [goalAnchorBlock, ""] : []),
-      ...(dynamicSystemPrompt ? [dynamicSystemPrompt, ""] : []),
-      ...buildSystemPromptLines(actionDefinitions, {
-        compactSystemPrompt,
-        preferFinalizeOnLastResult: opts.preferFinalizeOnLastResult !== false
-      }),
-      ...buildEnvelopeLines(actionDefinitions, {
-        compactExamples: opts.compactEnvelopeExamples !== false,
-        effectivePlannerMode: opts.effectivePlannerMode,
-        plannerMode: opts.plannerMode,
-        request: opts.request,
-        runState: opts.runState
-      }),
-      ...(compactSystemPrompt ? [] : buildGuidanceLines(actionDefinitions)),
-      // Caller-supplied directives: appended last so override-by-recency applies.
-      ...extraDirectives
-    ].join("\n");
-  }
-
-  function buildSystemPromptLines(availableActions, options) {
-    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
-    const opts = options && typeof options === "object" ? options : {};
-    const compactSystemPrompt = opts.compactSystemPrompt === true;
-    const preferFinalizeOnLastResult = opts.preferFinalizeOnLastResult !== false;
     const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
-    const lines = compactSystemPrompt ? [...COMPACT_SYSTEM_LINES] : [...BASE_SYSTEM_LINES];
-    const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
-    lines.push(`Current standalone-only actions for plan validation: ${standaloneActionNames}.`);
+    const lines = [];
 
     if (hasAction("list_agent_skills")) {
       if (compactSystemPrompt) {
@@ -74071,6 +74306,20 @@ ${user}:`]
     if (!compactSystemPrompt && hasAction("use_agent_skill")) {
       lines.push("Once you load a skill via read_agent_skill, follow its SKILL.md workflow. Use use_agent_skill when a skill must stay active across multiple later steps.");
     }
+
+    return lines;
+  }
+
+  // ADR-0035 (AGRUN-262) — virtual-workspace planner directives.
+  // Extracted verbatim from planner-prompt.js buildSystemPromptLines (the
+  // workspace_write / patch / publish_candidate / review_candidate clusters,
+  // including the !compact verbose cluster). Every line is gated on the workspace
+  // action's presence. Host override key: `workspaceDirectives`. Default output
+  // is byte-identical (locked by test/unit/prompt-snapshot.test.js).
+  function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
+    const lines = [];
 
     // ADR-0033 Part 4 Tier A.5 (B1 + B4 fix) — load-bearing workspace rules for ALL modes
     // including compact. The audit (2026-05-20 evening) identified four load-bearing lines
@@ -74115,6 +74364,20 @@ ${user}:`]
       }
     }
 
+    return lines;
+  }
+
+  // ADR-0035 (AGRUN-262) — research (web_search / read_url) planner directives.
+  // Extracted verbatim from planner-prompt.js buildSystemPromptLines. Both the
+  // base-mode and compact-mode blocks are gated on (read_url || web_search), so a
+  // host that disables both research actions sees NO web_search/read_url directive
+  // (the Globe3 leak ADR-0034 closed). Host override key: `researchDirectives`.
+  // Default output is byte-identical (locked by test/unit/prompt-snapshot.test.js).
+  function buildLines$3({ availableActions, compactSystemPrompt } = {}) {
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
+    const lines = [];
+
     if (!compactSystemPrompt && (hasAction("read_url") || hasAction("web_search"))) {
       lines.push("For source-grounded research, treat web_search results as candidate leads until a successful read_url adds the page to readSources. Cite URLs in the final Sources list only when they are in successful readSources; if you use search snippets without reading pages, explicitly label the answer as search-summary-only and explain the limitation.");
       lines.push("read_url supports optional textStart and textLength. If a readSource textRange shows hasAfter=true and the missing answer may be later in that same page, call read_url again with the same url and textStart=nextTextStart instead of assuming the unseen text is irrelevant.");
@@ -74136,20 +74399,31 @@ ${user}:`]
       lines.push("If loopState.readUrlRecoverySignal tells you the last URL is blocked/non-retryable, do not loop on that same URL; use alternate candidates, refined web_search, or honest limited with concrete remainingGaps.");
     }
 
-    if (!compactSystemPrompt && preferFinalizeOnLastResult && hasAction("execute_skill_tool")) {
-      lines.push("If the needed skill tool result is already present in toolContext.lastResult, prefer finalize instead of repeating the same execute_skill_tool call. Exception: when toolContext.lastResult.resultKind is one of \"resolution\", \"lookup\", \"preparatory\", \"intermediate\", \"partial\", or \"other\", the tool call was preparatory — continue with the next evidence-gathering tool call instead of finalizing.");
-    }
+    return lines;
+  }
 
-    if (!compactSystemPrompt) {
-      lines.push(...buildTodoAutoPlannerGuidance(actionDefinitions));
-    }
+  // ADR-0035 (AGRUN-262) — convergence / read-only-signal advisory directives.
+  // Extracted verbatim from planner-prompt.js buildSystemPromptLines (the final
+  // compact-vs-base signal-reading block). These lines tell the AI how to read
+  // loopState repair signals (plannerInvalidSignal, actionFailureSignal,
+  // readAttemptSignal, qualityContext, planValidationFeedback) and finalize.
+  // Host override key: `convergenceAdvisory`. Default output is byte-identical
+  // (locked by test/unit/prompt-snapshot.test.js).
+  //
+  // `stripOodaeSignals` is the SPIKE/oodae-ablation flag (planner-prompt.js
+  // SPIKE_STRIP_OODAE_SIGNALS) threaded in so the A/B knob keeps working; in
+  // production it is false and every line renders.
+  function buildLines$2({ compactSystemPrompt, stripOodaeSignals = false } = {}) {
+    const lines = [];
 
     if (compactSystemPrompt) {
       lines.push("If plannerInvalidSignal, planValidationFeedback, qualityContext, actionFailureSignal, or readAttemptSignal is present, read it and choose a corrected next envelope yourself.");
     } else {
       lines.push("If your previous envelope was invalid or empty, the runtime surfaces loopState.plannerInvalidSignal as read-only repair facts. Return one corrected planner JSON envelope yourself; runtime will not synthesize web_search or any other fallback action.");
       lines.push("If loopState.planValidationFeedback is present, your previous type:\"plan\" envelope failed the runtime envelope contract. Read its code/detail/error and choose the next valid envelope yourself; do not repeat the same invalid plan shape.");
-      lines.push("If your previous final answer triggered runtime quality issues, runtime emits enum codes via loopState.qualityContext (issues: ['placeholder_artifact', 'claim_count_exceeds_source_coverage', 'missing_research_report_sections', etc.], noteCount). The runtime no longer blocks finalize on these — read the codes and either expand the answer (workspace_replace, fresh finalize) or accept and re-emit if you disagree with the diagnosis.");
+      if (!stripOodaeSignals) {
+        lines.push("If your previous final answer triggered runtime quality issues, runtime emits enum codes via loopState.qualityContext (issues: ['placeholder_artifact', 'claim_count_exceeds_source_coverage', 'missing_research_report_sections', etc.], noteCount). The runtime no longer blocks finalize on these — read the codes and either expand the answer (workspace_replace, fresh finalize) or accept and re-emit if you disagree with the diagnosis.");
+      }
       // ADR-0026 — read-only signal replacing the deleted consecutive-failure
       // force-finalize guard. AI sees the count and decides; runtime no longer
       // pushes the run to terminate.
@@ -74159,7 +74433,9 @@ ${user}:`]
       // ADR-0028 — read-only signal replacing the deleted resolveResearchContinuation
       // auto-read pick + summarize_limits push. AI owns the read_url URL choice
       // and decides whether thin evidence warrants finalize or another search.
-      lines.push("If loopState.readAttemptSignal is present (attemptCount, threshold), you have read `attemptCount` URLs this turn. The runtime no longer auto-picks the next URL or auto-finalizes when attemptCount reaches threshold — that is your call. Choose one: read another URL (different from the ones already in `readSources`), run a fresh `web_search` with a different query, or finalize with whatever evidence you have gathered (state limitations honestly per ADR-0024). The runtime will not stop you; it will hit `maxSteps` if you keep retrying without progress.");
+      if (!stripOodaeSignals) {
+        lines.push("If loopState.readAttemptSignal is present (attemptCount, threshold), you have read `attemptCount` URLs this turn. The runtime no longer auto-picks the next URL or auto-finalizes when attemptCount reaches threshold — that is your call. Choose one: read another URL (different from the ones already in `readSources`), run a fresh `web_search` with a different query, or finalize with whatever evidence you have gathered (state limitations honestly per ADR-0024). The runtime will not stop you; it will hit `maxSteps` if you keep retrying without progress.");
+      }
       lines.push("Use finalize only when YOU judge the current tool evidence, readSources, skill instructions, and any virtual workspace draft are enough for a user-facing answer. Runtime does not decide sufficiency for you.");
       lines.push("When a loaded skill or action contract requires finalReadiness, include it on finalize/publish using observable tool, readSources, and workspace facts. It is YOUR self-assessment; runtime records consistency and required-field checks only.");
       lines.push("If the user explicitly asks the final answer to include finalReadiness.decision, include one plain-text line with that exact field in the visible answer and keep it consistent with your finalReadiness.decision. Do not output readiness JSON.");
@@ -74169,11 +74445,222 @@ ${user}:`]
     return lines;
   }
 
+  function buildTodoAutoPlannerGuidance(availableActions) {
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
+
+    if (!hasAction("todo_plan") || !hasAction("todo_advance")) {
+      return [];
+    }
+
+    return [
+      "Use TodoState as the default harness for semantically complex or long-running tasks. If the user asks for work that naturally has multiple ordered steps, deep research, auditing, implementation, debugging, comparison, rollout planning, or progress that should stay visible across turns, and no ACTIVE TODO PLAN is present, choose todo_plan before doing the task. The plan must set the first item that will be worked on to active and leave later items pending.",
+      "If ACTIVE TODO PLAN says it is a planning placeholder, your next decision must be todo_plan. Replace the placeholder with a task-specific todo list generated from the user's actual request. Do not use a generic research/checklist template unless it truly matches the task.",
+      "Do not satisfy visible progress by writing a checklist, progress tracker, TodoState Progress, or todo list inside the final prose answer. TodoState is internal runtime state for the host UI; the user-facing answer should focus on the actual result, evidence, and conclusions. The host UI renders task progress separately.",
+      "When an ACTIVE TODO PLAN is present, use todo_advance as work progresses: mark completed active items done, promote the next concrete item to active, and use todo_plan only when the plan itself must change. After completing a visible work action such as web_search, read_url, workspace_write, workspace_replace, or workspace_finalize_candidate for the active item, your next decision should usually be todo_advance or todo_run_next before unrelated work. If todo_run_next is available and TodoState autopilot says not to finalize yet, choose todo_run_next to advance the plan. Do not create TodoState for simple greetings, one-shot factual answers, or clearly single-step requests."
+    ];
+  }
+
+  // ADR-0035 (AGRUN-262) — TodoState auto-planner planner directives.
+  // The directive STRINGS already live in todo-auto-planner-guidance.js (gated on
+  // the presence of todo_* actions). This thin section wraps that module so the
+  // override API exposes a `todoDirectives` key and so the todo guidance is a
+  // first-class, host-replaceable section like the others. Default output is
+  // byte-identical: base mode renders buildTodoAutoPlannerGuidance(actions),
+  // compact mode renders nothing (matches the pre-refactor `!compactSystemPrompt`
+  // gate). Locked by test/unit/prompt-snapshot.test.js.
+
+  function buildLines$1({ availableActions, compactSystemPrompt } = {}) {
+    if (compactSystemPrompt) return [];
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    return buildTodoAutoPlannerGuidance(actionDefinitions);
+  }
+
+  // ADR-0035 (AGRUN-262) — host prompt-override resolution.
+  //
+  // Each planner-prompt section has a default (a frozen string[] OR a
+  // buildLines(ctx) function). A host may override a section via
+  // runtimeConfig.prompts.<key>. This module is the SSOT for the override
+  // contract and the single resolver both the envelope-mode
+  // (buildSystemPromptLines) and native-mode (buildNativeToolsSystemPrompt)
+  // builders call.
+
+  // The complete, backward-compatible-forever set of override keys. config.js
+  // validates host input against this list (throws on unknown keys). Adding a
+  // key is safe; renaming/removing one is a breaking change.
+  const PROMPT_SECTION_KEYS = Object.freeze([
+    "basePlannerDirectives",    // envelope base-mode static array
+    "compactPlannerDirectives", // envelope compact-mode static array
+    "skillDirectives",          // envelope skill-discovery blocks
+    "workspaceDirectives",      // envelope virtual-workspace blocks
+    "researchDirectives",       // envelope web_search/read_url blocks
+    "convergenceAdvisory",      // envelope signal/finalize advisory block
+    "todoDirectives",           // envelope TodoState auto-planner block
+    "nativePlannerDirectives"   // native tool-calling mode directive body
+  ]);
+
+  // Resolve one section to its final string[] lines.
+  //
+  //   override === undefined → use the runtime default (array or builder fn)
+  //   override === null / false → section disabled (empty); NO default re-inject
+  //   override is array → used verbatim
+  //   override is function → called with ctx, must return string[]
+  //
+  // The same branch handles array/function for BOTH the default and the override.
+  // Non-string entries in a function's return (host OR default) are dropped so a
+  // malformed override cannot break the run — matching config.js house style
+  // (normalizeOutputGuardrails drops invalid entries rather than throwing).
+  //
+  // ctx shape is per-call-site and is public surface (documented in
+  // prompts/README.md): envelope sections receive
+  // { availableActions, compactSystemPrompt } (+ stripOodaeSignals for
+  // convergenceAdvisory); the native section receives
+  // { availableActions, standaloneActionNames, nativePlanGuidance }.
+  function resolvePromptSection(override, defaultValue, ctx) {
+    const chosen = override === undefined ? defaultValue : override;
+    if (chosen === null || chosen === false) return [];
+    const out = typeof chosen === "function" ? chosen(ctx) : chosen;
+    if (!Array.isArray(out)) return [];
+    return out.filter((line) => typeof line === "string");
+  }
+
+  // SPIKE/oodae-ablation — A/B knob, NOT production logic. When the env var
+  // AGRUN_SPIKE_STRIP_OODAE_SIGNALS=1 is set, strip the orient/evaluate
+  // read-only signals (readAttemptSignal + qualityContext + evidenceState)
+  // from the planner prompt. This degrades the loop toward "pure ReAct"
+  // (observe -> decide -> act, no orient/evaluate signal feedback) so we can
+  // measure whether those signals actually help the AI. Default OFF -> the
+  // production prompt is byte-identical. Guarded for the browser bundle where
+  // `process` may be undefined.
+  // Level read at module-load: 0=off (production), 1=narrow, 2=wide.
+  const SPIKE_STRIP_LEVEL =
+    (typeof process !== "undefined" && process.env
+      ? parseInt(process.env.AGRUN_SPIKE_STRIP_OODAE_SIGNALS || "0", 10)
+      : 0) || 0;
+  // L1 (narrow): the orient/evaluate signals that actually fire on single-turn
+  // research tasks — readAttemptSignal + qualityContext + evidenceState.
+  const SPIKE_STRIP_OODAE_SIGNALS = SPIKE_STRIP_LEVEL >= 1;
+  // L2 (wide): also strip clarificationStatus (orient) + the session evidence
+  // block (context/memory). NOTE: these are inert on single-turn,
+  // non-ambiguous tasks (clarification=none, no prior session evidence) — they
+  // only diverge from L1 on multi-turn or clarification-requiring tasks.
+  const SPIKE_STRIP_OODAE_SIGNALS_WIDE = SPIKE_STRIP_LEVEL >= 2;
+  // SPIKE/oodae-ablation — qualityContext WIRING experiment. The prompt has long
+  // instructed the AI to read loopState.qualityContext, but the value was never
+  // injected (issue codes only reached host result.diagnostics, never the
+  // in-loop AI). When AGRUN_SPIKE_WIRE_QUALITYCONTEXT=1, inject the recorded
+  // finalResponseQuality issue codes into loopState.qualityContext so the AI can
+  // actually see them on the next planner cycle — closing the half-wired signal
+  // so we can A/B test whether delivering it helps self-correction. Default OFF
+  // = current (unwired) production behaviour.
+  const SPIKE_WIRE_QUALITYCONTEXT =
+    typeof process !== "undefined" &&
+    process.env &&
+    process.env.AGRUN_SPIKE_WIRE_QUALITYCONTEXT === "1";
+
+  function buildPlannerSystemPrompt(availableActions, options) {
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const opts = options && typeof options === "object" ? options : {};
+    const roleBlock = buildRoleSystemPromptBlock$1(opts.agentRole || null);
+    const dynamicSystemPrompt = typeof opts.systemPrompt === "string" ? opts.systemPrompt.trim() : "";
+    // AGRUN-142 — verbatim anchor block (ORIGINAL USER QUERY + GOAL ANCHOR).
+    // Injected right after roleBlock so it stays stable across cycles and can
+    // be prompt-cached alongside system-level guidance. Empty when disabled
+    // or when no anchor text is available.
+    const goalAnchorBlock = compactDuplicateGoalAnchorBlock(
+      typeof opts.goalAnchorBlock === "string"
+      ? opts.goalAnchorBlock.trim()
+        : "",
+      opts.request && opts.request.prompt
+    );
+    const extraDirectives = Array.isArray(opts.plannerDirectives)
+      ? opts.plannerDirectives.filter((line) => typeof line === "string" && line.trim())
+      : [];
+    const compactSystemPrompt = opts.compactSystemPrompt === true;
+
+    return [
+      ...(roleBlock ? [roleBlock, ""] : []),
+      ...(goalAnchorBlock ? [goalAnchorBlock, ""] : []),
+      ...(dynamicSystemPrompt ? [dynamicSystemPrompt, ""] : []),
+      ...buildSystemPromptLines(actionDefinitions, {
+        compactSystemPrompt,
+        preferFinalizeOnLastResult: opts.preferFinalizeOnLastResult !== false,
+        prompts: opts.prompts
+      }),
+      ...buildEnvelopeLines(actionDefinitions, {
+        compactExamples: opts.compactEnvelopeExamples !== false,
+        effectivePlannerMode: opts.effectivePlannerMode,
+        plannerMode: opts.plannerMode,
+        request: opts.request,
+        runState: opts.runState
+      }),
+      ...(compactSystemPrompt ? [] : buildGuidanceLines(actionDefinitions)),
+      // Caller-supplied directives: appended last so override-by-recency applies.
+      ...extraDirectives
+    ].join("\n");
+  }
+
+  function buildSystemPromptLines(availableActions, options) {
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const opts = options && typeof options === "object" ? options : {};
+    const compactSystemPrompt = opts.compactSystemPrompt === true;
+    const preferFinalizeOnLastResult = opts.preferFinalizeOnLastResult !== false;
+    const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
+    // ADR-0035 (AGRUN-262) — each section resolves through the host override map
+    // (opts.prompts). undefined → runtime default; null/false → disabled;
+    // array/function → host content. Defaults are byte-identical (snapshot-locked).
+    const prompts = opts.prompts && typeof opts.prompts === "object" ? opts.prompts : {};
+    const ctx = {
+      availableActions: actionDefinitions,
+      compactSystemPrompt,
+      stripOodaeSignals: SPIKE_STRIP_OODAE_SIGNALS
+    };
+    const lines = [
+      ...resolvePromptSection(
+        compactSystemPrompt ? prompts.compactPlannerDirectives : prompts.basePlannerDirectives,
+        compactSystemPrompt ? compactPlannerDirectives : basePlannerDirectives,
+        ctx
+      )
+    ];
+    const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
+    lines.push(`Current standalone-only actions for plan validation: ${standaloneActionNames}.`);
+
+    lines.push(...resolvePromptSection(prompts.skillDirectives, buildLines$5, ctx));
+
+    lines.push(...resolvePromptSection(prompts.workspaceDirectives, buildLines$4, ctx));
+
+    lines.push(...resolvePromptSection(prompts.researchDirectives, buildLines$3, ctx));
+
+    if (!compactSystemPrompt && preferFinalizeOnLastResult && hasAction("execute_skill_tool")) {
+      lines.push("If the needed skill tool result is already present in toolContext.lastResult, prefer finalize instead of repeating the same execute_skill_tool call. Exception: when toolContext.lastResult.resultKind is one of \"resolution\", \"lookup\", \"preparatory\", \"intermediate\", \"partial\", or \"other\", the tool call was preparatory — continue with the next evidence-gathering tool call instead of finalizing.");
+    }
+
+    lines.push(...resolvePromptSection(prompts.todoDirectives, buildLines$1, ctx));
+
+    lines.push(...resolvePromptSection(prompts.convergenceAdvisory, buildLines$2, ctx));
+
+    return lines;
+  }
+
   function buildGuidanceLines(availableActions) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     return actionDefinitions
       .map((action) => readString$y(action.guidance))
       .filter(Boolean);
+  }
+
+  // SPIKE/oodae-ablation — read the recorded finalResponseQuality issue codes
+  // off runState and shape them for the planner prompt. Returns null when there
+  // are no issues so JSON.stringify omits the field (AI sees nothing, same as
+  // the unwired baseline). Only invoked when AGRUN_SPIKE_WIRE_QUALITYCONTEXT=1.
+  function buildQualityContextForPrompt(runState) {
+    const fq = runState && typeof runState === "object" ? runState.finalResponseQuality : null;
+    const issues = fq && Array.isArray(fq.lastIssues) ? fq.lastIssues.filter(Boolean) : [];
+    if (issues.length === 0) return undefined;
+    return {
+      issues,
+      noteCount: Number.isInteger(fq.vetoCount) && fq.vetoCount >= 0 ? fq.vetoCount : issues.length
+    };
   }
 
   function buildPlannerPrompt(options) {
@@ -74230,7 +74717,12 @@ ${user}:`]
         options.plannerInvalidSignal || (options.runState && options.runState.plannerInvalidSignal)
       ),
       turnControl: summarizeTurnControlForPrompt(options.turnControl || (options.runState && options.runState.turnControl)),
-      readAttemptSignal: sanitizeReadAttemptSignalForPrompt(options.readAttemptSignal),
+      readAttemptSignal: SPIKE_STRIP_OODAE_SIGNALS
+        ? null
+        : sanitizeReadAttemptSignalForPrompt(options.readAttemptSignal),
+      qualityContext: SPIKE_WIRE_QUALITYCONTEXT
+        ? buildQualityContextForPrompt(options.runState)
+        : undefined,
       deniedActions: options.deniedActions || [],
       hasEvidenceSignal: plannerState.hasEvidenceSignal === true,
       hasUserClarification: plannerState.hasUserClarification === true,
@@ -74305,14 +74797,18 @@ ${user}:`]
       invalidActionBlock || null,
       invalidActionBlock ? "" : null,
       `User request: ${options.request.prompt}`,
-      sessionContextBlock ? "" : null,
-      sessionContextBlock || null,
+      (SPIKE_STRIP_OODAE_SIGNALS_WIDE || !sessionContextBlock) ? null : "",
+      SPIKE_STRIP_OODAE_SIGNALS_WIDE ? null : (sessionContextBlock || null),
       "",
       "Normalization state:",
       JSON.stringify({
-        clarificationStatus: readString$y(plannerState.clarificationStatus) || "none",
+        clarificationStatus: SPIKE_STRIP_OODAE_SIGNALS_WIDE
+          ? "none"
+          : (readString$y(plannerState.clarificationStatus) || "none"),
         hasPendingClarification: Boolean(plannerState.pendingClarification),
-        evidenceState: readString$y(plannerState.evidenceState) || "none"
+        evidenceState: SPIKE_STRIP_OODAE_SIGNALS
+          ? "none"
+          : (readString$y(plannerState.evidenceState) || "none")
       }, null, 2),
       "",
       "Available actions:",
@@ -76650,23 +77146,21 @@ ${user}:`]
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   }
 
-  function buildNativeToolsSystemPrompt(agentRole, systemPrompt, capabilities, plannerDirectives, availableActions) {
-    const roleBlock = buildRoleSystemPromptBlock(agentRole);
-    const dynamicSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
-    const extraDirectives = Array.isArray(plannerDirectives)
-      ? plannerDirectives.filter((line) => typeof line === "string" && line.trim()).map((line) => line.trim())
-      : [];
+  // ADR-0035 (AGRUN-262) — native tool-calling mode planner directives.
+  // Extracted verbatim from planner-native-system-prompt.js buildNativeToolsSystemPrompt
+  // (the directive body between the host role/system-prompt prefix and the
+  // caller-supplied extraDirectives suffix). Host override key:
+  // `nativePlannerDirectives`. Default output is byte-identical (locked by
+  // test/unit/prompt-snapshot.test.js).
+  //
+  // The readOnlyPlanning forbidden-action line keeps the SSOT template literal
+  // (DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS) — same single source of truth
+  // as the envelope-mode base directives.
+
+  function buildLines({ availableActions, standaloneActionNames, nativePlanGuidance } = {}) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     const hasAction = (name) => actionDefinitions.some((action) => action && action.name === name);
-    const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
-    const nativePlanGuidance = readString$v(
-      capabilities &&
-      capabilities.nativePlan &&
-      capabilities.nativePlan.guidance
-    );
     return [
-      ...(roleBlock ? [roleBlock, ""] : []),
-      ...(dynamicSystemPrompt ? [dynamicSystemPrompt, ""] : []),
       "[agrun:planner-contract]",
       "Internal contract: pick the next step for an action loop. Choose exactly one tool call as your next step.",
       "User-visible text inside the final answer or finalize instruction must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
@@ -76713,6 +77207,34 @@ ${user}:`]
       "Do not create or revise TodoState for a simple one-step lookup, search, or read request; choose the relevant research action directly. Use todo_plan only for genuinely multi-step tasks that need progress tracking.",
       ...(nativePlanGuidance ? [nativePlanGuidance] : []),
       "When you choose finalize, the instruction must end the turn and must not ask the user a follow-up question.",
+    ];
+  }
+
+  // `promptOverrides` is the resolved runtimeConfig.prompts map (optional). Only
+  // the `nativePlannerDirectives` key applies in native tool-calling mode; the
+  // envelope-mode keys are ignored here.
+  function buildNativeToolsSystemPrompt(agentRole, systemPrompt, capabilities, plannerDirectives, availableActions, promptOverrides) {
+    const roleBlock = buildRoleSystemPromptBlock(agentRole);
+    const dynamicSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
+    const extraDirectives = Array.isArray(plannerDirectives)
+      ? plannerDirectives.filter((line) => typeof line === "string" && line.trim()).map((line) => line.trim())
+      : [];
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
+    const nativePlanGuidance = readString$v(
+      capabilities &&
+      capabilities.nativePlan &&
+      capabilities.nativePlan.guidance
+    );
+    const prompts = promptOverrides && typeof promptOverrides === "object" ? promptOverrides : {};
+    return [
+      ...(roleBlock ? [roleBlock, ""] : []),
+      ...(dynamicSystemPrompt ? [dynamicSystemPrompt, ""] : []),
+      ...resolvePromptSection(
+        prompts.nativePlannerDirectives,
+        buildLines,
+        { availableActions: actionDefinitions, standaloneActionNames, nativePlanGuidance }
+      ),
       ...extraDirectives
     ].join("\n");
   }
@@ -77058,7 +77580,8 @@ ${user}:`]
       options.request && options.request.systemPrompt,
       capabilities,
       options.plannerDirectives,
-      options.availableActions
+      options.availableActions,
+      options.prompts
     );
     emitStep(options, "agent-workflow-packet", createPlannerRequestPacket({
       activeAgentSkill: options.activeAgentSkill,
@@ -77313,7 +77836,8 @@ ${user}:`]
       runState: options.runState,
       todoState: options.runState && options.runState.todoState,
       preferFinalizeOnLastResult: options.preferFinalizeOnLastResult,
-      goalAnchorBlock: options.goalAnchorBlock
+      goalAnchorBlock: options.goalAnchorBlock,
+      prompts: options.prompts
     });
     emitStep(options, "planner-system-prompt-profile", systemPromptProfile);
     emitStep(options, "agent-workflow-packet", createPlannerRequestPacket({
@@ -78190,6 +78714,8 @@ ${user}:`]
           baseTimeoutMs: request && request.timeoutMs
         }),
         preferFinalizeOnLastResult: options.runtimeConfig && options.runtimeConfig.preferFinalizeOnLastResult,
+        // ADR-0035 (AGRUN-262) — host prompt-section overrides (runtimeConfig.prompts).
+        prompts: options.runtimeConfig && options.runtimeConfig.prompts,
         availableActions: plannerActions,
         availableAgentSkills: plannerAgentSkills,
         catalogListed: runState.agentSkillContext.catalogListed === true,
@@ -81630,7 +82156,7 @@ ${user}:`]
   }
 
   /** Jaccard overlap between two token sets. Returns 0 for empties. */
-  function jaccard(a, b) {
+  function jaccard$1(a, b) {
     if (!a || !b || a.size === 0 || b.size === 0) return 0;
     let intersection = 0;
     for (const token of a) {
@@ -81654,7 +82180,7 @@ ${user}:`]
       }
       results.push({
         threadId: thread.id,
-        score: jaccard(messageTokens, threadTokens),
+        score: jaccard$1(messageTokens, threadTokens),
         threadTokenCount: threadTokens.size
       });
     }
@@ -81853,7 +82379,7 @@ ${user}:`]
     const goalTokens = new Set(tokenizeTopicText(spec.goalAnchorText));
     const trajectoryTokens = new Set(tokenizeTopicText(spec.trajectoryText));
     if (goalTokens.size === 0 || trajectoryTokens.size === 0) return null;
-    return jaccard(goalTokens, trajectoryTokens);
+    return jaccard$1(goalTokens, trajectoryTokens);
   }
 
   function extractActionHistory(source) {
@@ -82946,6 +83472,16 @@ ${user}:`]
       // runState.finalResponseQuality via noteFinalResponseQualityIssues
       // earlier in the loop). The first finalizer response is the answer.
       response.text = normalizeFinalResponseStructure(response.text, { prompt: effectivePrompt });
+      // GAP-B fix — the finalize path's user-facing answer is synthesized HERE,
+      // not carried on decision.answer, so the earlier noteQualityIssuesAsSignal
+      // call (which reads decision.answer) short-circuited and left
+      // runState.finalResponseQuality undefined. Record quality on the real
+      // synthesized text now so host diagnostics (result.diagnostics) populate
+      // and the codes are available to the cross-turn qualityContext signal.
+      noteFinalResponseQualityIssues(runState, {
+        decision: { answer: response.text },
+        source: terminalSource
+      });
       // ADR-0015 PR 1 — runtime no longer back-fills the virtual workspace
       // when the final answer arrives. Workspace files are AI-authored via
       // workspace_write / workspace_replace; an empty workspace is the
@@ -88892,6 +89428,12 @@ ${user}:`]
           const researchProjection = projectResearchRunState(result.runState);
           activeThread.todoState = todoProjection.todoState || null;
           activeThread.researchContext = cloneThreadResearchContext(researchProjection.researchContext);
+          // qualityContext wiring — persist the finalize quality issue codes so
+          // the next turn's planner can surface them via loopState.qualityContext
+          // (the cross-turn self-correction signal). Mirrors researchContext carry.
+          activeThread.finalResponseQuality = result.runState.finalResponseQuality
+            ? cloneValue$1(result.runState.finalResponseQuality)
+            : null;
           // AGRUN-214m — persist the durable research slice (topic,
           // evidenceGraph, reportLoop status, finalEnvelope) so the next
           // turn can finalize from existing evidence instead of treating
@@ -89004,6 +89546,9 @@ ${user}:`]
       const activeThreadResearchContext = applied.activeThread && applied.activeThread.researchContext
         ? cloneValue$1(applied.activeThread.researchContext)
         : null;
+      const activeThreadFinalResponseQuality = applied.activeThread && applied.activeThread.finalResponseQuality
+        ? cloneValue$1(applied.activeThread.finalResponseQuality)
+        : null;
       // AGRUN-214m — surface the durable research slice so a follow-up
       // finalize-only turn inherits the original topic + evidenceGraph
       // instead of seeing a fresh runState and re-extracting topic from
@@ -89020,6 +89565,7 @@ ${user}:`]
           goalAnchorText: activeThreadGoalAnchorText,
           research: activeThreadResearchSlice,
           researchContext: activeThreadResearchContext,
+          finalResponseQuality: activeThreadFinalResponseQuality,
           todoState: activeThreadTodoState
         },
         previousThreadId: activeThreadId,
@@ -89382,6 +89928,35 @@ ${user}:`]
     );
     error.code = ERROR_CODES.INVALID_SESSION_POLICY;
     throw error;
+  }
+
+  // ADR-0035 (AGRUN-262) — the default value for every prompt-override section.
+  //
+  // A default is EITHER a frozen string[] (base/compact static arrays) OR a
+  // buildLines(ctx) function (the conditional sections). config.js uses this
+  // registry to resolve runtimeConfig.prompts to a complete set (host override
+  // where given, default otherwise) so getRuntimeConfig().prompts shows the full
+  // resolved set "as shipped". The resolver in resolve.js applies these at render
+  // time; this module just maps key → default.
+
+  const PROMPT_SECTION_DEFAULTS = Object.freeze({
+    basePlannerDirectives,
+    compactPlannerDirectives,
+    skillDirectives: buildLines$5,
+    workspaceDirectives: buildLines$4,
+    researchDirectives: buildLines$3,
+    convergenceAdvisory: buildLines$2,
+    todoDirectives: buildLines$1,
+    nativePlannerDirectives: buildLines
+  });
+
+  // Guard: the registry must cover exactly the documented key set (SSOT in
+  // resolve.js). If they ever drift, fail loudly at module load rather than
+  // silently shipping a section with no default.
+  for (const key of PROMPT_SECTION_KEYS) {
+    if (!(key in PROMPT_SECTION_DEFAULTS)) {
+      throw new Error(`prompts/defaults.js missing default for section "${key}"`);
+    }
   }
 
   // AGRUN-146 — Drift detector config normalizer.
@@ -89773,6 +90348,13 @@ ${user}:`]
         agentRole: resolvedRole,
         approvalSigning: normalizeApprovalSigning(config.approvalSigning),
         budget: normalizeBudgetConfig(config.budget),
+        // AGRUN-297 — host-defined output-acceptance POLICY (ADR-0051).
+        // `candidateQuality` lets a host relax/tighten the built-in default
+        // guardrail's structure-issue severity; `outputGuardrails` is the
+        // host-written guardrail list (OpenAI-Agents-SDK shape, adapted:
+        // block surfaces a re-plan observation to the AI, never halts/authors).
+        candidateQuality: normalizeCandidateQuality(config.candidateQuality),
+        outputGuardrails: normalizeOutputGuardrails(config.outputGuardrails),
         citationCoverageGuard: config.citationCoverageGuard,
         circuitBreaker: normalizeCircuitBreaker(config.circuitBreaker),
         compactionPolicy: normalizeCompactionPolicy(config.compactionPolicy),
@@ -89804,6 +90386,11 @@ ${user}:`]
         skillPolicy: normalizeSkillPolicy(config.skillPolicy),
         preferFinalizeOnLastResult: config.preferFinalizeOnLastResult !== false,
         plannerDirectives: normalizePlannerDirectives(config.plannerDirectives),
+        // ADR-0035 (AGRUN-262) — host prompt-section overrides. Returns the full
+        // resolved set (host override where given, runtime default otherwise) so
+        // getRuntimeConfig().prompts shows exactly what ships. Per-section REPLACE
+        // only; null/false disables a section; default behavior byte-identical.
+        prompts: normalizePromptsConfig(config.prompts),
         // AGRUN-256 — publish-candidate mode gate. Default behavior hides
         // workspace_publish_candidate from the planner action surface unless
         // the run is long_research-mode (skill activation or researchActivation),
@@ -89823,6 +90410,88 @@ ${user}:`]
       skills: registeredSkills,
       fallbackSkill: null
     };
+  }
+
+  // AGRUN-297 / ADR-0051 — host output-acceptance policy normalizers.
+  function normalizeCandidateQuality(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const overrides = source.structureIssueSeverity
+      && typeof source.structureIssueSeverity === "object"
+      && !Array.isArray(source.structureIssueSeverity)
+      ? source.structureIssueSeverity
+      : null;
+    const structureIssueSeverity = {};
+    if (overrides) {
+      for (const [code, severity] of Object.entries(overrides)) {
+        if (severity === "blocking" || severity === "advisory") {
+          structureIssueSeverity[code] = severity;
+        }
+      }
+    }
+    return { structureIssueSeverity };
+  }
+
+  // ADR-0035 (AGRUN-262) — host prompt-section overrides.
+  //
+  // Returns the FULL resolved set: every section key present, with the host's
+  // override where supplied and the runtime default otherwise. This is both the
+  // value threaded to the prompt builders (resolvePromptSection treats a default
+  // builder/array identically to a host one) and what getRuntimeConfig().prompts
+  // exposes so hosts can verify what shipped.
+  //
+  // Per-section REPLACE only (no merge inside a section). A section value may be:
+  //   - an array of strings  → used verbatim (non-strings dropped at render)
+  //   - a function (ctx) => string[]  → called at render with the section's ctx
+  //   - null or false        → section disabled (renders nothing)
+  //   - undefined            → keep the runtime default
+  // Unknown keys and wrong value types THROW with a helpful message (a silently
+  // ignored typo would make a host think they overrode a section when they did
+  // not). Backward-compatible forever: adding a key is safe; this is public surface.
+  function normalizePromptsConfig(value) {
+    const resolved = { ...PROMPT_SECTION_DEFAULTS };
+    if (value == null) return Object.freeze(resolved);
+    if (typeof value !== "object" || Array.isArray(value)) {
+      throw new TypeError(
+        `runtimeConfig.prompts must be an object keyed by section name, got ` +
+        `${Array.isArray(value) ? "array" : typeof value}. ` +
+        `Valid sections: ${PROMPT_SECTION_KEYS.join(", ")}.`
+      );
+    }
+    for (const [key, override] of Object.entries(value)) {
+      if (!PROMPT_SECTION_KEYS.includes(key)) {
+        throw new Error(
+          `runtimeConfig.prompts: unknown section "${key}". ` +
+          `Valid sections: ${PROMPT_SECTION_KEYS.join(", ")}.`
+        );
+      }
+      if (override === undefined) continue;
+      if (override === null || override === false || Array.isArray(override) || typeof override === "function") {
+        resolved[key] = override;
+        continue;
+      }
+      throw new TypeError(
+        `runtimeConfig.prompts.${key} must be an array of strings, a function ` +
+        `(ctx) => string[], null, or false to disable; got ${typeof override}.`
+      );
+    }
+    return Object.freeze(resolved);
+  }
+
+  // Host-written output guardrails. Each entry is { name, execute } where execute
+  // is preserved by reference (a function — never cloned/stripped). Invalid
+  // entries are dropped so a malformed host config cannot break the run.
+  function normalizeOutputGuardrails(value) {
+    if (!Array.isArray(value)) return [];
+    const guardrails = [];
+    for (const entry of value) {
+      if (!entry || typeof entry !== "object") continue;
+      if (typeof entry.execute !== "function") continue;
+      const name = typeof entry.name === "string" && entry.name.trim()
+        ? entry.name.trim()
+        : `guardrail_${guardrails.length + 1}`;
+      guardrails.push({ name, execute: entry.execute });
+    }
+    return guardrails;
   }
 
   function readInitialSkillManifests(provider, defaultSkills) {
@@ -91841,6 +92510,105 @@ ${user}:`]
     return out;
   }
 
+  // ADR-0051 — optional, host-side output-guardrail RECIPES. These are not part
+  // of the runtime decision path; a host opts in by listing them in
+  // `createRuntime({ outputGuardrails: [...] })`. Each recipe is a factory that
+  // returns a ready `{ name, execute }` guardrail so a host can wire it in one
+  // line:
+  //
+  //   import { nearDuplicateSectionsGuardrail } from "agrun";
+  //   createRuntime({ outputGuardrails: [ nearDuplicateSectionsGuardrail() ] });
+  //
+  // Recipes are heuristic and tunable — they catch the SEMANTIC/soft cases the
+  // runtime's exact-match sensors (e.g. duplicate_headings) cannot. Tune or
+  // replace them; the runtime holds no opinion.
+
+  // Small generic English stopword set. Intentionally short — recipes stay
+  // heuristic, not a hardcoded padding-word list (the subset rule below carries
+  // the "qualifier-added rehash" case generically, language-agnostically).
+  const HEADING_STOPWORDS = new Set([
+    "the", "a", "an", "of", "in", "on", "for", "and", "or", "to", "with", "vs",
+    "is", "are", "as", "by", "its"
+  ]);
+
+  function headingTokenSet(rawHeading) {
+    const normalized = String(rawHeading == null ? "" : rawHeading)
+      .replace(/^#{1,6}\s+/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ");
+    return new Set(normalized.split(/\s+/).filter((token) => token && !HEADING_STOPWORDS.has(token)));
+  }
+
+  function jaccard(a, b) {
+    if (a.size === 0 || b.size === 0) return 0;
+    let intersection = 0;
+    for (const token of a) if (b.has(token)) intersection += 1;
+    return intersection / (a.size + b.size - intersection);
+  }
+
+  function isSubsetOf(small, large) {
+    for (const token of small) if (!large.has(token)) return false;
+    return true;
+  }
+
+  function collectHeadings(text) {
+    return String(text == null ? "" : text)
+      .split(/\r?\n/)
+      .filter((line) => /^#{2,3}\s+\S/.test(line))
+      .map((line) => ({ raw: line.replace(/^#{2,3}\s+/, "").trim(), tokens: headingTokenSet(line) }));
+  }
+
+  /**
+   * Recipe: block publish when two section headings are NEAR-duplicates — the
+   * "re-titled / Continued / Advanced / Deployment" rehash a weak model emits to
+   * pad word count. The runtime `duplicate_headings` sensor only catches EXACT
+   * string matches; this recipe catches the semantic case via two generic,
+   * language-agnostic signals:
+   *   1. token-set Jaccard >= `threshold` (default 0.6), or
+   *   2. one heading's token set is a non-trivial subset of another's
+   *      (`minSubsetTokens`, default 2) — the "qualifier added to the same title".
+   *
+   * @param {object} [options]
+   * @param {number} [options.threshold=0.6]   Jaccard similarity to flag a pair.
+   * @param {number} [options.minSubsetTokens=2] Min tokens for the subset rule.
+   * @param {string} [options.name="near-duplicate-sections"] Guardrail name.
+   * @returns {{ name: string, execute: function }}
+   */
+  function nearDuplicateSectionsGuardrail(options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
+    const threshold = typeof opts.threshold === "number" && opts.threshold > 0 && opts.threshold <= 1
+      ? opts.threshold
+      : 0.6;
+    const minSubsetTokens = Number.isInteger(opts.minSubsetTokens) && opts.minSubsetTokens >= 1
+      ? opts.minSubsetTokens
+      : 2;
+    const name = typeof opts.name === "string" && opts.name.trim() ? opts.name.trim() : "near-duplicate-sections";
+
+    return {
+      name,
+      execute(args) {
+        const candidate = args && typeof args.candidate === "string" ? args.candidate : "";
+        const headings = collectHeadings(candidate);
+        for (let i = 0; i < headings.length; i += 1) {
+          for (let j = i + 1; j < headings.length; j += 1) {
+            const a = headings[i].tokens;
+            const b = headings[j].tokens;
+            const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+            const subsetDuplicate = small.size >= minSubsetTokens && small.size < large.size && isSubsetOf(small, large);
+            if (subsetDuplicate || jaccard(a, b) >= threshold) {
+              return {
+                block: true,
+                reason: `Near-duplicate sections "${headings[i].raw}" and "${headings[j].raw}" — merge them or cut the padded rehash instead of re-titling the same content.`,
+                info: { a: headings[i].raw, b: headings[j].raw }
+              };
+            }
+          }
+        }
+        return { block: false };
+      }
+    };
+  }
+
   // AGRUN-274a — provider adapter, NOT a Set A skill. `isProviderAdapter`
   // tells skill-probe.js to skip this entry; `canHandle` was dead code
   // (router never reached this skill) and is removed. The `execute`
@@ -92661,6 +93429,7 @@ ${user}:`]
   exports.loadAgentSkills = loadAgentSkills;
   exports.loadSkillIndexProvider = loadSkillIndexProvider;
   exports.materializeEvidenceGraph = materializeEvidenceGraph;
+  exports.nearDuplicateSectionsGuardrail = nearDuplicateSectionsGuardrail;
   exports.normalizeCostPricing = normalizeCostPricing;
   exports.normalizeMultimodalParts = normalizeMultimodalParts;
   exports.normalizeRepoFileToolsConfig = normalizeRepoFileToolsConfig;

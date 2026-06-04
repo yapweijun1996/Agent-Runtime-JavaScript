@@ -329,3 +329,57 @@ declarative defaults" and put the extraction work on the backlog.
 The current Globe3 ticket is closed by ADR-0034; ADR-0035 is the
 architectural follow-up that prevents the NEXT host from hitting the
 same pattern.
+
+## Phase 1 inventory — VERIFIED against current code (2026-06-04, AGRUN-262)
+
+The 2026-05-25 "Phase 3 extraction map" line numbers above are STALE
+(measured when `planner-prompt.js` was ~1361 lines; it is now 1476).
+This section supersedes them. Verified line ranges and the exact
+**push order** that byte-identical extraction MUST preserve.
+
+### `src/runtime/planner-prompt.js` → `buildSystemPromptLines` (187-315)
+
+| # | Source lines | Content | Class | Gate | Target file |
+|---|---|---|---|---|---|
+| 0 | `BASE_SYSTEM_LINES` 71-109 | 38-line base array. Line 93 is a TEMPLATE LITERAL interpolating `DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS.join(", ")` — array is computed at module load, not a frozen literal. Contains class-B advisory action refs (web_search/read_url/todo_*/workspace_*) inside `If loopState.X.active` lines. | unconditional (base) | `!compact` selects | `planner-base-directives.js` |
+| 0 | `COMPACT_SYSTEM_LINES` 111-142 | 31-line compact array. Line 124 references `read_url` (class C). | unconditional (compact) | `compact` selects | `planner-compact-directives.js` |
+| 1 | 195 | `Current standalone-only actions for plan validation: ${standaloneActionNames}.` | dynamic | always | **STAYS INLINE** (glue, not a named override section) |
+| 2 | 197-204 | `list_agent_skills` block (compact: 1 line; base: 2 lines) | action-gated | `hasAction("list_agent_skills")` | `skill-directives.js` |
+| 3 | 206-210 | `execute_skill_tool` block (compact/base variant) | action-gated | `hasAction("execute_skill_tool")` | `skill-directives.js` |
+| 4 | 212-214 | `use_agent_skill` line | action-gated | `!compact && hasAction("use_agent_skill")` | `skill-directives.js` |
+| 5 | 226-229 | `workspace_write` (2 lines, ALL modes incl compact) | action-gated | `hasAction("workspace_write")` | `workspace-directives.js` |
+| 6 | 230-233 | propose+apply patch (2 lines) | action-gated | `hasAction("workspace_propose_patch") && hasAction("workspace_apply_patch")` | `workspace-directives.js` |
+| 7 | 234-241 | `workspace_publish_candidate` (2 lines) | action-gated | `hasAction("workspace_publish_candidate")` | `workspace-directives.js` |
+| 8 | 242-244 | `workspace_review_candidate` (1 line) | action-gated | `hasAction("workspace_review_candidate")` | `workspace-directives.js` |
+| 9 | 246-257 | `!compact` workspace_write cluster (4 lines + nested publish sub-cluster 251-256) | action-gated | `!compact && hasAction("workspace_write")` (nested `publish`) | `workspace-directives.js` |
+| 10 | 259-264 | base research block (4 lines) | action-gated | `!compact && (hasAction("read_url") \|\| hasAction("web_search"))` | `research-directives.js` |
+| 11 | 272-278 | compact research block (5 lines) | action-gated | `compact && (read_url\|\|web_search)` | `research-directives.js` |
+| 12 | 280-282 | preferFinalize execute_skill_tool line | action+flag-gated | `!compact && preferFinalizeOnLastResult && hasAction("execute_skill_tool")` | **STAYS INLINE** (interleaved AFTER research; folding into skill-directives would reorder bytes) |
+| 13 | 284-286 | `!compact` → `buildTodoAutoPlannerGuidance(actions)` (already its own module `todo-auto-planner-guidance.js`) | action-gated | `!compact` | `todo-directives.js` (thin wrapper over existing module) |
+| 14 | 288-312 | signal/convergence advisory block. compact: 1 line (289). base: many (291-311) with **SPIKE_STRIP_OODAE_SIGNALS gates at 293/305-307** → builder MUST take spike flag as param. | mode-gated + spike-gated | `compact ? 1 line : base block` | `convergence-advisory.js` |
+
+**Push order is sequential 0→14.** Skill content is interleaved (steps
+2-4 then 12). Step 12 (preferFinalize) MUST remain at its position
+after research (steps 10-11), so it stays inline rather than joining
+skill-directives — confirmed by advisor review.
+
+### `src/runtime/planner-native-system-prompt.js` → `buildNativeToolsSystemPrompt` (4-69)
+
+One assembled array (18-68). Lines 21-42 + 61-66 are unconditional;
+21-42 include UNCONDITIONAL web_search/read_url refs (28-30) — a
+pre-existing leak the snapshot locks as-is (Phase 6 lint scope, NOT
+Phase 3). Gated sub-blocks: `list_agent_skills` (43-45),
+`workspace_write` cluster (46-60, with nested `workspace_publish_candidate`
+52-53 and `workspace_review_candidate` 55-56). Line 37 already uses the
+SSOT `DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS` template (pre-Phase-3
+fix, verified intact). Target: `planner-native-directives.js`.
+
+### Phase 2 snapshot coverage (the gate)
+
+`test/unit/prompt-snapshot.test.js` locks FULL rendered text for 7
+`buildSystemPromptLines` configs (incl. `compact-full` for the compact
+branches and `default-full-prefer-finalize-off` for step 12 OFF) + 5
+`buildNativeToolsSystemPrompt` configs (incl. `native-workspace-no-publish`
+for the nested publish/review sub-gate OFF). `ALL_ACTIONS` is an explicit
+literal list so coverage cannot silently shrink. Registered in
+`test/smoke.test.js` → runs under `npm test`.

@@ -134,6 +134,61 @@ createRuntime({
 });
 ```
 
+### Prompt Content Overrides (`prompts`)
+
+`plannerDirectives` *appends* lines. `prompts` *replaces* a whole default
+section. ADR-0035 extracted agrun.js's opinionated planner-prompt content into
+named sections (see [`src/runtime/prompts/README.md`](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/prompts/README.md))
+that a host can replace per-section without forking. **Default behavior is
+byte-identical** — passing no `prompts` config changes nothing.
+
+| Option | Default | Values | Effect |
+|--------|---------|--------|--------|
+| `prompts` | `{}` | object keyed by section name | Per-section REPLACE. Value per key: `string[]`, `(ctx) => string[]`, or `null`/`false` to disable. Unknown keys / wrong types throw. |
+
+Section keys: `basePlannerDirectives`, `compactPlannerDirectives`,
+`skillDirectives`, `workspaceDirectives`, `researchDirectives`,
+`convergenceAdvisory`, `todoDirectives`, `nativePlannerDirectives`.
+
+`runtime.getRuntimeConfig().prompts` returns the full resolved set (host
+override where given, default otherwise). Default text is dumped to
+`dist/agrun_docs/prompts/*.md` by `npm run build`.
+
+```js
+// Shape 1 — SILENT HOST: ship a research-capable surface but suppress the
+// built-in research coaching prose (you provide your own via plannerDirectives
+// or a loaded skill). Other sections keep defaults.
+createRuntime({
+  prompts: { researchDirectives: false }
+});
+
+// Shape 2 — CUSTOM PERSONA: replace the base planner directives with your own
+// house rules. Function form receives { availableActions, compactSystemPrompt }.
+createRuntime({
+  prompts: {
+    basePlannerDirectives: ({ availableActions }) => [
+      "[agrun:planner-contract]",
+      "Return exactly one JSON envelope per cycle.",
+      "Never expose internal runtime terms to the user.",
+      availableActions.some((a) => a.name === "web_search")
+        ? "Use web_search before answering time-sensitive questions."
+        : "Answer from provided context only."
+    ]
+  }
+});
+
+// Shape 3 — RESTRICTED ACTION SET: a host with no workspace/research tools
+// strips those sections so the lite-tier model never sees directives for tools
+// it cannot call (prevents the planner-invalid-action loop ADR-0034 closes).
+createRuntime({
+  disabledActions: ["web_search", "read_url", "workspace_write"],
+  prompts: {
+    researchDirectives: false,
+    workspaceDirectives: false
+  }
+});
+```
+
 ## Self-Correction
 
 Automatic re-plan when an action errors.
