@@ -70,6 +70,7 @@ Typical issue codes:
 | `external_word_count_below_target` | External word count is materially below the requested target. |
 | `content_after_final_section` | Candidate continues with a major section after the declared/requested final section. |
 | `duplicate_headings` | Structure inspector found repeated heading labels. |
+| `duplicate_section_numbers` | Structure inspector found repeated section numbers. Advisory by default unless host policy makes it blocking. |
 | `ai_review_not_ready` | AI self-review did not mark the candidate publish-ready. |
 | `objective_requirement_unmet` | AI self-review marked an objective checklist item as partial or unmet. |
 
@@ -80,8 +81,18 @@ Typical issue codes:
 - Missing or stale AI review blocks publish.
 - Blocked/unread cited URLs block publish.
 - Content after a declared/requested final section blocks publish.
-- Objective structure blockers prevent `decision: "ready"`.
+- Objective structure blockers prevent `decision: "ready"`. By default,
+  `duplicate_headings` is blocking, while cosmetic section-numbering issues
+  such as `duplicate_section_numbers`, `non_monotonic_section_numbers`, and
+  `gapped_section_numbers` are advisory. Hosts that require strict numbered
+  sections can make those codes blocking with
+  `runtimeConfig.candidateQuality.structureIssueSeverity`.
 - `decision: "limited"` remains allowed for honest partial publication when the AI lists concrete `remainingGaps`.
+- For citation blockers, terminal repair can accept a limited publish only when
+  the active repair contract explicitly allows `workspace_publish_candidate`
+  and the AI declares `evidenceSatisfied: false`, `requirementSatisfied: false`,
+  and concrete citation gaps. Without that terminal repair contract, blocked or
+  unread citations still block publish.
 
 The runtime does not force a limited answer. It exposes why the candidate is blocked and lets the AI choose a repair action.
 
@@ -89,9 +100,38 @@ The runtime does not force a limited answer. It exposes why the candidate is blo
 
 When repeated overwrite-style mutations do not grow a length-deficient candidate, workspace mutation growth convergence can hide only the stalled overwrite actions from the planner surface. It keeps alternate AI-owned repair choices available, such as insert, multi-edit, read/review, and valid limited publish when the objective facts show recovery is not progressing.
 
+When workspace mutation growth reaches hard-veto, terminal repair must not
+reintroduce the forbidden overwrite actions through
+`workspaceRepairSignal.recommendedActionOrder`. The planner surface and terminal
+repair payload should agree: `workspace_write` / `workspace_replace` stay hidden
+while non-overwrite actions remain visible. This avoids a loop where the planner
+is offered an action that the runtime immediately blocks before execution.
+
 If the selected candidate already has a fresh review, terminal repair does not keep offering `workspace_review_candidate` as a no-progress loop. When publish is the only remaining valid action, the focused terminal repair prompt includes `validPublishContract.requiredArgsExample` so the AI can produce a valid limited publish envelope without the runtime writing or rewriting the report.
 
-Current live limitation: Gemini Flash-Lite/high can still fail at the publish-only envelope stage by repeatedly returning invalid planner packets instead of the listed `workspace_publish_candidate` action. That is a planner-envelope quality issue, not a candidate-content hardcode issue; the runtime now exposes the debug facts needed to diagnose it.
+AGRUN-300 changed candidate-quality citation blockers from a passive publish
+block into an action contract. When `candidateQualitySignal` contains detailed
+`unread_cited_url` or `blocked_source_cited` issues, terminal repair now records
+the exact cited URLs under `observableDeficits.source` and
+`workspaceRepairSignal.citation`. The planner surface should then prefer exact
+`read_url`, workspace patch/edit actions to remove or replace unsupported
+citations, or a valid limited publish when budget is constrained. A fresh
+`workspace_read` / `workspace_review_candidate` no longer gets re-offered as
+the primary loop when the only remaining blocker is the same objective citation
+fact.
+
+Live status: the 2026-06-05 AGRUN-300 rerun
+`/tmp/agrun-live-verifier-agrun-300-20260605-093705` shows the citation-loop
+target improved. The run completed through `workspace_publish_candidate`, made
+3 successful `read_url` calls, and reached 3040 words. It did not hit the prior
+`unread_cited_url` max-step loop.
+
+Do not call the full 3000-word path successful yet. The final publish was
+`decision: "limited"`, `userGoalSatisfied=false`, `acceptanceGateScore=75`, and
+the candidate carried a duplicate section-numbering structure issue. AGRUN-301A
+audited this as a policy boundary: duplicate section numbers remain an objective
+fact, but they are advisory by default unless the user, skill, host policy, or
+AI-owned checklist explicitly requires strict numbered sections.
 
 ## Node Live Summary
 
@@ -102,6 +142,16 @@ Node live 3000-word debug output now uses:
 - `candidateQualitySignal` - objective candidate issues for debugging.
 
 When reviewing a run, do not treat `acceptanceGateScore=100` as human editorial quality. Open the generated report and inspect the `candidateQualitySignal` section.
+
+AGRUN-301A follow-up live rerun
+`/tmp/agrun-live-verifier-agrun-301a-20260605-103220` completed successfully:
+`decision: "ready"`, `candidateWords=3051`, 3 strong `read_url` sources,
+`candidateQualitySignal.status="pass"`, and `userGoalSatisfied=true`. Manual
+review still found a host-quality issue: the report padded "Core Principles" by
+listing overview labels and then repeating the same labels as H3 subsections.
+That is not a runtime fact-sensor blocker; it is handled by the optional
+`reportQualityGuardrail` section-rehash policy in
+[output-guardrails.md](./output-guardrails.md).
 
 ## Debug Checklist
 

@@ -3,6 +3,7 @@ name: deep-research-writer
 description: Iterative research-write-verify loop for fact-grounded long-form reports. Length follows evidence depth, not a fixed target.
 tags: research, deep-research, report, fact-check, iteration, long-form, evidence, citations, verify, cross-reference
 inputTypes: research-report, research-question, topic, deep-analysis, comparison, market-scan, profile, brief
+requiresPublishReadiness: true
 ---
 # Deep Research Writer
 
@@ -32,6 +33,8 @@ debuggable packet:
 - `questions.md`: what you decomposed.
 - `evidence.json`: usable facts, successful source URLs, failed/thin
   reads, and remaining gaps.
+- `outline.md`: the report index. Each section has a purpose, planned
+  title, and supporting source URLs.
 - `draft.md`: the full working report.
 - `critique.md`: your self-review, even if the result is "no blocking
   gaps".
@@ -130,13 +133,35 @@ Before writing any claim into your draft:
 - Decide structure based on what your evidence supports — not a fixed
   section count. Some topics need 3 sections, some need 8, some need
   a flat narrative.
+- Before long-form drafting, write `workspace_write outline.md` with the
+  section index: heading, role in the report, source URLs, and any gap.
+  This is your map for the draft. Do not keep broad-searching when you
+  already have enough evidence to create the index.
 - Start drafting as soon as you have enough usable evidence to answer
   the main request, or when further source work is not producing better
   evidence. You can revise the draft later; do not wait for perfect
   evidence while workspace remains empty.
 - Write to `workspace_write draft.md` in the user's language.
-- Stop when each evidence line has a place. Do not pad to hit a word
-  target.
+- If the user gave a concrete length and `lengthProgress` says the draft
+  is short, continue section-by-section from `outline.md`. Use
+  `workspace_append` to add complete new sections or
+  `workspace_insert_after_section` to expand a thin section. Avoid
+  repeating small `workspace_write` rewrites that replace the whole draft
+  without materially closing the length gap.
+- If the draft is long enough but structure audit reports duplicate
+  headings or duplicate section numbers, prefer `workspace_propose_patch`
+  before direct replacement. Use exactly one
+  `normalize_headings{headings:[{"lineNumber":42,"text":"## 4. Unique Heading"}]}`
+  operation with line numbers from `duplicate_heading_context`,
+  `duplicate_section_number_context`, or `section_number_repair_context`,
+  set `applyIfValid:true`, and inspect `structureBefore` /
+  `structureAfter`. Call `workspace_apply_patch` only when the preview is
+  valid but was not already applied. Do not mix this with `replace`
+  unless exact current `find` text is visible and
+  heading-only repair cannot improve structure.
+- Stop when each evidence line has a place. Do not pad with unsupported
+  filler, but do use all supported section material when the user asked
+  for a long concrete length.
 - Cite inline by pointing at source titles or domain names so the
   reader can trace back; the explicit Sources list comes later.
 - After writing `draft.md`, read it back with `workspace_read` and
@@ -174,8 +199,14 @@ For each item in `critique.md`:
 
 - If it is a missing source: go back to Phase B for that sub-question.
 - If it is an unverified claim: go back to Phase C.
-- If it is a structural gap: revise `draft.md` via `workspace_replace`
-  or rewrite via `workspace_write`.
+- If it is a structural gap: prefer `workspace_propose_patch` /
+  `workspace_apply_patch` with `normalize_headings` for duplicate heading
+  or duplicate section-number repair. For heading-only repair, include
+  `applyIfValid:true` in `workspace_propose_patch` and call
+  `workspace_apply_patch` only if the valid preview was not already
+  applied. If patch tools are unavailable or the structure problem
+  requires more than heading-line repair, revise `draft.md` via
+  `workspace_replace` or rewrite via `workspace_write`.
 - After updating, run Phase E again.
 
 Keep iterating until critique.md has no blocking items, OR evidence
@@ -288,6 +319,18 @@ Then make an explicit AI-owned readiness decision:
     evidence supports more detail, revise/expand `final_candidate.md`
     with `workspace_append`, `workspace_insert_after_section`, or
     `workspace_replace` before any next terminal action.
+  - If `declaredUnsatisfied` includes structure and the observation shows
+    `duplicate_heading_context`, `duplicate_section_number_context`, or
+    `section_number_repair_context`, use `workspace_propose_patch` with
+    `applyIfValid:true` and one `normalize_headings` operation. Call
+    `workspace_apply_patch` only for a valid preview that was not already
+    applied before trying another terminal action.
+  - If source and length are satisfied but the remaining deficits include
+    both structure and TodoState, use the listed structure patch action
+    and sync TodoState with `todo_advance` / `todo_run_next`, or
+    `todo_cancel` for stale plan items. Do not append, insert, write,
+    replace, search, or read unless `allowedActions` explicitly requires
+    it.
   - If `declaredUnsatisfied` includes `evidence`, continue searching or
     reading unless evidence is genuinely exhausted by the Phase F rules.
   - If you still finalize as `limited`, explicitly state why no more

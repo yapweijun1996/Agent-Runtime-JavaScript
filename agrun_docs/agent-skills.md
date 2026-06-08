@@ -98,6 +98,19 @@ checks, progress updates, and a structured final report. Use `web-research` for
 quick current-info or URL/article reads; use `long-web-research` when one
 search/read pass would produce a thin answer.
 
+The bundled `report-writing` skill is instruction-only. It is for long-form
+reports, memos, articles, essays, and synthesis tasks where the right behavior is
+to plan, draft, read back, self-review, repair, and publish from
+`runState.virtualWorkspace`. It is portable across browser and Node-hosted tests
+because it relies on TodoState and virtual workspace actions rather than a
+user-facing Canvas UI or real file writes.
+Its publish-readiness capability is carried as skill metadata
+(`capabilities.requiresPublishReadiness`) and must survive raw skill parsing,
+manifest normalization, and runtime skill summaries. That metadata authorizes
+the direct runtime `workspace_publish_candidate` action surface for the active
+or freshly read skill. It does not create a bundled skill tool named
+`workspace_publish_candidate`.
+
 For single-topic research, final `Sources:` fallback selection is relevance
 guarded. Runtime source selection extracts distinctive prompt terms such as a
 handle, product name, or quoted topic, and search-result fallback sources must
@@ -170,7 +183,9 @@ see why a URL was judged `strong`, `medium`/`usable`, `weak`, `thin`, or
 
 AGRUN-214i adds a generic `runState.virtualWorkspace` for complex final
 responses beyond research-specific state. It is browser-safe and never writes
-real files. The planner may use these actions:
+real files. The workspace is pure JavaScript state and can be exercised in Node
+tests, but it is not a Node.js or Python execution sandbox. The planner may use
+these actions:
 
 - `workspace_list`
 - `workspace_read`
@@ -391,6 +406,13 @@ The planner prompt receives only skill summaries (name, description, tools schem
 When the planner selects `use_agent_skill`, the chosen `SKILL.md` instructions become the active agent skill for the current run.
 Those instructions are then appended to the provider answer system prompt.
 When the planner selects `execute_skill_tool`, the active bundled skill tool runs inside the browser-safe runtime and its structured result is written into `runState.toolContext`.
+
+Runtime actions and bundled skill tools are separate namespaces. The planner
+must call runtime actions such as `workspace_publish_candidate` directly with
+their own args envelope. It must not wrap them as
+`execute_skill_tool({ toolName: "workspace_publish_candidate" })`. The runtime
+preflight rejects reserved runtime/custom action names used as `toolName` and
+returns recovery guidance to call the direct action instead.
 
 ### Skill/Tool Inference Fallback
 

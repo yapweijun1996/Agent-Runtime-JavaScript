@@ -17,8 +17,9 @@ is deferred to a later slice — see Consequences.
   as the LAST check after all built-in gates pass, before terminalizing. A `{block:true}`
   returns the existing `virtual_workspace_publish_blocked` non-terminal result (reason →
   AI's next cycle); a throwing guardrail is recorded (`output-guardrail-error` step) and
-  treated as non-blocking; zero guardrails = unchanged behavior. Respects
-  `publishLoopEscape` (budget-exhaustion terminal still ships).
+  treated as non-blocking; zero guardrails = unchanged behavior. Guardrails remain
+  authoritative during `publishLoopEscape`: the escape valve can bypass stale
+  protocol/readiness repair loops, but it cannot bypass host publish policy.
 - Tests: `test/unit/workspace-actions.test.js` (block / pass / throw / none),
   `test/unit/runtime-config-lifecycle.test.js` (normalization preserves both fields).
 - NOT yet done: the fact-bundle SSOT consolidation; the built-in sensors are still the
@@ -95,9 +96,11 @@ shape, adapted to agrun's iterative OODAE loop.
    `candidateQuality` config (severity map from the AGRUN-297 fix). Hosts can append,
    replace, or relax guardrails. With zero host guardrails configured, behavior is
    unchanged (the default = today's checks) → no regression.
-5. **Escape valve unchanged.** ADR-0048's budget-exhaustion publish path is orthogonal:
-   it decides *terminate vs loop forever*, not *what is acceptable*. Guardrails inform
-   the AI; the escape valve remains the runtime's last-resort anti-infinite-loop terminal.
+5. **Escape valve cannot bypass host policy.** ADR-0048's budget-exhaustion publish path is
+   orthogonal: it decides *terminate vs loop forever*, not *what is acceptable*. The escape
+   valve may skip stale built-in protocol/readiness gates when hard-veto conditions prove
+   the model is looping, but host output guardrails still run as the final publish policy.
+   A blocking guardrail returns `output_guardrail_blocked` instead of shipping the artifact.
 
 ## Alternatives
 
@@ -123,10 +126,10 @@ shape, adapted to agrun's iterative OODAE loop.
   `requirementRecoveryEvaluator` + `researchAcceptanceEvaluator` facts into one bundle is
   non-trivial refactor surface; must be staged so the terminal-repair validator behavior
   at the block boundary is preserved exactly (regression risk concentrated there).
-- This ADR does NOT fix the two observed weak-model quality gaps (it is orthogonal):
-  (a) the lite model cannot execute the complex structure-dedup repair ops; (b) the
-  escape valve ships a known `blocked` candidate on budget exhaustion. Those are separate
-  follow-ups; the guardrail only relocates POLICY.
+- This ADR does NOT make weak models good editors by itself. It gives hosts an
+  authoritative validation layer: if a model cannot repair a blocked candidate before
+  budget exhaustion, a host guardrail can stop publish rather than labeling the artifact
+  successful.
 
 ## Verification (planned — for the eventual implementation PR)
 

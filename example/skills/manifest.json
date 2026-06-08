@@ -1,7 +1,7 @@
 {
   "skills": [
     {
-      "checksum": "e6dd88a40717b74748f4180eaa7ed1f45a6d8331304d8cf56b94103e5237a97e",
+      "checksum": "ad8d0358bafb6b6a71a7d83435b1c219af759dbeb5d8eda58f292936f68b22a6",
       "description": "Iterative research-write-verify loop for fact-grounded long-form reports. Length follows evidence depth, not a fixed target.",
       "inputTypes": [
         "research-report",
@@ -43,7 +43,7 @@
       "version": ""
     },
     {
-      "checksum": "d83b61811021faff07a8ffa2c22e9d3d882d1597052065e5ac40c419ddce746e",
+      "checksum": "fe345843c68dbd9e9e93c785fec27cb6e410384ecac3feb944709c05c843370c",
       "description": "Run long-form topic research with iterative search, source reading, evidence tracking, and a final report.",
       "inputTypes": [
         "topic",
@@ -68,6 +68,39 @@
         "citations",
         "topic",
         "investigation"
+      ],
+      "tools": [],
+      "version": ""
+    },
+    {
+      "checksum": "770d70a39a6dfd47b02dc77661a4615ccf6cddc26784d5ab648b6bf1e93b7dad",
+      "description": "Plan, draft, review, and publish long-form reports through TodoState and the virtual workspace without relying on a user-facing canvas.",
+      "inputTypes": [
+        "report",
+        "long-form",
+        "article",
+        "memo",
+        "brief",
+        "analysis",
+        "synthesis",
+        "essay",
+        "documentation"
+      ],
+      "name": "report-writing",
+      "skillId": "report-writing",
+      "sourcePath": "report-writing/SKILL.md",
+      "tags": [
+        "report",
+        "writing",
+        "long-form",
+        "workspace",
+        "draft",
+        "review",
+        "publish",
+        "todo",
+        "synthesis",
+        "article",
+        "memo"
       ],
       "tools": [],
       "version": ""

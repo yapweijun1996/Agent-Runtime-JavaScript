@@ -259,7 +259,7 @@ Concrete study points:
 Do not bring over:
 
 - pnpm workspace or monorepo assumptions
-- TypeScript-first architecture into the browser-only vanilla JS runtime core
+- TypeScript-first architecture into the browser-first/browser-safe vanilla JS runtime core
 - provider package sprawl
 - Node.js runtime assumptions
 - framework integration layers
@@ -443,7 +443,7 @@ Concrete study points:
 
 Do not bring over:
 
-- TypeScript-first architecture into browser-only vanilla JS runtime
+- TypeScript-first architecture into browser-first/browser-safe vanilla JS runtime
 - Anthropic API-specific message types and streaming internals
 - CLI/TUI product surface (ink components, terminal interaction)
 - MCP server connections and coordinator mode

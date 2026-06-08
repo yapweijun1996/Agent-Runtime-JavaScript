@@ -2,7 +2,7 @@
 
 `agrun.js` is a browser-first agent runtime library written in vanilla JavaScript.
 
-The runtime target is browser environments only. Node.js is allowed for local build, test, and release tooling, but Node.js is not a supported runtime target for the distributed library.
+The production contract is browser-first and browser-safe. Node.js is allowed for local build, test, live checks, and pure-JS state modules such as the virtual workspace, but code shipped in `dist/agrun.js` must not depend on Node-only APIs.
 
 The repository keeps two truths in view:
 
@@ -114,7 +114,7 @@ Browser example notes:
 
 - Keep runtime behavior browser-safe. Do not add Node-specific runtime assumptions to code shipped in `dist/agrun.js`.
 - Keep files small and single-purpose. Prefer refactoring before a file grows past the repository guidance in `AGENTS.md`.
-- Resolve documentation conflicts through [agrun_docs/architecture-ssot.md](./agrun_docs/architecture-ssot.md): `task.md` owns current planning, ADRs own durable architecture decisions, contract docs own host-facing behavior, and live-test records are historical evidence.
+- Resolve documentation conflicts through [agrun_docs/architecture-ssot.md](./agrun_docs/architecture-ssot.md): `task.jsonl` owns current planning (the structured task board), ADRs own durable architecture decisions, contract docs own host-facing behavior, and live-test records are historical evidence.
 - Keep runtime boundaries explicit. Capabilities belong in skills when they do not require runtime-owned coordination such as planning, approval, session continuity, or evidence handling.
 - If a change affects the built output, commit the updated `dist/agrun.js` in the same PR.
 - If a change alters a public contract or architecture boundary, add or update an ADR and the related docs in the same PR.

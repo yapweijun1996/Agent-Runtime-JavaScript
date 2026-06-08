@@ -203,6 +203,23 @@ Four ways to provide agent skills:
 
 1. **Bundled skills (default)** — skills embedded at build time from `skills/*/SKILL.md`. When `agentSkills` is omitted, these are used automatically.
 
+   **Opting out (first-class, AGRUN-313 Phase 0).** Pass `agentSkills: []` to run a
+   working generic agent loop with **no domain skills** — the planner still receives
+   the built-in actions; it just sees no skill instruction packages. This is verified
+   by `test/unit/agent-skills-opt-out.test.js` (a zero-skills run takes a real planner
+   step). To be explicit instead of relying on the default, import and pass the bundle:
+
+   ```js
+   import { createRuntime, bundledAgentSkills } from 'agrun';
+   createRuntime({ agentSkills: [] });                              // no skills
+   createRuntime({ agentSkills: bundledAgentSkills });              // explicit = current default
+   createRuntime({ agentSkills: [...bundledAgentSkills, mySkill] }); // augment the bundle
+   ```
+
+   Per the micro-kernel RFC ([agrun_docs/micro-kernel-plugin-skills-rfc.md](./micro-kernel-plugin-skills-rfc.md)),
+   Phases 0–2 ship non-breaking in the 1.x line with the bundled default unchanged; the
+   default flips to `[]` only at the agrun 2.0 major, with a deprecation window.
+
 2. **parseSkillMarkdown(text)** — parse a SKILL.md-formatted string into a skill object. Same frontmatter convention as ROLE.md (`name`, `description` in YAML frontmatter, markdown body as instructions).
 
 ```js
@@ -295,7 +312,9 @@ sources as well as search fallback sources, so unrelated generic pages are not
 promoted to final citations.
 
 Complex response drafting can also use `runState.virtualWorkspace`. This is a
-generic browser-safe workspace with fixed artifact files:
+generic browser-safe, pure-JS workspace with fixed artifact files. It stores and
+edits text artifacts in runtime state; it does not read/write real files and does
+not execute Node.js or Python code by itself:
 
 ```text
 outline.md

@@ -303,6 +303,14 @@ When a convergence state reaches `escalation: "hard_veto"`:
 
 **Priority order: hard_veto > terminalRepairState.allowedActions > advisory**
 
+Narrow exception: when `terminalRepairState.workspaceRepairSignal` shows both a
+length deficit and a structure deficit, and its `recommendedActionOrder`
+explicitly includes a rewrite action, `workspaceMutationGrowthConvergence`
+must not shrink the planner surface down to insert-only. Keep the recommended
+`workspace_replace` / `workspace_write` rewrite path visible so the agent can
+repair non-monotonic headings and grow the candidate instead of producing
+`unknown_action_name` loops.
+
 Advisory-escalation signals do NOT remove actions from the surface — they inject guidance into the planner prompt only.
 
 ### AGRUN-237-GAP-04 Lessons

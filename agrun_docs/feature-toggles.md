@@ -370,7 +370,7 @@ The gate commits ONLY when at least one of these is true
 
 1. `evaluation.required === true` — i.e. `isLongResearchRun(runState) === true`. This is true only when:
    - host/envelope sets `runState.researchActivation = "long_research"`, OR
-   - a long-research skill (`deep-research-writer`, `long-web-research`, etc.) is the active/selected skill via `agentSkillContext`.
+   - a long-research skill (`deep-research-writer`, `long-web-research`, etc.) is active via `agentSkillContext`.
    - **There is NO lexical-prompt path.** Mandarin/English/any prompt text is ignored; activation is skill-driven (ADR-0012).
 2. The gate was already committed on a previous step (`previous.enabled === true`).
 3. The model has emitted a publish attempt (`runState.publishBlockSignal`).
@@ -487,7 +487,7 @@ Lite-tier planner models sometimes write reasoning like *"I am in terminal repai
 | Your host scenario | Opt-in path | Action needed |
 |---|---|---|
 | Host data/tool chatbox — no long-form drafting | none | **Keep default.** Deliver answers via `finalize`. |
-| Bundles a long-research skill (`deep-research-writer` / `long-web-research`) | **(b) skill activation** | None — gate defers automatically when the skill is active. |
+| Bundles a long-research skill (`deep-research-writer` / `long-web-research`) or a publish-readiness skill such as `report-writing` | **(b) skill activation** | None — gate defers automatically when the skill is active. |
 | Custom publish-direct flow with **no** long-research skill | **(a) host config opt-out** | `publishCandidateGate: { enabled: false }` |
 | Runtime in terminal-repair recovery | **(c) runtime recovery** | None — repair surface owns the action when its `allowedActions` includes it. |
 
@@ -507,7 +507,7 @@ createRuntime({
 For hosts that bundle long-form research workflows. The gate defers automatically when any of these are true on `runState`:
 
 - `researchActivation === "long_research"` (set by the planner or the skill), OR
-- the active / selected / last-read skill is `deep-research-writer` or `long-web-research`.
+- the active / selected / last-read skill is `deep-research-writer` or `long-web-research`, or the active / last-read skill declares `requiresPublishReadiness`.
 
 No config change required — registering the skill is enough:
 
@@ -851,7 +851,7 @@ createRuntime({
 ### When the answer is "no, that's not a toggle"
 
 - "Disable OODAE loop." → OODAE is the runtime. Not a flag.
-- "Run on Node.js server." → Browser-only by design. See [agrun_docs/spec.md](./spec.md).
+- "Require Node.js server runtime APIs." → Not a toggle. The production contract is browser-first/browser-safe. Pure-JS modules and tests may run in Node.js, but shipped runtime behavior must not depend on Node-only APIs. See [agrun_docs/spec.md](./spec.md).
 - "Use MCP servers as tools." → MCP needs stdio / server transport, incompatible with frontend-only. Not planned.
 - "Disable planner entirely." → The planner is the runtime. ADR-0026 removed the single-tool fast path; every cycle goes through the planner. To skip the second planner round-trip, wire `onToolResult` and call your own finalize path.
 

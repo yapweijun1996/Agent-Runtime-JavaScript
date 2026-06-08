@@ -54,7 +54,15 @@ For local autoseed, set `DEEPSEEK_API_KEY` in `.env.local` and
 - `tsc --noEmit` clean, all browser smoke tests green.
 - UI verified live: the DeepSeek card renders with the `deepseek-v4-flash` /
   `deepseek-v4-pro` dropdown and an API-key input (no endpoint field).
-- **Not yet verified:** a real DeepSeek chat turn (no `DEEPSEEK_API_KEY` was
-  available at implementation time). A live e2e — including whether agrun's
-  OpenAI tool-call parsing tolerates `deepseek-v4-pro` thinking output's
-  `reasoning_content` — is still pending a real key.
+- **Live e2e verified** (2026-06-05, real `DEEPSEEK_API_KEY`) via
+  `test/node-deepseek-live.mjs`, driving `dist/agrun.js` through the OpenAI
+  transport + DeepSeek base URL. Three cases all PASS:
+  1. `deepseek-v4-flash` basic chat completes.
+  2. `deepseek-v4-flash` web_search turn — tool call emitted + executed, real
+     cited sources returned.
+  3. `deepseek-v4-pro` (thinking) web_search turn — tool call emitted +
+     executed, correct answer (1M-token context). This **refutes the earlier
+     `reasoning_content` concern**: agrun's OpenAI tool-call parsing tolerates
+     v4-pro thinking output; tool calls round-trip cleanly.
+- Note: the runtime needs a real `webSearchEndpoint` for tool turns; without it
+  the model truthfully reports search is unavailable (not a parsing failure).

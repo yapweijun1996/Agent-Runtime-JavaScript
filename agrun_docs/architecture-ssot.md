@@ -13,8 +13,10 @@ skills, planner/action contracts, public API, or release documentation.
 
 When documents conflict, use this order:
 
-1. `task.md` — current planning SSOT: active milestone, blockers, and accepted
-   next work.
+1. `task.jsonl` — current planning SSOT: the structured task board (one JSON
+   record per ticket: status, priority, files, acceptance). Owns active
+   milestone, blockers, and accepted next work. Narrative history lives in
+   `agrun_docs/archive/task-board-narrative-*.md`.
 2. ADRs in `agrun_docs/adr/` — durable architecture decisions. The newest ADR
    touching a subsystem supersedes older design notes and historical live-test
    reports for that subsystem.
@@ -70,7 +72,7 @@ where they conflict with ADR-0012 / AGRUN-217.
 
 ## Editing Rules
 
-- If a change alters architecture direction, update `task.md` and the relevant
+- If a change alters architecture direction, update `task.jsonl` and the relevant
   ADR first.
 - If a change alters public host behavior, update `public-runtime-api.md`,
   `result-schema.md`, or `action-contract.md` as applicable.

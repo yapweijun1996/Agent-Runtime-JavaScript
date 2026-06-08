@@ -38,6 +38,8 @@ createRuntime({
 ```
 
 - Runs as the **last check** in `workspace_publish_candidate`, after all built-in gates pass.
+  It also runs during ADR-0048 `publishLoopEscape`; the escape valve can bypass stale
+  protocol/readiness repair loops, but it cannot bypass host publish policy.
 - `block: true` → returns the non-terminal `virtual_workspace_publish_blocked` result; the
   `reason` reaches the AI's next planner cycle. The runtime never authors content, never
   fills `remainingGaps`, never picks the candidate.
@@ -45,8 +47,9 @@ createRuntime({
   **non-blocking** — a host bug cannot crash the run.
 - With **no** `outputGuardrails`, behavior is exactly as before (the built-in sensors are
   the default gate).
-- Guardrails respect the [ADR-0048](./adr/0048-publish-loop-escape-valve.md) escape valve: on
-  budget exhaustion the run still delivers the artifact rather than loop forever.
+- A blocking guardrail remains authoritative even on budget exhaustion. If the host
+  verifier says "do not publish", agrun returns `output_guardrail_blocked` instead of
+  calling the blocked candidate successful.
 
 ## Configuring the built-in structure severity
 
@@ -63,8 +66,10 @@ createRuntime({
 });
 ```
 
-Defaults: `duplicate_headings` / `duplicate_section_numbers` are **blocking**;
-the cosmetic `non_monotonic_section_numbers` / `gapped_section_numbers` are **advisory**.
+Defaults: `duplicate_headings` is **blocking**. Cosmetic section-numbering facts
+(`duplicate_section_numbers`, `non_monotonic_section_numbers`, and
+`gapped_section_numbers`) are **advisory** unless the host explicitly makes them
+blocking.
 
 ## Shipped recipe: `nearDuplicateSectionsGuardrail`
 
@@ -90,3 +95,50 @@ oriented and intentionally simple — tune `threshold` or replace it. It is opt-
 not a runtime default, so the runtime holds no opinion. See
 `test/unit/output-guardrail-near-duplicate.test.js` for verified behavior (blocks the real
 padded report, no false positive on a clean one).
+
+## Shipped recipe: `reportQualityGuardrail` / `aiVerifierGuardrail`
+
+`reportQualityGuardrail()` is an optional deterministic report-quality verifier for common
+long-form failures found in live tests:
+
+- placeholder section bodies such as parenthetical "principles/patterns/examples" filler;
+- terminal/debug artifact leakage such as "Last updated" or "terminal repair";
+- final sections that are not actually last, for example `Conclusion` followed by more
+  main sections;
+- section rehash padding, where a model first lists overview bullets and then repeats the
+  same labels as subsections, repeats the same bold list labels inside one section, or
+  starts multiple paragraphs in the same section with near-identical opener tokens;
+- optional near-duplicate heading blocking through the same heading-similarity signal.
+
+```js
+import { createRuntime, aiVerifierGuardrail } from "agrun";
+
+createRuntime({
+  outputGuardrails: [
+    aiVerifierGuardrail({
+      checkNearDuplicateHeadings: true,
+      blockNearDuplicateHeadings: true,
+      // default true; set false to report section-rehash issues as advisory
+      blockSectionRehash: true
+    })
+  ]
+});
+```
+
+`aiVerifierGuardrail()` is the host adapter name for future AI verifier integration. If the
+host does not provide a `verify` function, it falls back to `reportQualityGuardrail()`; if a
+host verifier is provided, agrun still only asks it to validate. The verifier never writes
+the report, edits sections, or invents content.
+
+`section_rehash_overview_repeated_by_subheadings` and
+`section_rehash_repeated_list_labels` and
+`section_rehash_repeated_paragraph_openers` are host-side quality policy signals. They
+are intended for strict report-quality modes where "3000 words" should not be satisfied
+by duplicating the same outline material under slightly different local structure or
+restarting nearby paragraphs with the same setup sentence. Hosts can disable the check
+with `checkSectionRehash:false` or keep the issue advisory with
+`blockSectionRehash:false`.
+
+The repeated-paragraph-opener check is deliberately a guardrail recipe, not a runtime
+default. It reports a compact issue sample so the next AI cycle can rewrite the affected
+section; agrun still does not merge, shorten, or author paragraphs itself.

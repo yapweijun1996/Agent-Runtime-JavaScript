@@ -364,6 +364,7 @@ Rules:
 - the planner must activate a bundled skill before calling `execute_skill_tool`
 - `execute_skill_tool` may optionally include `skillName`, but it must match the active bundled skill when present
 - the tool must exist in the active skill's bundled `tools.mjs`
+- `toolName` must name a bundled skill tool, not a runtime action. Reserved runtime/custom action names such as `workspace_publish_candidate` are rejected in preflight; the planner should call those actions directly instead of wrapping them in `execute_skill_tool`.
 - tool args must be an object
 - required args must be present
 - provided args should match the declared primitive type contract when `parameters.properties[*].type` is present

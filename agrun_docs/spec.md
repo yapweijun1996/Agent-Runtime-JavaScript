@@ -17,6 +17,11 @@ For host-facing contracts, see:
 `agrun.js` is a browser-first, single-file agent runtime library.
 The project should be useful and feature-complete enough for real host integrations while still keeping boundaries clear.
 
+Some runtime modules are intentionally pure JavaScript and can run in Node.js
+tests or host-side checks. That compatibility does not change the production
+contract: shipped runtime behavior must stay browser-safe and must not require
+Node-only APIs.
+
 The goal of this architecture is not "as few features as possible".
 The goal is a capable runtime with clear boundaries.
 
@@ -818,3 +823,6 @@ Production:   Browser → Host Backend (proxy) → Provider API (backend keys)
 ```
 
 This boundary keeps `agrun.js` focused on runtime execution and avoids duplicating security infrastructure that every production backend already provides.
+Node.js may still be used by hosts for backend proxying, test harnesses, and
+pure-JS module checks; those uses should not introduce Node-only requirements
+into the browser runtime contract.

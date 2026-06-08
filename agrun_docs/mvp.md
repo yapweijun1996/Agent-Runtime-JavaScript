@@ -18,7 +18,7 @@ const runtime = createRuntime(options);
 
 The current MVP is already a shipped, working library.
 It is a fully functional browser-first agent runtime, not just a skill runner.
-The current baseline includes a unified runtime, multi-cycle execution, session-backed continuity, planner/action-capable turns, approval resolution, and bundled agent instruction packages while still staying browser-only and single-file.
+The current baseline includes a unified runtime, multi-cycle execution, session-backed continuity, planner/action-capable turns, approval resolution, and bundled agent instruction packages while still staying browser-first, browser-safe, and single-file.
 
 For exact contracts, see:
 

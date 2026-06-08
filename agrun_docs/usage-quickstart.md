@@ -4,14 +4,14 @@ This page is the fastest path from "I have `agrun.js`" to "I have a working chat
 
 ## What is agrun.js?
 
-`agrun.js` is a **browser-only agent runtime**. It is not an LLM client — it is what you put **in front of** OpenAI / Gemini to turn a single LLM call into a goal-driven loop:
+`agrun.js` is a **browser-first agent runtime**. It is not an LLM client — it is what you put **in front of** OpenAI / Gemini to turn a single LLM call into a goal-driven loop:
 
 - it picks **what to do next** (a planner LLM call)
 - it executes **skills** (your code) and **actions** (built-in primitives like `web_search`, `read_url`, `ask_clarification`)
 - it remembers session history and cross-session memory
 - it asks for **human approval** before risky steps when the host opts in
 
-Bundle the LLM provider and orchestration into one ~1.7 MB UMD file (`dist/agrun.js`) that runs in the browser. No Node.js server required.
+Bundle the LLM provider and orchestration into one ~1.7 MB UMD file (`dist/agrun.js`) that runs in the browser. No Node.js server is required for the runtime, although Node.js is used for build/test/live checks and can execute pure-JS state modules.
 
 Use it when you want an agent loop, planner, tool calling, sessions, memory, and approval — without assembling those primitives yourself on top of a raw provider SDK.
 
@@ -23,7 +23,7 @@ Use it when you want an agent loop, planner, tool calling, sessions, memory, and
 | **Provider adapter skill** | Browser-safe wrapper that lets agrun call an LLM provider. `openaiBrowserSkill` and `geminiBrowserSkill` are still public exports. Deleted Set A skills are not. | `options.skills` |
 | **Custom action** | A host-defined tool built with `defineAction(spec)`. Use this for app-specific executable behavior instead of legacy Set A skills. | `options.customActions` |
 | **Action** | A built-in primitive the planner can choose. Seven exist: `web_search`, `read_url`, `ask_clarification`, `execute_skill_tool`, `list_agent_skills`, `read_agent_skill`, `use_agent_skill`. | runtime-owned, not user-defined |
-| **Agent skill** | An instruction package (markdown ROLE.md style) the planner reads to decide what tools to call. Different from `skill`. | `options.agentSkills` |
+| **Agent skill** | An instruction package (markdown ROLE.md style) the planner reads to decide what tools to call. Different from `skill`. Omit for the bundled default; pass `agentSkills: []` to run a generic loop with no skills (see [public-runtime-api.md → Skill Loading](./public-runtime-api.md)). | `options.agentSkills` |
 | **Planner** | The LLM that decides which skill or action to run. Default `auto` lets agrun choose between `native_tools` (provider tool calling) and `envelope` (JSON parsing opt-out). | `options.plannerMode` |
 | **Session** | Multi-turn conversation persisted across `runtime.run()` calls. Created via `runtime.createSession()` or `runtime.openSession(id)`. | `options.sessionStore` |
 | **Memory** | Two layers: per-session `memoryEntries` (this conversation) + cross-session `globalMemory` (preferences/facts/decisions auto-promoted across sessions). | `options.globalMemory`, `options.memory` |
