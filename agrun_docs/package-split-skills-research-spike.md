@@ -220,6 +220,55 @@ no source change shipped from the measurement itself.)
 side effect; a CI lint that rejects top-level executable statements in `src/runtime`
 would keep the invariant — cheap to add when P2 lands.)
 
+#### P1 ESM TREE-SHAKE — DONE (2026-06-08): B2 PROVEN, research fully drops, last live edge found+cleared
+
+P1 shipped the real (non-temp) ESM build + a committed, reproducible measurement, and
+went past P0's prediction to an EMPIRICAL all-zero. What landed (source only):
+- **`rollup.config.js`** — second output: per-module ESM via `preserveModules` into
+  `dist/esm/` (entry `dist/esm/index.js`). UMD `dist/agrun.js` kept for back-compat.
+  (Single-file ESM was tried first and still lingered — concatenation defeats downstream
+  DCE; `preserveModules` is the fix, one module per file.)
+- **`package.json`** — `module`, `sideEffects:false`, and an `exports` map
+  (`import`→`./dist/esm/index.js`, `require`→`./dist/agrun.js`). No `type:"module"` (would
+  break the CJS `rollup.config.js`); the `.js`-under-ESM-dir is unambiguous via `exports`.
+- **`src/research-index.js`** — additive research barrel (the future `@agrun/skills-research`
+  entry); `src/index.js` still re-exports research for back-compat (removal = P2/breaking).
+- **`build/measure-bundle.cjs`** — bundles a probe that imports ONLY `{ createRuntime }`
+  from `dist/esm/index.js` with `treeshake.moduleSideEffects:false` (what a consumer's
+  `sideEffects:false` grants), greps research markers. PASS = present-in-full, gone-in-probe.
+
+Result (`node build/measure-bundle.cjs`):
+
+| marker | full ESM | tree-shaken probe |
+|---|---|---|
+| evidence-graph `RESEARCH_EVIDENCE_NOISE_RE` | 4 | **0 (dropped)** |
+| acceptance-evaluator `refreshResearchAcceptanceEvaluator` | 7 | **0** |
+| finalize-contract `observeAiFirstResearchFinalizeContract` | 4 | **0** |
+| report-loop `evaluateResearchReportLoop` | 4 | **0** |
+| research skill `deep-research-writer` | 2 | **0** |
+
+**The measurement also exposed a real edge P0 had wrongly attributed to format.** With
+`preserveModules`, finalize/acceptance/skill dropped immediately — but evidence-graph +
+report-loop still lingered. Tracing the probe's module graph showed it was NOT the
+format and NOT the `src/index.js` re-export (stripping it changed nothing): a live import
+edge `runtime.js → action-registry.js → actions/virtual-workspace-actions.js →
+research-report-loop.js → research-evidence-graph.js`. The 2.2 de-import had migrated the
+canonical gate refresh (`action-loop-action.js`) to the `reportLoopHooks.refreshGate`
+seam but MISSED the pre-publish refresh in `virtual-workspace-actions.js`, which still
+imported `refreshResearchReportLoopGate` directly. Routing that one call through
+`readReportLoopHooks(runtimeConfig).refreshGate(...)` (default no-op; research pack
+supplies the impl via `bundledRuntimeHooks`) removed the last edge ⇒ all markers → 0.
+Behaviour is unchanged: a research run wires `bundledRuntimeHooks` so the gate runs
+identically; the unit test (`workspace-actions.test.js`) now wires `bundledRuntimeHooks`
+in `makeResearchContext` to mirror production.
+
+**VERDICT: B2 is proven end-to-end.** A generic consumer importing only `createRuntime`
+from the ESM artifact tree-shakes ALL research code (evidence-graph included) out of its
+bundle — which UMD (P0) could not. Litmus green: `npm run check` (incl. prompt-snapshot
+byte-identical), live short 4/4, live `node-3000` (exit 0, completed via publish path with
+honest `limited`), browser + long-task-lab builds. Still additive/non-breaking: `src/index.js`
+keeps the research re-exports, no package published, no version bump — that is P2.
+
 ---
 
 ## 6. Hard edges — how the package boundary handles them
@@ -236,6 +285,16 @@ data section (like acceptance-evaluator 2.2), or (b) accept that the 168 readers
 the vocabulary and only the import edge moves. The slot-absent arbiter (stub the slot
 factory → null, run `npm run check`) decides whether (a) is even needed. evidence-graph
 + the 3 leaves ride along (they're imported only by report-loop's builder).
+
+> **UPDATE (P1, 2026-06-08): the report-loop IMPORT edge is now fully cleared from
+> core's `createRuntime` graph.** The feared "168 readers" are runState FIELD reads
+> (vocabulary residue — still present, still §6.3/cosmetic) — NOT import edges. The only
+> live import edge was a SINGLE call site (`virtual-workspace-actions.js` calling
+> `refreshResearchReportLoopGate` directly); routing it through `reportLoopHooks.refreshGate`
+> dropped report-loop AND evidence-graph (+ its leaves) out of a generic consumer's
+> tree-shaken bundle (measured 0/0 — see §5 P1). So option (b) held: the data/normalizer
+> already live in `kernel-report-loop.js` (2.2), the behavior import edge is gone (P1),
+> and only the field-name vocabulary remains for the later cosmetic pass.
 
 ### research-state (the gate predicate `isResearchQualityGateRequired = isEvidenceConvergenceRun`)
 Dangerous-last. The predicate is read by `planner-action-surface`, convergence,
