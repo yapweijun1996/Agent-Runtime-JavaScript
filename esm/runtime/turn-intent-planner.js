@@ -1,0 +1,200 @@
+/**
+ * LLM-backed turn-intent planner. Escalation path for structural cases the
+ * `extractTurnIntent` Jaccard extractor cannot resolve (typical example:
+ * cross-language pivot-back where word overlap is too thin to cross
+ * `MIN_OVERLAP` even though the user clearly asked to return to an earlier
+ * thread).
+ *
+ * Harness contract:
+ *  - This module does NOT make network calls directly. It takes a
+ *    `classify` callback the runtime wires up (so tests and providers can
+ *    swap implementations cheaply).
+ *  - It does NOT carry domain vocabulary, pivot lexicons, or locale
+ *    regexes. Those belong to the planner prompt, not the router stack.
+ *  - Output is normalized to the same `turnIntent` shape the router
+ *    already consumes, plus an optional `targetThreadId` that the router
+ *    honors as an authoritative pivot destination (bypasses Jaccard
+ *    thresholds — that is the whole point of escalating to an LLM).
+ *
+ * Gating is the caller's responsibility: invoke the planner only when
+ * structural signals are insufficient (e.g. extractor returned `{}`,
+ * `threads.length >= 2`, and a classifier was configured). That keeps the
+ * cheap path free and makes the escalation cost explicit.
+ */
+
+const VALID_TARGET_FALLBACK = null;
+
+/**
+ * Build compact, LLM-friendly thread summaries. Intentionally trims heavy
+ * thread fields so the prompt stays small; the planner only needs enough
+ * signal to decide pivot vs new vs continue.
+ *
+ * @param {Array<Thread>} threads
+ * @returns {Array<{id:string, topic:string, sample:string, recentCount:number}>}
+ */
+function buildThreadSummaries(threads) {
+  if (!Array.isArray(threads)) return [];
+  const summaries = [];
+  for (const thread of threads) {
+    if (!thread || typeof thread !== "object") continue;
+    const id = typeof thread.id === "string" && thread.id ? thread.id : null;
+    if (!id) continue;
+    const topic = typeof thread.topic === "string" ? thread.topic.trim().slice(0, 160) : "";
+    const recents = Array.isArray(thread.recentUserTexts) ? thread.recentUserTexts : [];
+    const sample = recents.length > 0 && typeof recents[recents.length - 1] === "string"
+      ? recents[recents.length - 1].trim().slice(0, 200)
+      : "";
+    summaries.push({
+      id,
+      topic,
+      sample,
+      recentCount: recents.length
+    });
+  }
+  return summaries;
+}
+
+/**
+ * Normalize a raw classifier result into the strict turnIntent shape the
+ * router consumes. Rejects unknown keys, coerces booleans, and validates
+ * `targetThreadId` against the caller-supplied thread list so a planner
+ * hallucination never reaches the router.
+ *
+ * @param {unknown} raw
+ * @param {{threadIds:Set<string>, activeThreadId:string|null}} context
+ * @returns {object}
+ */
+function normalizePlannedIntent(raw, context) {
+  const intent = {};
+  if (!raw || typeof raw !== "object") return intent;
+  const threadIds = context && context.threadIds instanceof Set ? context.threadIds : new Set();
+  const activeThreadId = context && typeof context.activeThreadId === "string"
+    ? context.activeThreadId
+    : null;
+
+  if (raw.pivotIntent === true) intent.pivotIntent = true;
+  if (raw.divergentIntent === true) intent.divergentIntent = true;
+  if (raw.referentialIntent === true) intent.referentialIntent = true;
+  const kind = normalizeIntentKind(raw.kind);
+  if (kind) {
+    intent.kind = kind;
+    if (kind === "new_task") {
+      intent.divergentIntent = true;
+    }
+  }
+
+  if (typeof raw.targetThreadId === "string" && raw.targetThreadId) {
+    if (threadIds.has(raw.targetThreadId) && raw.targetThreadId !== activeThreadId) {
+      intent.targetThreadId = raw.targetThreadId;
+    }
+  }
+
+  // Self-consistency: a targetThreadId without a pivotIntent is treated as
+  // a pivot — the planner was confident enough to pick a specific thread,
+  // which is stronger signal than the boolean on its own.
+  if (intent.targetThreadId && intent.pivotIntent !== true) {
+    intent.pivotIntent = true;
+  }
+
+  // Mutual-exclusion guard: divergent means "new topic, no prior context
+  // applies" — it cannot coexist with a pivot target. Drop the weaker
+  // signal (divergent) so the router's pivot branch fires cleanly.
+  if (intent.pivotIntent && intent.divergentIntent) {
+    delete intent.divergentIntent;
+  }
+
+  return intent;
+}
+
+/**
+ * Call the LLM classifier with a normalized payload and return a validated
+ * intent object. Swallows classifier errors and returns `{}` so routing
+ * degrades gracefully — the structural layer's conservative default keeps
+ * the user on the active thread.
+ *
+ * @param {object} options
+ * @param {string} options.userMessage
+ * @param {Array<Thread>} options.threads
+ * @param {string|null} options.activeThreadId
+ * @param {(payload:object)=>Promise<object>} options.classify
+ * @returns {Promise<object>}
+ */
+async function planTurnIntent(options) {
+  const source = options && typeof options === "object" ? options : {};
+  const userMessage = typeof source.userMessage === "string" ? source.userMessage.trim() : "";
+  const threads = Array.isArray(source.threads) ? source.threads.filter(Boolean) : [];
+  const activeThreadId = typeof source.activeThreadId === "string" ? source.activeThreadId : null;
+  const classify = typeof source.classify === "function" ? source.classify : null;
+
+  if (!userMessage || threads.length === 0 || !classify) return {};
+
+  const summaries = buildThreadSummaries(threads);
+  if (summaries.length === 0) return {};
+
+  const threadIds = new Set(summaries.map((s) => s.id));
+
+  let raw;
+  try {
+    raw = await classify({
+      userMessage,
+      activeThreadId,
+      threads: summaries
+    });
+  } catch (_err) {
+    return {};
+  }
+
+  return normalizePlannedIntent(raw, { threadIds, activeThreadId: activeThreadId || VALID_TARGET_FALLBACK });
+}
+
+/**
+ * Merge a structural intent (from `extractTurnIntent`) with a planned
+ * intent (from `planTurnIntent`). Planner wins on overlapping keys
+ * because escalation only happens when structural was insufficient; the
+ * planner saw richer context and should override. But planner is
+ * additive — it cannot erase structural signals that weren't asked about.
+ *
+ * @param {object} structural
+ * @param {object} planned
+ * @returns {object}
+ */
+function mergeTurnIntent(structural, planned) {
+  const out = {};
+  if (structural && typeof structural === "object") {
+    for (const [key, val] of Object.entries(structural)) {
+      if (val !== undefined && val !== null) out[key] = val;
+    }
+  }
+  if (planned && typeof planned === "object") {
+    for (const [key, val] of Object.entries(planned)) {
+      if (val !== undefined && val !== null) out[key] = val;
+    }
+  }
+  // If planner produced a pivot target, clear any prior divergentIntent
+  // (structural can never coexist with a targeted pivot — see the same
+  // guard in normalizePlannedIntent).
+  if (out.targetThreadId && out.divergentIntent) {
+    delete out.divergentIntent;
+  }
+  if (out.kind === "new_task") {
+    out.divergentIntent = true;
+  }
+  return out;
+}
+
+function normalizeIntentKind(value) {
+  if (typeof value !== "string") return "";
+  const kind = value.trim();
+  if (
+    kind === "new_task" ||
+    kind === "follow_up" ||
+    kind === "drill_down" ||
+    kind === "approval_resolution" ||
+    kind === "unknown"
+  ) {
+    return kind;
+  }
+  return "";
+}
+
+export { buildThreadSummaries, mergeTurnIntent, normalizePlannedIntent, planTurnIntent };

@@ -1,0 +1,69 @@
+import { normalizeConvergenceConfig } from '../action-pattern-convergence.js';
+import { PUBLISH_DIRECT_ACTION } from '../kernel-terminal-actions.js';
+
+// ADR-0035 (AGRUN-262) — native tool-calling mode planner directives.
+// Extracted verbatim from planner-native-system-prompt.js buildNativeToolsSystemPrompt
+// (the directive body between the host role/system-prompt prefix and the
+// caller-supplied extraDirectives suffix). Host override key:
+// `nativePlannerDirectives`. Default output is byte-identical (locked by
+// test/unit/prompt-snapshot.test.js).
+//
+// The readOnlyPlanning forbidden-action line renders from
+// normalizeConvergenceConfig(runtimeConfig), matching the envelope-mode
+// directives and enforcement SSOT.
+
+function buildLines({ availableActions, standaloneActionNames, nativePlanGuidance, runtimeConfig } = {}) {
+  const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+  const config = normalizeConvergenceConfig(runtimeConfig);
+  const hasAction = (name) => actionDefinitions.some((action) => action && action.name === name);
+  return [
+    "[agrun:planner-contract]",
+    "Internal contract: pick the next step for an action loop. Choose exactly one tool call as your next step.",
+    "User-visible text inside the final answer or finalize instruction must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
+    "Check the current topic, current goal, open ambiguity, confirmed memory, and recent turns before asking for clarification.",
+    "Treat clarification as a last resort.",
+    "If YOU judge the current session evidence is sufficient to answer, use finalize. Use final_answer only when that tool is available for a simple no-tool answer.",
+    "When current or factual evidence is needed and evidence is missing, gather evidence before asking for clarification or finalizing.",
+    "For source-grounded research, treat web_search results as candidate leads until a successful read_url adds the page to readSources. Cite URLs in final sources only when they are in successful readSources; if you use search snippets without reading pages, label the answer as search-summary-only.",
+    "read_url supports optional textStart and textLength. If a readSource textRange shows hasAfter=true and the missing answer may be later in that same page, call read_url again with the same url and textStart=nextTextStart instead of assuming the unseen text is irrelevant.",
+    "If loopState.readUrlRecoverySignal says the latest URL is needs_alternate_source or source_blocked, do not retry that same non-retryable URL; use an alternate candidate, run refined web_search, or finalize/publish limited with evidenceSatisfied=false and concrete remainingGaps if evidence is exhausted.",
+    "If loopState.requirementRecoveryEvaluator.validLimitedAllowed=false, observable deficits still appear recoverable; do not clean ready or publish limited until you perform the listed recovery attempt, or can name a concrete unrecoverable blocker with remainingGaps.",
+    "If loopState.requirementRecoveryEvaluator.convergence.repeatedInvalidTerminalCount>=2, do not repeat the same workspace_publish_candidate/finalize payload. If validLimitedAllowed=false, perform recovery work first. If validLimitedAllowed=true, publish only with a corrected valid limited finalReadiness matching the observed deficits and concrete remainingGaps.",
+    "If loopState.actionPatternConvergence.convergenceSignal forbids repeat_same_action_args, do not call the same action with identical args again; change args, choose a different recovery action, or publish valid limited with concrete remainingGaps if recovery is exhausted.",
+    "If loopState.actionPatternConvergence.convergenceSignal forbids repeat_same_terminal_intent, do not repeat workspace_publish_candidate/finalize with the same terminal intent; change observable facts through evidence/workspace recovery or publish a valid limited result with concrete remainingGaps.",
+    "If loopState.actionPatternConvergence.terminalCorrectionState.active=true, the publish/finalize no-progress correction is sticky; do evidence/workspace/TodoState recovery from allowedNextMoves before another terminal attempt, or publish a valid limited result with concrete remainingGaps matching observed deficits.",
+    "If loopState.actionPatternConvergence.terminalRetryCooldown.active=true, clean ready, direct finalize, and plain workspace_publish_candidate are cooling down; do recovery/TodoState sync first, or publish only valid limited with concrete remainingGaps and false failed-dimension flags.",
+    `If loopState.actionPatternConvergence.readOnlyPlanningState.active=true, do not choose more ${config.readOnlyPlanningForbiddenActions.join(", ")}. Choose productive evidence/workspace recovery or valid limited with concrete remainingGaps.`,
+    "If loopState.actionPatternConvergence.structureRepairConvergence.active=true, the structure audit is not improving. Do not repeat workspace_read/workspace_list/append/insert around the same broken outline; use targeted workspace_write/workspace_replace to remove duplicate heading/section-number samples, then finalize/publish, or publish valid limited with concrete structure gaps.",
+    "If source and length are satisfied but terminal repair still shows structure plus todo deficits, use the listed patch action for heading/section-number repair and sync TodoState with todo_advance/todo_run_next/todo_cancel; do not append/insert/write/replace/search/read unless current allowedActions explicitly require it.",
+    "If loopState.actionPatternConvergence.latestCorrectionSignal.status=escalated or terminalCorrectionState.ignoredTerminalCorrectionCount>=2, do not clean ready and do not retry plain publish/finalize; do recovery first or publish valid limited only.",
+    "If loopState.terminalRepairState.active=true, terminal repair mode is active: direct finalize/final_answer and plain workspace_publish_candidate are unavailable. Choose a listed allowed recovery action, or call workspace_publish_candidate with decision=limited only when it is listed in terminalRepairState.allowedActions.",
+    `Current standalone-only actions for plan validation: ${standaloneActionNames}. These must be standalone tool calls, not plan.actions entries.`,
+    ...(hasAction("list_agent_skills")
+      ? ["When a specialized skill would improve quality, use list_agent_skills before domain tools. Search by capability keywords, not prompt entities; for non-English prompts, translate the task type into capability keywords yourself."]
+      : []),
+    ...(hasAction("workspace_write")
+      ? [
+        "Virtual workspace tools provide browser-safe draft artifacts: workspace_write writes, workspace_read/workspace_list reviews existing artifacts, workspace_replace revises, workspace_finalize_candidate marks the user-facing candidate, and workspace_publish_candidate publishes that selected candidate directly when it is the answer. Follow standalone-only action metadata when choosing plan versus direct tool calls.",
+        "Before relying on a virtual workspace draft, inspect the relevant file with workspace_read or workspace_list and use textStats (chars, nonWhitespaceChars, cjkChars, words) as inputs for YOUR readiness judgment. Runtime will not decide whether requested requirements are satisfied.",
+        "If a loaded skill gives a workspace workflow, follow the skill's SKILL.md rather than native planner defaults.",
+        "If a TodoState plan exists, keep it synchronized yourself: after completing a phase choose todo_run_next or todo_advance before moving to the next phase, and before any terminal publish/finalize mark completed phases done or honestly blocked/abandoned. Runtime will only observe stale TodoState; it will not mark items done for you.",
+        hasAction(PUBLISH_DIRECT_ACTION)
+          ? "workspace_publish_candidate sends the selected candidate without a finalizer LLM. Before calling it, satisfy the action contract: finalize the candidate, read back the latest candidate, sync any active TodoState, include finalReadiness when the action or loaded skill requires it, and make the report structurally clean with one coherent title, unique section headings/numbers, no repeated conclusion blocks, and no raw user request copied into the title. If you drafted a long answer in a custom workspace path, pass that same path to workspace_finalize_candidate and workspace_publish_candidate, or copy it into final_candidate.md first; direct finalize may shorten or omit the workspace artifact."
+          : null,
+        hasAction("workspace_review_candidate")
+          ? "For long-form or research workspace answers, call workspace_review_candidate after reading the selected candidate and before workspace_publish_candidate. That review is YOUR self-review; runtime only exposes candidateQualitySignal facts for you to repair."
+          : null
+      ]
+        .filter(Boolean)
+      : []),
+    "When a loaded skill or action contract requires finalReadiness, include it on finalize/publish using observable tool, readSources, and workspace facts. It is YOUR self-assessment; runtime records consistency and required-field checks only.",
+    "If the user explicitly asks the visible answer to include finalReadiness.decision, include one plain-text line with that exact field in your finalize instruction, and keep it consistent with finalReadiness.decision. Do not include readiness JSON.",
+    "Use final_answer only for simple no-tool answers when the runtime exposes that tool. If a loaded skill workflow, read_url evidence, virtual workspace drafting, or readiness contract is active, use finalize with the required contract or continue tool work.",
+    "Do not create or revise TodoState for a simple one-step lookup, search, or read request; choose the relevant research action directly. Use todo_plan only for genuinely multi-step tasks that need progress tracking.",
+    ...(nativePlanGuidance ? [nativePlanGuidance] : []),
+    "When you choose finalize, the instruction must end the turn and must not ask the user a follow-up question.",
+  ];
+}
+
+export { buildLines };
