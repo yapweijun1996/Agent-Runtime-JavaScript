@@ -2,7 +2,7 @@ const DEFAULT_BUILD_ID = "dev";
 
 function getRuntimeBuildId() {
   return readBuildId(
-    "349e63f54-dirty"
+    "f34b86173-dirty"
       
   );
 }
