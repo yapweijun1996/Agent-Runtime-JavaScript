@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-248-D — planner recovery is now planner-owned. Runtime records
 // invalid/empty planner output as a repair signal for the next planner
 // cycle; it does not synthesize web_search or any other action.
@@ -11,6 +13,7 @@
 // the streak the moment a valid decision is produced (so a long session is
 // never starved by an early bad turn — a good turn resets it). It is NOT a
 // per-cycle-reset counter anymore (that reset is what made it dead code).
+
 
 const MAX_RECOVERY_RETRIES = 2;
 
@@ -51,10 +54,10 @@ function buildPlannerRepairSignal(options = {}) {
   const count = Number.isInteger(options.count) && options.count > 0
     ? options.count
     : 0;
-  const reason = readString$1f(options.reason) || "invalid_planner_output";
-  const source = readString$1f(options.source) || "planner";
+  const reason = readString(options.reason) || "invalid_planner_output";
+  const source = readString(options.source) || "planner";
   const forbiddenMoves = Array.isArray(options.forbiddenMoves)
-    ? options.forbiddenMoves.map(readString$1f).filter(Boolean)
+    ? options.forbiddenMoves.map(readString).filter(Boolean)
     : [];
   if (count > 2 && !forbiddenMoves.includes("repeat_invalid_envelope")) {
     forbiddenMoves.push("repeat_invalid_envelope");
@@ -64,7 +67,7 @@ function buildPlannerRepairSignal(options = {}) {
     count,
     escalation: count > 2 ? "hard_veto" : "advisory",
     forbiddenMoves: forbiddenMoves.slice(0, 8),
-    lastResponsePreview: readString$1f(options.lastResponsePreview).slice(0, 600),
+    lastResponsePreview: readString(options.lastResponsePreview).slice(0, 600),
     reason,
     repairMode: "planner_owned_retry",
     requiredEnvelope: "valid planner JSON envelope only",
@@ -78,10 +81,6 @@ function ensureRecoveryState(runState) {
     runState.recoveryState = { retries: 0, lastSignal: null, exhaustedAt: null };
   }
   return runState.recoveryState;
-}
-
-function readString$1f(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { MAX_RECOVERY_RETRIES, buildPlannerRepairSignal, isRecoveryBudgetExhausted, noteRecoveryAttempt, resetRecoveryBudget };

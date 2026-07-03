@@ -47,7 +47,35 @@ function formatRunId(sequence) {
   return `${RUN_ID_PREFIX}-${sequence}`;
 }
 
-function readNonNegativeInteger(value) {
+// AGRUN-427 — derive the immediate parent run id from a child run id. Subagent
+// children are minted as `${parentRunId}.child-${n}` (spawn-subagent-capability.js),
+// so the parent is the id with the final `.child-<n>` segment stripped; a nested
+// grandchild resolves to its immediate parent. Top-level runs have no such suffix
+// -> null. Surfaced in the run-started event so hosts can correlate a child run to
+// its parent (time-travel / branching debugging) without string-parsing runIds.
+function deriveParentRunId(runId) {
+  if (typeof runId !== "string") return null;
+  const match = runId.match(/^(.*)\.child-\d+$/);
+  return match ? match[1] : null;
+}
+
+// AGRUN-427 — full run lineage from a single run id, root -> self inclusive.
+// Subagent children are minted as `${parentRunId}.child-${n}`, so walking
+// deriveParentRunId yields the ancestry; a host/inspector building a branch tree
+// from a flat list of run ids uses this to place each run under its parent.
+// Returns [] for a non-string/empty id, [runId] for a top-level run.
+function deriveRunLineage(runId) {
+  if (typeof runId !== "string" || !runId) return [];
+  const chain = [runId];
+  let parent = deriveParentRunId(runId);
+  while (parent) {
+    chain.push(parent);
+    parent = deriveParentRunId(parent);
+  }
+  return chain.reverse();
+}
+
+function readNonNegativeInteger$1(value) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
@@ -60,7 +88,7 @@ function readNonNegativeInteger(value) {
  */
 function hydrateRunSequence(sessionRecord) {
   if (!sessionRecord || typeof sessionRecord !== "object") return sessionRecord;
-  const persisted = readNonNegativeInteger(sessionRecord.lastRunSequence);
+  const persisted = readNonNegativeInteger$1(sessionRecord.lastRunSequence);
   const fromLastRun = sessionRecord.lastRun && typeof sessionRecord.lastRun === "object"
     ? parseRunSequence(sessionRecord.lastRun.runId)
     : null;
@@ -153,19 +181,19 @@ function createSessionRunIdGenerator(options) {
 }
 
 function mergeFreshSessionRecord(sessionRecord, fresh) {
-  const localSeq = readNonNegativeInteger(sessionRecord.lastRunSequence);
-  const localCompactedAt = readNonNegativeInteger(sessionRecord.compactedAt);
+  const localSeq = readNonNegativeInteger$1(sessionRecord.lastRunSequence);
+  const localCompactedAt = readNonNegativeInteger$1(sessionRecord.compactedAt);
   const next = cloneValue(fresh);
   for (const key of Object.keys(sessionRecord)) {
     delete sessionRecord[key];
   }
   Object.assign(sessionRecord, next);
-  const freshSeq = readNonNegativeInteger(sessionRecord.lastRunSequence);
+  const freshSeq = readNonNegativeInteger$1(sessionRecord.lastRunSequence);
   sessionRecord.lastRunSequence = Math.max(localSeq, freshSeq);
-  if (localCompactedAt > readNonNegativeInteger(sessionRecord.compactedAt)) {
+  if (localCompactedAt > readNonNegativeInteger$1(sessionRecord.compactedAt)) {
     sessionRecord.compactedAt = localCompactedAt;
   }
   sessionRecord.version = typeof fresh.version === "number" ? fresh.version : 0;
 }
 
-export { createSessionRunIdGenerator, formatRunId, hydrateRunSequence, parseRunSequence };
+export { createSessionRunIdGenerator, deriveParentRunId, deriveRunLineage, formatRunId, hydrateRunSequence, parseRunSequence };

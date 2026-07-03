@@ -1,4 +1,4 @@
-import { FINALIZE_CANDIDATE_ACTION } from './kernel-terminal-actions.js';
+import { WORKSPACE_REPLACE_ACTION, USE_AGENT_SKILL_ACTION, READ_AGENT_SKILL_ACTION, FINALIZE_CANDIDATE_ACTION, WORKSPACE_WRITE_ACTION, TODO_RUN_NEXT_ACTION, TODO_CANCEL_ACTION, TODO_ADVANCE_ACTION, TODO_PLAN_ACTION, EXECUTE_SKILL_TOOL_ACTION, READ_URL_ACTION, WEB_SEARCH_ACTION, TODO_INSPECT_ACTION } from './action-names.js';
 
 // Composite session-level budget for long-running tasks. Replaces the
 // per-action-name consecutive failure guard with four independent caps
@@ -67,19 +67,19 @@ function markActionProgress(runState, actionName, output) {
 
 function shouldMarkActionProgress(actionName, output) {
   switch (actionName) {
-    case "web_search":
-    case "read_url":
-    case "execute_skill_tool":
-    case "todo_plan":
-    case "todo_advance":
-    case "todo_cancel":
-    case "todo_run_next":
-    case "workspace_write":
+    case WEB_SEARCH_ACTION:
+    case READ_URL_ACTION:
+    case EXECUTE_SKILL_TOOL_ACTION:
+    case TODO_PLAN_ACTION:
+    case TODO_ADVANCE_ACTION:
+    case TODO_CANCEL_ACTION:
+    case TODO_RUN_NEXT_ACTION:
+    case WORKSPACE_WRITE_ACTION:
     case FINALIZE_CANDIDATE_ACTION:
-    case "read_agent_skill":
-    case "use_agent_skill":
+    case READ_AGENT_SKILL_ACTION:
+    case USE_AGENT_SKILL_ACTION:
       return true;
-    case "workspace_replace":
+    case WORKSPACE_REPLACE_ACTION:
       return Boolean(output && output.changed === true);
     default:
       return false;
@@ -117,7 +117,7 @@ function markSessionFingerprintProgress(runState, actionName) {
   const trimmed = typeof actionName === "string" ? actionName.trim() : "";
   if (!trimmed) return false;
   // Skip todo-only and inspect actions: they do not represent external progress.
-  if (trimmed === "todo_run_next" || trimmed === "todo_inspect" || trimmed === "todo_advance" || trimmed === "todo_cancel") {
+  if (trimmed === TODO_RUN_NEXT_ACTION || trimmed === TODO_INSPECT_ACTION || trimmed === TODO_ADVANCE_ACTION || trimmed === TODO_CANCEL_ACTION) {
     return false;
   }
   const counts = budget.fingerprintCounts;

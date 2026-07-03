@@ -1,4 +1,5 @@
 import { isQuestionLikeText, isExecutableTopicLikeTurn } from './topic-like-task.js';
+import { readString } from './semantic-json.js';
 
 function classifyGoalQuality(currentGoal, currentTopic, options) {
   if (!currentGoal) {
@@ -76,11 +77,11 @@ function classifyGoalQuality(currentGoal, currentTopic, options) {
 }
 
 function normalizeValue(value) {
-  return readString$1c(value).toLowerCase().replace(/\s+/g, " ");
+  return readString(value).toLowerCase().replace(/\s+/g, " ");
 }
 
 function readTurnIntentKind(options) {
-  return readString$1c(
+  return readString(
     options &&
     typeof options === "object" &&
     options.turnIntent &&
@@ -91,16 +92,12 @@ function readTurnIntentKind(options) {
 }
 
 function readExecutionClass(options) {
-  return readString$1c(
+  return readString(
     options &&
     typeof options === "object"
       ? options.executionClass
       : ""
   );
-}
-
-function readString$1c(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { classifyGoalQuality };

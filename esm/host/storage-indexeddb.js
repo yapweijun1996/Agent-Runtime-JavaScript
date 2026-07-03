@@ -1,3 +1,5 @@
+import { readString } from '../runtime/semantic-json.js';
+
 const DEFAULT_DB_NAME = "agrun-message-storage-v1";
 const DB_VERSION = 1;
 
@@ -15,7 +17,7 @@ const SCHEMA = Object.freeze({
 });
 
 function createIndexedDBMessageStorage(options = {}) {
-  const dbName = readString$1Y(options.dbName) || DEFAULT_DB_NAME;
+  const dbName = readString(options.dbName) || DEFAULT_DB_NAME;
   const redactor = typeof options.redactor === "function" ? options.redactor : null;
   let dbPromise = null;
 
@@ -39,10 +41,10 @@ function createIndexedDBMessageStorage(options = {}) {
     },
 
     async listSessions(query = {}) {
-      const since = readNumber$n(query.since);
+      const since = readNumber$m(query.since);
       const limit = readPositiveInteger$p(query.limit);
       const records = (await getAll(await getDb(), "sessions"))
-        .filter((record) => since == null || readNumber$n(record.time && record.time.created) > since)
+        .filter((record) => since == null || readNumber$m(record.time && record.time.created) > since)
         .sort(compareCreated);
       return (limit ? records.slice(0, limit) : records).map((record) => ({
         sessionID: record.sessionID,
@@ -59,16 +61,16 @@ function createIndexedDBMessageStorage(options = {}) {
 
     async getParts(_sessionID, messageID) {
       return (await getAllByIndex(await getDb(), "parts", "messageID", messageID))
-        .sort((a, b) => (readNumber$n(a.index) || 0) - (readNumber$n(b.index) || 0))
+        .sort((a, b) => (readNumber$m(a.index) || 0) - (readNumber$m(b.index) || 0))
         .map(cloneValue);
     },
 
     async appendSessionDiff(sessionID, fileDiff) {
       const record = {
         ...cloneValue(fileDiff || {}),
-        id: readString$1Y(fileDiff && fileDiff.id) || `diff-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-        sessionID: readString$1Y(sessionID) || readString$1Y(fileDiff && fileDiff.sessionID),
-        ts: readNumber$n(fileDiff && fileDiff.ts) || Date.now()
+        id: readString(fileDiff && fileDiff.id) || `diff-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        sessionID: readString(sessionID) || readString(fileDiff && fileDiff.sessionID),
+        ts: readNumber$m(fileDiff && fileDiff.ts) || Date.now()
       };
       await putRecord(await getDb(), "diffs", record);
       return cloneValue(record);
@@ -76,7 +78,7 @@ function createIndexedDBMessageStorage(options = {}) {
 
     async getSessionDiff(sessionID) {
       return (await getAllByIndex(await getDb(), "diffs", "sessionID", sessionID))
-        .sort((a, b) => (readNumber$n(a.ts) || 0) - (readNumber$n(b.ts) || 0))
+        .sort((a, b) => (readNumber$m(a.ts) || 0) - (readNumber$m(b.ts) || 0))
         .map(cloneValue);
     }
   };
@@ -154,11 +156,11 @@ function getAllByIndex(db, storeName, indexName, value) {
 
 function normalizeSession(session) {
   const record = cloneValue(session || {});
-  const sessionID = readString$1Y(record.sessionID) || readString$1Y(record.sessionId);
+  const sessionID = readString(record.sessionID) || readString(record.sessionId);
   if (!sessionID) throw new TypeError("createSession requires sessionID.");
   return {
     ...record,
-    schemaVersion: readString$1Y(record.schemaVersion) || "agrun.storage-session.v1",
+    schemaVersion: readString(record.schemaVersion) || "agrun.storage-session.v1",
     sessionID,
     time: normalizeTime(record.time)
   };
@@ -166,8 +168,8 @@ function normalizeSession(session) {
 
 function normalizeMessage(sessionID, message) {
   const record = cloneValue(message || {});
-  const id = readString$1Y(record.id);
-  const resolvedSessionID = readString$1Y(sessionID) || readString$1Y(record.sessionID);
+  const id = readString(record.id);
+  const resolvedSessionID = readString(sessionID) || readString(record.sessionID);
   if (!resolvedSessionID) throw new TypeError("writeMessage requires sessionID.");
   if (!id) throw new TypeError("writeMessage requires message.id.");
   return {
@@ -180,9 +182,9 @@ function normalizeMessage(sessionID, message) {
 
 function normalizePart(sessionID, messageID, part) {
   const record = cloneValue(part || {});
-  const id = readString$1Y(record.id);
-  const resolvedSessionID = readString$1Y(sessionID) || readString$1Y(record.sessionID);
-  const resolvedMessageID = readString$1Y(messageID) || readString$1Y(record.messageID);
+  const id = readString(record.id);
+  const resolvedSessionID = readString(sessionID) || readString(record.sessionID);
+  const resolvedMessageID = readString(messageID) || readString(record.messageID);
   if (!resolvedSessionID) throw new TypeError("writePart requires sessionID.");
   if (!resolvedMessageID) throw new TypeError("writePart requires messageID.");
   if (!id) throw new TypeError("writePart requires part.id.");
@@ -205,12 +207,12 @@ function normalizeTime(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
     ...cloneValue(source),
-    created: readNumber$n(source.created) || Date.now()
+    created: readNumber$m(source.created) || Date.now()
   };
 }
 
 function compareCreated(a, b) {
-  return (readNumber$n(a && a.time && a.time.created) || 0) - (readNumber$n(b && b.time && b.time.created) || 0);
+  return (readNumber$m(a && a.time && a.time.created) || 0) - (readNumber$m(b && b.time && b.time.created) || 0);
 }
 
 function cloneValue(value) {
@@ -224,12 +226,8 @@ function readPositiveInteger$p(value) {
   return number;
 }
 
-function readNumber$n(value) {
+function readNumber$m(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readString$1Y(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createIndexedDBMessageStorage };

@@ -1,5 +1,6 @@
 import { stringifySessionContent, stableStringify } from './content.js';
 import { readContextSnapshot } from './context-snapshot-normalize.js';
+import { readString } from '../runtime/semantic-json.js';
 import { projectSessionContextFromSnapshot } from './context-snapshot-projection.js';
 
 const EVIDENCE_KINDS = ["fact", "preference", "decision"];
@@ -13,7 +14,7 @@ function buildSessionEvidenceSnapshot(options) {
   const includeOtherMemory = options.includeOtherMemory !== false;
   const scopedEntries = filterMemoryEntriesByThread(options.memoryEntries, options.threadScope);
   const classified = classifySessionMemoryEntries(scopedEntries);
-  const recentMessageCount = readPositiveInteger$n(policy.recentMessages, 6);
+  const recentMessageCount = readPositiveInteger$l(policy.recentMessages, 6);
   const recentTurnCount = Math.max(2, Math.ceil(recentMessageCount / 2));
   const allTurns = buildRecentTurns(completedMessages);
   const compactedContext = summary && typeof summary.text === "string" ? summary.text.trim() : "";
@@ -43,7 +44,7 @@ function buildSessionEvidenceSnapshot(options) {
 
   return {
     ...context,
-    estimatedTokens: estimateContextTokens(context, readPositiveInteger$n(policy.charsPerToken, 4))
+    estimatedTokens: estimateContextTokens(context, readPositiveInteger$l(policy.charsPerToken, 4))
   };
 }
 
@@ -108,7 +109,7 @@ function classifySessionMemoryEntries(entries) {
  * / invalid URLs are dropped. Order is stable (first occurrence wins).
  */
 function buildThreadScopedEvidenceUrls(memoryEntries, activeThreadId) {
-  const threadId = readString$1O(activeThreadId);
+  const threadId = readString(activeThreadId);
   if (!threadId) return null;
   const list = Array.isArray(memoryEntries) ? memoryEntries : [];
   if (list.length === 0) return null;
@@ -116,7 +117,7 @@ function buildThreadScopedEvidenceUrls(memoryEntries, activeThreadId) {
   for (const entry of list) {
     if (!entry || typeof entry !== "object") continue;
     const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-    const entryThread = readString$1O(metadata.threadId) || DEFAULT_THREAD_ID;
+    const entryThread = readString(metadata.threadId) || DEFAULT_THREAD_ID;
     if (entryThread !== threadId) continue;
     collectUrlsFromMetadata(metadata, urls);
   }
@@ -137,23 +138,23 @@ function filterMemoryEntriesByThread(entries, scope) {
   const list = Array.isArray(entries) ? entries : [];
   if (!scope || typeof scope !== "object") return list.slice();
   if (scope.crossThread === true) return list.slice();
-  const threadId = readString$1O(scope.threadId);
+  const threadId = readString(scope.threadId);
   if (!threadId) return list.slice();
   return list.filter((entry) => {
     if (!entry || typeof entry !== "object") return false;
     const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
-    const entryThread = readString$1O(metadata.threadId) || DEFAULT_THREAD_ID;
+    const entryThread = readString(metadata.threadId) || DEFAULT_THREAD_ID;
     return entryThread === threadId;
   });
 }
 
 function collectUrlsFromMetadata(metadata, sink) {
-  const direct = readString$1O(metadata.url) || readString$1O(metadata.sourceUrl);
+  const direct = readString(metadata.url) || readString(metadata.sourceUrl);
   if (direct) sink.add(direct);
   if (Array.isArray(metadata.sources)) {
     for (const source of metadata.sources) {
       if (source && typeof source === "object") {
-        const url = readString$1O(source.url);
+        const url = readString(source.url);
         if (url) sink.add(url);
       }
     }
@@ -176,12 +177,12 @@ function readBaseContext(value) {
 
   const context = projectSessionContextFromSnapshot(snapshot);
   return {
-    activeQuery: readString$1O(context && context.activeQuery),
-    clarificationStatus: readString$1O(context && context.clarificationStatus) || "none",
-    currentGoal: readString$1O(context && context.currentGoal),
-    currentTopic: readString$1O(context && context.currentTopic),
+    activeQuery: readString(context && context.activeQuery),
+    clarificationStatus: readString(context && context.clarificationStatus) || "none",
+    currentGoal: readString(context && context.currentGoal),
+    currentTopic: readString(context && context.currentTopic),
     lastResolution: context && context.lastResolution ? stableClone(context.lastResolution) : null,
-    openAmbiguity: readString$1O(context && context.openAmbiguity),
+    openAmbiguity: readString(context && context.openAmbiguity),
     pendingClarification: context && context.pendingClarification ? stableClone(context.pendingClarification) : null
   };
 }
@@ -193,22 +194,22 @@ function normalizeEvidenceItem(entry, index) {
 
   const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
   const kind = readEvidenceKind(metadata.kind);
-  const status = readString$1O(metadata.status) || "confirmed";
-  const text = readEntryText$1(entry);
+  const status = readString(metadata.status) || "confirmed";
+  const text = readEntryText$2(entry);
 
   if (!kind || status !== "confirmed" || !text) {
     return null;
   }
 
   const slot = normalizeSlot$1(metadata.slot);
-  const threadId = readString$1O(metadata.threadId) || DEFAULT_THREAD_ID;
-  const turnId = readString$1O(metadata.turnId) || null;
-  const source = readString$1O(metadata.source) || null;
-  const supersededBy = readString$1O(metadata.supersededBy) || null;
+  const threadId = readString(metadata.threadId) || DEFAULT_THREAD_ID;
+  const turnId = readString(metadata.turnId) || null;
+  const source = readString(metadata.source) || null;
+  const supersededBy = readString(metadata.supersededBy) || null;
   const confidence = typeof metadata.confidence === "number"
     ? clampConfidence$2(metadata.confidence)
     : DEFAULT_CONFIDENCE;
-  const id = readString$1O(metadata.id)
+  const id = readString(metadata.id)
     || `${threadId}|${kind}|${slot || normalizeText(text)}|${index}`;
 
   return {
@@ -267,8 +268,8 @@ function compactTurnsForContext(turns, maxTurns, anchors) {
 function anchorTurns(compacted, recentTurns, anchors) {
   const allTurns = Array.isArray(compacted) ? compacted : [];
   const recent = Array.isArray(recentTurns) ? recentTurns : [];
-  const currentGoal = readString$1O(anchors && anchors.currentGoal);
-  const currentTopic = readString$1O(anchors && anchors.currentTopic);
+  const currentGoal = readString(anchors && anchors.currentGoal);
+  const currentTopic = readString(anchors && anchors.currentTopic);
   const selected = new Set(recent.map((turn) => allTurns.indexOf(turn)).filter((index) => index >= 0));
   const goalIndex = findAnchorTurnIndex(allTurns, currentGoal);
   const topicIndex = findAnchorTurnIndex(allTurns, currentTopic);
@@ -311,7 +312,7 @@ function renderEvidenceBlock(items) {
 function renderMemoryBlock(entries) {
   return (Array.isArray(entries) ? entries : [])
     .map((entry, index) => {
-      const text = readEntryText$1(entry);
+      const text = readEntryText$2(entry);
       return `${index + 1}. ${text || stableStringify(entry)}`;
     })
     .join("\n");
@@ -338,7 +339,7 @@ function estimateContextTokens(context, charsPerToken) {
   return Math.ceil(text.length / charsPerToken);
 }
 
-function readEntryText$1(entry) {
+function readEntryText$2(entry) {
   if (!entry || typeof entry !== "object") {
     return "";
   }
@@ -382,7 +383,7 @@ function findAnchorTurnIndex(turns, anchorText) {
   }
 
   for (let index = turns.length - 1; index >= 0; index -= 1) {
-    const userText = readString$1O(turns[index] && turns[index].user);
+    const userText = readString(turns[index] && turns[index].user);
     const normalizedUser = normalizeAnchorText$1(userText);
     if (!normalizedUser) {
       continue;
@@ -405,11 +406,11 @@ function stableClone(value) {
 }
 
 function readEvidenceKind(value) {
-  const normalized = readString$1O(value);
+  const normalized = readString(value);
   return EVIDENCE_KINDS.includes(normalized) ? normalized : "";
 }
 
-function readPositiveInteger$n(value, fallback) {
+function readPositiveInteger$l(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
@@ -425,18 +426,14 @@ function clampConfidence$2(value) {
 }
 
 function normalizeText(value) {
-  return readString$1O(value)
+  return readString(value)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
 
 function normalizeAnchorText$1(value) {
-  return readString$1O(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
-}
-
-function readString$1O(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return readString(value).toLowerCase().replace(/[.?!]+$/g, "").replace(/\s+/g, " ").trim();
 }
 
 export { buildSessionEvidenceSnapshot, buildThreadScopedEvidenceUrls, classifySessionMemoryEntries, filterMemoryEntriesByThread };

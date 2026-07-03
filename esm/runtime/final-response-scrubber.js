@@ -1,5 +1,7 @@
+import { readString } from './semantic-json.js';
+
 function scrubFinalResponseText(value) {
-  const text = readString$o(value);
+  const text = readString(value);
 
   if (!text) {
     return "";
@@ -26,7 +28,7 @@ function scrubFinalResponseText(value) {
 // skills" filler that survives scrubbing and is not an answer. Detecting the
 // leak (not "scrubbed text is empty") is the correct re-prompt trigger.
 function finalResponseHasLeakedActionBlock(value) {
-  const text = readString$o(value);
+  const text = readString(value);
   if (!text) return false;
   return text
     .split(/\n\s*\n/)
@@ -270,7 +272,7 @@ function closedFenceEnd(text) {
 function noop() {}
 
 function isFollowUpParagraph(value) {
-  const text = readString$o(value);
+  const text = readString(value);
 
   if (!text) {
     return false;
@@ -285,10 +287,6 @@ function isFollowUpParagraph(value) {
   }
 
   return false;
-}
-
-function readString$o(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createStreamFence, finalResponseHasLeakedActionBlock, scrubFinalResponseText };

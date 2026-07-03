@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-248-B — Single source of truth for action result envelopes.
 //
 // Every action.execute(...) result flows through normalizeActionResultEnvelope()
@@ -10,6 +12,7 @@
 //
 // AI-first: runtime validates *mechanical shape* only. Action body is opaque
 // pass-through; per-action body schemas are out of scope for v1.
+
 
 const ACTION_RESULT_ENVELOPE_VERSION = "v1";
 
@@ -32,11 +35,11 @@ function normalizeActionResultEnvelope({ action, rawResult, durationMs }) {
     });
   }
 
-  const control = readString$Y(rawResult.control);
+  const control = readString(rawResult.control);
   const body = rawResult.output && typeof rawResult.output === "object" && !Array.isArray(rawResult.output)
     ? rawResult.output
     : {};
-  const summary = readString$Y(rawResult.summary) || `${actionName} executed`;
+  const summary = readString(rawResult.summary) || `${actionName} executed`;
   const schema = action && action.outputSchema && typeof action.outputSchema === "object"
     ? action.outputSchema
     : null;
@@ -64,7 +67,7 @@ function normalizeActionResultEnvelope({ action, rawResult, durationMs }) {
     }
 
     const allowedKinds = readKindArray(schema.kinds);
-    const bodyKind = readString$Y(body.kind);
+    const bodyKind = readString(body.kind);
     if (bodyKind && allowedKinds.length > 0 && !allowedKinds.includes(bodyKind)) {
       return createProtocolErrorEnvelope({
         actionName,
@@ -96,7 +99,7 @@ function normalizeActionResultEnvelope({ action, rawResult, durationMs }) {
   }
 
   // outputSchema:null waiver path — body kind passes through unchanged.
-  const envelopeKind = readString$Y(body.kind) || actionName;
+  const envelopeKind = readString(body.kind) || actionName;
   return finalizeEnvelope({
     actionName,
     control,
@@ -110,7 +113,7 @@ function normalizeActionResultEnvelope({ action, rawResult, durationMs }) {
 
 function createExecuteErrorEnvelope({ action, error, durationMs }) {
   const actionName = readActionName$1(action);
-  const errorMessage = readString$Y(error && error.message) || "action_execute_error";
+  const errorMessage = readString(error && error.message) || "action_execute_error";
   return finalizeEnvelopeRaw({
     actionName,
     control: "continue",
@@ -152,10 +155,10 @@ function createProtocolErrorEnvelope({
 function envelopeToObservation(envelope) {
   if (!envelope || typeof envelope !== "object") return null;
   if (envelope.status === "protocol_error") {
-    const message = readString$Y(envelope.summary)
-      || readString$Y(envelope.body && envelope.body.error)
+    const message = readString(envelope.summary)
+      || readString(envelope.body && envelope.body.error)
       || `${envelope.actionName} protocol_error`;
-    const stage = readString$Y(envelope.body && envelope.body.errorStage)
+    const stage = readString(envelope.body && envelope.body.errorStage)
       || (envelope.reason === "execute_threw" ? "execute" : "envelope");
     return {
       actionName: envelope.actionName,
@@ -181,7 +184,7 @@ function finalizeEnvelope({ actionName, control, kind, schema, body, summary, du
     status,
     kind,
     summary,
-    reason: status === "blocked" ? readString$Y(body && body.reason) || readString$Y(body && body.status) || null : null,
+    reason: status === "blocked" ? readString(body && body.reason) || readString(body && body.status) || null : null,
     metrics,
     body
   });
@@ -217,7 +220,7 @@ function finalizeEnvelopeRaw({
 function deriveStatusFromBody(body) {
   if (!body || typeof body !== "object") return "success";
   if (body.ok === false) return "blocked";
-  const status = readString$Y(body.status).toLowerCase();
+  const status = readString(body.status).toLowerCase();
   if (status && FALLBACK_BLOCKED_STATUS_VALUES.has(status)) return "blocked";
   return "success";
 }
@@ -254,20 +257,16 @@ function readMetricPath(body, path) {
 
 function readKindArray(value) {
   if (!Array.isArray(value)) return [];
-  return value.map((entry) => readString$Y(entry)).filter(Boolean);
+  return value.map((entry) => readString(entry)).filter(Boolean);
 }
 
 function readActionName$1(action) {
-  return readString$Y(action && action.name) || "unknown_action";
+  return readString(action && action.name) || "unknown_action";
 }
 
 function readDurationMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return 0;
   return value;
-}
-
-function readString$Y(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { ACTION_RESULT_ENVELOPE_VERSION, createExecuteErrorEnvelope, createProtocolErrorEnvelope, envelopeToObservation, normalizeActionResultEnvelope };

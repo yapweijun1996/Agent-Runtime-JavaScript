@@ -13,9 +13,10 @@
 // default. "How many sources are enough" is a research-domain semantic, not a kernel
 // opinion, so `DEFAULT_MIN_READ_SOURCES`/`DEFAULT_MIN_RELEVANT_SOURCES` were removed
 // from here. When the host supplies neither minReadSources/minRelevantSources nor the
-// minEvidenceArtifacts aliases, the normalizer leaves them absent (0). The opt-in
-// @agrun/skills-research pack applies its 3/2 default in research-report-loop.js
-// (refreshGate). The remaining loop-BUDGET defaults below (vetoes / search passes) are
+// minEvidenceArtifacts aliases, the normalizer leaves them absent (0). A research
+// skill that wants the 3/2 evidence gate supplies it via config (the old
+// research-report-loop.js refreshGate algorithm was removed in AGRUN-522 — the
+// judgment is the skill's job). The remaining loop-BUDGET defaults below (vetoes / search passes) are
 // generic mechanism, kept in core. The resulting sourceMinimum stays a NON-BLOCKING
 // observable signal — AI owns finalize-with-limitations.
 const DEFAULT_MAX_RESEARCH_LOOP_VETOES = 4;

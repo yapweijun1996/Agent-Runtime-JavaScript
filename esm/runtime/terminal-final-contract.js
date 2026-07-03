@@ -1,8 +1,9 @@
 import { countSuccessfulReadUrlArtifacts } from './final-readiness.js';
+import { readString, readFiniteNumber } from './semantic-json.js';
 
 function applyTerminalFinalContract(options = {}) {
   const runState = options.runState && typeof options.runState === "object" ? options.runState : null;
-  const source = readString$1E(options.source) || "final_response";
+  const source = readString(options.source) || "final_response";
   const contractText = readTerminalContractText(options);
   const suffixAudit = normalizeExplicitFinalSuffix(options.text, contractText);
   const readinessAudit = inspectTerminalReadinessConsistency({
@@ -47,7 +48,7 @@ function inspectTerminalReadinessConsistency(options = {}) {
     return { issues, ok: true, status: finalReadiness ? "missing_requirements_assessment" : "not_declared" };
   }
 
-  const declaredReadUrls = readFiniteNumber$5(assessment.successfulReadUrlCount);
+  const declaredReadUrls = readFiniteNumber(assessment.successfulReadUrlCount);
   const observedReadUrls = countSuccessfulReadUrlArtifacts(runState);
   if (declaredReadUrls != null && declaredReadUrls !== observedReadUrls) {
     issues.push({
@@ -68,13 +69,13 @@ function inspectTerminalReadinessConsistency(options = {}) {
   if (researchGateBlocked && assessment.evidenceSatisfied === true) {
     issues.push({
       code: "evidence_satisfied_conflicts_with_research_gate",
-      researchFinalReason: readString$1E(researchState.finalReason) || null
+      researchFinalReason: readString(researchState.finalReason) || null
     });
   }
   if (researchGateBlocked && finalReadiness.decision === "ready") {
     issues.push({
       code: "ready_conflicts_with_research_gate",
-      researchFinalReason: readString$1E(researchState.finalReason) || null
+      researchFinalReason: readString(researchState.finalReason) || null
     });
   }
 
@@ -109,7 +110,7 @@ function inspectTerminalReadinessConsistency(options = {}) {
         requestedUnit: requestedLengthContract.unit
       });
     }
-    const declaredRequestedLength = readFiniteNumber$5(assessment.requestedLength);
+    const declaredRequestedLength = readFiniteNumber(assessment.requestedLength);
     if (declaredRequestedLength != null && declaredRequestedLength !== requestedLengthContract.value) {
       issues.push({
         code: "requested_length_mismatch",
@@ -153,7 +154,7 @@ function inspectTerminalReadinessConsistency(options = {}) {
 
 function normalizeExplicitFinalSuffix(text, contractText) {
   const suffix = extractExplicitFinalSuffix(contractText);
-  const source = readString$1E(text);
+  const source = readString(text);
   if (!suffix) {
     return {
       count: 0,
@@ -199,7 +200,7 @@ function readTerminalContractText(context) {
   const seen = new Set();
   const text = [];
   for (const piece of pieces) {
-    const value = readString$1E(piece);
+    const value = readString(piece);
     if (!value || seen.has(value)) continue;
     seen.add(value);
     text.push(value);
@@ -208,7 +209,7 @@ function readTerminalContractText(context) {
 }
 
 function extractRequestedLengthContract(prompt) {
-  const value = readString$1E(prompt);
+  const value = readString(prompt);
   if (!value) return null;
   const wordMatch = value.match(/\b(\d{2,6})\s*[- ]?words?\b/i);
   if (wordMatch) {
@@ -238,14 +239,14 @@ function extractRequestedLengthContract(prompt) {
 }
 
 function extractExplicitFinalSuffix(prompt) {
-  const value = readString$1E(prompt);
+  const value = readString(prompt);
   if (!value) return "";
   const match = value.match(/\bend\s+exactly\s*(?::|(?:with|as)\s+)([`"'“”]?)([A-Za-z0-9_.:/-]{3,160})\1/i);
-  return match ? readString$1E(match[2]) : "";
+  return match ? readString(match[2]) : "";
 }
 
 function summarizeFinalText(content) {
-  const text = readString$1E(content);
+  const text = readString(content);
   const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
   const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
   return {
@@ -257,7 +258,7 @@ function summarizeFinalText(content) {
 }
 
 function readStatsKeyForUnit(unit) {
-  const value = readString$1E(unit).toLowerCase();
+  const value = readString(unit).toLowerCase();
   if (value === "words" || value === "word") return "words";
   if (value === "cjk_chars" || value === "cjk" || value.includes("cjk")) return "cjkChars";
   if (value === "non_whitespace_chars" || value === "nonwhitespacechars") return "nonWhitespaceChars";
@@ -278,10 +279,10 @@ function recordTerminalContractAudit(runState, audit) {
 function normalizeTextStats$4(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
-    chars: readNumber$g(source.chars),
-    cjkChars: readNumber$g(source.cjkChars),
-    nonWhitespaceChars: readNumber$g(source.nonWhitespaceChars),
-    words: readNumber$g(source.words)
+    chars: readNumber$k(source.chars),
+    cjkChars: readNumber$k(source.cjkChars),
+    nonWhitespaceChars: readNumber$k(source.nonWhitespaceChars),
+    words: readNumber$k(source.words)
   };
 }
 
@@ -304,24 +305,16 @@ function readObservedSourceMinimum(runState) {
   const source = packet || loop;
   if (!source) return null;
   return {
-    minReadSources: readNumber$g(source.minReadSources),
-    minRelevantSources: readNumber$g(source.minRelevantSources),
+    minReadSources: readNumber$k(source.minReadSources),
+    minRelevantSources: readNumber$k(source.minRelevantSources),
     passed: source.passed === true,
-    readSources: readNumber$g(source.readSources),
-    relevantSources: readNumber$g(source.relevantSources)
+    readSources: readNumber$k(source.readSources),
+    relevantSources: readNumber$k(source.relevantSources)
   };
 }
 
-function readFiniteNumber$5(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readNumber$g(value) {
+function readNumber$k(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function readString$1E(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { applyTerminalFinalContract, extractExplicitFinalSuffix, extractRequestedLengthContract, inspectTerminalReadinessConsistency, normalizeExplicitFinalSuffix, readStatsKeyForUnit, readTerminalContractText, summarizeFinalText };

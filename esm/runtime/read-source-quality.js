@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 function classifyReadSourceTier(value, options = {}) {
   return explainReadSourceQuality(value, options).tier;
 }
@@ -8,18 +10,18 @@ function explainReadSourceQuality(value, options = {}) {
     return createQualityDetail("thin", "missing_source", [], {});
   }
 
-  const existingTier = readString$1A(source.tier).toLowerCase();
+  const existingTier = readString(source.tier).toLowerCase();
   if (READ_SOURCE_TIERS.has(existingTier)) {
     return normalizeExistingQualityDetail(source, existingTier);
   }
 
-  const url = readString$1A(source.url).toLowerCase();
-  const title = readString$1A(source.title).toLowerCase();
-  const text = readString$1A(source.text).toLowerCase();
-  const platform = readString$1A(source.platform).toLowerCase();
+  const url = readString(source.url).toLowerCase();
+  const title = readString(source.title).toLowerCase();
+  const text = readString(source.text).toLowerCase();
+  const platform = readString(source.platform).toLowerCase();
   const originStatus = typeof source.originStatus === "number" ? source.originStatus : null;
   const bytes = typeof source.bytes === "number" ? source.bytes : 0;
-  const query = readString$1A(options.query).toLowerCase();
+  const query = readString(options.query).toLowerCase();
   const overlap = countTokenOverlap$2(query, `${title} ${text} ${url}`);
   const metrics = {
     bytes,
@@ -86,7 +88,7 @@ function explainReadSourceQuality(value, options = {}) {
   const distinctiveTokensForBody = extractDistinctiveTokens(query);
   let distinctiveBodyHits = 0;
   if (distinctiveTokensForBody.length > 0) {
-    const haystackLower = readString$1A(text).toLowerCase();
+    const haystackLower = readString(text).toLowerCase();
     for (const token of distinctiveTokensForBody) {
       if (haystackLower.includes(token)) distinctiveBodyHits += 1;
     }
@@ -130,7 +132,7 @@ function countBlockedReadSources(value) {
 }
 
 function countReadSourcesByTier(value, tier) {
-  const normalizedTier = readString$1A(tier).toLowerCase();
+  const normalizedTier = readString(tier).toLowerCase();
   const sources = Array.isArray(value) ? value : [];
   let count = 0;
 
@@ -155,6 +157,37 @@ function isReadableEvidenceSource(value) {
   return tier === "usable" || tier === "strong";
 }
 
+// AGRUN-491 (audit M12) — the read-source success predicate lives in TWO
+// deliberately-distinct LAYERS, both co-located here so the distinction is
+// explicit and neither drifts:
+//
+//   isReadableEvidenceSource  — CONTENT-QUALITY layer. "Is this source good
+//     enough to CITE?" Requires tier usable/strong (excludes thin <120-char /
+//     "loading" / blocked-by-content / origin>=400). Drives the AI's
+//     final-response prompt, citation selection, and the research quality gate.
+//
+//   isSuccessfulReadUrlArtifact — TRANSPORT-SUCCESS layer. "Did this read_url
+//     FETCH succeed?" ok !== false, status/originStatus < 400, and it returned
+//     SOME text or title (any length). Drives finalReadiness' ground-truth
+//     count that terminal-final-contract cross-checks the AI's self-declared
+//     successfulReadUrlCount against, plus the research-acceptance evidence
+//     count. A short-but-valid page (e.g. an 80-char stock quote) is a
+//     successful FETCH but not citable-quality — so this is intentionally
+//     looser than isReadableEvidenceSource, NOT a divergent copy of it.
+//
+// Pinned by read-source-success-predicate-guard.test.js, which asserts the two
+// layers agree on the clear cases (strong page = both true; ok:false / 404 =
+// both false) and diverge ONLY on the thin-but-fetched case.
+function isSuccessfulReadUrlArtifact(value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.ok === false) return false;
+  const status = typeof value.status === "number" ? value.status : null;
+  const originStatus = typeof value.originStatus === "number" ? value.originStatus : null;
+  if (status != null && status >= 400) return false;
+  if (originStatus != null && originStatus >= 400) return false;
+  return Boolean(readString(value.text) || readString(value.title));
+}
+
 const READ_SOURCE_TIERS = new Set(["blocked", "thin", "weak", "usable", "strong"]);
 
 function normalizeExistingQualityDetail(source, tier) {
@@ -166,8 +199,8 @@ function normalizeExistingQualityDetail(source, tier) {
   if (existing) {
     return createQualityDetail(
       tier,
-      readString$1A(existing.reason) || "explicit_tier",
-      Array.isArray(existing.signals) ? existing.signals.map(readString$1A).filter(Boolean) : [],
+      readString(existing.reason) || "explicit_tier",
+      Array.isArray(existing.signals) ? existing.signals.map(readString).filter(Boolean) : [],
       existing.metrics && typeof existing.metrics === "object" ? existing.metrics : {}
     );
   }
@@ -175,7 +208,7 @@ function normalizeExistingQualityDetail(source, tier) {
     bytes: typeof source.bytes === "number" ? source.bytes : 0,
     originStatus: typeof source.originStatus === "number" ? source.originStatus : null,
     status: typeof source.status === "number" ? source.status : null,
-    textLength: readString$1A(source.text).length
+    textLength: readString(source.text).length
   });
 }
 
@@ -189,18 +222,18 @@ function createQualityDetail(tier, reason, signals, metrics) {
       status: typeof safeMetrics.status === "number" ? safeMetrics.status : null,
       textLength: typeof safeMetrics.textLength === "number" ? safeMetrics.textLength : 0
     },
-    reason: readString$1A(reason) || "unknown",
-    signals: Array.isArray(signals) ? signals.map(readString$1A).filter(Boolean).slice(0, 8) : [],
+    reason: readString(reason) || "unknown",
+    signals: Array.isArray(signals) ? signals.map(readString).filter(Boolean).slice(0, 8) : [],
     tier
   };
 }
 
 function createThinSignals({ bytes, text }) {
   const signals = [];
-  if (readString$1A(text) === "loading") signals.push("loading");
-  if (THIN_PAGE_PATTERNS.some((pattern) => pattern.test(readString$1A(text)))) signals.push("thin_pattern");
+  if (readString(text) === "loading") signals.push("loading");
+  if (THIN_PAGE_PATTERNS.some((pattern) => pattern.test(readString(text)))) signals.push("thin_pattern");
   if (bytes > 0 && bytes < 160) signals.push(`bytes:${bytes}`);
-  if (readString$1A(text).length < 120) signals.push(`text:${readString$1A(text).length}`);
+  if (readString(text).length < 120) signals.push(`text:${readString(text).length}`);
   return signals.length > 0 ? signals : ["thin_content"];
 }
 
@@ -251,14 +284,14 @@ function isTopicOwnedSource({ query, text, title, url }) {
 
   let parsed;
   try {
-    parsed = new URL(readString$1A(url));
+    parsed = new URL(readString(url));
   } catch {
     return false;
   }
 
   const domainCompact = parsed.hostname.replace(/^www\./i, "").replace(/[^a-z0-9]+/gi, "");
   const pathCompact = parsed.pathname.replace(/[^a-z0-9]+/gi, "");
-  const titleCompact = readString$1A(title).replace(/[^a-z0-9]+/gi, "").toLowerCase();
+  const titleCompact = readString(title).replace(/[^a-z0-9]+/gi, "").toLowerCase();
   const haystack = `${domainCompact} ${pathCompact} ${titleCompact}`;
   const matched = queryTokens.some((token) => haystack.includes(token));
   if (!matched) return false;
@@ -266,10 +299,10 @@ function isTopicOwnedSource({ query, text, title, url }) {
   const lowValue = [
     ...MARKETPLACE_PATTERNS$1,
     ...COMMUNITY_PATTERNS$1
-  ].some((pattern) => pattern.test(readString$1A(url)) || pattern.test(readString$1A(title)));
+  ].some((pattern) => pattern.test(readString(url)) || pattern.test(readString(title)));
   if (lowValue) return false;
 
-  return readString$1A(text).length >= 180;
+  return readString(text).length >= 180;
 }
 
 function extractDistinctiveTokens(value) {
@@ -300,7 +333,7 @@ function countTokenOverlap$2(query, haystack) {
     return 0;
   }
 
-  const haystackText = readString$1A(haystack).toLowerCase();
+  const haystackText = readString(haystack).toLowerCase();
   let count = 0;
 
   for (const token of queryTokens) {
@@ -313,7 +346,7 @@ function countTokenOverlap$2(query, haystack) {
 }
 
 function tokenize$3(value) {
-  return splitMixedScriptBoundaries$1(readString$1A(value))
+  return splitMixedScriptBoundaries$1(readString(value))
     .toLowerCase()
     .split(/[^a-z0-9\u4e00-\u9fff]+/i)
     .filter((token) => token.length >= 3)
@@ -321,13 +354,9 @@ function tokenize$3(value) {
 }
 
 function splitMixedScriptBoundaries$1(value) {
-  return readString$1A(value)
+  return readString(value)
     .replace(/([\u4e00-\u9fff])([a-z0-9])/gi, "$1 $2")
     .replace(/([a-z0-9])([\u4e00-\u9fff])/gi, "$1 $2");
 }
 
-function readString$1A(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-export { classifyReadSourceTier, countBlockedReadSources, countReadSourcesByTier, explainReadSourceQuality, hasUsableReadSource, isReadableEvidenceSource };
+export { classifyReadSourceTier, countBlockedReadSources, countReadSourcesByTier, explainReadSourceQuality, hasUsableReadSource, isReadableEvidenceSource, isSuccessfulReadUrlArtifact };

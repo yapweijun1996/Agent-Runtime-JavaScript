@@ -1,3 +1,5 @@
+import { readString } from '../semantic-json.js';
+
 const askClarificationAction = Object.freeze({
   description: "Ask the user a short clarifying question and stop.",
   name: "ask_clarification",
@@ -18,7 +20,7 @@ const askClarificationAction = Object.freeze({
 });
 
 async function executeAskClarificationAction(context, args) {
-  const question = readString$W(args && args.question) || "Could you clarify what information you want?";
+  const question = readString(args && args.question) || "Could you clarify what information you want?";
 
   return {
     control: "complete",
@@ -30,10 +32,6 @@ async function executeAskClarificationAction(context, args) {
     },
     summary: "ask_clarification"
   };
-}
-
-function readString$W(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { askClarificationAction, executeAskClarificationAction };

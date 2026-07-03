@@ -26,10 +26,17 @@ function resolvePlannerMode({
     });
   }
 
+  // ADR-0058 (2026-07-02, supersedes ADR-0031) — auto resolves to
+  // native_tools: measured equal-or-faster with equal-or-better correctness
+  // on openai/gemini/deepseek across short-task and long-report live A/Bs
+  // after the C3a/C3b gap fixes (AGRUN-574/575/576/577/578).
+  // `nativeToolsFailurePolicy` (default fallback_to_envelope) keeps envelope
+  // as the per-call safety net; `plannerMode: "envelope"` remains the
+  // explicit opt-out. The resolver stays provider/model-agnostic.
   return Object.freeze({
     configuredMode: "auto",
-    effectiveMode: "envelope",
-    reason: "default_envelope"
+    effectiveMode: "native_tools",
+    reason: "default_native_tools"
   });
 }
 

@@ -1,4 +1,5 @@
 import { summarizeReadSourceForDirection } from '../session/context-snapshot-fields.js';
+import { readString } from './semantic-json.js';
 
 const FINALIZER_CONTEXT_LIMITS = Object.freeze({
   activeQuery: 400,
@@ -26,10 +27,10 @@ function projectSessionContextFromPlannerState(sessionContext, plannerState) {
     return context;
   }
 
-  const pendingClarification = hasOwn$3(state, "pendingClarification")
+  const pendingClarification = hasOwn$4(state, "pendingClarification")
     ? state.pendingClarification
     : context.pendingClarification;
-  const lastResolution = hasOwn$3(state, "lastResolution")
+  const lastResolution = hasOwn$4(state, "lastResolution")
     ? state.lastResolution
     : context.lastResolution;
   const clarificationStatus = pendingClarification
@@ -40,10 +41,10 @@ function projectSessionContextFromPlannerState(sessionContext, plannerState) {
 
   return {
     ...context,
-    activeQuery: readString$1W(state.activeQuery) || context.activeQuery,
+    activeQuery: readString(state.activeQuery) || context.activeQuery,
     clarificationStatus,
-    currentGoal: readString$1W(state.currentGoal) || context.currentGoal,
-    currentTopic: readString$1W(state.currentTopic) || context.currentTopic,
+    currentGoal: readString(state.currentGoal) || context.currentGoal,
+    currentTopic: readString(state.currentTopic) || context.currentTopic,
     lastResolution,
     openAmbiguity: pendingClarification && typeof pendingClarification.question === "string"
       ? pendingClarification.question
@@ -87,16 +88,12 @@ function normalizeContext(sessionContext) {
   return sessionContext && typeof sessionContext === "object" ? sessionContext : null;
 }
 
-function hasOwn$3(value, key) {
+function hasOwn$4(value, key) {
   return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
 }
 
-function readString$1W(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function capString(value, maxChars) {
-  const text = readString$1W(value);
+  const text = readString(value);
   if (!text) return "";
   const budget = Number.isInteger(maxChars) && maxChars > 0 ? maxChars : 0;
   if (budget === 0 || text.length <= budget) return text;

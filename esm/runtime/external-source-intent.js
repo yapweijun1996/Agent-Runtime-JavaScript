@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-246-D (C2 fix) — removed English-only regex classification.
 // Old: EXPLICIT_SOURCE_REQUEST_RE / NEWS_REQUEST_RE / FRESH_NEWS_REQUEST_RE decided
 // whether coverage guidance applied, silently returning false for all non-English
@@ -8,18 +10,15 @@
 // Q&A prompts. Full planner-envelope self-declaration (AGRUN-246-D complete) is
 // a follow-up task; this removes the language bias as the minimum viable fix.
 
+
 function isExternalSourceCoveragePrompt(value) {
-  const prompt = readString$1n(value);
+  const prompt = readString(value);
   return prompt.length > 0;
 }
 
 function isNewsLikeSourceCoveragePrompt(value) {
-  const prompt = readString$1n(value);
+  const prompt = readString(value);
   return prompt.length > 0;
-}
-
-function readString$1n(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { isExternalSourceCoveragePrompt, isNewsLikeSourceCoveragePrompt };

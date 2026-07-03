@@ -1,4 +1,5 @@
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 
 // Kernel acceptance-evaluator DATA only; the acceptance hook seam was removed.
 //
@@ -7,17 +8,16 @@ import { cloneValue } from './utils.js';
 // the empty state-slot shape and read-only planner-prompt projection.
 
 
+
 // --- Pure-data plumbing moved verbatim from research-acceptance-evaluator.js
 // (AGRUN-313 2.2). Local coercers kept identical to the behavior file's (0-default
 // readNumber) so the projection is byte-identical; the behavior file keeps its own
 // copies for its own use.
-function readString$1F(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function readNumber$h(value) {
+
+function readNumber$e(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
-function readNullableNumber$5(value) {
+function readNullableNumber$4(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
@@ -47,19 +47,19 @@ function createResearchAcceptanceEvaluatorState() {
 
 function buildNextMoveContract$1(signal) {
   const dimensions = Array.isArray(signal.activeConflictDimensions)
-    ? signal.activeConflictDimensions.map(readString$1F).filter(Boolean)
+    ? signal.activeConflictDimensions.map(readString).filter(Boolean)
     : [];
   const moves = Array.isArray(signal.allowedNextMoves)
-    ? signal.allowedNextMoves.map(readString$1F).filter(Boolean)
+    ? signal.allowedNextMoves.map(readString).filter(Boolean)
     : [];
   const deficits = signal.observableDeficits && typeof signal.observableDeficits === "object"
     ? signal.observableDeficits
     : null;
   const deficitText = deficits
     ? [
-        readNumber$h(deficits.readSourceDeficit) > 0 ? `readSourceDeficit=${readNumber$h(deficits.readSourceDeficit)}` : "",
-        readNumber$h(deficits.relevantSourceDeficit) > 0 ? `relevantSourceDeficit=${readNumber$h(deficits.relevantSourceDeficit)}` : "",
-        readNumber$h(deficits.lengthDeficit) > 0 ? `lengthDeficit=${readNumber$h(deficits.lengthDeficit)} ${readString$1F(deficits.lengthUnit) || ""}`.trim() : ""
+        readNumber$e(deficits.readSourceDeficit) > 0 ? `readSourceDeficit=${readNumber$e(deficits.readSourceDeficit)}` : "",
+        readNumber$e(deficits.relevantSourceDeficit) > 0 ? `relevantSourceDeficit=${readNumber$e(deficits.relevantSourceDeficit)}` : "",
+        readNumber$e(deficits.lengthDeficit) > 0 ? `lengthDeficit=${readNumber$e(deficits.lengthDeficit)} ${readString(deficits.lengthUnit) || ""}`.trim() : ""
       ].filter(Boolean).join(", ")
     : "";
   return [
@@ -87,56 +87,56 @@ function summarizeResearchAcceptanceEvaluator(value) {
     : null;
   return {
     activeConflictDimensions: Array.isArray(value.activeConflictDimensions)
-      ? value.activeConflictDimensions.map(readString$1F).filter(Boolean).slice(0, 6)
+      ? value.activeConflictDimensions.map(readString).filter(Boolean).slice(0, 6)
       : [],
-    status: readString$1F(value.status) || "tracking",
-    repeatedSourceReadinessConflictCount: readNumber$h(value.repeatedSourceReadinessConflictCount),
-    repeatedLengthReadinessConflictCount: readNumber$h(value.repeatedLengthReadinessConflictCount),
-    repeatedReadinessConflictCount: readNumber$h(value.repeatedReadinessConflictCount),
-    repeatedPublishBlockCount: readNumber$h(value.repeatedPublishBlockCount),
-    stepsWithoutNewEvidence: readNumber$h(value.stepsWithoutNewEvidence),
-    lastSuccessfulEvidenceCount: readNumber$h(value.lastSuccessfulEvidenceCount),
-    lastSuccessfulReadUrlCount: readNumber$h(value.lastSuccessfulReadUrlCount),
+    status: readString(value.status) || "tracking",
+    repeatedSourceReadinessConflictCount: readNumber$e(value.repeatedSourceReadinessConflictCount),
+    repeatedLengthReadinessConflictCount: readNumber$e(value.repeatedLengthReadinessConflictCount),
+    repeatedReadinessConflictCount: readNumber$e(value.repeatedReadinessConflictCount),
+    repeatedPublishBlockCount: readNumber$e(value.repeatedPublishBlockCount),
+    stepsWithoutNewEvidence: readNumber$e(value.stepsWithoutNewEvidence),
+    lastSuccessfulEvidenceCount: readNumber$e(value.lastSuccessfulEvidenceCount),
+    lastSuccessfulReadUrlCount: readNumber$e(value.lastSuccessfulReadUrlCount),
     lastConflictCodes: Array.isArray(value.lastConflictCodes)
-      ? value.lastConflictCodes.map(readString$1F).filter(Boolean).slice(0, 8)
+      ? value.lastConflictCodes.map(readString).filter(Boolean).slice(0, 8)
       : [],
     sourceMinimum: sourceMinimum ? {
       passed: sourceMinimum.passed === true,
-      reads: readNumber$h(sourceMinimum.readSources),
-      minReads: readNumber$h(sourceMinimum.minReadSources),
-      relevant: readNumber$h(sourceMinimum.relevantSources),
-      minRelevant: readNumber$h(sourceMinimum.minRelevantSources)
+      reads: readNumber$e(sourceMinimum.readSources),
+      minReads: readNumber$e(sourceMinimum.minReadSources),
+      relevant: readNumber$e(sourceMinimum.relevantSources),
+      minRelevant: readNumber$e(sourceMinimum.minRelevantSources)
     } : null,
     candidate: candidate ? {
-      path: readString$1F(candidate.path) || null,
-      chars: readNullableNumber$5(candidate.chars),
-      cjkChars: readNullableNumber$5(candidate.cjkChars),
-      words: readNullableNumber$5(candidate.words)
+      path: readString(candidate.path) || null,
+      chars: readNullableNumber$4(candidate.chars),
+      cjkChars: readNullableNumber$4(candidate.cjkChars),
+      words: readNullableNumber$4(candidate.words)
     } : null,
     observableDeficits: deficits ? {
-      lengthDeficit: readNullableNumber$5(deficits.lengthDeficit),
-      lengthObserved: readNullableNumber$5(deficits.lengthObserved),
-      lengthRequested: readNullableNumber$5(deficits.lengthRequested),
-      lengthUnit: readString$1F(deficits.lengthUnit) || null,
-      readSourceDeficit: readNullableNumber$5(deficits.readSourceDeficit),
-      relevantSourceDeficit: readNullableNumber$5(deficits.relevantSourceDeficit)
+      lengthDeficit: readNullableNumber$4(deficits.lengthDeficit),
+      lengthObserved: readNullableNumber$4(deficits.lengthObserved),
+      lengthRequested: readNullableNumber$4(deficits.lengthRequested),
+      lengthUnit: readString(deficits.lengthUnit) || null,
+      readSourceDeficit: readNullableNumber$4(deficits.readSourceDeficit),
+      relevantSourceDeficit: readNullableNumber$4(deficits.relevantSourceDeficit)
     } : null,
     sourceProgressSignals: Array.isArray(value.sourceProgressSignals)
-      ? value.sourceProgressSignals.map(readString$1F).filter(Boolean).slice(0, 8)
+      ? value.sourceProgressSignals.map(readString).filter(Boolean).slice(0, 8)
       : [],
     workspaceProgressSignals: Array.isArray(value.workspaceProgressSignals)
-      ? value.workspaceProgressSignals.map(readString$1F).filter(Boolean).slice(0, 8)
+      ? value.workspaceProgressSignals.map(readString).filter(Boolean).slice(0, 8)
       : [],
     acceptanceConvergenceSignal: signal ? {
-      kind: readString$1F(signal.kind) || "acceptance_convergence_signal",
-      status: readString$1F(signal.status) || null,
-      reason: readString$1F(signal.reason) || null,
-      forbiddenReadiness: readString$1F(signal.forbiddenReadiness) || null,
+      kind: readString(signal.kind) || "acceptance_convergence_signal",
+      status: readString(signal.status) || null,
+      reason: readString(signal.reason) || null,
+      forbiddenReadiness: readString(signal.forbiddenReadiness) || null,
       allowedNextMoves: Array.isArray(signal.allowedNextMoves)
-        ? signal.allowedNextMoves.map(readString$1F).filter(Boolean).slice(0, 6)
+        ? signal.allowedNextMoves.map(readString).filter(Boolean).slice(0, 6)
         : [],
       requiredLimitedFields: Array.isArray(signal.requiredLimitedFields)
-        ? signal.requiredLimitedFields.map(readString$1F).filter(Boolean).slice(0, 6)
+        ? signal.requiredLimitedFields.map(readString).filter(Boolean).slice(0, 6)
         : [],
       requiredCorrection: signal.requiredCorrection && typeof signal.requiredCorrection === "object"
         ? cloneValue(signal.requiredCorrection)

@@ -87,8 +87,19 @@ function extractBalancedJson(text, open, close) {
 // AGRUN-447 — readString / readStringArray / readPositiveInteger below are
 // the SSOT for these readers. New code imports from here instead of adding
 // another local copy (~100 legacy locals migrate opportunistically).
-function readString$1S(value) {
+function readString$5(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readStringArray$6(value) {
+  return Array.isArray(value) ? value.map(readString$5).filter(Boolean) : [];
+}
+
+// AGRUN-466 — canonical finite-number reader (null fallback). The two local
+// `: 0` fallback variants are a different semantic and deliberately NOT
+// served by this function.
+function readFiniteNumber$9(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function readBoolean$2(value, fallback) {
@@ -99,7 +110,7 @@ function readBoolean$2(value, fallback) {
   return fallback === true;
 }
 
-function readNumber$m(value, fallback) {
+function readNumber$n(value, fallback) {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : fallback;
@@ -123,4 +134,4 @@ function safeParse$2(text) {
   }
 }
 
-export { extractBalancedJson, parseLooseJsonValue, readArray$3 as readArray, readBoolean$2 as readBoolean, readNumber$m as readNumber, readObject$2 as readObject, readString$1S as readString };
+export { extractBalancedJson, parseLooseJsonValue, readArray$3 as readArray, readBoolean$2 as readBoolean, readFiniteNumber$9 as readFiniteNumber, readNumber$n as readNumber, readObject$2 as readObject, readString$5 as readString, readStringArray$6 as readStringArray };

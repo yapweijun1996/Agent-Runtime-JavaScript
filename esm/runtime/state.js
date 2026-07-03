@@ -12,9 +12,10 @@ import { createReadUrlRecoverySignalState } from './read-url-recovery-signal.js'
 import { createEmptyResearchWorkspace } from './research-state.js';
 import { createResearchReportLoopState } from './kernel-report-loop.js';
 import { createSessionBudgetState } from './session-budget.js';
-import { createTerminalRepairState } from './terminal-repair-state.js';
-import { createInvalidActionConvergenceState } from './invalid-action-convergence.js';
+import { createTerminalRepairState } from './terminal-repair/internal-utils.js';
+import './action-names.js';
 import { createEmptyVirtualWorkspace } from './virtual-workspace.js';
+import { createInvalidActionConvergenceState } from './invalid-action-convergence.js';
 import { createRuntimeEventLedger } from './runtime-event-ledger.js';
 import { projectMetricsRunState, createRunKernelState, projectRunKernelState, projectApprovalRunState, projectResearchRunState, projectWorkspaceRunState, projectTodoRunState } from './run-state-projections.js';
 
@@ -84,6 +85,18 @@ function createRunState(runId, maxSteps, lineage, options) {
       // Reset by action-loop-session-cycle on each new turn.
       listSkillsCallsThisTurn: 0
     },
+    // ADR-0057 Phase 1 (AGRUN-565) — deferred-action-loading open state,
+    // beside its shape sibling agentSkillContext and with the SAME
+    // persistence posture: per-run only (NOT carried by
+    // hydrateRunStateWithThread — thread carry is explicitly Phase 3), rides
+    // snapshotRunState/createLastRunSummary below sanitized to plain data.
+    // `deferred` mirrors runtimeConfig.deferredNamespaces at run start
+    // (seeded by createActionLoopSession via ensureActionNamespaceContext);
+    // `opened` is written only by the open_action_namespace action.
+    actionNamespaceContext: {
+      deferred: [],
+      opened: {}
+    },
     // AGRUN-486 (audit H8): the LIVE planner repair budget. `retries` counts
     // the streak of consecutive failed-repair cycles; it gates the N+1
     // envelope-repair LLM call (isRecoveryBudgetExhausted) and is zeroed the
@@ -121,8 +134,8 @@ function createRunState(runId, maxSteps, lineage, options) {
     // builder/materialize creates + assigns the real graph. Core readers null-guard.
     researchEvidenceGraph: null,
     researchWorkspace: createEmptyResearchWorkspace(),
-    // Intentional research-pack round-trip carriers: only the opt-in
-    // @agrun/skills-research pack populates these via research-thread-sync.js.
+    // Intentional research round-trip carriers: only the research plumbing
+    // (research-thread-sync.js) populates these when a research skill is engaged.
     // Pure-core runs keep them empty/inert, and core readers are null-safe.
     researchReportLoop: createResearchReportLoopState(),
     researchAcceptanceEvaluator: createResearchAcceptanceEvaluatorState(),
@@ -197,6 +210,9 @@ function readEventLedgerOptions(options) {
 function snapshotRunState(runState) {
   const snapshot = cloneValue(runState);
   snapshot.agentSkillContext = sanitizeAgentSkillContext(runState.agentSkillContext);
+  // ADR-0057 Phase 1 — mirrors the agentSkillContext treatment above so the
+  // crash-recovery export always carries a plain-data open-state slot.
+  snapshot.actionNamespaceContext = sanitizeActionNamespaceContext(runState.actionNamespaceContext);
   snapshot.recoveryState = sanitizeRecoveryState(runState && runState.recoveryState);
   snapshot.costLedger = projectMetricsRunState(runState).costLedger;
   // AGRUN-248-C — eventLedger is a live object (closures + methods); strip
@@ -285,6 +301,8 @@ function createLastRunSummary(runState, memoryEntriesAdded) {
     finalAnswerSource: kernelState.finalAnswerSource,
     runtimeBuildId: kernelState.runtimeBuildId,
     agentSkillContext: sanitizeAgentSkillContext(runState.agentSkillContext),
+    // ADR-0057 Phase 1 — same summary treatment as its sibling agentSkillContext.
+    actionNamespaceContext: sanitizeActionNamespaceContext(runState.actionNamespaceContext),
     recoveryState: sanitizeRecoveryState(runState.recoveryState),
     researchState: researchState.researchState,
     readinessContinuationSignal: researchState.readinessContinuationSignal,
@@ -308,6 +326,32 @@ function createLastRunSummary(runState, memoryEntriesAdded) {
     memoryEntriesAdded: memoryEntriesAdded.length,
     oodaeCycles: runState.oodae.cycles.length
   };
+}
+
+// ADR-0057 Phase 1 — plain-data projection of the namespace open state
+// ({ deferred: string[], opened: { name: { openedAtCycle } } }). Defensive
+// like sanitizeAgentSkillContext below: a malformed/absent slot sanitizes to
+// the empty shape rather than throwing during snapshot/export.
+function sanitizeActionNamespaceContext(context) {
+  const source = context && typeof context === "object" && !Array.isArray(context) ? context : {};
+  const deferred = Array.isArray(source.deferred)
+    ? source.deferred
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean)
+    : [];
+  const opened = {};
+  const openedSource = source.opened && typeof source.opened === "object" && !Array.isArray(source.opened)
+    ? source.opened
+    : {};
+  for (const [name, record] of Object.entries(openedSource)) {
+    if (!record) continue;
+    opened[name] = {
+      openedAtCycle: record && typeof record === "object" && Number.isInteger(record.openedAtCycle)
+        ? record.openedAtCycle
+        : 0
+    };
+  }
+  return { deferred, opened };
 }
 
 function sanitizeAgentSkillContext(context) {

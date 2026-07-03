@@ -26,6 +26,7 @@ import { normalizeCostPricing } from './cost-ledger.js';
 import { normalizeHandoffInputFilters } from './handoff-input-filter.js';
 import { normalizeCompactionPolicy } from '../session/compaction-policy.js';
 import { normalizeEvidencePolicyConfig } from './evidence-policy.js';
+import { isKnownActionNamespace, ACTION_NAMESPACE_MANIFEST } from './action-namespace-gate.js';
 import { classifyEvidenceState } from './evidence-state.js';
 import { normalizeResearchReportLoopConfig } from './kernel-report-loop.js';
 import { normalizeSkillCatalogTopK, normalizeSkillCatalogRanker, normalizeSkillCatalogMaxK } from './skill-catalog-ranking.js';
@@ -65,7 +66,7 @@ function normalizeRuntimeConfig(options) {
   );
   // AGRUN-313 (post-3.0) — core no longer defaults to the bundled role catalog. A host
   // resolves a role-by-name against the roles it passes (e.g. bundledAgentRoles from
-  // @agrun/skills-research); a role passed as an object still resolves with no catalog.
+  // the in-tree role DATA default-research-roles.js); a role passed as an object still resolves with no catalog.
   const resolvedRole = resolveActiveRole(config.role, Array.isArray(config.agentRoles) ? config.agentRoles : []);
   const resolvedMemory = normalizeMemory(config.memory);
   // GAP 5 — maxCostUsd needs the resolved pricing to validate the
@@ -133,6 +134,14 @@ function normalizeRuntimeConfig(options) {
         : classifyEvidenceState,
       customActions: normalizeCustomActions(config.customActions),
       disabledActions: normalizeDisabledActions(config.disabledActions),
+      // ADR-0057 Phase 1 (AGRUN-565) — opt-in deferred action namespaces.
+      // Default [] keeps prompts and dispatch byte-identical. When a declared
+      // namespace is listed, its member actions leave the planner catalog and
+      // both dispatch doors gate them until the AI calls open_action_namespace
+      // (action-namespace-gate.js is the SSOT the doors + prompt read this
+      // value through). runtime-level only — composes with disabledActions
+      // (disabled subtracts unconditionally; deferred subtracts until opened).
+      deferredNamespaces: normalizeDeferredNamespaces(config.deferredNamespaces),
       globalMemory: normalizeGlobalMemory(config.globalMemory),
       handoffInputFilters: normalizeHandoffInputFilters(config.handoffInputFilters),
       longResearchQualityGate: config.longResearchQualityGate,
@@ -141,6 +150,13 @@ function normalizeRuntimeConfig(options) {
       skillCatalogTopK: normalizeSkillCatalogTopK(config.skillCatalogTopK),
       toolCallExamples: normalizeToolCallExamples(config.toolCallExamples),
       maxSteps: normalizeMaxSteps(config.maxSteps),
+      // ROADMAP D2 — opt-in HEAP cap for session.actionHistory (prompt cost
+      // is already bounded by history compaction; this bounds memory on very
+      // long runs). null = disabled (default; no behavior change). When set,
+      // the loop trims the OLDEST entries in place at each cycle boundary
+      // and shifts the compaction cursor so folded-observation bookkeeping
+      // stays consistent.
+      actionHistoryLimit: normalizeActionHistoryLimit(config.actionHistoryLimit),
       // Opt-in whole-run wall-clock budget. null = disabled (default; no
       // behavior change). When set, the action loop checks elapsed time at
       // each cycle boundary and returns a structured RUN_DEADLINE_EXCEEDED
@@ -421,6 +437,36 @@ function normalizeDisabledActions(value) {
   return value.filter((name) => typeof name === "string" && name.trim()).map((name) => name.trim());
 }
 
+// ADR-0057 Phase 1 — validate against the declared namespace manifest and
+// FAIL LOUD on unknown names. Unlike disabledActions (which may legitimately
+// name host custom actions unknown at config time), the namespace set is
+// static and declared in-core, so a typo ("workspaces") would otherwise be a
+// silent no-op — the "silent no-op cap is worse than an error" posture of
+// maxCostUsd above.
+function normalizeDeferredNamespaces(value) {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error("deferredNamespaces must be an array of namespace names when provided.");
+  }
+  const seen = new Set();
+  const normalized = [];
+  for (const entry of value) {
+    if (typeof entry !== "string" || !entry.trim()) {
+      throw new Error("deferredNamespaces entries must be non-empty strings.");
+    }
+    const name = entry.trim();
+    if (!isKnownActionNamespace(name)) {
+      const known = ACTION_NAMESPACE_MANIFEST.map((item) => item.name).join(", ");
+      throw new Error(`deferredNamespaces: unknown namespace "${name}". Known namespaces: ${known}.`);
+    }
+    if (!seen.has(name)) {
+      seen.add(name);
+      normalized.push(name);
+    }
+  }
+  return normalized;
+}
+
 // AGRUN-271 — host-supplied actions. Each entry must already have been
 // produced by defineAction() (or otherwise match the same shape). We do
 // shape-validation here rather than blindly trusting the caller, because
@@ -608,6 +654,18 @@ function normalizeMaxSteps(value) {
 
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error('maxSteps must be a positive integer when provided.');
+  }
+
+  return value;
+}
+
+function normalizeActionHistoryLimit(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error('actionHistoryLimit must be a positive integer when provided.');
   }
 
   return value;

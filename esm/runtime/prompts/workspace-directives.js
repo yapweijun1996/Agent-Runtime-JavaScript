@@ -1,4 +1,4 @@
-import { PUBLISH_DIRECT_ACTION } from '../kernel-terminal-actions.js';
+import { PUBLISH_DIRECT_ACTION } from '../action-names.js';
 
 // ADR-0035 (AGRUN-262) — virtual-workspace planner directives.
 // Extracted verbatim from planner-prompt.js buildSystemPromptLines (the
@@ -25,6 +25,7 @@ function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
   if (hasAction("workspace_write")) {
     lines.push("Workspace write rule: use workspace_write ONLY for the first write to a path or a deliberate full rewrite — it REPLACES the entire file, so calling it twice on the same path erases the draft. To expand or improve an existing draft, use targeted edits: workspace_insert_after_section to deepen an existing section, workspace_replace to revise text. The `content` field accepts text of any length; write real, source-grounded prose (typically 200-2000+ characters per call). When a section is thin, web_search/read_url for material before writing — never pad to reach a word count.");
     lines.push("Before writing or appending to an existing path, inspect it once with workspace_read when workspace_read is currently allowed. If terminalRepairState/actionPatternConvergence forbids workspace_read, use visible workspace facts and the allowedActions surface instead.");
+    lines.push("Workspace authoring (workspace_write, workspace_replace, workspace_insert_after_section, workspace_apply_patch, workspace_multi_edit) is for deliverables that genuinely need multi-turn work — integrating evidence you still have to gather, revising an existing draft across steps, or self-review before publishing. If you can produce the complete deliverable in ONE response — even a long, multi-section one, like a ~1500-word article from knowledge you already have — answer directly; workspace drafting only adds steps without improving that result. For a simple or direct answer (a single fact, a brief explanation, a quick lookup or search result), likewise finalize directly. Choose workspace authoring only when YOU judge the deliverable cannot be completed well in a single response.");
   }
   if (hasAction("workspace_propose_patch") && hasAction("workspace_apply_patch")) {
     lines.push("When source and length are satisfied but terminal repair still shows structure plus todo deficits, use the listed patch action for heading/section-number repair and sync TodoState with todo_advance/todo_run_next/todo_cancel before publishing. Do not append, insert, write, replace, search, or read unless current allowedActions explicitly require it.");

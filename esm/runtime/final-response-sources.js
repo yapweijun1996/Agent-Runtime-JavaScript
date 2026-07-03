@@ -1,4 +1,5 @@
 import { normalizeCandidateSource } from '../session/context-snapshot-fields.js';
+import { readString } from './semantic-json.js';
 import { isExternalSourceCoveragePrompt } from './external-source-intent.js';
 import { isReadableEvidenceSource } from './read-source-quality.js';
 import { extractResearchCoverageTargets } from './research-coverage-guard.js';
@@ -74,6 +75,13 @@ const GENERIC_PATH_SEGMENTS = new Set([
 
 function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIMIT, options = {}) {
   const context = researchContext && typeof researchContext === "object" ? researchContext : {};
+  // AGRUN-519 (part B) — in evidence-convergence (research quality-gate) runs the
+  // runtime must NOT author a Sources section from unread search-snippet URLs: the
+  // report's cited evidence must be read-checked. `requireReadEvidence` suppresses
+  // the search-snippet fallback so only read_url sources surface. Non-research
+  // prompts (article/news coverage) keep the fallback. Read-evidence absence then
+  // yields an empty payload — the AI's own in-prose Sources/limitations stand.
+  const requireReadEvidence = !!(options && options.requireReadEvidence);
   const searchResults = normalizeSearchResults(
     context.aggregatedSearchResults || context.searchResults
   );
@@ -86,8 +94,9 @@ function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIM
   const seenUrls = new Set();
   const targetAwareSources = selectTargetAwareSources({
     requireConcreteArticle: isArticleLikePrompt(options && options.prompt),
+    requireReadEvidence,
     limit,
-    prompt: readString$1j(options && options.prompt),
+    prompt: readString(options && options.prompt),
     readSources,
     searchResults,
     verificationState,
@@ -99,7 +108,7 @@ function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIM
   }
 
   for (const item of readSources) {
-    const url = readString$1j(item.url);
+    const url = readString(item.url);
     if (!url || seenUrls.has(url) || !isReadableEvidenceSource(item) || !isDirectEvidenceUrl(url)) {
       continue;
     }
@@ -110,7 +119,7 @@ function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIM
     seenUrls.add(url);
     sources.push({
       kind: "read_url",
-      title: readString$1j(item.title) || readString$1j(matchingSearchByUrl.get(url)?.title) || url,
+      title: readString(item.title) || readString(matchingSearchByUrl.get(url)?.title) || url,
       url
     });
 
@@ -123,12 +132,16 @@ function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIM
     return createSourcePayload(sources);
   }
 
+  if (requireReadEvidence) {
+    return createSourcePayload(sources);
+  }
+
   const searchCandidates = verificationState !== "none" && verifiedUrls.size > 0
     ? searchResults.filter((item) => verifiedUrls.has(item.url))
     : searchResults;
 
   for (const item of searchCandidates) {
-    const url = readString$1j(item.url);
+    const url = readString(item.url);
     if (!url || seenUrls.has(url) || !isDirectEvidenceUrl(url)) {
       continue;
     }
@@ -147,7 +160,7 @@ function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIM
     seenUrls.add(url);
     sources.push({
       kind: "web_search",
-      title: readString$1j(item.title) || url,
+      title: readString(item.title) || url,
       url
     });
 
@@ -160,7 +173,7 @@ function collectFinalResponseSources(researchContext, limit = DEFAULT_SOURCE_LIM
 }
 
 function appendSourcesSection(text, sources) {
-  const normalizedText = stripGenericSourceLabels(readString$1j(text));
+  const normalizedText = stripGenericSourceLabels(readString(text));
   const sourceList = Array.isArray(sources) ? sources.filter(Boolean) : [];
   const textWithoutModelSources = stripSourcesSection(normalizedText);
 
@@ -208,8 +221,8 @@ function createSourcePayload(sources) {
 }
 
 function formatSourceLine(item) {
-  const title = readString$1j(item && item.title);
-  const url = readString$1j(item && item.url);
+  const title = readString(item && item.title);
+  const url = readString(item && item.url);
 
   if (!title || title === url) {
     return `[${url}](${url})`;
@@ -219,7 +232,7 @@ function formatSourceLine(item) {
 }
 
 function stripSourcesSection(text) {
-  const normalized = readString$1j(text);
+  const normalized = readString(text);
   if (!normalized) return "";
 
   const lines = normalized.split(/\r?\n/);
@@ -239,7 +252,7 @@ function stripSourcesSection(text) {
 }
 
 function stripGenericSourceLabels(text) {
-  const normalized = readString$1j(text);
+  const normalized = readString(text);
   if (!normalized) return "";
 
   return normalized
@@ -250,21 +263,21 @@ function stripGenericSourceLabels(text) {
 }
 
 function isGenericSourceLabelLine(line) {
-  return /^\s*(?:[-*+]\s*)?(?:[*_]{0,2})?Sources?\s*:\s*(?:Web\s+Search(?:\s+Results?)?|Search(?:\s+Results?)?|web_search|Provider|Grounding|Model|Planned\s+Tool\s+Results?|Tool\s+Results?|Search\s+Data)(?:[*_]{0,2})?\s*$/i.test(readString$1j(line));
+  return /^\s*(?:[-*+]\s*)?(?:[*_]{0,2})?Sources?\s*:\s*(?:Web\s+Search(?:\s+Results?)?|Search(?:\s+Results?)?|web_search|Provider|Grounding|Model|Planned\s+Tool\s+Results?|Tool\s+Results?|Search\s+Data)(?:[*_]{0,2})?\s*$/i.test(readString(line));
 }
 
 function isSourcesHeadingLine(line) {
-  return /^\s*(?:#{1,6}\s*)?(?:[*_]{1,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\s*:?\s*(?:[*_]{1,2})?\s*$/i.test(readString$1j(line));
+  return /^\s*(?:#{1,6}\s*)?(?:[*_]{1,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\s*:?\s*(?:[*_]{1,2})?\s*$/i.test(readString(line));
 }
 
 function isUnsupportedInlineSourcesLine(line) {
-  const normalized = readString$1j(line);
+  const normalized = readString(line);
   if (!normalized || /https?:\/\//i.test(normalized)) return false;
   return /^\s*(?:#{1,6}\s*)?(?:[*_]{0,2})?(?:(?:Verified|Selected|Reference|Evidence)\s+)?Sources\b\s+.{1,180}$/i.test(normalized);
 }
 
 function escapeMarkdownLinkText(value) {
-  return readString$1j(value).replace(/[[\]]/g, "");
+  return readString(value).replace(/[[\]]/g, "");
 }
 
 function normalizeSearchResults(value) {
@@ -283,8 +296,8 @@ function normalizeReadSources(value) {
       item && typeof item === "object" && !Array.isArray(item)
         ? {
             ...item,
-            title: readString$1j(item.title),
-            url: readString$1j(item.url)
+            title: readString(item.title),
+            url: readString(item.url)
           }
         : null
     ))
@@ -292,7 +305,7 @@ function normalizeReadSources(value) {
 }
 
 function selectTargetAwareSources(options) {
-  const targets = extractResearchCoverageTargets(readString$1j(options && options.prompt));
+  const targets = extractResearchCoverageTargets(readString(options && options.prompt));
   if (targets.length < 2) return null;
 
   const candidates = collectSourceCandidates(options);
@@ -322,11 +335,13 @@ function collectSourceCandidates(options) {
   const readSources = Array.isArray(options && options.readSources) ? options.readSources : [];
   const searchResults = Array.isArray(options && options.searchResults) ? options.searchResults : [];
   const verifiedUrls = options && options.verifiedUrls instanceof Set ? options.verifiedUrls : new Set();
-  const verificationState = readString$1j(options && options.verificationState);
+  const verificationState = readString(options && options.verificationState);
+  // AGRUN-519 (part B) — research quality-gate runs only cite read-checked sources.
+  const requireReadEvidence = !!(options && options.requireReadEvidence);
   const candidates = [];
   const seenUrls = new Set();
   const push = (item, kind) => {
-    const url = readString$1j(item && item.url);
+    const url = readString(item && item.url);
     if (!url || seenUrls.has(url) || !isDirectEvidenceUrl(url)) return;
     if (kind === "read_url" && !isReadableEvidenceSource(item)) return;
     if (kind === "web_search" && verificationState !== "none" && verifiedUrls.size > 0 && !verifiedUrls.has(url)) return;
@@ -334,23 +349,25 @@ function collectSourceCandidates(options) {
     candidates.push({
       domain: readDomain$3(url),
       kind,
-      snippet: readString$1j(item && item.snippet) || readString$1j(item && item.content),
-      title: readString$1j(item && item.title) || url,
+      snippet: readString(item && item.snippet) || readString(item && item.content),
+      title: readString(item && item.title) || url,
       url
     });
   };
 
   for (const item of readSources) push(item, "read_url");
-  for (const item of searchResults) push(item, "web_search");
+  if (!requireReadEvidence) {
+    for (const item of searchResults) push(item, "web_search");
+  }
   return candidates;
 }
 
 function isConcreteArticleSource(source) {
-  const url = readString$1j(source && source.url);
+  const url = readString(source && source.url);
   if (!isDirectEvidenceUrl(url)) return false;
 
-  const title = readString$1j(source && source.title);
-  const snippet = readString$1j(source && source.snippet) || readString$1j(source && source.content);
+  const title = readString(source && source.title);
+  const snippet = readString(source && source.snippet) || readString(source && source.content);
   if (isNonNewsEvidenceSource({ title, snippet, url })) {
     return false;
   }
@@ -369,9 +386,9 @@ function isConcreteArticleSource(source) {
 }
 
 function isNonNewsEvidenceSource(source) {
-  const url = readString$1j(source && source.url);
-  const title = readString$1j(source && source.title);
-  const snippet = readString$1j(source && source.snippet);
+  const url = readString(source && source.url);
+  const title = readString(source && source.title);
+  const snippet = readString(source && source.snippet);
   try {
     const parsed = new URL(url);
     const pathname = decodeURIComponent(parsed.pathname).toLowerCase();
@@ -387,7 +404,7 @@ function sourceMatchesTarget(source, target) {
     source.snippet,
     source.url,
     source.domain
-  ].map(readString$1j).join(" ");
+  ].map(readString).join(" ");
   return Array.isArray(target && target.aliases)
     && target.aliases.some((alias) => hasComparablePhrase$1(haystack, alias));
 }
@@ -404,7 +421,7 @@ function isArticleLikePrompt(value) {
 
 function hasSpecificPath(url) {
   try {
-    const parsed = new URL(readString$1j(url));
+    const parsed = new URL(readString(url));
     const segments = parsed.pathname
       .split("/")
       .map((segment) => decodeURIComponent(segment).toLowerCase().replace(/[^a-z0-9-]+/g, ""))
@@ -419,7 +436,7 @@ function hasSpecificPath(url) {
 
 function isHomepageOrGenericSection(url) {
   try {
-    const parsed = new URL(readString$1j(url));
+    const parsed = new URL(readString(url));
     const segments = parsed.pathname
       .split("/")
       .map((segment) => decodeURIComponent(segment).toLowerCase().replace(/[^a-z0-9-]+/g, ""))
@@ -432,7 +449,7 @@ function isHomepageOrGenericSection(url) {
 }
 
 function normalizeComparableText$2(value) {
-  return readString$1j(value)
+  return readString(value)
     .toLowerCase()
     .replace(/\bu\.s\.a\.\b/g, "usa")
     .replace(/\bu\.s\.\b/g, "us")
@@ -442,7 +459,7 @@ function normalizeComparableText$2(value) {
 }
 
 function extractPromptFocusTerms(value) {
-  const text = readString$1j(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (!text) return [];
 
   const terms = [];
@@ -474,7 +491,7 @@ function sourceMatchesPromptFocus(source, terms) {
     source && source.content,
     source && source.text,
     source && source.url
-  ].map(readString$1j).join(" "));
+  ].map(readString).join(" "));
 
   return terms.some((term) => haystack.includes(term));
 }
@@ -492,7 +509,7 @@ function readOutputArray$1(output, ...keys) {
 }
 
 function addDirectUrl(sink, value) {
-  const url = readString$1j(value);
+  const url = readString(value);
   if (isDirectEvidenceUrl(url)) {
     sink.add(url);
   }
@@ -500,7 +517,7 @@ function addDirectUrl(sink, value) {
 
 function readDomain$3(url) {
   try {
-    return new URL(readString$1j(url)).hostname.replace(/^www\./i, "");
+    return new URL(readString(url)).hostname.replace(/^www\./i, "");
   } catch (error) {
     return "";
   }
@@ -527,8 +544,8 @@ function filterSourcesByEvidence(payload, evidenceUrls) {
     };
   }
 
-  const allowed = new Set(urls.map((url) => readString$1j(url)).filter(Boolean));
-  const kept = sources.filter((item) => allowed.has(readString$1j(item && item.url)));
+  const allowed = new Set(urls.map((url) => readString(url)).filter(Boolean));
+  const kept = sources.filter((item) => allowed.has(readString(item && item.url)));
   return {
     citations: kept.map((item) => item.url),
     sources: kept
@@ -550,7 +567,7 @@ function reconcileCitations(plannerCitations, evidenceCitations) {
 
   // Evidence citations take priority.
   for (const url of evidence) {
-    const normalized = readString$1j(url);
+    const normalized = readString(url);
     if (normalized && !seen.has(normalized)) {
       seen.add(normalized);
       merged.push(normalized);
@@ -558,7 +575,7 @@ function reconcileCitations(plannerCitations, evidenceCitations) {
   }
 
   for (const citation of planner) {
-    const normalized = readString$1j(citation);
+    const normalized = readString(citation);
     if (!normalized || /^https?:\/\//i.test(normalized) || seen.has(normalized)) continue;
     seen.add(normalized);
     merged.push(normalized);
@@ -568,7 +585,7 @@ function reconcileCitations(plannerCitations, evidenceCitations) {
 }
 
 function isDirectEvidenceUrl(value) {
-  const normalized = readString$1j(value);
+  const normalized = readString(value);
   if (!isHttpUrl$1(normalized)) return false;
 
   try {
@@ -588,11 +605,7 @@ function isDirectEvidenceUrl(value) {
 }
 
 function isHttpUrl$1(value) {
-  return /^https?:\/\//i.test(readString$1j(value));
-}
-
-function readString$1j(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return /^https?:\/\//i.test(readString(value));
 }
 
 function readVerifiedUrls(verification) {

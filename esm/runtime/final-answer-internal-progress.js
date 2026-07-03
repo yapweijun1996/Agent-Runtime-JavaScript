@@ -1,5 +1,6 @@
 import { normalizeConstrainedEvidenceClaims, ensureClaimCoverageSection } from './claim-coverage.js';
 import { stripInternalVirtualWorkspaceSections } from './virtual-workspace.js';
+import { readString } from './semantic-json.js';
 
 const INTERNAL_PROGRESS_HEADING = /^(?:#{1,6}\s*)?(?:\*\*)?\s*(todostate\s+progress|task\s+progress|progress\s+tracker|todo\s+list|todo\s+state\s+progress)\s*(?:\*\*)?\s*:?\s*$/i;
 const SECTION_HEADING = /^(?:#{1,6}\s+\S|(?:\*\*)?\s*(?:sources|key takeaway|summary|findings|recommendations|limitations|answer)\b)/i;
@@ -147,10 +148,10 @@ function requiresResearchQualitySections(context) {
     ? workspace.finalReadiness
     : {};
   const workspaceGaps = Array.isArray(readiness.remainingGaps)
-    ? readiness.remainingGaps.map(readString$1p).filter(Boolean)
+    ? readiness.remainingGaps.map(readString).filter(Boolean)
     : [];
   const stateGaps = researchState && Array.isArray(researchState.gaps)
-    ? researchState.gaps.map(readString$1p).filter(Boolean)
+    ? researchState.gaps.map(readString).filter(Boolean)
     : [];
   const sourceQuality = researchState && researchState.sourceQuality && typeof researchState.sourceQuality === "object"
     ? researchState.sourceQuality
@@ -161,7 +162,7 @@ function requiresResearchQualitySections(context) {
 }
 
 function hasResearchQualitySections(text) {
-  const value = readString$1p(text);
+  const value = readString(text);
   const hasSourceQuality = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:source\s+quality|source\s+assessment|evidence\s+quality|quality\s+of\s+sources)\b/i.test(value);
   const hasGaps = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:evidence\s+gaps?|limitations?|limits\s+of\s+the\s+evidence)\b/i.test(value);
   return hasSourceQuality && hasGaps;
@@ -171,10 +172,10 @@ function isResearchReportLoopActive(context) {
   const loop = context && context.researchReportLoop && typeof context.researchReportLoop === "object"
     ? context.researchReportLoop
     : null;
-  const status = loop ? readString$1p(loop.status) : "";
+  const status = loop ? readString(loop.status) : "";
   return Boolean(
     loop &&
-    (loop.enabled === true || readString$1p(loop.finalMode) || (status && status !== "idle"))
+    (loop.enabled === true || readString(loop.finalMode) || (status && status !== "idle"))
   );
 }
 
@@ -206,7 +207,7 @@ function buildEvidenceGapsText(context) {
   const gaps = []
     .concat(Array.isArray(state.gaps) ? state.gaps : [])
     .concat(Array.isArray(readiness.remainingGaps) ? readiness.remainingGaps : [])
-    .map(readString$1p)
+    .map(readString)
     .filter(Boolean);
   const unique = Array.from(new Set(gaps)).slice(0, 6);
   if (unique.length === 0) {
@@ -216,7 +217,7 @@ function buildEvidenceGapsText(context) {
 }
 
 function ensureAnalystReportScaffold(text, context = {}) {
-  const value = readString$1p(text);
+  const value = readString(text);
   if (!value || !isResearchReportLoopActive(context)) return value;
 
   const withoutLeadingCaveats = shouldStripStandaloneVerificationCaveats(context)
@@ -248,7 +249,7 @@ function ensureAnalystReportScaffold(text, context = {}) {
 // like "# Research Report: I'm doing competitor research. Can you write..."
 // Drop the suffix in those cases and fall back to a bare "# Research Report".
 function readCleanScaffoldTopic(topic) {
-  const value = readString$1p(topic);
+  const value = readString(topic);
   if (!value) return "";
   if (value.length > 80) return "";
   if (/[.!?](?:\s|$)/.test(value)) return "";
@@ -256,7 +257,7 @@ function readCleanScaffoldTopic(topic) {
 }
 
 function stripUserFacingResearchDiagnostics(text) {
-  const lines = readString$1p(text).split(/\r?\n/);
+  const lines = readString(text).split(/\r?\n/);
   const output = [];
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
@@ -275,11 +276,11 @@ function stripUserFacingResearchDiagnostics(text) {
 }
 
 function isResearchDiagnosticLine(line) {
-  return /\b(?:final answer with explicit limitations|source minimum|relevant source|read source|authority coverage|source-authority gate|quality gate|structured evidence gate|workspace|OODAE|TodoState|debug)\b/i.test(readString$1p(line));
+  return /\b(?:final answer with explicit limitations|source minimum|relevant source|read source|authority coverage|source-authority gate|quality gate|structured evidence gate|workspace|OODAE|TodoState|debug)\b/i.test(readString(line));
 }
 
 function stripStandaloneVerificationCaveats(text) {
-  const lines = readString$1p(text).split(/\r?\n/);
+  const lines = readString(text).split(/\r?\n/);
   return lines
     .filter((line) => !/^\s*(?:[-*+]\s*)?(?:Employment \/ company|Education \/ profile-directory) claims: not directly verified from the read source\(s\) in this run\.\s*$/i.test(line))
     .join("\n")
@@ -305,11 +306,11 @@ function readResearchTopic(context) {
   const workspace = context && context.researchWorkspace && typeof context.researchWorkspace === "object"
     ? context.researchWorkspace
     : {};
-  return readString$1p(graph.topic) || readString$1p(loop.topic) || readString$1p(workspace.topic);
+  return readString(graph.topic) || readString(loop.topic) || readString(workspace.topic);
 }
 
 function insertBeforeSources(text, sections) {
-  const value = readString$1p(text);
+  const value = readString(text);
   const marker = /\n(?:#{1,6}\s*)?Sources\s*:?\s*\n/i.exec(value);
   if (!marker) return [value, sections].filter(Boolean).join("\n\n");
   const sourceStart = marker.index + 1;
@@ -353,10 +354,6 @@ function normalizeLabel(value) {
 
 function readNumber$9(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function readString$1p(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeBlankLines(text) {

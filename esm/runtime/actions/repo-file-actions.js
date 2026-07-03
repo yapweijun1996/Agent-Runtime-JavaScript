@@ -1,4 +1,5 @@
 import { hasRepoSearchTool, hasRepoReadFileTool, assertRepoPathAllowed, normalizeRepoSearchOutput, assertRepoGlobAllowed, normalizeRepoFileOutput } from '../repo-file-tools.js';
+import { readString } from '../semantic-json.js';
 
 function createRepoReadFileAction(repoFileTools) {
   if (!hasRepoReadFileTool(repoFileTools)) return null;
@@ -94,7 +95,7 @@ async function executeRepoSearchAction(context, args) {
 
 function normalizeRepoSearchArgs(context, args) {
   const config = readConfig(context);
-  const query = readString$L(args && args.query);
+  const query = readString(args && args.query);
   if (!query) {
     throw new Error('repo_rg requires a non-empty "query".');
   }
@@ -130,10 +131,6 @@ function createUnavailableResult(actionName) {
 function normalizePositiveInteger$3(value, fallback) {
   if (!Number.isInteger(value) || value <= 0) return fallback;
   return Math.min(value, fallback);
-}
-
-function readString$L(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createRepoReadFileAction, createRepoSearchAction, executeRepoReadFileAction, executeRepoSearchAction };

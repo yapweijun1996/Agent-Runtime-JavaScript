@@ -13,8 +13,8 @@ function buildInvalidActionPromptBlock(convergence) {
     isInDisabledActions: Array.isArray(convergence.disabledActionsEncountered)
       ? convergence.disabledActionsEncountered.includes(convergence.actionName || convergence.lastInvalidActionName)
       : false,
-    consecutiveInvalidCount: readNonNegativeInteger$1(convergence.consecutiveInvalidCount),
-    consecutiveRepairFailureCount: readNonNegativeInteger$1(convergence.consecutiveRepairFailureCount),
+    consecutiveInvalidCount: readNonNegativeInteger(convergence.consecutiveInvalidCount),
+    consecutiveRepairFailureCount: readNonNegativeInteger(convergence.consecutiveRepairFailureCount),
     escalation: convergence.escalation === "hard_signal" ? "hard_signal" : "advisory",
     availableActions: trimArray(convergence.availableActions, 24),
     availableAgentSkillIds: trimArray(convergence.availableAgentSkillIds, 32)
@@ -22,7 +22,7 @@ function buildInvalidActionPromptBlock(convergence) {
   return ["Invalid action observation:", JSON.stringify(payload)].join("\n");
 }
 
-function readNonNegativeInteger$1(value) {
+function readNonNegativeInteger(value) {
   return Number.isInteger(value) && value >= 0 ? value : 0;
 }
 

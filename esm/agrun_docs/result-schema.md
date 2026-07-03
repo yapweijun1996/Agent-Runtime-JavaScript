@@ -47,6 +47,19 @@ Top-level shape:
 | `runState` | required | stable | runtime | Consume per-run execution state. |
 | `finalAnswerSource` | required | stable | runtime | Attribute the terminal answer to a skill, planner, policy, or action. |
 | `mode` | required today | transitional | runtime | Compatibility/debug only, not a long-term control-flow switch. |
+| `diagnostics` | required | stable | runtime | Read-only host telemetry (see below). Hosts cannot influence the run via this field. |
+
+### Diagnostics
+
+`result.diagnostics` is read-only host telemetry for surfacing run state in UX/analytics without inspecting internal `runState`:
+
+| Field | Shape | Meaning |
+| --- | --- | --- |
+| `recovery` | `{ retries, lastSignal, exhaustedAt }` | Bounded envelope-recovery state (ADR-0014) — "AI is having trouble parsing" UX. |
+| `finalResponseQuality` | `{ issues, noteCount, lastSource }` | Final-response quality issue codes (ADR-0019) — "answer too short / placeholders" UX. |
+| `permissionDenials` | `Array<{ actionName, kind, reason }>` | Every permission denial in the run, consolidated for "show what was denied and why" UX and analytics (AGRUN-439). `kind` is `"approval"` (an approval-gated action the user/host denied) or `"skill_policy"` (a skill/tool denied by policy). `reason` is the human-readable denial summary or `null`. Empty array when nothing was denied. Pure read-only projection from `runState.actionHistory` + the step ledger — it adds no new emission site. |
+| `workingMemory` | `{ facts: {slot: text}, preferences: {slot: text}, decisions: {slot: text} }` | JSON consolidation of the durable memory the AI extracted this run, grouped by kind and keyed by slot, last-wins (AGRUN-426). AI-first: the AI decides what is durable (the extraction LLM emits the entries); this only groups them. For a cross-turn working memory, a host can call the exported `projectWorkingMemory(entries)` on its accumulated session memory list. Read-only projection — no behavior change. |
+| `errors` | `{ count, items: Array<{ source, kind, actionName, message }> }` | Turn-scoped error digest (AGRUN-438): the failures this run recorded, from `runState.actionHistory` error entries (`source: "action"`) plus the terminal `runState.error` (`source: "run"`). `items` is bounded to the most recent 20 (ring-buffer watermark); `count` is the true total. Denials are excluded (see `permissionDenials`). Re-scoped from a Claude-Code process-wide error ring buffer to a per-run digest — a browser tab/run is its own scope. Read-only projection — no new emission site. |
 
 ### Output and Error Rules
 

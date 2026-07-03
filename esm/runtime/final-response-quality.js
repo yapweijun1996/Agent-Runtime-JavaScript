@@ -2,6 +2,7 @@ import { extractResearchCoverageTargets } from './research-coverage-guard.js';
 import { readFinalSourcePrompt } from './final-source-prompt.js';
 import { isExternalSourceCoveragePrompt } from './external-source-intent.js';
 import { isConcreteArticleSource } from './final-response-sources.js';
+import { readString } from './semantic-json.js';
 import { analyzeClaimCoverage } from './claim-coverage.js';
 
 const PLACEHOLDER_PATTERNS = [
@@ -17,8 +18,8 @@ const RESEARCH_WORKSPACE_LEAK_RE = /^(?:#{1,6}\s*)?(?:\*\*)?\s*(research\s+works
 const VIRTUAL_WORKSPACE_LEAK_RE = /^(?:#{1,6}\s*)?(?:\*\*)?\s*(virtual\s+workspace|workspace\s+(?:draft|files?|operations?|quality)|draft\s+workspace|final\s+candidate|critique\s+notes?)\s*(?:\*\*)?\s*:?\s*$/im;
 
 function analyzeFinalResponseQuality(text, context = {}) {
-  const value = readString$1h(text);
-  const prompt = readString$1h(context.prompt);
+  const value = readString(text);
+  const prompt = readString(context.prompt);
   const targets = extractResearchCoverageTargets(prompt);
   const issues = [];
 
@@ -122,7 +123,7 @@ function analyzeFinalResponseQuality(text, context = {}) {
 // (alias removed in PR 2).
 function noteFinalResponseQualityIssues(runState, context = {}) {
   const decision = context && context.decision && typeof context.decision === "object" ? context.decision : null;
-  const answer = readString$1h(decision && decision.answer);
+  const answer = readString(decision && decision.answer);
   if (!answer) return null;
 
   const prompt = readPrompt$3(runState);
@@ -140,16 +141,16 @@ function noteFinalResponseQualityIssues(runState, context = {}) {
   runState.finalResponseQuality = {
     ...state,
     lastIssues: analysis.ok ? [] : analysis.issues.map((issue) => issue.code),
-    lastSource: readString$1h(context && context.source) || null,
+    lastSource: readString(context && context.source) || null,
     vetoCount: analysis.ok ? noteCount : noteCount + 1
   };
   return null;
 }
 
 function normalizeFinalResponseStructure(text, context = {}) {
-  const value = readString$1h(text);
+  const value = readString(text);
   if (!value) return "";
-  const prompt = readString$1h(context.prompt);
+  const prompt = readString(context.prompt);
   const targets = extractResearchCoverageTargets(prompt);
   const sourceCleaned = shouldEnforceSourceLinkQuality(prompt, targets)
     ? stripTrailingSourcesBlock(stripUnsupportedSourceLabelLines(value))
@@ -174,7 +175,7 @@ function normalizeFinalResponseStructure(text, context = {}) {
 
   const output = [];
   for (const target of targets) {
-    const body = readString$1h(segments.get(target.key));
+    const body = readString(segments.get(target.key));
     if (!body) continue;
     output.push(`${target.label}\n${body}`);
   }
@@ -185,7 +186,7 @@ function normalizeFinalResponseStructure(text, context = {}) {
 
 function findDuplicateTargetHeadings(text, targets) {
   if (!Array.isArray(targets) || targets.length < 2) return [];
-  const lines = readString$1h(text).split(/\r?\n/);
+  const lines = readString(text).split(/\r?\n/);
   return targets.filter((target) => {
     const aliases = Array.isArray(target && target.aliases) ? target.aliases : [target && target.label];
     const count = lines.filter((line) => aliases.some((alias) => isHeadingForTarget(line, alias))).length;
@@ -194,10 +195,10 @@ function findDuplicateTargetHeadings(text, targets) {
 }
 
 function isHeadingForTarget(line, alias) {
-  const heading = readString$1h(line)
+  const heading = readString(line)
     .replace(/^#{1,6}\s*/, "")
     .replace(/[:：]\s*$/, "");
-  const needle = readString$1h(alias);
+  const needle = readString(alias);
   if (!heading || !needle) return false;
   const normalizedHeading = normalizeComparableText(heading);
   const normalizedNeedle = normalizeComparableText(needle);
@@ -211,13 +212,13 @@ function isHeadingForTarget(line, alias) {
 }
 
 function hasBareSourcesSection(text) {
-  const lines = readString$1h(text).split(/\r?\n/);
+  const lines = readString(text).split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     if (!SOURCE_HEADING_RE.test(lines[index])) continue;
     const body = [];
     for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
       const line = lines[cursor];
-      if (!readString$1h(line)) {
+      if (!readString(line)) {
         if (body.length > 0) break;
         continue;
       }
@@ -226,7 +227,7 @@ function hasBareSourcesSection(text) {
       if (body.length >= 6) break;
     }
     const bodyText = body.join("\n");
-    if (readString$1h(bodyText) && !MARKDOWN_LINK_RE.test(bodyText)) {
+    if (readString(bodyText) && !MARKDOWN_LINK_RE.test(bodyText)) {
       return true;
     }
   }
@@ -242,22 +243,22 @@ function shouldEnforceSourceLinkQuality(prompt, targets) {
 }
 
 function hasUnsupportedSourceLabel(text) {
-  return readString$1h(text).split(/\r?\n/).some((line) => {
+  return readString(text).split(/\r?\n/).some((line) => {
     const match = line.match(SOURCE_LABEL_RE);
     if (!match) return false;
-    const value = readString$1h(match[1]);
+    const value = readString(match[1]);
     if (!value) return false;
     return !MARKDOWN_LINK_RE.test(value);
   });
 }
 
 function stripUnsupportedSourceLabelLines(text) {
-  return readString$1h(text)
+  return readString(text)
     .split(/\r?\n/)
     .filter((line) => {
       const match = line.match(SOURCE_LABEL_RE);
       if (!match) return true;
-      return MARKDOWN_LINK_RE.test(readString$1h(match[1]));
+      return MARKDOWN_LINK_RE.test(readString(match[1]));
     })
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -265,17 +266,17 @@ function stripUnsupportedSourceLabelLines(text) {
 }
 
 function stripTrailingSourcesBlock(text) {
-  const lines = readString$1h(text).split(/\r?\n/);
+  const lines = readString(text).split(/\r?\n/);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     if (SOURCE_HEADING_RE.test(lines[index])) {
       return lines.slice(0, index).join("\n").trim();
     }
   }
-  return readString$1h(text);
+  return readString(text);
 }
 
 function stripInternalArtifactLines(text) {
-  return readString$1h(text)
+  return readString(text)
     .split(/\r?\n/)
     .filter((line) => !isInternalArtifactLine(line))
     .join("\n")
@@ -284,7 +285,7 @@ function stripInternalArtifactLines(text) {
 }
 
 function isInternalArtifactLine(line) {
-  const normalized = readString$1h(line).replace(/^`+|`+$/g, "").trim();
+  const normalized = readString(line).replace(/^`+|`+$/g, "").trim();
   if (!normalized) return false;
   return /^\[\s*"[^"]*\b(?:search|read|analy[sz]e|todo|plan|fetch|inspect)\b[^"]*"\s*(?:,\s*"[^"]*")*\s*\]$/i.test(normalized);
 }
@@ -301,10 +302,10 @@ function requiresResearchReportSections(context) {
     ? workspace.finalReadiness
     : {};
   const workspaceGaps = Array.isArray(readiness.remainingGaps)
-    ? readiness.remainingGaps.map(readString$1h).filter(Boolean)
+    ? readiness.remainingGaps.map(readString).filter(Boolean)
     : [];
   const stateGaps = researchState && Array.isArray(researchState.gaps)
-    ? researchState.gaps.map(readString$1h).filter(Boolean)
+    ? researchState.gaps.map(readString).filter(Boolean)
     : [];
   const sourceQuality = researchState && researchState.sourceQuality && typeof researchState.sourceQuality === "object"
     ? researchState.sourceQuality
@@ -318,7 +319,7 @@ function requiresResearchReportSections(context) {
 }
 
 function hasResearchReportSections(text) {
-  const value = readString$1h(text);
+  const value = readString(text);
   if (!value) return false;
   const hasSourceQuality = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:source\s+quality|source\s+assessment|evidence\s+quality|quality\s+of\s+sources)\b/i.test(value);
   const hasGaps = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:evidence\s+gaps?|limitations?|limits\s+of\s+the\s+evidence)\b/i.test(value);
@@ -330,16 +331,16 @@ function readNumber$7(value) {
 }
 
 function stripUnsupportedEvidenceLinks(text, context = {}) {
-  const prompt = readString$1h(context.prompt);
+  const prompt = readString(context.prompt);
   if (!shouldEnforceSourceLinkQuality(prompt, context.targets)) {
-    return readString$1h(text);
+    return readString(text);
   }
 
-  return readString$1h(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+[^)]*)\)/gi, (match, label, url) => {
-    const cleanLabel = readString$1h(label).replace(/^source\s*:\s*/i, "");
+  return readString(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+[^)]*)\)/gi, (match, label, url) => {
+    const cleanLabel = readString(label).replace(/^source\s*:\s*/i, "");
     return isConcreteArticleSource({ title: cleanLabel, url })
-      ? `[${cleanLabel || readString$1h(label)}](${url})`
-      : cleanLabel || readString$1h(label);
+      ? `[${cleanLabel || readString(label)}](${url})`
+      : cleanLabel || readString(label);
   });
 }
 
@@ -350,13 +351,13 @@ function collectTargetSegments(text, targets) {
 
   function flush() {
     if (!activeTarget) return;
-    const body = readString$1h(buffer.join("\n"));
+    const body = readString(buffer.join("\n"));
     if (body) {
       byKey.set(activeTarget.key, body);
     }
   }
 
-  for (const line of readString$1h(text).split(/\r?\n/)) {
+  for (const line of readString(text).split(/\r?\n/)) {
     const nextTarget = targets.find((target) => {
       const aliases = Array.isArray(target && target.aliases) ? target.aliases : [target && target.label];
       return aliases.some((alias) => isHeadingForTarget(line, alias));
@@ -381,16 +382,12 @@ function readPrompt$3(runState) {
 }
 
 function normalizeComparableText(value) {
-  return readString$1h(value)
+  return readString(value)
     .toLowerCase()
     .replace(/\bu\.s\.a\.\b/g, "usa")
     .replace(/\bu\.s\.\b/g, "us")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-}
-
-function readString$1h(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { analyzeFinalResponseQuality, normalizeFinalResponseStructure, noteFinalResponseQualityIssues };

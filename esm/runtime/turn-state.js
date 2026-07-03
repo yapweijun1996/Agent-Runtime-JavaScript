@@ -1,5 +1,6 @@
 import { classifyGoalQuality } from './goal-quality.js';
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 
 function createTurnState(options) {
   const inputResolution = options && typeof options === "object" ? options.inputResolution : null;
@@ -13,16 +14,16 @@ function createTurnState(options) {
     : null;
   const turnIntent = options && typeof options === "object" ? options.turnIntent : null;
   const executionClass = options && typeof options === "object"
-    ? readString$17(options.executionClass)
+    ? readString(options.executionClass)
     : "";
-  const turnIntentKind = readString$17(turnIntent && turnIntent.kind);
-  const currentPrompt = readString$17(observationSummary && observationSummary.prompt)
-    || readString$17(options && options.originalQuery)
-    || readString$17(turnIntent && turnIntent.goal);
+  const turnIntentKind = readString(turnIntent && turnIntent.kind);
+  const currentPrompt = readString(observationSummary && observationSummary.prompt)
+    || readString(options && options.originalQuery)
+    || readString(turnIntent && turnIntent.goal);
   const goalAnchorText = turnIntentKind === "new_task" && currentPrompt
     ? currentPrompt
-    : readString$17(intentState && intentState.goal)
-    || readString$17(inquiryContext && inquiryContext.activeGoal);
+    : readString(intentState && intentState.goal)
+    || readString(inquiryContext && inquiryContext.activeGoal);
   // 2026-05-09 — Prefer `researchState.topic` (AI-authored via tool
   // calls) when available; fall through to `intentState.topic` /
   // `inquiryContext.activeTopic` raw values otherwise.
@@ -38,11 +39,11 @@ function createTurnState(options) {
   // never benefited. AI-first replacement: trust whatever the
   // upstream pipeline produces; AI sees the full original prompt
   // elsewhere via `originalQuery`.
-  const researchTopic = readString$17(
+  const researchTopic = readString(
     options && options.runState && options.runState.researchState && options.runState.researchState.topic
   );
-  const rawTopic = readString$17(intentState && intentState.topic)
-    || readString$17(inquiryContext && inquiryContext.activeTopic);
+  const rawTopic = readString(intentState && intentState.topic)
+    || readString(inquiryContext && inquiryContext.activeTopic);
   const topicAnchorText = researchTopic
     || extractStructuralTopic(rawTopic)
     || rawTopic;
@@ -51,7 +52,7 @@ function createTurnState(options) {
     topicAnchorText,
     {
       executionClass,
-      prompt: readString$17(observationSummary && observationSummary.prompt),
+      prompt: readString(observationSummary && observationSummary.prompt),
       turnIntent
     }
   ).quality;
@@ -97,7 +98,7 @@ function readTurnStateStatus(value) {
 }
 
 function deriveTurnStateStatus(goalQuality, intentState, inquiryContext, pendingApprovalAction, turnIntent) {
-  if (readString$17(turnIntent && turnIntent.kind) === "approval_resolution") {
+  if (readString(turnIntent && turnIntent.kind) === "approval_resolution") {
     return "running_control_step";
   }
 
@@ -124,7 +125,7 @@ function readPendingApprovalAction(pendingApproval) {
     return "";
   }
 
-  return readString$17(pendingApproval.actionName);
+  return readString(pendingApproval.actionName);
 }
 
 function cloneStructuredValue$1(value) {
@@ -134,16 +135,12 @@ function cloneStructuredValue$1(value) {
 }
 
 function extractStructuralTopic(value) {
-  const text = readString$17(value);
+  const text = readString(value);
   if (!text) return "";
   const topicPhrase = text.match(/\btopic\s*[:=]?\s*["'“”‘’`]([^"'“”‘’`]{2,160})["'“”‘’`]/i);
   if (topicPhrase) return topicPhrase[1].trim();
   const quoted = text.match(/["'“”‘’`]([^"'“”‘’`]{2,120})["'“”‘’`]/);
   return quoted ? quoted[1].trim() : "";
-}
-
-function readString$17(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 const TURN_STATE_STATUSES = [

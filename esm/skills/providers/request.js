@@ -1,7 +1,8 @@
 import { ERROR_CODES } from '../../runtime/errors.js';
 import { validateImageParts, normalizeMultimodalParts } from '../../runtime/multimodal.js';
+import { normalizeTimeContext } from '../../runtime/host-time-context.js';
 
-function readString$E(source, keys) {
+function readString$1(source, keys) {
   for (const key of keys) {
     if (typeof source[key] === "string") {
       return source[key].trim();
@@ -12,7 +13,7 @@ function readString$E(source, keys) {
 }
 
 function readOptionalString$1(source, keys) {
-  const value = readString$E(source, keys);
+  const value = readString$1(source, keys);
   return value.length > 0 ? value : null;
 }
 
@@ -103,8 +104,8 @@ function readSessionEvidenceItems(value) {
         return null;
       }
 
-      const kind = readString$E(item, ["kind"]);
-      const text = readString$E(item, ["text"]);
+      const kind = readString$1(item, ["kind"]);
+      const text = readString$1(item, ["text"]);
 
       if (!kind || !text) {
         return null;
@@ -145,12 +146,12 @@ function normalizeBrowserProviderRequest(rawInput, providerId) {
 
   assertNoUnsupportedProviderParameters(rawInput);
 
-  const provider = readString$E(rawInput, ["provider", "providerId"]);
+  const provider = readString$1(rawInput, ["provider", "providerId"]);
   const apiVariant = readApiVariant(rawInput, providerId);
   const authMode = readAuthMode(rawInput);
-  const apiKey = readString$E(rawInput, ["apiKey"]);
-  const model = readString$E(rawInput, ["model", "modelId"]);
-  const prompt = readString$E(rawInput, ["prompt"]);
+  const apiKey = readString$1(rawInput, ["apiKey"]);
+  const model = readString$1(rawInput, ["model", "modelId"]);
+  const prompt = readString$1(rawInput, ["prompt"]);
   const cachedContentMode = readCachedContentMode(rawInput, authMode);
   const systemPrompt = readOptionalString$1(rawInput, ["systemPrompt", "system"]);
   const endpoint = readOptionalString$1(rawInput, ["endpoint"]);
@@ -168,13 +169,15 @@ function normalizeBrowserProviderRequest(rawInput, providerId) {
   const sessionContext = readSessionContext$2(rawInput);
   const parts = readInputParts(rawInput);
   const conversation = readConversation(rawInput);
-  const signal = readAbortSignal$1(rawInput.signal);
+  const signal = readAbortSignal(rawInput.signal);
   const timeoutMs = readTimeoutMs(rawInput);
   const reasoningEffort = readReasoningEffort(rawInput);
   const reasoningSummary = readReasoningSummary(rawInput);
   const geminiThinkingConfig = readGeminiThinkingConfig$1(rawInput, providerId);
   const previousResponseId = readPreviousResponseId(rawInput, providerId, apiVariant);
   const responseFormat = readResponseFormat(rawInput, providerId, apiVariant);
+  // AGRUN-518 — opt-in host time context (null when the host omits it).
+  const timeContext = normalizeTimeContext(rawInput.timeContext);
 
   if (provider !== providerId) {
     throw new Error(`Expected provider "${providerId}".`);
@@ -226,6 +229,7 @@ function normalizeBrowserProviderRequest(rawInput, providerId) {
     signal,
     streamEndpoint,
     systemPrompt,
+    timeContext,
     timeoutMs,
     previousResponseId,
     geminiThinkingConfig,
@@ -239,7 +243,7 @@ function normalizeBrowserProviderRequest(rawInput, providerId) {
   };
 }
 
-function readAbortSignal$1(value) {
+function readAbortSignal(value) {
   if (!value || typeof value !== "object") return null;
   if (typeof value.aborted !== "boolean") return null;
   if (typeof value.addEventListener !== "function") return null;
@@ -421,7 +425,7 @@ function readConversation(source) {
         return null;
       }
 
-      const role = readString$E(message, ["role"]);
+      const role = readString$1(message, ["role"]);
       const parts = normalizeMultimodalParts(message.parts);
 
       if ((role !== "user" && role !== "assistant") || parts.length === 0) {

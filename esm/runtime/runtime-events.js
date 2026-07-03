@@ -1,6 +1,7 @@
 import { createUsageSnapshot, accumulateUsage } from '../session/token-budget.js';
 import { recordCostEntry, phaseFromStepType } from './cost-ledger.js';
 import { cloneValue } from './utils.js';
+import { readFiniteNumber } from './semantic-json.js';
 
 function createRuntimeMetrics() {
   return {
@@ -97,15 +98,11 @@ function recordCostLedgerEntry(type, detail, runState) {
     model: typeof detail.model === "string"
       ? detail.model
       : (typeof usage.model === "string" ? usage.model : null),
-    inputTokens: readFiniteNumber$7(usage.inputTokens),
-    outputTokens: readFiniteNumber$7(usage.outputTokens),
-    totalTokens: readFiniteNumber$7(usage.totalTokens),
-    latencyMs: readFiniteNumber$7(detail.durationMs)
+    inputTokens: readFiniteNumber(usage.inputTokens),
+    outputTokens: readFiniteNumber(usage.outputTokens),
+    totalTokens: readFiniteNumber(usage.totalTokens),
+    latencyMs: readFiniteNumber(detail.durationMs)
   });
-}
-
-function readFiniteNumber$7(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function sanitizeUsageDetail(detail, runState) {

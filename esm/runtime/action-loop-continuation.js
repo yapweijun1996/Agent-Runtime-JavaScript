@@ -1,4 +1,5 @@
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 
 function maybeFinalizeMaxStepsContinuation(session) {
   if (!session || !session.runState) return null;
@@ -50,9 +51,9 @@ function maybeFinalizeMaxStepsContinuation(session) {
 }
 
 function createContinuationOutput(options) {
-  const activeLabel = readString$z(options.activeItem && options.activeItem.label) || "the current task";
+  const activeLabel = readString(options.activeItem && options.activeItem.label) || "the current task";
   const remaining = (options.activeItem ? 1 : 0) + options.pendingCount;
-  const goal = readString$z(options.todoState && options.todoState.goal);
+  const goal = readString(options.todoState && options.todoState.goal);
   const maxSteps = Number.isInteger(options.maxSteps) ? options.maxSteps : null;
   const text = [
     "I paused this long-running task to preserve direction and progress.",
@@ -87,10 +88,6 @@ function countPendingItems(todoState) {
     return 0;
   }
   return todoState.items.filter((item) => item && item.status === "pending").length;
-}
-
-function readString$z(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function finalizeContinuationResult(session, output) {

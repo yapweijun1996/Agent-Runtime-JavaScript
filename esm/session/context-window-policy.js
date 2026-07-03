@@ -1,3 +1,5 @@
+import { readString } from '../runtime/semantic-json.js';
+
 const DEFAULT_CONTEXT_WINDOW_COMPACTION = Object.freeze({
   degradationOrder: ["other_memory", "history", "recent_turns", "summary"],
   failureMode: "error",
@@ -57,7 +59,7 @@ function normalizeContextWindowCompactionPolicy(source, legacyRecentMessages) {
     strategy: config.strategy === "priority_preserve_v1"
       ? config.strategy
       : DEFAULT_CONTEXT_WINDOW_COMPACTION.strategy,
-    summaryFormat: readString$A(config.summaryFormat) || DEFAULT_CONTEXT_WINDOW_COMPACTION.summaryFormat,
+    summaryFormat: readString(config.summaryFormat) || DEFAULT_CONTEXT_WINDOW_COMPACTION.summaryFormat,
     tiers: {
       confirmedMemory: {
         itemPriority: normalizeItemPriority(
@@ -155,7 +157,7 @@ function normalizeDegradationOrder(value) {
   const entries = Array.isArray(value) ? value : [];
   const allowed = new Set(DEFAULT_CONTEXT_WINDOW_COMPACTION.degradationOrder);
   const normalized = entries
-    .map(readString$A)
+    .map(readString)
     .filter((entry) => allowed.has(entry));
 
   return normalized.length > 0
@@ -166,7 +168,7 @@ function normalizeDegradationOrder(value) {
 function normalizeItemPriority(value) {
   const allowed = new Set(DEFAULT_CONTEXT_WINDOW_COMPACTION.tiers.confirmedMemory.itemPriority);
   const normalized = (Array.isArray(value) ? value : [])
-    .map(readString$A)
+    .map(readString)
     .filter((entry) => allowed.has(entry));
 
   return normalized.length > 0
@@ -177,7 +179,7 @@ function normalizeItemPriority(value) {
 function normalizeAnchorSignals(value) {
   const allowed = new Set(DEFAULT_CONTEXT_WINDOW_COMPACTION.tiers.recentTurns.anchorSignals);
   const normalized = (Array.isArray(value) ? value : [])
-    .map(readString$A)
+    .map(readString)
     .filter((entry) => allowed.has(entry));
 
   return normalized.length > 0
@@ -197,10 +199,6 @@ function normalizePositiveInteger$1(value, fallback) {
 
 function readBoolean(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
-}
-
-function readString$A(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { DEFAULT_CONTEXT_WINDOW_COMPACTION, normalizeContextWindowCompactionPolicy, toTargetTokens };

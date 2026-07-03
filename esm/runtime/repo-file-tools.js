@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 const DEFAULT_MAX_FILE_CHARS = 12000;
 const DEFAULT_MAX_SEARCH_RESULTS = 20;
 const DEFAULT_MAX_RESULT_CHARS = 240;
@@ -56,7 +58,7 @@ function normalizeRepoFileToolsConfig(value) {
     maxResultChars: normalizePositiveInteger$4(value.maxResultChars, DEFAULT_MAX_RESULT_CHARS, MAX_HARD_RESULT_CHARS),
     maxSearchResults: normalizePositiveInteger$4(value.maxSearchResults, DEFAULT_MAX_SEARCH_RESULTS, MAX_HARD_SEARCH_RESULTS),
     readFile,
-    rootDir: readString$M(value.rootDir),
+    rootDir: readString(value.rootDir),
     search
   };
 }
@@ -70,7 +72,7 @@ function hasRepoSearchTool(config) {
 }
 
 function normalizeRepoPath(value) {
-  const path = readString$M(value);
+  const path = readString(value);
   if (!path) {
     throw new Error('repo file tools require a non-empty "path".');
   }
@@ -104,7 +106,7 @@ function assertRepoPathAllowed(path, config, operation = "read") {
 }
 
 function normalizeRepoGlob(value) {
-  const glob = readString$M(value);
+  const glob = readString(value);
   if (!glob) return "";
   if (glob.includes("\0") || glob.includes("\\") || glob.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(glob)) {
     throw new Error("repo search glob must be a relative forward-slash pattern.");
@@ -131,7 +133,7 @@ function assertRepoGlobAllowed(glob, config) {
 
 function normalizeRepoFileOutput(value, request) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const text = truncateText$1(readString$M(source.text), request.maxFileChars);
+  const text = truncateText$1(readString(source.text), request.maxFileChars);
   return {
     kind: "repo_file_result",
     ok: source.ok !== false,
@@ -166,11 +168,11 @@ function normalizeRepoSearchOutput(value, request) {
 
 function normalizeMatch(value, index, request) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const text = truncateText$1(readString$M(source.text), request.maxResultChars);
+  const text = truncateText$1(readString(source.text), request.maxResultChars);
   return {
     column: normalizeNonNegativeInteger(source.column, null),
     line: normalizeNonNegativeInteger(source.line, null),
-    path: readString$M(source.path) || `match-${index + 1}`,
+    path: readString(source.path) || `match-${index + 1}`,
     text: text.value,
     truncated: Boolean(source.truncated) || text.truncated
   };
@@ -198,7 +200,7 @@ function normalizeNonNegativeInteger(value, fallback) {
 
 function normalizePathPatterns(value) {
   return (Array.isArray(value) ? value : [])
-    .map(readString$M)
+    .map(readString)
     .filter(Boolean)
     .map((pattern) => pattern.replace(/\\/g, "/"));
 }
@@ -238,8 +240,8 @@ function globOverlapsPattern(glob, denyPattern) {
 }
 
 function matchPathPattern(path, pattern) {
-  const normalizedPath = readString$M(path).replace(/^\.\//, "");
-  const normalizedPattern = readString$M(pattern).replace(/^\.\//, "");
+  const normalizedPath = readString(path).replace(/^\.\//, "");
+  const normalizedPattern = readString(pattern).replace(/^\.\//, "");
   if (!normalizedPath || !normalizedPattern) return false;
   if (normalizedPattern.endsWith("/")) {
     return normalizedPath.startsWith(normalizedPattern);
@@ -256,10 +258,6 @@ function globToRegExp(pattern) {
     .replace(/\*/g, "[^/]*")
     .replace(new RegExp(placeholder, "g"), ".*");
   return new RegExp(`^${escaped}$`, "i");
-}
-
-function readString$M(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { assertRepoGlobAllowed, assertRepoPathAllowed, hasRepoReadFileTool, hasRepoSearchTool, normalizeRepoFileOutput, normalizeRepoFileToolsConfig, normalizeRepoGlob, normalizeRepoPath, normalizeRepoSearchOutput };

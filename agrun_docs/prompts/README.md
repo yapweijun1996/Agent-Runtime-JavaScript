@@ -9,8 +9,8 @@ any section per-host via `createRuntime({ prompts: { <key>: ... } })`.
 | `basePlannerDirectives` | `src/runtime/prompts/planner-base-directives.js` | 37 | [basePlannerDirectives.md](basePlannerDirectives.md) |
 | `compactPlannerDirectives` | `src/runtime/prompts/planner-compact-directives.js` | 25 | [compactPlannerDirectives.md](compactPlannerDirectives.md) |
 | `skillDirectives` | `src/runtime/prompts/skill-directives.js` | 4 | [skillDirectives.md](skillDirectives.md) |
-| `workspaceDirectives` | `src/runtime/prompts/workspace-directives.js` | 15 | [workspaceDirectives.md](workspaceDirectives.md) |
-| `researchDirectives` | `src/runtime/prompts/research-directives.js` | 4 | [researchDirectives.md](researchDirectives.md) |
-| `convergenceAdvisory` | `src/runtime/prompts/convergence-advisory.js` | 11 | [convergenceAdvisory.md](convergenceAdvisory.md) |
+| `workspaceDirectives` | `src/runtime/prompts/workspace-directives.js` | 16 | [workspaceDirectives.md](workspaceDirectives.md) |
+| `researchDirectives` | `src/runtime/prompts/research-directives.js` | 5 | [researchDirectives.md](researchDirectives.md) |
+| `convergenceAdvisory` | `src/runtime/prompts/convergence-advisory.js` | 10 | [convergenceAdvisory.md](convergenceAdvisory.md) |
 | `todoDirectives` | `src/runtime/prompts/todo-directives.js` | 4 | [todoDirectives.md](todoDirectives.md) |
-| `nativePlannerDirectives` | `src/runtime/prompts/planner-native-directives.js` | 34 | [nativePlannerDirectives.md](nativePlannerDirectives.md) |
+| `nativePlannerDirectives` | `src/runtime/prompts/planner-native-directives.js` | 38 | [nativePlannerDirectives.md](nativePlannerDirectives.md) |

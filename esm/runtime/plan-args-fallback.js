@@ -65,7 +65,7 @@ const RESERVED_FLAT_ARG_KEYS = new Set([
  * fallback args are present.
  */
 function readPlanActionFallbackArgs(record, options = {}) {
-  if (!isPlainObject$1(record)) return null;
+  if (!isPlainObject$2(record)) return null;
 
   for (const key of TOOL_ARGS_ALIAS_KEYS) {
     const value = readNonEmptyObject(record[key]);
@@ -91,8 +91,8 @@ function readPlanActionFallbackArgs(record, options = {}) {
  * sibling `toolArgsJson`).
  */
 function mergeMissingArgs(base, fallback) {
-  const target = isPlainObject$1(base) ? { ...base } : {};
-  if (!isPlainObject$1(fallback)) return target;
+  const target = isPlainObject$2(base) ? { ...base } : {};
+  if (!isPlainObject$2(fallback)) return target;
   for (const [key, value] of Object.entries(fallback)) {
     if (target[key] == null) {
       target[key] = value;
@@ -127,11 +127,11 @@ function parseToolArgsJson(value) {
 }
 
 function readNonEmptyObject(value) {
-  if (!isPlainObject$1(value)) return null;
+  if (!isPlainObject$2(value)) return null;
   return Object.keys(value).length > 0 ? value : null;
 }
 
-function isPlainObject$1(value) {
+function isPlainObject$2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 

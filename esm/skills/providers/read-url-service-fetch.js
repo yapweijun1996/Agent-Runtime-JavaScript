@@ -1,4 +1,5 @@
 import { normalizeServiceEndpoint, normalizeAuthMode, resolveBaseFetch, readRequestUrl, normalizeMethod, shouldProxyRequest, buildServiceHeaders, readPositiveInteger, readNonNegativeInteger, createSyntheticReadResponse } from './read-url-service-helpers.js';
+import { readString } from '../../runtime/semantic-json.js';
 
 const DEFAULT_WAIT_UNTIL = "domcontentloaded";
 const READ_URL_RESPONSE_META = new WeakMap();
@@ -7,13 +8,13 @@ const RETRYABLE_READ_URL_SERVICE_ERROR = "READ_URL_SERVICE_UNAVAILABLE";
 function createReadUrlServiceFetch(options = {}) {
   const endpoint = normalizeServiceEndpoint(options.endpoint);
   const authMode = normalizeAuthMode(options.authMode);
-  const apiKey = readString$R(options.apiKey);
+  const apiKey = readString(options.apiKey);
   const baseFetch = resolveBaseFetch(options.baseFetch);
   const includeScreenshot = options.includeScreenshot === true;
   const passthroughUrls = Array.isArray(options.passthroughUrls)
-    ? options.passthroughUrls.map(readString$R).filter(Boolean)
+    ? options.passthroughUrls.map(readString).filter(Boolean)
     : [];
-  const waitUntil = readString$R(options.waitUntil) || DEFAULT_WAIT_UNTIL;
+  const waitUntil = readString(options.waitUntil) || DEFAULT_WAIT_UNTIL;
 
   if (!endpoint) {
     throw new Error('Read URL service fetch requires a non-empty "endpoint".');
@@ -79,8 +80,8 @@ function attachReadUrlMeta(response, payload) {
     return;
   }
 
-  const screenshotBase64 = readString$R(payload && payload.screenshotBase64);
-  const screenshotMimeType = readString$R(payload && payload.screenshotMimeType) || "image/jpeg";
+  const screenshotBase64 = readString(payload && payload.screenshotBase64);
+  const screenshotMimeType = readString(payload && payload.screenshotMimeType) || "image/jpeg";
   const textRange = normalizeTextRange$1(
     (payload && payload.textRange) || (payload && payload.meta && payload.meta.textRange)
   );
@@ -95,7 +96,7 @@ function attachReadUrlMeta(response, payload) {
     screenshotMimeType,
     textRange,
     textWindowApplied: Boolean(textRange),
-    title: readString$R(payload && payload.title)
+    title: readString(payload && payload.title)
   });
 }
 
@@ -120,10 +121,6 @@ function readRetryableErrorMessage(error) {
   }
 
   return "Read URL service request failed before a response was available.";
-}
-
-function readString$R(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeTextRange$1(value) {

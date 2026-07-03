@@ -1,4 +1,5 @@
 import { findActiveTodoItem, countItemsByStatus, findItemIndexById } from './todo-queries.js';
+import { readString } from './semantic-json.js';
 
 const TODO_TASK_LIFECYCLE_STATUSES = Object.freeze([
   "running",
@@ -10,10 +11,6 @@ const TODO_TASK_LIFECYCLE_STATUSES = Object.freeze([
 
 const CONTINUATION_FINAL_SOURCE = "continuation_required";
 const CONTINUATION_TERMINALIZER = "max_steps_continuation";
-
-function readString$1s(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function readNumber$b(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -65,23 +62,23 @@ function projectTodoTaskLifecycle(runState) {
     total: items.length
   };
   const status = deriveLifecycleStatus(todoState, state, counts);
-  const threadId = readString$1s(state.threadId) || "default";
-  const todoId = readString$1s(todoState.id) || "todo";
-  const activeItemId = readString$1s(activeItem?.id) || null;
+  const threadId = readString(state.threadId) || "default";
+  const todoId = readString(todoState.id) || "todo";
+  const activeItemId = readString(activeItem?.id) || null;
   const hasUnfinishedWork = counts.active > 0 || counts.pending > 0;
 
   return {
     activeItemId,
-    activeItemLabel: readString$1s(activeItem?.label) || null,
+    activeItemLabel: readString(activeItem?.label) || null,
     activePosition: readActivePosition(todoState, activeItemId),
     canCancel: status === "running" || status === "paused" || status === "blocked",
     canContinue: status === "paused" && hasUnfinishedWork && !state.pendingApproval,
     counts,
-    goal: readString$1s(todoState.goal) || null,
+    goal: readString(todoState.goal) || null,
     reason: status === "paused"
       ? CONTINUATION_FINAL_SOURCE
       : (state.pendingApproval ? "pending_approval" : null),
-    runId: readString$1s(state.runId) || null,
+    runId: readString(state.runId) || null,
     status,
     taskId: `todo-task:${threadId}:${todoId}`,
     threadId,

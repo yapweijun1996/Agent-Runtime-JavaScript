@@ -1,5 +1,6 @@
 import { normalizeResearchSlice } from '../runtime/research-thread-sync.js';
 import { normalizeTodoState } from '../runtime/todo-state.js';
+import { readString } from '../runtime/semantic-json.js';
 
 const DEFAULT_THREAD_ID$1 = "default";
 const THREAD_STATUSES = ["active", "paused", "closed"];
@@ -13,7 +14,7 @@ const DEFAULT_MAX_THREADS = 8;
 function createThread(options) {
   const source = options && typeof options === "object" ? options : {};
   const now = typeof source.now === "number" ? source.now : Date.now();
-  const id = readString$1_(source.id) || generateThreadId(now);
+  const id = readString(source.id) || generateThreadId(now);
   return {
     budget: source.budget && typeof source.budget === "object" ? { ...source.budget } : null,
     createdAt: now,
@@ -31,7 +32,7 @@ function createThread(options) {
     // 212a) hydrate cleanly without a migration step.
     todoState: normalizeTodoState(source.todoState),
     toolContext: normalizeToolContext$1(source.toolContext),
-    topic: readString$1_(source.topic)
+    topic: readString(source.topic)
   };
 }
 
@@ -79,7 +80,7 @@ function createDefaultThread(overrides) {
  */
 function findThreadById(threads, threadId) {
   const list = Array.isArray(threads) ? threads : [];
-  const target = readString$1_(threadId);
+  const target = readString(threadId);
   if (!target) return null;
   return list.find((thread) => thread && thread.id === target) || null;
 }
@@ -90,7 +91,7 @@ function findThreadById(threads, threadId) {
  */
 function appendRecentUserText(thread, text) {
   const existing = Array.isArray(thread && thread.recentUserTexts) ? thread.recentUserTexts : [];
-  const trimmed = readString$1_(text);
+  const trimmed = readString(text);
   if (!trimmed) return existing.slice();
   const updated = existing.concat([trimmed]);
   if (updated.length <= MAX_RECENT_USER_TEXTS) return updated;
@@ -110,7 +111,7 @@ function readThreadsState(sessionRecord) {
   const record = sessionRecord && typeof sessionRecord === "object" ? sessionRecord : {};
   const normalizedList = normalizeThreadList(record.threads);
   const threads = normalizedList.length > 0 ? normalizedList : [createDefaultThread()];
-  const requestedActive = readString$1_(record.activeThreadId);
+  const requestedActive = readString(record.activeThreadId);
   const activeThreadId = findThreadById(threads, requestedActive)
     ? requestedActive
     : threads[0].id;
@@ -135,8 +136,8 @@ function applyRouterVerdict(options) {
   const source = options && typeof options === "object" ? options : {};
   const state = readThreadsState(source.sessionRecord);
   const verdict = source.verdict && typeof source.verdict === "object" ? source.verdict : null;
-  const userText = readString$1_(source.userText);
-  const turnId = readString$1_(source.turnId) || null;
+  const userText = readString(source.userText);
+  const turnId = readString(source.turnId) || null;
   const now = typeof source.now === "number" ? source.now : Date.now();
   const maxThreads = Number.isInteger(source.maxThreads) && source.maxThreads > 0
     ? source.maxThreads
@@ -156,7 +157,7 @@ function applyRouterVerdict(options) {
     const newThread = createThread({
       lastActiveAt: now,
       recentUserTexts: userText ? [userText] : [],
-      topic: readString$1_(verdict.topic),
+      topic: readString(verdict.topic),
       goalAnchor: userText
         ? { createdAt: now, text: userText, turnId }
         : undefined
@@ -164,13 +165,17 @@ function applyRouterVerdict(options) {
     threads.push(newThread);
     activeThreadId = newThread.id;
   } else if (verdict.action === "pivot_back") {
-    const target = readString$1_(verdict.threadId);
+    const target = readString(verdict.threadId);
     if (target && findThreadById(threads, target)) {
       activeThreadId = target;
     }
     threads = bumpThread(threads, activeThreadId, userText, now, turnId);
-  } else if (verdict.action === "continue_thread") {
-    const target = readString$1_(verdict.threadId);
+  } else if (verdict.action === "continue_thread" || verdict.action === "cross_thread_recall") {
+    // AGRUN-593 — cross_thread_recall keeps thread state exactly like
+    // continue_thread (the answer lands on the active thread); the whole-
+    // session VIEW for the turn is the session layer's job (readThreadScope
+    // returns null for this verdict).
+    const target = readString(verdict.threadId);
     if (target && findThreadById(threads, target)) {
       activeThreadId = target;
     }
@@ -236,7 +241,7 @@ function bumpThread(threads, activeThreadId, userText, now, turnId) {
     const existingAnchor = thread.goalAnchor && typeof thread.goalAnchor === "object"
       ? thread.goalAnchor
       : null;
-    const hasText = Boolean(existingAnchor && readString$1_(existingAnchor.text));
+    const hasText = Boolean(existingAnchor && readString(existingAnchor.text));
     const nextGoalAnchor = !hasText && userText
       ? { createdAt: now, text: userText, turnId: turnId || null }
       : existingAnchor;
@@ -267,7 +272,7 @@ function evictIfNeeded(threads, activeThreadId, maxThreads) {
  * words and short noise. Exposed for topic-router scoring + tests.
  */
 function tokenizeTopicText(value) {
-  const text = readString$1_(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (!text) return [];
   const raw = text.split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean);
   const filtered = [];
@@ -285,8 +290,8 @@ function normalizeGoalAnchor(value) {
   }
   return {
     createdAt: typeof value.createdAt === "number" ? value.createdAt : null,
-    text: readString$1_(value.text),
-    turnId: readString$1_(value.turnId) || null
+    text: readString(value.text),
+    turnId: readString(value.turnId) || null
   };
 }
 
@@ -311,7 +316,7 @@ function normalizeResearchContext(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   return {
     aggregatedSearchResults: Array.isArray(source.aggregatedSearchResults) ? source.aggregatedSearchResults.slice() : [],
-    lastQuery: readString$1_(source.lastQuery) || null,
+    lastQuery: readString(source.lastQuery) || null,
     readSources: Array.isArray(source.readSources) ? source.readSources.slice() : [],
     searchPasses: Array.isArray(source.searchPasses) ? source.searchPasses.slice() : [],
     searchResults: Array.isArray(source.searchResults) ? source.searchResults.slice() : []
@@ -320,13 +325,13 @@ function normalizeResearchContext(value) {
 
 function normalizeRecentUserTexts(value) {
   if (!Array.isArray(value)) return [];
-  const cleaned = value.map((item) => readString$1_(item)).filter(Boolean);
+  const cleaned = value.map((item) => readString(item)).filter(Boolean);
   if (cleaned.length <= MAX_RECENT_USER_TEXTS) return cleaned;
   return cleaned.slice(-MAX_RECENT_USER_TEXTS);
 }
 
 function normalizeThreadStatus(value) {
-  const candidate = readString$1_(value).toLowerCase();
+  const candidate = readString(value).toLowerCase();
   return THREAD_STATUSES.includes(candidate) ? candidate : "active";
 }
 
@@ -334,10 +339,6 @@ function generateThreadId(seed) {
   const seedPart = Number.isFinite(seed) ? Math.abs(seed).toString(36) : "0";
   const randomPart = Math.floor(Math.random() * 1e9).toString(36);
   return `t-${seedPart.slice(-4)}${randomPart.slice(-4)}`;
-}
-
-function readString$1_(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 const STOP_WORDS = new Set([

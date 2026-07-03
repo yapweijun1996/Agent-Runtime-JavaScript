@@ -10,6 +10,61 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Active work on `main` that has not shipped to a version tag.
 
+## [4.1.0] — 2026-07-03 (production-ready hardening)
+
+The 2026-07-02 → 07-03 arc: native-tools default planner (ADR-0058), 2-5×
+faster turns at half the LLM calls, first-token streaming, and a day of
+live-e2e-driven fixes. Details:
+[`agrun_docs/release-notes/2026-07-02-performance-arc-native-default.md`](./agrun_docs/release-notes/2026-07-02-performance-arc-native-default.md),
+task board AGRUN-568…AGRUN-598.
+
+### Added
+- **Standard live e2e suite** ([`agrun_docs/standard-live-e2e.md`](./agrun_docs/standard-live-e2e.md)):
+  short-150 / long-1500 / deep-research-1200 / 8-turn conversation (with a
+  real web_search news turn) × 3 providers, plus agrun-vs-OpenAI-Agents-SDK
+  single-turn and multi-turn benchmarks. Tuned agrun beats the SDK on the
+  same 7-turn conversation (20.9 s vs 32.9 s).
+- **Production deployment guide** ([`agrun_docs/production-deployment.md`](./agrun_docs/production-deployment.md)):
+  key-security shapes, the 5.6× production chat profile, pause semantics.
+- `createRuntime({ actionHistoryLimit })` — opt-in heap cap (D2).
+- Cross-thread recall verdict: memory questions get the whole-session view
+  while topic threads stay scoped (AGRUN-593).
+
+### Fixed
+- Session silently forgot anything older than 3 exchanges (AGRUN-586).
+- Guaranteed-rejection cycles: standalone-only actions in native parallel
+  batches; policy-denied tools on the model surface (AGRUN-588).
+- Clarification loop: a reply to a pending clarification now resolves it;
+  web_search no longer trusts model-guessed provider names (AGRUN-595).
+- Proportionality: headline-style asks answer from search results directly
+  instead of paying a read-every-cited-page tax (AGRUN-597).
+- gemini streaming tool-call double-extraction blanked tool names (AGRUN-585).
+
+### Hardening
+- web-search endpoints must be http(s) and parse (D4); ESM entry verified
+  with `dist/esm/package.json` type marker (D3); default model ids verified
+  live (D5).
+
+### Security
+- **AGRUN-523 — provider `apiKey` no longer leaks on approval turns.** A
+  blocked / `approval_required` result previously embedded the host provider
+  `apiKey` verbatim in the resume token, riding back on
+  `result.output.pendingApproval.resumeToken.request.apiKey` **and**
+  `result.runState.pendingApproval.resumeToken.request.apiKey` (universal, any
+  provider). Every secret-keyed field is now redacted from the resume token
+  before it is signed, so the whole result is secret-free while `sign → verify`
+  still validates on resume.
+
+### Breaking
+- **Approval resume now REQUIRES client-auth hosts to re-supply `apiKey`.**
+  Because the resume token no longer carries the provider key, a client-auth
+  `approval_resolution` must pass `apiKey` (and any `fetch`/endpoints) back in:
+  `runtime.run({ type:"approval_resolution", decision:"approve", apiKey, resumeToken })`.
+  The runtime no longer falls back to a key embedded in the token. Server-auth
+  (`authMode:"server"`) resumes are unaffected (they never carried a client
+  key). The reference browser host already re-supplies its key on every approve.
+  See [`agrun_docs/approval-flow.md`](./agrun_docs/approval-flow.md#resume-token).
+
 ## [1.0.0] — 2026-05-27 (AGRUN-274 final — ADR-0040)
 
 Major version bump. The legacy `canHandle` skill-loop router and its 6

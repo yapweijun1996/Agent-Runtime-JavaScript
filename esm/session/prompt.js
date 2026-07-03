@@ -1,5 +1,6 @@
 import { stableStringify, stringifySessionContent } from './content.js';
 import { summarizeReadSourceForDirection } from './context-snapshot-fields.js';
+import { readString } from '../runtime/semantic-json.js';
 import { normalizeThreadId } from './summary-key.js';
 
 function hasSessionContext(sessionContext) {
@@ -35,7 +36,7 @@ function summarizeSessionContextMeta(sessionContext) {
   return {
     decisionsCount: countEvidenceItems(items, "decision"),
     ambiguityPresent: hasText(context && context.openAmbiguity),
-    clarificationStatus: readString$1N(context && context.clarificationStatus) || "none",
+    clarificationStatus: readString(context && context.clarificationStatus) || "none",
     factsCount: countEvidenceItems(items, "fact"),
     goalPresent: hasText(context && context.currentGoal),
     historyCount: countHistoryMessages((context && (context.recentTurns || context.history)) || ""),
@@ -60,7 +61,7 @@ function buildSessionContextPromptBlock(sessionContext, heading) {
   }
 
   return [
-    readString$1N(heading) || "Session evidence:",
+    readString(heading) || "Session evidence:",
     renderSection("Current goal", sessionContext.currentGoal),
     renderSection("Current topic", sessionContext.currentTopic),
     renderSection("Active query", sessionContext.activeQuery),
@@ -90,6 +91,11 @@ function buildCompactionPrompt(options) {
     "Open questions:",
     "Next step:",
     "Keep goals, confirmed facts, constraints, decisions, and unresolved work.",
+    // AGRUN-424 — preservation rules: fold the prior summary forward, keep
+    // concrete identifiers exact, and never silently resolve an open question.
+    "Fold the existing summary below into your output; do not drop anything from it that is still relevant.",
+    "Preserve concrete identifiers verbatim: names, numbers, dates, amounts, currencies, URLs, file paths, and IDs.",
+    "Keep every still-open question under Open questions.",
     "Omit greetings, filler, and duplicated details.",
     "Return plain text only."
   ];
@@ -204,10 +210,6 @@ function renderStructuredSection(title, value) {
   return text ? `${title}:\n${text}` : "";
 }
 
-function readString$1N(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function serializeStructuredValue(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return "";
@@ -217,12 +219,12 @@ function serializeStructuredValue(value) {
 }
 
 function readClarificationStatus$1(value) {
-  const text = readString$1N(value);
+  const text = readString(value);
   return text && text !== "none" ? text : "";
 }
 
 function hasText(value) {
-  return readString$1N(value).length > 0;
+  return readString(value).length > 0;
 }
 
 function countEvidenceItems(items, kind) {
@@ -236,7 +238,7 @@ function countEvidenceItems(items, kind) {
 }
 
 function countHistoryMessages(value) {
-  const text = readString$1N(value);
+  const text = readString(value);
 
   if (!text) {
     return 0;
@@ -250,7 +252,7 @@ function countHistoryMessages(value) {
 }
 
 function countNumberedLines(value) {
-  const text = readString$1N(value);
+  const text = readString(value);
 
   if (!text) {
     return 0;

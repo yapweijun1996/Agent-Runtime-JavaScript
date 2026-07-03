@@ -14,21 +14,23 @@ All execution enters through `runtime.run(input)`, which calls `runLoop()`.
 ```text
 runtime.run(input)
   └ runLoop(options)
-      ├─ Approval resolution?  → runApprovalResolution()
-      ├─ Not a provider request? → runSkillLoop()
-      ├─ Direct skill match?   → runSkillLoop()
-      └─ Otherwise             → runActionLoop()
+      ├─ Approval resolution?        → runApprovalResolution()
+      ├─ Not a tool-loop request?    → INVALID_RUN_INPUT (rejected)
+      └─ Tool-loop provider request  → runActionLoop()
 ```
 
 ### Route Selection Logic
 
-1. **Approval Resolution**: If the input contains a `resumeToken` from a prior pending-approval result, the runtime resumes the interrupted action through `runApprovalResolution()`.
+There are exactly two accepted inputs; everything else is rejected. The legacy
+skill-loop router (the removed `runSkillLoop` / `findDirectSkillMatch` /
+`skill-probe` infrastructure) and the `legacySkillLoop` config option were
+deleted in AGRUN-274d.
 
-2. **Non-Provider Input**: If the input is not a tool-loop provider request (no `provider`, `model`, or `apiKey`), the runtime runs the simpler skill-only path via `runSkillLoop()`.
+1. **Approval Resolution**: If the input is an approval resolution carrying a `resumeToken` from a prior pending-approval result, the runtime resumes the interrupted action through `runApprovalResolution()`.
 
-3. **Direct Skill Match**: Even for provider requests, the runtime first probes for a direct skill match via `findDirectSkillMatch()`. If a skill can handle the input directly, it bypasses the planner entirely.
+2. **Tool-Loop Provider Request → Action Loop (Planner Path)**: A request with `prompt` + `provider` + `apiKey` + `model` drives the full multi-cycle OODAE action loop. There is no direct-skill-match shortcut: skills participate through planner/tool actions and engaged skill capabilities, never by bypassing the planner.
 
-4. **Action Loop (Planner Path)**: When no shortcut applies, the runtime enters the full multi-cycle OODAE action loop.
+3. **Anything else → `INVALID_RUN_INPUT`**: Any non-tool-loop input (a bare `string`, `{type:"web_search",…}`, etc.) is rejected with `INVALID_RUN_INPUT` — there is no skill-only fallback path. Hosts that previously routed such inputs through the `canHandle` router must either pass a tool-loop provider request or register their capability as a `customAction` via `defineAction`.
 
 ## The OODAE Cycle
 

@@ -1,9 +1,15 @@
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 
-const DEFAULT_CANDIDATE_PATH = "final_candidate.md";
+// SSOT for the default final-candidate workspace path. The AI authors its own
+// filename (ADR-0015) and stamps it onto `quality.finalCandidatePath`; this is
+// only the fallback default used until the AI sets one. Exported so the ~13
+// fallback sites across the runtime share one definition instead of repeating
+// the string literal (ADR-0056 H1 cleanup). Value is unchanged.
+const DEFAULT_FINAL_CANDIDATE_PATH = "final_candidate.md";
 
 function createWorkspaceCandidateLifecycle(options = {}) {
-  const activePath = normalizeWorkspacePath(options.activePath) || DEFAULT_CANDIDATE_PATH;
+  const activePath = normalizeWorkspacePath(options.activePath) || DEFAULT_FINAL_CANDIDATE_PATH;
   return {
     activePath,
     draftPaths: normalizeDraftPaths(options.draftPaths, activePath),
@@ -16,7 +22,7 @@ function createWorkspaceCandidateLifecycle(options = {}) {
 }
 
 function normalizeWorkspaceCandidateLifecycle(value, options = {}) {
-  const selectedPath = normalizeWorkspacePath(options.activePath) || DEFAULT_CANDIDATE_PATH;
+  const selectedPath = normalizeWorkspacePath(options.activePath) || DEFAULT_FINAL_CANDIDATE_PATH;
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const activePath = normalizeWorkspacePath(source.activePath) || selectedPath;
   return createWorkspaceCandidateLifecycle({
@@ -33,20 +39,20 @@ function normalizeWorkspaceCandidateLifecycle(value, options = {}) {
 function normalizeCandidatePathMismatchSignal(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const mismatchKind = readString$1D(source.mismatchKind);
+  const mismatchKind = readString(source.mismatchKind);
   const selectedPath = normalizeWorkspacePath(source.selectedPath);
   if (!mismatchKind || !selectedPath) return null;
   return {
-    action: readString$1D(source.action) || null,
+    action: readString(source.action) || null,
     activePath: normalizeWorkspacePath(source.activePath) || selectedPath,
     finalizedPath: normalizeWorkspacePath(source.finalizedPath) || null,
     kind: "candidate_path_mismatch_signal",
     lastWrittenPath: normalizeWorkspacePath(source.lastWrittenPath) || null,
     mismatchKind,
-    observedAt: readString$1D(source.observedAt) || null,
+    observedAt: readString(source.observedAt) || null,
     publishedPath: normalizeWorkspacePath(source.publishedPath) || null,
     selectedPath,
-    status: readString$1D(source.status) || "observed",
+    status: readString(source.status) || "observed",
     writtenPath: normalizeWorkspacePath(source.writtenPath) || null
   };
 }
@@ -212,7 +218,7 @@ function hasPriorWriteToPath(workspace, filePath, lifecycle) {
 }
 
 function isContentWriteAction(action) {
-  const value = readString$1D(action);
+  const value = readString(action);
   return value === "write" ||
     value === "replace" ||
     value === "append" ||
@@ -222,11 +228,11 @@ function isContentWriteAction(action) {
     value === "promote";
 }
 
-function readWorkspaceSelectedCandidatePath(workspace, fallback = DEFAULT_CANDIDATE_PATH) {
+function readWorkspaceSelectedCandidatePath(workspace, fallback = DEFAULT_FINAL_CANDIDATE_PATH) {
   const quality = workspace && workspace.quality && typeof workspace.quality === "object"
     ? workspace.quality
     : {};
-  return normalizeWorkspacePath(quality.finalCandidatePath) || normalizeWorkspacePath(fallback) || DEFAULT_CANDIDATE_PATH;
+  return normalizeWorkspacePath(quality.finalCandidatePath) || normalizeWorkspacePath(fallback) || DEFAULT_FINAL_CANDIDATE_PATH;
 }
 
 function normalizeDraftPaths(value, activePath) {
@@ -251,7 +257,7 @@ function removeDraftPath(paths, path) {
 }
 
 function normalizeLifecycleStatus(value) {
-  const status = readString$1D(value);
+  const status = readString(value);
   if (!status) return "";
   if (
     status === "idle" ||
@@ -268,13 +274,9 @@ function normalizeLifecycleStatus(value) {
 }
 
 function normalizeWorkspacePath(value) {
-  const path = readString$1D(value);
+  const path = readString(value);
   if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return "";
   return path;
 }
 
-function readString$1D(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-export { createWorkspaceCandidateLifecycle, normalizeCandidatePathMismatchSignal, normalizeWorkspaceCandidateLifecycle, projectWorkspaceCandidateLifecycle, recordWorkspaceCandidateFinalize, recordWorkspaceCandidatePublish, recordWorkspaceCandidateRead, recordWorkspaceCandidateWrite, syncRunStateCandidatePathMismatchSignal };
+export { DEFAULT_FINAL_CANDIDATE_PATH, createWorkspaceCandidateLifecycle, normalizeCandidatePathMismatchSignal, normalizeWorkspaceCandidateLifecycle, projectWorkspaceCandidateLifecycle, recordWorkspaceCandidateFinalize, recordWorkspaceCandidatePublish, recordWorkspaceCandidateRead, recordWorkspaceCandidateWrite, syncRunStateCandidatePathMismatchSignal };

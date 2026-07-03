@@ -1,4 +1,5 @@
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 
 // AGRUN-214m — Thread-scoped research SSOT.
 //
@@ -15,6 +16,7 @@ import { cloneValue } from './utils.js';
 // follows the same pattern as `goalAnchor` and `todoState` thread fields.
 
 
+
 const SLICE_VERSION = 1;
 const MAX_OBSERVATIONS = 64;
 const MAX_SOURCE_ARTIFACTS = 32;
@@ -24,7 +26,7 @@ function normalizeResearchSlice(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
-  const topic = readString$1$(value.topic);
+  const topic = readString(value.topic);
   const evidenceGraph = trimEvidenceGraph(value.evidenceGraph);
   const reportLoop = trimReportLoop(value.reportLoop);
   const finalEnvelope = value.finalEnvelope && typeof value.finalEnvelope === "object"
@@ -36,10 +38,10 @@ function normalizeResearchSlice(value) {
     || finalEnvelope;
   if (!hasContent) return null;
   return {
-    entityKey: readString$1$(value.entityKey),
+    entityKey: readString(value.entityKey),
     evidenceGraph,
     finalEnvelope,
-    lastTurnId: readString$1$(value.lastTurnId) || null,
+    lastTurnId: readString(value.lastTurnId) || null,
     reportLoop,
     topic,
     updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : null,
@@ -55,8 +57,8 @@ function normalizeResearchSlice(value) {
 function serializeResearchSlice(runState, options) {
   if (!runState || typeof runState !== "object") return null;
   const opts = options && typeof options === "object" ? options : {};
-  const topic = readString$1$(runState.researchState && runState.researchState.topic)
-    || readString$1$(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
+  const topic = readString(runState.researchState && runState.researchState.topic)
+    || readString(runState.researchEvidenceGraph && runState.researchEvidenceGraph.topic);
   const graph = runState.researchEvidenceGraph;
   const loop = runState.researchReportLoop;
   const envelope = runState.researchFinalEnvelope;
@@ -67,16 +69,16 @@ function serializeResearchSlice(runState, options) {
   const hasLoop = loop && typeof loop === "object"
     && (loop.enabled === true
       || (typeof loop.status === "string" && loop.status && loop.status !== "idle")
-      || readString$1$(loop.finalMode));
+      || readString(loop.finalMode));
   const hasEnvelope = envelope && typeof envelope === "object";
   if (!topic && !hasGraph && !hasLoop && !hasEnvelope) {
     return null;
   }
   return normalizeResearchSlice({
-    entityKey: readString$1$(graph && graph.entity && graph.entity.key),
+    entityKey: readString(graph && graph.entity && graph.entity.key),
     evidenceGraph: hasGraph ? graph : null,
     finalEnvelope: hasEnvelope ? envelope : null,
-    lastTurnId: readString$1$(opts.turnId) || readString$1$(runState.runId) || null,
+    lastTurnId: readString(opts.turnId) || readString(runState.runId) || null,
     reportLoop: hasLoop ? loop : null,
     topic,
     updatedAt: typeof opts.now === "number" ? opts.now : Date.now()
@@ -108,7 +110,7 @@ function applyResearchSliceToRunState(runState, slice) {
     if (!runState.researchState || typeof runState.researchState !== "object") {
       runState.researchState = {};
     }
-    if (!readString$1$(runState.researchState.topic)) {
+    if (!readString(runState.researchState.topic)) {
       runState.researchState.topic = normalized.topic;
     }
   }
@@ -151,25 +153,21 @@ function trimReportLoop(value) {
       ? cloneValue(value.authorityCoverage)
       : null,
     enabled: value.enabled === true,
-    finalMode: readString$1$(value.finalMode) || null,
+    finalMode: readString(value.finalMode) || null,
     gateSignal: value.gateSignal && typeof value.gateSignal === "object"
       ? cloneValue(value.gateSignal)
       : null,
-    lastTopic: readString$1$(value.lastTopic) || null,
+    lastTopic: readString(value.lastTopic) || null,
     recentQueries: Array.isArray(value.recentQueries)
       ? cloneValue(value.recentQueries).slice(-20)
       : [],
     sourceMinimum: value.sourceMinimum && typeof value.sourceMinimum === "object"
       ? cloneValue(value.sourceMinimum)
       : null,
-    status: readString$1$(value.status) || "idle",
+    status: readString(value.status) || "idle",
     vetoCount: typeof value.vetoCount === "number" ? value.vetoCount : 0,
     version: typeof value.version === "number" ? value.version : 2
   };
-}
-
-function readString$1$(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { applyResearchSliceToRunState, normalizeResearchSlice, serializeResearchSlice };

@@ -1,5 +1,6 @@
 import { createAgentSkillSummary, normalizeAgentSkill, normalizeSkillManifest, normalizeSkillManifests } from './agent-skills.js';
 import { extractSkillCapabilities } from './skill-capabilities.js';
+import { readString } from './semantic-json.js';
 
 /**
  * Parse a SKILL.md string (YAML frontmatter + markdown body) into a
@@ -288,7 +289,7 @@ async function loadSingleSkillFromRecord(baseUrl, record) {
 }
 
 function findSkillIndexRecord(records, skillIdOrName) {
-  const target = readString$1(skillIdOrName).toLowerCase();
+  const target = readString(skillIdOrName).toLowerCase();
   if (!target) return null;
   return records.find((record) => {
     return record.manifest.skillId.toLowerCase() === target ||
@@ -303,7 +304,7 @@ function createSkillCacheKey(record) {
     record.manifest.checksum,
     record.sourcePath,
     record.toolsPath
-  ].map(readString$1).join("|");
+  ].map(readString).join("|");
 }
 
 function readEntryPath(entry) {
@@ -313,14 +314,14 @@ function readEntryPath(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     return "";
   }
-  return readString$1(entry.sourcePath) || readString$1(entry.skill);
+  return readString(entry.sourcePath) || readString(entry.skill);
 }
 
 function readEntryToolsPath(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     return "";
   }
-  return readString$1(entry.toolsPath) || readString$1(entry.tools);
+  return readString(entry.toolsPath) || readString(entry.tools);
 }
 
 async function loadSkillTools(baseUrl, toolsPath) {
@@ -362,10 +363,6 @@ function parseListField(value) {
     .split(",")
     .map((item) => stripQuotes(item.trim()))
     .filter(Boolean);
-}
-
-function readString$1(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { loadAgentSkills, loadSkillIndexProvider, parseSkillMarkdown };

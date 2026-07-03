@@ -1,6 +1,7 @@
 import { formatStandalonePlanActionNames } from './action-plan-contract.js';
 import { buildLines } from './prompts/planner-native-directives.js';
 import { resolvePromptSection } from './prompts/resolve.js';
+import { readString } from './semantic-json.js';
 
 // `promptOverrides` is the resolved runtimeConfig.prompts map (optional). Only
 // the `nativePlannerDirectives` key applies in native tool-calling mode; the
@@ -13,7 +14,7 @@ function buildNativeToolsSystemPrompt(agentRole, systemPrompt, capabilities, pla
     : [];
   const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
   const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
-  const nativePlanGuidance = readString$t(
+  const nativePlanGuidance = readString(
     capabilities &&
     capabilities.nativePlan &&
     capabilities.nativePlan.guidance
@@ -33,11 +34,7 @@ function buildNativeToolsSystemPrompt(agentRole, systemPrompt, capabilities, pla
 
 function buildRoleSystemPromptBlock(role) {
   if (!role || typeof role !== "object" || Array.isArray(role)) return "";
-  return readString$t(role.instructions);
-}
-
-function readString$t(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return readString(role.instructions);
 }
 
 export { buildNativeToolsSystemPrompt };

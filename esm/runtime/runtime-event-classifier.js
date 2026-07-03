@@ -1,8 +1,11 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-248-C — Pure classifier mapping `(type, mode)` → `{ visibility, phase }`.
 //
 // 104 step types do NOT get a per-type enum. Rules are prefix/suffix based so
 // new step types are auto-categorized without a migration table. classifier
 // stays free of runtime state — it only reads its inputs.
+
 
 const VISIBILITY_AGENT_TYPES = Object.freeze(
   new Set(["action-executing", "action-executed", "action-execute-error"])
@@ -35,7 +38,7 @@ function classifyEvent({ type, mode } = {}) {
 }
 
 function classifyVisibility(type, _mode) {
-  const value = readString$1u(type);
+  const value = readString(type);
   if (!value) return "debug";
 
   // Explicit agent allowlist wins first — action-execute-error matches the
@@ -57,7 +60,7 @@ function classifyVisibility(type, _mode) {
 }
 
 function classifyPhase(type) {
-  const value = readString$1u(type);
+  const value = readString(type);
   if (!value) return null;
 
   const phaseMatch = PHASE_FROM_PHASE_PREFIX_RE.exec(value);
@@ -72,10 +75,6 @@ function classifyPhase(type) {
   if (LIFECYCLE_TYPES.has(value)) return "lifecycle";
 
   return null;
-}
-
-function readString$1u(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { classifyEvent, classifyPhase, classifyVisibility };

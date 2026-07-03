@@ -1,5 +1,6 @@
 import { stampProvenance } from '../runtime/memory-entry.js';
 import { requestSemanticMemoryExtraction } from '../runtime/semantic-memory.js';
+import { readString } from '../runtime/semantic-json.js';
 
 const MEMORY_KINDS = new Set(["decision", "fact", "preference"]);
 
@@ -21,7 +22,7 @@ async function extractSessionMemoryEntries(options) {
 function createEntry(entry, provenance) {
   const kind = readKind(entry && entry.kind);
   const slot = normalizeSlot(entry && entry.slot);
-  const text = readString$4(entry && entry.text);
+  const text = readString(entry && entry.text);
 
   if (!kind || !slot || !text) {
     return null;
@@ -83,12 +84,12 @@ function normalizeProvenance(value) {
 }
 
 function readKind(value) {
-  const kind = readString$4(value);
+  const kind = readString(value);
   return MEMORY_KINDS.has(kind) ? kind : "";
 }
 
 function normalizeSlot(value) {
-  return readString$4(value)
+  return readString(value)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
@@ -98,10 +99,6 @@ function clampConfidence(value) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.min(1, value))
     : 0.8;
-}
-
-function readString$4(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { extractSessionMemoryEntries };

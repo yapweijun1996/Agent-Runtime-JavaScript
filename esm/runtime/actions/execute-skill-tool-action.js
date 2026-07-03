@@ -1,6 +1,7 @@
 import { normalizeAgentSkill, loadAgentSkillFromProvider, findAgentSkillTool } from '../agent-skills.js';
 import { normalizeAliases } from '../action-args-validation.js';
 import { getPolicyManifestForSkill, evaluateSkillPolicy, emitSkillPolicyStep, createSkillPolicyError } from '../skill-policy.js';
+import { readString } from '../semantic-json.js';
 
 function createExecuteSkillToolAction(agentSkills, agentSkillIndexProvider, toolCallExamples, options = {}) {
   const firstToolContext = findFirstToolContext(agentSkills);
@@ -125,11 +126,11 @@ function createExecuteSkillToolAction(agentSkills, agentSkillIndexProvider, tool
 
 function normalizeReservedActionNames(values) {
   const names = Array.isArray(values) ? values : [];
-  return new Set(names.map((name) => readString$U(name).toLowerCase()).filter(Boolean));
+  return new Set(names.map((name) => readString(name).toLowerCase()).filter(Boolean));
 }
 
 function assertNoReservedRuntimeActionToolName(args, reservedActionNames) {
-  const toolName = readString$U(args && args.toolName);
+  const toolName = readString(args && args.toolName);
   if (!toolName || !reservedActionNames || !reservedActionNames.has(toolName.toLowerCase())) return;
   throw new Error(
     `execute_skill_tool toolName "${toolName}" is a runtime action, not a bundled skill tool. Call the "${toolName}" action directly with its own args envelope instead of wrapping it in execute_skill_tool.`
@@ -137,8 +138,8 @@ function assertNoReservedRuntimeActionToolName(args, reservedActionNames) {
 }
 
 async function assertEarlyExecuteSkillPolicy(context, args) {
-  const requestedSkillName = readString$U(args && args.skillName);
-  const toolName = readString$U(args && args.toolName);
+  const requestedSkillName = readString(args && args.skillName);
+  const toolName = readString(args && args.toolName);
   if (!requestedSkillName && !toolName) return;
 
   const manifest = await getPolicyManifestForSkill(context, requestedSkillName);
@@ -191,15 +192,15 @@ function prepareExecuteSkillToolInvocation(context, args) {
   const normalizedArgs = args && typeof args === "object" && !Array.isArray(args)
     ? { ...args }
     : {};
-  let requestedSkillName = readString$U(normalizedArgs.skillName);
-  let toolName = readString$U(normalizedArgs.toolName);
+  let requestedSkillName = readString(normalizedArgs.skillName);
+  let toolName = readString(normalizedArgs.toolName);
 
   if (debug && debug.enabled) {
     debug.log("execute_skill_tool | resolve start", {
       providedSkillName: requestedSkillName || null,
       providedToolName: toolName || null,
       hasActiveSkill: !!activeSkill,
-      activeSkillName: readString$U(activeSkill && activeSkill.name) || null,
+      activeSkillName: readString(activeSkill && activeSkill.name) || null,
       argsKeys: Object.keys(normalizedArgs),
       availableSkills: (context.agentSkills || []).map((s) => ({
         name: s && s.name,
@@ -246,7 +247,7 @@ function prepareExecuteSkillToolInvocation(context, args) {
   const resolvedSkill = requestedSkillName
     ? findSkillByName(context.agentSkills, requestedSkillName)
     : activeSkill;
-  const resolvedSkillName = readString$U(resolvedSkill && resolvedSkill.name) || requestedSkillName;
+  const resolvedSkillName = readString(resolvedSkill && resolvedSkill.name) || requestedSkillName;
 
   if (!resolvedSkill || !resolvedSkillName) {
     if (context.agentSkillIndexProvider && requestedSkillName && toolName) {
@@ -343,27 +344,27 @@ async function prepareExecuteSkillToolInvocationForExecution(context, args) {
 
 function findSkillByName(agentSkills, requestedSkillName) {
   const skills = Array.isArray(agentSkills) ? agentSkills : [];
-  const target = readString$U(requestedSkillName).toLowerCase();
+  const target = readString(requestedSkillName).toLowerCase();
 
   if (!target) {
     return null;
   }
 
   return skills.find((skill) => (
-    readString$U(skill && skill.name).toLowerCase() === target ||
-    readString$U(skill && skill.skillId).toLowerCase() === target
+    readString(skill && skill.name).toLowerCase() === target ||
+    readString(skill && skill.skillId).toLowerCase() === target
   )) || null;
 }
 
 function findSkillByToolName(agentSkills, toolName) {
   const skills = Array.isArray(agentSkills) ? agentSkills : [];
-  const target = readString$U(toolName).toLowerCase();
+  const target = readString(toolName).toLowerCase();
 
   if (!target) return null;
 
   for (const skill of skills) {
     if (!skill || !Array.isArray(skill.tools)) continue;
-    if (skill.tools.some((t) => t && readString$U(t.name).toLowerCase() === target)) {
+    if (skill.tools.some((t) => t && readString(t.name).toLowerCase() === target)) {
       return skill;
     }
   }
@@ -377,9 +378,9 @@ function findToolInSkill(skill, toolName) {
     return executableTool;
   }
 
-  const target = readString$U(toolName).toLowerCase();
+  const target = readString(toolName).toLowerCase();
   const tools = skill && Array.isArray(skill.tools) ? skill.tools : [];
-  return tools.find((tool) => readString$U(tool && tool.name).toLowerCase() === target) || null;
+  return tools.find((tool) => readString(tool && tool.name).toLowerCase() === target) || null;
 }
 
 function inferSkillTool(agentSkills, args, debug) {
@@ -533,7 +534,7 @@ function validateToolArgs(parameters, args, toolName) {
       continue;
     }
 
-    const expectedType = readString$U(schema.properties[key] && schema.properties[key].type);
+    const expectedType = readString(schema.properties[key] && schema.properties[key].type);
     if (!expectedType || matchesExpectedType(value, expectedType)) {
       continue;
     }
@@ -581,10 +582,6 @@ function matchesExpectedType(value, expectedType) {
   }
 
   return typeof value === expectedType;
-}
-
-function readString$U(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createExecuteSkillToolAction, prepareExecuteSkillToolInvocation };

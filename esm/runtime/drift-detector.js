@@ -83,7 +83,7 @@ function detectDrift(input) {
  * @param {number} [options.maxEntries=5]
  */
 function computeTrajectorySignal(source, options) {
-  const maxEntries = readPositiveInteger$a(
+  const maxEntries = readPositiveInteger$9(
     options && options.maxEntries,
     DEFAULT_MAX_TRAJECTORY_ENTRIES
   );
@@ -131,7 +131,7 @@ function normalizeDetectInput(raw) {
   const cycleCount = Number.isInteger(raw.cycleCount) ? raw.cycleCount : null;
   if (cycleCount == null || cycleCount <= 0) return null;
 
-  const cycleInterval = readPositiveInteger$a(raw.cycleInterval, DEFAULT_CYCLE_INTERVAL);
+  const cycleInterval = readPositiveInteger$9(raw.cycleInterval, DEFAULT_CYCLE_INTERVAL);
   if (cycleCount % cycleInterval !== 0) return null;
 
   const severeThreshold = readUnitInterval$1(raw.severeThreshold, DEFAULT_SEVERE_THRESHOLD);
@@ -189,7 +189,7 @@ function readNonEmpty(value) {
   return trimmed.length > 0 ? trimmed : "";
 }
 
-function readPositiveInteger$a(value, fallback) {
+function readPositiveInteger$9(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 

@@ -1,3 +1,5 @@
+import { readString, readFiniteNumber } from './semantic-json.js';
+
 // ADR-0029 — Cost Ledger (read-only fact layer)
 //
 // Records per-provider-call token usage + latency, with optional host-supplied
@@ -7,6 +9,7 @@
 // SSOT for: cost observability (#11 of harness_engineering.txt typical
 // components). Sibling of `metrics` (counters) and `sessionBudget` (prompt
 // token budget). Not a policy engine.
+
 
 const DEFAULT_PRICING_PER = 1_000_000;
 const PHASE_BY_STEP_TYPE = {
@@ -65,13 +68,13 @@ function recordCostEntry(ledger, params) {
   if (!ledger || typeof ledger !== "object") return null;
   if (!params || typeof params !== "object") return null;
 
-  const provider = readString$1L(params.provider);
-  const model = readString$1L(params.model);
-  const inputTokens = readFiniteNumber$8(params.inputTokens);
-  const outputTokens = readFiniteNumber$8(params.outputTokens);
-  const totalTokens = readFiniteNumber$8(params.totalTokens)
+  const provider = readString(params.provider);
+  const model = readString(params.model);
+  const inputTokens = readFiniteNumber(params.inputTokens);
+  const outputTokens = readFiniteNumber(params.outputTokens);
+  const totalTokens = readFiniteNumber(params.totalTokens)
     ?? sumTokens(inputTokens, outputTokens);
-  const latencyMs = readFiniteNumber$8(params.latencyMs);
+  const latencyMs = readFiniteNumber(params.latencyMs);
 
   if (
     inputTokens == null &&
@@ -86,7 +89,7 @@ function recordCostEntry(ledger, params) {
   const cost = resolveCost(ledger, {
     provider,
     model,
-    callKind: readString$1L(params.callKind) || null,
+    callKind: readString(params.callKind) || null,
     inputTokens,
     outputTokens
   });
@@ -100,7 +103,7 @@ function recordCostEntry(ledger, params) {
   const entry = {
     ts: Number.isFinite(params.ts) ? params.ts : Date.now(),
     phase: normalizePhase(params.phase),
-    callKind: readString$1L(params.callKind) || null,
+    callKind: readString(params.callKind) || null,
     provider: provider || null,
     model: model || null,
     inputTokens,
@@ -157,11 +160,11 @@ function phaseFromStepType(stepType) {
 
 function readPricingEntry(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const input = readFiniteNumber$8(raw.input);
-  const output = readFiniteNumber$8(raw.output);
+  const input = readFiniteNumber(raw.input);
+  const output = readFiniteNumber(raw.output);
   if (input == null && output == null) return null;
   const per = readPositiveNumber$2(raw.per) || DEFAULT_PRICING_PER;
-  const currency = readString$1L(raw.currency) || "USD";
+  const currency = readString(raw.currency) || "USD";
   return { input, output, per, currency };
 }
 
@@ -224,8 +227,8 @@ function normalizePhase(value) {
 }
 
 function compositeKey(provider, model) {
-  const p = readString$1L(provider).toLowerCase();
-  const m = readString$1L(model).toLowerCase();
+  const p = readString(provider).toLowerCase();
+  const m = readString(model).toLowerCase();
   if (!p && !m) return "";
   return `${p || "n/a"}:${m || "n/a"}`;
 }
@@ -250,14 +253,6 @@ function cloneBucket(bucket) {
 function sumTokens(input, output) {
   if (input == null && output == null) return null;
   return (input || 0) + (output || 0);
-}
-
-function readString$1L(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readFiniteNumber$8(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function readPositiveNumber$2(value) {

@@ -1,4 +1,6 @@
+import { READ_URL_ACTION, WEB_SEARCH_ACTION } from './action-names.js';
 import { explainReadSourceQuality } from './read-source-quality.js';
+import { readString } from './semantic-json.js';
 
 const RETRYABLE_ERRORS = new Set([
   "timeout",
@@ -42,8 +44,8 @@ function isRetryableReadUrlResult(output) {
 
 function classifyReadUrlFailure(output) {
   const source = output && typeof output === "object" ? output : {};
-  const error = readString$1z(source.error);
-  const reason = readString$1z(source.reason) || error || null;
+  const error = readString(source.error);
+  const reason = readString(source.reason) || error || null;
   const statusCode = readStatusCode(source.status);
   const originStatus = readStatusCode(source.originStatus);
   const effectiveStatus = originStatus ?? statusCode;
@@ -59,7 +61,7 @@ function classifyReadUrlFailure(output) {
     };
   }
 
-  if (RETRYABLE_ERRORS.has(error) || RETRYABLE_ERRORS.has(readString$1z(source.code))) {
+  if (RETRYABLE_ERRORS.has(error) || RETRYABLE_ERRORS.has(readString(source.code))) {
     return {
       category: "transient",
       error: error || null,
@@ -83,7 +85,7 @@ function classifyReadUrlFailure(output) {
 
   if (
     NON_RETRYABLE_ERRORS.has(error) ||
-    NON_RETRYABLE_ERRORS.has(readString$1z(source.code)) ||
+    NON_RETRYABLE_ERRORS.has(readString(source.code)) ||
     (effectiveStatus != null && NON_RETRYABLE_STATUS_CODES.has(effectiveStatus))
   ) {
     return {
@@ -108,8 +110,8 @@ function classifyReadUrlFailure(output) {
 
 function refreshReadUrlRecoverySignal(runState, context = {}) {
   if (!runState || typeof runState !== "object") return null;
-  const actionName = readString$1z(context.actionName);
-  if (actionName !== "read_url" && actionName !== "web_search") {
+  const actionName = readString(context.actionName);
+  if (actionName !== READ_URL_ACTION && actionName !== WEB_SEARCH_ACTION) {
     return normalizeSignal(runState.readUrlRecoverySignal);
   }
 
@@ -117,12 +119,12 @@ function refreshReadUrlRecoverySignal(runState, context = {}) {
   const current = normalizeSignal(runState.readUrlRecoverySignal);
   const candidates = readAlternateSourceCandidates(runState, current.failedUrl);
 
-  if (actionName === "web_search") {
+  if (actionName === WEB_SEARCH_ACTION) {
     const next = {
       ...current,
       alternateSourceCandidates: candidates,
-      updatedAtCycle: readNullableNumber$3(runState.cycleCount),
-      updatedBy: "web_search"
+      updatedAtCycle: readNullableNumber$2(runState.cycleCount),
+      updatedBy: WEB_SEARCH_ACTION
     };
     runState.readUrlRecoverySignal = next;
     return next;
@@ -132,8 +134,8 @@ function refreshReadUrlRecoverySignal(runState, context = {}) {
     runState.readUrlRecoverySignal = {
       ...current,
       alternateSourceCandidates: candidates,
-      updatedAtCycle: readNullableNumber$3(runState.cycleCount),
-      updatedBy: "read_url"
+      updatedAtCycle: readNullableNumber$2(runState.cycleCount),
+      updatedBy: READ_URL_ACTION
     };
     return runState.readUrlRecoverySignal;
   }
@@ -151,20 +153,20 @@ function refreshReadUrlRecoverySignal(runState, context = {}) {
     const next = {
       ...createReadUrlRecoverySignalState(),
       alternateSourceCandidates: readAlternateSourceCandidates(runState, null),
-      updatedAtCycle: readNullableNumber$3(runState.cycleCount),
-      updatedBy: "read_url"
+      updatedAtCycle: readNullableNumber$2(runState.cycleCount),
+      updatedBy: READ_URL_ACTION
     };
     runState.readUrlRecoverySignal = next;
     return next;
   }
 
-  const failedUrl = readString$1z(output.url) || readString$1z(context.url) || current.failedUrl || null;
+  const failedUrl = readString(output.url) || readString(context.url) || current.failedUrl || null;
   const classification = unusableContent
     ? {
-        originStatus: readNullableNumber$3(contentQuality.metrics && contentQuality.metrics.originStatus),
+        originStatus: readNullableNumber$2(contentQuality.metrics && contentQuality.metrics.originStatus),
         reason: contentQuality.reason,
         retryable: false,
-        statusCode: readNullableNumber$3(output.status)
+        statusCode: readNullableNumber$2(output.status)
       }
     : classifyReadUrlFailure(output);
   const attemptCount = countFailedReadAttempts(runState, failedUrl, output);
@@ -191,8 +193,8 @@ function refreshReadUrlRecoverySignal(runState, context = {}) {
     alternateSourceCandidates,
     allowedNextMoves,
     forbiddenMove,
-    updatedAtCycle: readNullableNumber$3(runState.cycleCount),
-    updatedBy: "read_url"
+    updatedAtCycle: readNullableNumber$2(runState.cycleCount),
+    updatedBy: READ_URL_ACTION
   };
   runState.readUrlRecoverySignal = next;
   return next;
@@ -256,7 +258,7 @@ function readAllowedNextMoves(status, classification, alternateSourceCandidates)
 }
 
 function countFailedReadAttempts(runState, failedUrl, output) {
-  const url = normalizeUrlKey$2(failedUrl);
+  const url = normalizeUrlKey$1(failedUrl);
   if (!url) return 0;
   const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
     ? runState.researchContext.readSources
@@ -265,16 +267,16 @@ function countFailedReadAttempts(runState, failedUrl, output) {
     source &&
     typeof source === "object" &&
     source.ok === false &&
-    normalizeUrlKey$2(source.url) === url
+    normalizeUrlKey$1(source.url) === url
   )).length;
-  const currentUrl = normalizeUrlKey$2(output && output.url);
+  const currentUrl = normalizeUrlKey$1(output && output.url);
   const currentAlreadyCounted = readSources.some((source) => (
     source === output || (
       source &&
       output &&
       source.ok === false &&
-      normalizeUrlKey$2(source.url) === currentUrl &&
-      readString$1z(source.error) === readString$1z(output.error) &&
+      normalizeUrlKey$1(source.url) === currentUrl &&
+      readString(source.error) === readString(output.error) &&
       readStatusCode(source.status) === readStatusCode(output.status)
     )
   ));
@@ -283,7 +285,7 @@ function countFailedReadAttempts(runState, failedUrl, output) {
 }
 
 function readAlternateSourceCandidates(runState, failedUrl) {
-  const failedKey = normalizeUrlKey$2(failedUrl);
+  const failedKey = normalizeUrlKey$1(failedUrl);
   const failedUrls = new Set(readFailedUrls(runState));
   if (failedKey) failedUrls.add(failedKey);
   const readUrls = new Set(readSuccessfulOrAttemptedUrls(runState));
@@ -308,7 +310,7 @@ function readAlternateSourceCandidates(runState, failedUrl) {
   for (const item of raw) {
     const candidate = normalizeCandidate$1(item);
     if (!candidate) continue;
-    const key = normalizeUrlKey$2(candidate.url);
+    const key = normalizeUrlKey$1(candidate.url);
     if (!key || seen.has(key) || failedUrls.has(key) || readUrls.has(key)) continue;
     seen.add(key);
     candidates.push(candidate);
@@ -322,7 +324,7 @@ function readSuccessfulOrAttemptedUrls(runState) {
     ? runState.researchContext.readSources
     : [];
   return readSources
-    .map((source) => normalizeUrlKey$2(source && source.url))
+    .map((source) => normalizeUrlKey$1(source && source.url))
     .filter(Boolean);
 }
 
@@ -332,7 +334,7 @@ function readFailedUrls(runState) {
     : [];
   return readSources
     .filter((source) => source && typeof source === "object" && source.ok === false)
-    .map((source) => normalizeUrlKey$2(source.url))
+    .map((source) => normalizeUrlKey$1(source.url))
     .filter(Boolean);
 }
 
@@ -343,14 +345,14 @@ function pushCandidateArray(target, value) {
 
 function normalizeCandidate$1(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const url = readString$1z(value.url);
+  const url = readString(value.url);
   if (!url) return null;
   return {
-    domain: readString$1z(value.domain) || readDomain$6(url),
-    query: readString$1z(value.query) || null,
-    rank: readNullableNumber$3(value.rank),
-    snippet: readString$1z(value.snippet) || readString$1z(value.content) || null,
-    title: readString$1z(value.title) || url,
+    domain: readString(value.domain) || readDomain$6(url),
+    query: readString(value.query) || null,
+    rank: readNullableNumber$2(value.rank),
+    snippet: readString(value.snippet) || readString(value.content) || null,
+    title: readString(value.title) || url,
     url
   };
 }
@@ -369,27 +371,27 @@ function normalizeSignal(value) {
     : createReadUrlRecoverySignalState();
   return {
     kind: "read_url_recovery_signal",
-    status: readString$1z(source.status) || "none",
-    failedUrl: readString$1z(source.failedUrl) || null,
+    status: readString(source.status) || "none",
+    failedUrl: readString(source.failedUrl) || null,
     statusCode: readStatusCode(source.statusCode),
     originStatus: readStatusCode(source.originStatus),
-    reason: readString$1z(source.reason) || null,
+    reason: readString(source.reason) || null,
     retryable: source.retryable === true,
-    sameUrlAttemptCount: readNumber$e(source.sameUrlAttemptCount),
+    sameUrlAttemptCount: readNumber$c(source.sameUrlAttemptCount),
     alternateSourceCandidates: Array.isArray(source.alternateSourceCandidates)
       ? source.alternateSourceCandidates.map(normalizeCandidate$1).filter(Boolean).slice(0, MAX_ALTERNATE_SOURCE_CANDIDATES)
       : [],
     allowedNextMoves: Array.isArray(source.allowedNextMoves)
-      ? source.allowedNextMoves.map(readString$1z).filter(Boolean).slice(0, 8)
+      ? source.allowedNextMoves.map(readString).filter(Boolean).slice(0, 8)
       : [],
-    forbiddenMove: readString$1z(source.forbiddenMove) || null,
-    updatedAtCycle: readNullableNumber$3(source.updatedAtCycle),
-    updatedBy: readString$1z(source.updatedBy) || null
+    forbiddenMove: readString(source.forbiddenMove) || null,
+    updatedAtCycle: readNullableNumber$2(source.updatedAtCycle),
+    updatedBy: readString(source.updatedBy) || null
   };
 }
 
-function normalizeUrlKey$2(value) {
-  const url = readString$1z(value);
+function normalizeUrlKey$1(value) {
+  const url = readString(value);
   if (!url) return "";
   try {
     const parsed = new URL(url);
@@ -405,16 +407,12 @@ function readStatusCode(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function readNumber$e(value) {
+function readNumber$c(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function readNullableNumber$3(value) {
+function readNullableNumber$2(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readString$1z(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { classifyReadUrlFailure, createReadUrlRecoverySignalState, isRetryableReadUrlResult, refreshReadUrlRecoverySignal, summarizeReadUrlRecoverySignal };

@@ -662,9 +662,11 @@ Persona / system-prompt override.
 | `role` | none in core | `"name"` resolved against supplied `agentRoles` \| `{ name, instructions, ... }` \| parsed via `parseRoleMarkdown(md)` |
 
 ```js
-import { bundledAgentRoles } from "@agrun/skills-research";
+// AGRUN-522 — the @agrun/skills-* packages were removed; the host supplies its own
+// roles (e.g. parseRoleMarkdown for SKILL.md-style roles).
+const agentRoles = [ /* host-supplied role objects */ ];
 
-createRuntime({ agentRoles: bundledAgentRoles, role: "researcher" });
+createRuntime({ agentRoles, role: "researcher" });
 
 createRuntime({
   role: {
@@ -691,12 +693,13 @@ Runtime-loadable: `parseRoleMarkdown(markdownString)` returns the object.
 
 ```js
 import { createRuntime, parseSkillMarkdown } from "agrun";
-import { bundledAgentSkills as researchSkills } from "@agrun/skills-research";
-import { bundledAgentSkills as coderSkills } from "@agrun/skills-coder";
+// AGRUN-522 — the @agrun/skills-* packages were removed; domain skills are
+// host-supplied SKILL.md (parse with parseSkillMarkdown or load via a provider).
+const domainSkills = [ /* host-parsed SKILL.md agent skills */ ];
 
 const customSkill = parseSkillMarkdown(`# My Skill\n...`);
 createRuntime({
-  agentSkills: [...researchSkills, ...coderSkills, customSkill]
+  agentSkills: [...domainSkills, customSkill]
 });
 ```
 
@@ -802,7 +805,9 @@ createRuntime({
 
 ```js
 import { createRuntime, geminiBrowserSkill } from "agrun";
-import { bundledAgentSkills as researchSkills } from "@agrun/skills-research";
+// AGRUN-522 — the @agrun/skills-* packages were removed; supply your own research
+// SKILL.md agent skills (parseSkillMarkdown / agentSkillIndexProvider).
+const researchSkills = [ /* host-parsed research SKILL.md agent skills */ ];
 
 createRuntime({
   skills: [geminiBrowserSkill],

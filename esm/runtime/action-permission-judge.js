@@ -1,4 +1,5 @@
 import { stableStringify } from './action-fingerprint.js';
+import { readString } from './semantic-json.js';
 
 function normalizeActionPermissionJudgeConfig(value) {
   if (value == null || value === false) {
@@ -79,8 +80,8 @@ function normalizeJudgeResult(result, action) {
   const actionValue = readPolicyAction(source.action) || (source.isReadOnly === true ? "allow" : "ask");
   return createDecision$1(
     actionValue,
-    readString$X(source.reason) || (actionValue === "allow" ? "permission_judge_read_only" : "permission_judge_uncertain"),
-    readString$X(source.source) || "classifier",
+    readString(source.reason) || (actionValue === "allow" ? "permission_judge_read_only" : "permission_judge_uncertain"),
+    readString(source.source) || "classifier",
     action
   );
 }
@@ -88,7 +89,7 @@ function normalizeJudgeResult(result, action) {
 function createDecision$1(actionValue, reason, source, action) {
   return {
     action: readPolicyAction(actionValue) || "ask",
-    actionName: readString$X(action && action.name) || null,
+    actionName: readString(action && action.name) || null,
     cacheHit: false,
     permission: action && action.permission && typeof action.permission === "object" ? { ...action.permission } : null,
     reason,
@@ -117,7 +118,7 @@ function resolvePermissionRules(action, args) {
     if (hasMatchTier && rule.matchTier !== actionTier) continue;
     const hasPattern = typeof rule.pattern === "string" && rule.pattern.length > 0;
     if (hasPattern && (argPath === null || !argPath.includes(rule.pattern))) continue;
-    last = { policyAction, reason: readString$X(rule.reason) || `permission_rule_${policyAction}` };
+    last = { policyAction, reason: readString(rule.reason) || `permission_rule_${policyAction}` };
   }
   if (!last) return null;
   return createDecision$1(last.policyAction, last.reason, "permission_rules", action);
@@ -136,20 +137,16 @@ function createPermissionCacheKey(action, args) {
 
 function projectActionForJudge(action) {
   return {
-    description: readString$X(action && action.description),
-    name: readString$X(action && action.name),
+    description: readString(action && action.description),
+    name: readString(action && action.name),
     permission: action && action.permission && typeof action.permission === "object" ? { ...action.permission } : null,
     tier: Number.isInteger(action && action.tier) ? action.tier : null
   };
 }
 
 function readPolicyAction(value) {
-  const text = readString$X(value);
+  const text = readString(value);
   return text === "allow" || text === "ask" || text === "deny" ? text : "";
-}
-
-function readString$X(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeErrorMessage$2(error) {

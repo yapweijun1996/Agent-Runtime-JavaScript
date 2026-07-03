@@ -117,12 +117,27 @@ hook wiring (core's kernel seams must not import the moved files — they alread
 them in the bundle, so it's tractable).
 
 ### H4 — extract the virtual-workspace / candidate-publish APPLICATION (LARGEST — LEVEL 3)
-The 2,294-line virtual-workspace-actions.js + the `workspace_*` action surface is the
+
+> **RESOLVED + DOWNGRADED (2026-06-14, ADR-0056).** The §3 open question
+> ("workspace = generic vs application") is closed: a code-level fact-check proved
+> **virtual-workspace is GENERAL INFRASTRUCTURE — it stays in core.** The edit primitives
+> are domain-agnostic (the design doc itself: *"generic edit primitive, not a report-specific
+> fixer"*); both the coder and research packs register against them. The only research
+> coupling (`sourceMinimum`/evidence in `publish-readiness.js`) is **already data-gated** —
+> `readPublishSourceMinimum` returns null and `researchGateBlocked` is false when no research
+> state is present, so a coder/generic agent experiences the workspace as pure generic infra.
+> **Do NOT extract the workspace surface out of core** — that would remove generic
+> infrastructure and regress non-research agents. H4 is downgraded to **H1-class naming
+> cleanup** (residual optional items in ADR-0056: name the data-gated research read as a
+> capability seam; make the `final_candidate.md` default config-driven). The original
+> "extract the application" framing below was based on the now-falsified premise.
+
+~~The 2,294-line virtual-workspace-actions.js + the `workspace_*` action surface is the
 report-writing application. The north-star end state: the OODAE loop + a capability-gated
 action surface that knows NO domain action names stay in core; the workspace actions become
 an opt-in action pack registered via `customAction`/`defineAction`. This is the deepest,
 highest-risk phase and needs its own design spike (is workspace-publish generic long-output
-infra, or a research application? — §3 open question decides the boundary).
+infra, or a research application? — §3 open question decides the boundary).~~
 
 ---
 
@@ -133,10 +148,16 @@ code. The **source** purge (H3/H4) is a large, multi-step effort whose practical
 mostly "the source tree / grep is clean" — the consumer's bundle is already clean regardless.
 
 Suggested order by value/risk: **H1** (cheap, shrinks the grep) → **H2** (kills the LEVEL 2
-mode concept, real architectural value) → then DECIDE whether H3/H4 (the heavy structural
-source move + application extraction) are worth it, or whether "bundle-clean + source has
-labeled-but-tree-shakeable research" is an acceptable resting point. H4 in particular should
-not start without resolving §3's open question (workspace = generic vs application).
+mode concept, real architectural value) → then DECIDE whether H3 (the heavy structural
+source move) is worth it, or whether "bundle-clean + source has labeled-but-tree-shakeable
+research" is an acceptable resting point.
+
+> **Update (2026-06-14):** **H2 is DONE**; **H4 is RESOLVED + downgraded to H1-class**
+> (ADR-0056 — workspace is general infra, stays in core). The only structural phase left is
+> **H3** (physically moving the `research-*.js` files), whose practical payoff is "the source
+> grep is clean" — the consumer bundle is already clean. Recommended resting point:
+> **bundle-clean (done) + source has labeled, tree-shakeable, data-gated research** is
+> acceptable; pursue H3 only if a clean source grep becomes a hard requirement.
 
 **Do NOT claim "all hardcode removed"** until at least H2 lands and the litmus
 `grep -rE '"(long_research|workspace_publish_candidate)"' src/runtime` returns 0.
@@ -159,11 +180,16 @@ provider-timeout mode read, the convergence read, and `research-activation-token
 (deleted). Both research SKILL.md files dropped the "declare `mode: long_research`"
 instruction (the skill activates by being engaged).
 
+> **Superseded by AGRUN-522:** the `@agrun/skills-*` ESM packages referenced below were
+> later removed. The research/coder skills now ship as in-tree DATA
+> (`src/runtime/default-research-skills.js` / `default-coder-skills.js`), so wherever the
+> migration steps say "install `@agrun/skills-research`", import that DATA module instead.
+
 **MIGRATION (3.x → 4.0):**
 - A host that passed `researchActivation: "long_research"` in the request: REMOVE it. To
-  run a research/long-convergence workflow, install `@agrun/skills-research` and let the
-  agent engage the skill (`use_agent_skill`) — its `requiresEvidenceConvergence` capability
-  activates the gate. No mode flag.
+  run a research/long-convergence workflow, supply the in-tree research skills DATA
+  (`src/runtime/default-research-skills.js`) and let the agent engage the skill
+  (`use_agent_skill`) — its `requiresEvidenceConvergence` capability activates the gate. No mode flag.
 - Persisted threads from < 4.0 carrying `researchActivation` lose that field on rehydrate
   (it is no longer read; the run re-derives convergence from the engaged skill capability).
 - Version: core `agrun` + `@agrun/skills-research` + `@agrun/skills-coder` → 4.0.0

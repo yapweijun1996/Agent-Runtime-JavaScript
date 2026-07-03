@@ -1,4 +1,5 @@
 import { sanitizeTraceValue, TRACE_REDACTION_POLICY, summarizeTraceText, sanitizeTraceString, stableTraceHash } from './llm-trace.js';
+import { readString } from './semantic-json.js';
 
 const TRACE_JSON_CONTRACT_VERSION = "agrun.trace.v1";
 
@@ -651,10 +652,6 @@ function readTimestampMs(value) {
 
 function toRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function readString(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function readNumber(value) {

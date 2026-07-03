@@ -1,15 +1,15 @@
 // Stable, order-independent JSON stringify — used as input to the
 // action fingerprint hash so that `{a:1,b:2}` and `{b:2,a:1}` yield
 // the same fingerprint.
-function stableStringify(value) {
+function stableStringify$1(value) {
   if (value === null || value === undefined) return JSON.stringify(value ?? null);
   if (typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) {
-    return "[" + value.map(stableStringify).join(",") + "]";
+    return "[" + value.map(stableStringify$1).join(",") + "]";
   }
   const keys = Object.keys(value).sort();
   const parts = keys.map(
-    (key) => JSON.stringify(key) + ":" + stableStringify(value[key])
+    (key) => JSON.stringify(key) + ":" + stableStringify$1(value[key])
   );
   return "{" + parts.join(",") + "}";
 }
@@ -41,7 +41,7 @@ function fingerprintAction(decision) {
     toolName: typeof decision.toolName === "string" ? decision.toolName : null,
     args: decision.args && typeof decision.args === "object" ? decision.args : {}
   };
-  return djb2Hash(stableStringify(envelope));
+  return djb2Hash(stableStringify$1(envelope));
 }
 
-export { djb2Hash, fingerprintAction, stableStringify };
+export { djb2Hash, fingerprintAction, stableStringify$1 as stableStringify };

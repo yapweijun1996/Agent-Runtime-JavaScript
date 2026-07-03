@@ -75,6 +75,11 @@ function normalizePlannedIntent(raw, context) {
   if (raw.pivotIntent === true) intent.pivotIntent = true;
   if (raw.divergentIntent === true) intent.divergentIntent = true;
   if (raw.referentialIntent === true) intent.referentialIntent = true;
+  // AGRUN-593 — the turn asks about earlier conversation content (the user's
+  // name, a previous result) whose location is unknown or spans threads. The
+  // router answers with a cross-thread-recall verdict: stay on the active
+  // thread but give THIS turn the whole-session view.
+  if (raw.recallIntent === true) intent.recallIntent = true;
   const kind = normalizeIntentKind(raw.kind);
   if (kind) {
     intent.kind = kind;
@@ -100,6 +105,12 @@ function normalizePlannedIntent(raw, context) {
   // applies" — it cannot coexist with a pivot target. Drop the weaker
   // signal (divergent) so the router's pivot branch fires cleanly.
   if (intent.pivotIntent && intent.divergentIntent) {
+    delete intent.divergentIntent;
+  }
+
+  // AGRUN-593 — recall means "needs prior conversation content"; it cannot
+  // coexist with divergent ("no prior context applies"). Recall wins.
+  if (intent.recallIntent && intent.divergentIntent) {
     delete intent.divergentIntent;
   }
 
@@ -178,6 +189,11 @@ function mergeTurnIntent(structural, planned) {
   }
   if (out.kind === "new_task") {
     out.divergentIntent = true;
+  }
+  // AGRUN-593 — same recall-beats-divergent guard as normalizePlannedIntent,
+  // for the merged (structural + planned) shape.
+  if (out.recallIntent && out.divergentIntent) {
+    delete out.divergentIntent;
   }
   return out;
 }

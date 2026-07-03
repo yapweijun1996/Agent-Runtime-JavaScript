@@ -1,5 +1,6 @@
 import { buildSessionContextSystemPrompt } from './prompt.js';
 import { buildCurrentTurnParts, isImagePart } from '../runtime/multimodal.js';
+import { readString } from '../runtime/semantic-json.js';
 
 const DEFAULT_BYTES_PER_TOKEN = 4;
 const ACTION_LOOP_ENVELOPE_OVERHEAD = 192;
@@ -49,14 +50,14 @@ function createUsageSnapshot(output) {
       usage.promptTokenCount,
       usage.inputTokens
     ),
-    model: readString$1M(output.model) || readString$1M(usage.model) || null,
+    model: readString(output.model) || readString(usage.model) || null,
     outputTokens: readUsageNumber(
       usage.completion_tokens,
       usage.output_tokens,
       usage.candidatesTokenCount,
       usage.outputTokens
     ),
-    provider: readString$1M(output.provider) || readString$1M(usage.provider) || null,
+    provider: readString(output.provider) || readString(usage.provider) || null,
     totalTokens: readUsageNumber(
       usage.total_tokens,
       usage.totalTokenCount,
@@ -85,9 +86,9 @@ function accumulateUsage(cumulative, snapshot) {
 }
 
 function estimateProviderPromptTokens(request, sessionPolicy) {
-  const provider = readString$1M(request && request.provider) || "openai";
+  const provider = readString(request && request.provider) || "openai";
   const sessionPrompt = buildSessionContextSystemPrompt(request && request.sessionContext);
-  const bytesPerToken = readPositiveInteger$m(
+  const bytesPerToken = readPositiveInteger$k(
     sessionPolicy && sessionPolicy.charsPerToken,
     DEFAULT_BYTES_PER_TOKEN
   );
@@ -102,7 +103,7 @@ function estimateProviderPromptTokens(request, sessionPolicy) {
 function estimateOpenAIPromptTokens(request, sessionPrompt, bytesPerToken) {
   let total = OPENAI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
 
-  if (readString$1M(request && request.systemPrompt)) {
+  if (readString(request && request.systemPrompt)) {
     total += estimateMessageTokens("system", request.systemPrompt, bytesPerToken);
   }
 
@@ -117,7 +118,7 @@ function estimateOpenAIPromptTokens(request, sessionPrompt, bytesPerToken) {
 
 function estimateGeminiPromptTokens(request, sessionPrompt, bytesPerToken) {
   let total = GEMINI_REQUEST_OVERHEAD + ACTION_LOOP_ENVELOPE_OVERHEAD;
-  const systemPrompt = [readString$1M(request && request.systemPrompt), sessionPrompt]
+  const systemPrompt = [readString(request && request.systemPrompt), sessionPrompt]
     .filter(Boolean)
     .join("\n\n");
 
@@ -144,7 +145,7 @@ function estimateConversationTokens(conversation, bytesPerToken, overhead) {
       return total;
     }
 
-    const role = readString$1M(message.role) || "user";
+    const role = readString(message.role) || "user";
     return total + estimatePartsTokens(message.parts, bytesPerToken, overhead, role);
   }, 0);
 }
@@ -153,7 +154,7 @@ function estimatePartsTokens(parts, bytesPerToken, overhead, role = "user") {
   const list = Array.isArray(parts) ? parts : [];
   const text = list
     .filter((part) => part && typeof part === "object" && !isImagePart(part))
-    .map((part) => readString$1M(part.text))
+    .map((part) => readString(part.text))
     .filter(Boolean)
     .join("\n");
   const imageCount = list.filter(isImagePart).length;
@@ -181,12 +182,8 @@ function byteLength(text) {
   return text.length;
 }
 
-function readPositiveInteger$m(value, fallback) {
+function readPositiveInteger$k(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-function readString$1M(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function readUsageNumber(...values) {

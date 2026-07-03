@@ -1,12 +1,12 @@
 import { readString } from './semantic-json.js';
-import { FINALIZE_CANDIDATE_ACTION, PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
+import { READ_URL_ACTION, WEB_SEARCH_ACTION, WORKSPACE_READ_ACTION, FINALIZE_CANDIDATE_ACTION, PUBLISH_DIRECT_ACTION, WORKSPACE_APPLY_PATCH_ACTION, WORKSPACE_PROPOSE_PATCH_ACTION, WORKSPACE_WRITE_ACTION, WORKSPACE_INSERT_AFTER_SECTION_ACTION, WORKSPACE_REPLACE_ACTION } from './action-names.js';
 import { explainReadSourceQuality, isReadableEvidenceSource } from './read-source-quality.js';
 import { createSearchInquirySources } from './search-research-context.js';
 import { normalizeInquiryContext, createContextSnapshot } from '../session/context-snapshot-normalize.js';
 import { normalizeReadSource, normalizeCandidateSource } from '../session/context-snapshot-fields.js';
 
 function pushReadUrlRequestedStep(actionName, actionArgs, pushStep) {
-  if (actionName !== "read_url") {
+  if (actionName !== READ_URL_ACTION) {
     return;
   }
 
@@ -22,7 +22,7 @@ function pushReadUrlRequestedStep(actionName, actionArgs, pushStep) {
 }
 
 function pushReadUrlCompletedStep(actionName, output, query, pushStep) {
-  if (actionName !== "read_url" || !output || typeof output !== "object") {
+  if (actionName !== READ_URL_ACTION || !output || typeof output !== "object") {
     return;
   }
 
@@ -167,17 +167,17 @@ function readResearchQuery(runState, request) {
 // helper module both paths already import) makes the action set a single edit
 // instead of two — the divergence is structurally impossible to reintroduce.
 function shouldRefreshLongRunRequirementRecovery(actionName, status) {
-  if (actionName === "web_search") return status === "after_web_search";
-  if (actionName === "read_url") return status === "after_read_url";
+  if (actionName === WEB_SEARCH_ACTION) return status === "after_web_search";
+  if (actionName === READ_URL_ACTION) return status === "after_read_url";
   return [
-    "workspace_read",
+    WORKSPACE_READ_ACTION,
     FINALIZE_CANDIDATE_ACTION,
     PUBLISH_DIRECT_ACTION,
-    "workspace_apply_patch",
-    "workspace_propose_patch",
-    "workspace_write",
-    "workspace_insert_after_section",
-    "workspace_replace"
+    WORKSPACE_APPLY_PATCH_ACTION,
+    WORKSPACE_PROPOSE_PATCH_ACTION,
+    WORKSPACE_WRITE_ACTION,
+    WORKSPACE_INSERT_AFTER_SECTION_ACTION,
+    WORKSPACE_REPLACE_ACTION
   ].includes(actionName);
 }
 

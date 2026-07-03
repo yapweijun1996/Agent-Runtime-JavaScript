@@ -10,6 +10,7 @@ import { summarizeSessionContextMeta } from '../session/prompt.js';
 import { cloneValue } from './utils.js';
 import { consumeControlEnvelope, startControlEnvelope } from './control-envelope.js';
 import { readContextSnapshot, createContextSnapshot } from '../session/context-snapshot-normalize.js';
+import { readString } from './semantic-json.js';
 import { projectSessionContextFromSnapshot, createSessionContextViewFromSnapshot } from '../session/context-snapshot-projection.js';
 import { applyTurnControl, TURN_SIGNALS } from './turn-signal.js';
 import { beginActionLoopCycle } from './action-loop-session-cycle.js';
@@ -342,16 +343,12 @@ function readSessionContext$1(request) {
 
 function createSessionContextView$1(sessionContext) {
   return {
-    clarificationStatus: readString$f(sessionContext.clarificationStatus),
-    currentGoal: readString$f(sessionContext.currentGoal),
-    currentTopic: readString$f(sessionContext.currentTopic),
+    clarificationStatus: readString(sessionContext.clarificationStatus),
+    currentGoal: readString(sessionContext.currentGoal),
+    currentTopic: readString(sessionContext.currentTopic),
     lastResolution: cloneStructuredValue(sessionContext.lastResolution),
-    openAmbiguity: readString$f(sessionContext.openAmbiguity)
+    openAmbiguity: readString(sessionContext.openAmbiguity)
   };
-}
-
-function readString$f(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function cloneStructuredValue(value) {

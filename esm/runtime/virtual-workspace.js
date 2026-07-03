@@ -1,9 +1,15 @@
 import { cloneValue } from './utils.js';
-import { normalizeCandidatePathMismatchSignal, normalizeWorkspaceCandidateLifecycle, createWorkspaceCandidateLifecycle, recordWorkspaceCandidateRead, syncRunStateCandidatePathMismatchSignal, recordWorkspaceCandidateWrite, recordWorkspaceCandidateFinalize, recordWorkspaceCandidatePublish, projectWorkspaceCandidateLifecycle } from './workspace-candidate-lifecycle.js';
+import { WORKSPACE_PROPOSE_PATCH_ACTION, WORKSPACE_APPLY_PATCH_ACTION, WORKSPACE_WRITE_ACTION, WORKSPACE_REPLACE_ACTION } from './action-names.js';
+import { lowCycleRemainingThreshold } from './cycle-budget.js';
+import { normalizeCandidatePathMismatchSignal, normalizeWorkspaceCandidateLifecycle, DEFAULT_FINAL_CANDIDATE_PATH, createWorkspaceCandidateLifecycle, recordWorkspaceCandidateRead, syncRunStateCandidatePathMismatchSignal, recordWorkspaceCandidateWrite, recordWorkspaceCandidateFinalize, recordWorkspaceCandidatePublish, projectWorkspaceCandidateLifecycle } from './workspace-candidate-lifecycle.js';
+import { readString } from './semantic-json.js';
+import { extractRequestedLengthContract } from './terminal-final-contract.js';
 
 const DEFAULT_MAX_FILE_CHARS$1 = 24000;
 const DEFAULT_MAX_OPERATION_CHARS = 240;
 const DEFAULT_MAX_OPERATIONS = 80;
+const STRUCTURE_REPAIR_SHRINK_MIN_RATIO = 0.4;
+const STRUCTURE_REPAIR_SHRINK_MIN_WORDS = 250;
 // ADR-0015 PR 2 — three English-only prompt regexes
 // (COMPLEX_PROMPT_RE, FINAL_CANDIDATE_GATE_PROMPT_RE,
 // STRICT_RESEARCH_WORKSPACE_PROMPT_RE) deleted along with the
@@ -28,8 +34,8 @@ function normalizeVirtualWorkspaceConfig(value) {
       : "auto";
   return {
     enabled,
-    maxFileChars: readPositiveInteger$j(source.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1,
-    maxOperations: readPositiveInteger$j(source.maxOperations) || DEFAULT_MAX_OPERATIONS,
+    maxFileChars: readPositiveInteger$o(source.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1,
+    maxOperations: readPositiveInteger$o(source.maxOperations) || DEFAULT_MAX_OPERATIONS,
     requirePublishPath: source.requirePublishPath === true
   };
 }
@@ -43,11 +49,11 @@ function createVirtualWorkspace(options = {}) {
   // longer pre-populated; AI creates files by calling workspace_write.
   return {
     enabled: options.enabled === true,
-    mode: readString$1C(options.mode) || "complex_response",
+    mode: readString(options.mode) || "complex_response",
     files: {},
     operations: [],
     pendingPatch: null,
-    candidateLifecycle: createWorkspaceCandidateLifecycle({ activePath: "final_candidate.md" }),
+    candidateLifecycle: createWorkspaceCandidateLifecycle({ activePath: DEFAULT_FINAL_CANDIDATE_PATH }),
     candidatePathMismatchSignal: null,
     quality: createWorkspaceQuality(),
     replaceFindFailures: {},
@@ -89,16 +95,16 @@ function normalizeVirtualWorkspace(value) {
     if (path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) continue;
     const file = source && typeof source === "object" ? source : {};
     files[path] = {
-      content: readString$1C(file.content),
+      content: readString(file.content),
       path,
-      updatedAt: readString$1C(file.updatedAt) || null,
-      version: readPositiveInteger$j(file.version) || 0
+      updatedAt: readString(file.updatedAt) || null,
+      version: readPositiveInteger$o(file.version) || 0
     };
   }
   const quality = normalizeWorkspaceQuality(value.quality);
   return {
     enabled: value.enabled === true,
-    mode: readString$1C(value.mode) || "complex_response",
+    mode: readString(value.mode) || "complex_response",
     files,
     operations: normalizeOperations(value.operations),
     pendingPatch: normalizePendingPatch(value.pendingPatch),
@@ -108,7 +114,7 @@ function normalizeVirtualWorkspace(value) {
     candidatePathMismatchSignal: normalizeCandidatePathMismatchSignal(value.candidatePathMismatchSignal),
     quality,
     replaceFindFailures: normalizeReplaceFindFailures(value.replaceFindFailures),
-    version: readPositiveInteger$j(value.version) || 1
+    version: readPositiveInteger$o(value.version) || 1
   };
 }
 
@@ -117,12 +123,12 @@ function normalizeReplaceFindFailures(value) {
   const out = {};
   for (const [key, raw] of Object.entries(value)) {
     if (typeof key !== "string" || !key) continue;
-    const count = readPositiveInteger$j(raw && raw.count) || 0;
+    const count = readPositiveInteger$o(raw && raw.count) || 0;
     if (count <= 0) continue;
     out[key] = {
       count,
-      lastCycle: readPositiveInteger$j(raw.lastCycle) || 0,
-      findPreview: readString$1C(raw.findPreview).slice(0, 80)
+      lastCycle: readPositiveInteger$o(raw.lastCycle) || 0,
+      findPreview: readString(raw.findPreview).slice(0, 80)
     };
   }
   return out;
@@ -144,7 +150,7 @@ function validateWorkspacePathRecoverable(path) {
   // ADR-0013 — workspace path validation is recoverable, not fatal.
   // Returns { ok, path?, error? }. Callers translate failure into an
   // invalid_args observation rather than throwing.
-  const value = readString$1C(path);
+  const value = readString(path);
   if (!value) {
     return { ok: false, error: "workspace_path_required", path: value };
   }
@@ -200,7 +206,7 @@ function readWorkspaceFile(workspace, path) {
   const pathValidation = validateWorkspacePathRecoverable(path);
   if (!pathValidation.ok) {
     return addWorkspaceFileStats({
-      ...createWorkspaceFile(readString$1C(path) || "", ""),
+      ...createWorkspaceFile(readString(path) || "", ""),
       status: "invalid_args",
       error: pathValidation.error,
       message: describeWorkspacePathError(pathValidation.error)
@@ -217,7 +223,7 @@ function readWorkspaceFile(workspace, path) {
 
 function readWorkspaceFinalCandidate(workspace, path) {
   const source = normalizeVirtualWorkspace(workspace) || createEmptyVirtualWorkspace();
-  const resolvedPath = readString$1C(path) || readFinalCandidatePath(source);
+  const resolvedPath = readString(path) || readFinalCandidatePath(source);
   const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
   if (!pathValidation.ok) {
     return addWorkspaceFileStats({
@@ -241,10 +247,10 @@ function recordWorkspaceRead(runState, path, options = {}) {
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "read",
-      path: readString$1C(path) || "<unset>",
+      path: readString(path) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     return workspace;
   }
@@ -260,7 +266,7 @@ function recordWorkspaceRead(runState, path, options = {}) {
     path: filePath,
     status: "ok",
     summary: options.summary || `read ${filePath}`,
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   recordWorkspaceCandidateRead(workspace, filePath, { });
   syncRunStateCandidatePathMismatchSignal(runState, workspace);
@@ -277,10 +283,10 @@ function recordWorkspaceCandidateReview(runState, path, review, options = {}) {
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "review_candidate",
-      path: readString$1C(path) || "<unset>",
+      path: readString(path) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     return workspace;
   }
@@ -291,17 +297,17 @@ function recordWorkspaceCandidateReview(runState, path, review, options = {}) {
     ? source.issues.map(normalizeCandidateReviewIssue).filter(Boolean).slice(0, 24)
     : [];
   const candidateReview = {
-    fileUpdatedAt: readString$1C(file.updatedAt) || null,
-    fileVersion: readPositiveInteger$j(file.version) || 0,
-    finalSectionTitle: readString$1C(source.finalSectionTitle) || null,
+    fileUpdatedAt: readString(file.updatedAt) || null,
+    fileVersion: readPositiveInteger$o(file.version) || 0,
+    finalSectionTitle: readString(source.finalSectionTitle) || null,
     issueCount: issues.length,
     issues,
     path: filePath,
     readyToPublish: source.readyToPublish === true,
-    repairPlan: readString$1C(source.repairPlan) || null,
+    repairPlan: readString(source.repairPlan) || null,
     requirementsChecklist: normalizeCandidateRequirementsChecklist(source.requirementsChecklist),
     reviewedAt: new Date().toISOString(),
-    summary: readString$1C(source.summary) || null,
+    summary: readString(source.summary) || null,
     textStats: file.textStats || summarizeTextStats$2(file.content)
   };
   workspace.quality.candidateReview = candidateReview;
@@ -310,7 +316,7 @@ function recordWorkspaceCandidateReview(runState, path, review, options = {}) {
     path: filePath,
     status: "ok",
     summary: candidateReview.summary || options.summary || `reviewed ${filePath}`,
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   return workspace;
 }
@@ -345,31 +351,31 @@ function writeWorkspaceFile(runState, path, content, options = {}) {
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "write",
-      path: readString$1C(path) || "<unset>",
+      path: readString(path) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return {
-      ...createWorkspaceFile(readString$1C(path) || "", ""),
+      ...createWorkspaceFile(readString(path) || "", ""),
       status: "invalid_args",
       error: pathValidation.error,
       message: describeWorkspacePathError(pathValidation.error)
     };
   }
   const filePath = pathValidation.path;
-  const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
-  const nextContent = truncate$2(readString$1C(content), maxFileChars);
+  const maxFileChars = readPositiveInteger$o(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
+  const nextContent = truncate$3(readString(content), maxFileChars);
   const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-  const shrinkRisk = detectDestructiveWriteShrink(workspace, filePath, file, nextContent);
+  const shrinkRisk = detectDestructiveWriteShrink(runState, workspace, filePath, file, nextContent, options);
   if (shrinkRisk) {
     appendWorkspaceOperation(workspace, {
       action: "write",
       path: filePath,
       status: "destructive_shrink_blocked",
       summary: options.summary || `blocked shrink write for ${filePath}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0}, options);
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0}, options);
     refreshWorkspaceQuality(workspace);
     syncRunStateCandidatePathMismatchSignal(runState, workspace);
     return {
@@ -383,7 +389,7 @@ function writeWorkspaceFile(runState, path, content, options = {}) {
     content: nextContent,
     path: filePath,
     updatedAt: new Date().toISOString(),
-    version: (readPositiveInteger$j(file.version) || 0) + 1
+    version: (readPositiveInteger$o(file.version) || 0) + 1
   };
   workspace.version += 1;
   appendWorkspaceOperation(workspace, {
@@ -391,7 +397,7 @@ function writeWorkspaceFile(runState, path, content, options = {}) {
     path: filePath,
     status: "ok",
     summary: options.summary || `wrote ${filePath}`,
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   recordWorkspaceCandidateWrite(workspace, filePath, { action: "write" });
   refreshWorkspaceQuality(workspace);
@@ -400,25 +406,140 @@ function writeWorkspaceFile(runState, path, content, options = {}) {
   return workspace.files[filePath];
 }
 
-function detectDestructiveWriteShrink(workspace, filePath, file, nextContent) {
+function detectDestructiveWriteShrink(runState, workspace, filePath, file, nextContent, options = {}) {
   const quality = workspace && workspace.quality && typeof workspace.quality === "object"
     ? workspace.quality
     : {};
-  const finalCandidatePath = readString$1C(quality.finalCandidatePath) || "final_candidate.md";
+  const finalCandidatePath = readString(quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
   if (filePath !== finalCandidatePath) return null;
-  const current = readString$1C(file && file.content);
+  const current = readString(file && file.content);
   if (!current) return null;
   const before = summarizeTextStats$2(current);
   const after = summarizeTextStats$2(nextContent);
   const beforeSize = Math.max(before.nonWhitespaceChars, before.cjkChars, before.words);
   const afterSize = Math.max(after.nonWhitespaceChars, after.cjkChars, after.words);
+  const requestedLength = readRequestedLengthForWorkspace(runState, options);
+  const requestedRegression = detectRequestedLengthRegression(before, after, requestedLength);
+  if (requestedRegression) {
+    return requestedRegression;
+  }
   if (beforeSize < 1500) return null;
   if (afterSize >= beforeSize * 0.75) return null;
+  const beforeStructure = inspectWorkspaceCandidateStructure(current);
+  const afterStructure = inspectWorkspaceCandidateStructure(nextContent);
+  if (shouldAllowStructureRepairShrinkWrite({
+    afterStats: after,
+    afterStructure,
+    beforeStats: before,
+    beforeStructure,
+    requestedLength
+  })) {
+    return null;
+  }
   return {
     afterSize,
     beforeSize,
     ratio: Number((afterSize / beforeSize).toFixed(3)),
     reason: "final_candidate_destructive_shrink"
+  };
+}
+
+function shouldAllowStructureRepairShrinkWrite({
+  afterStats,
+  afterStructure,
+  beforeStats,
+  beforeStructure,
+  requestedLength
+}) {
+  if (!hasContentStructureIssue(beforeStructure)) return false;
+  if (!isStructureImproved(beforeStructure, afterStructure)) return false;
+  const afterIssueCodes = Array.isArray(afterStructure && afterStructure.issueCodes)
+    ? afterStructure.issueCodes.map(readString).filter(Boolean)
+    : [];
+  if (afterIssueCodes.includes("duplicate_headings") ||
+    afterIssueCodes.includes("semantic_duplicate_headings") ||
+    afterIssueCodes.includes("body_after_final_section")) {
+    return false;
+  }
+  const beforeWords = readPositiveInteger$o(beforeStats && beforeStats.words) || 0;
+  const afterWords = readPositiveInteger$o(afterStats && afterStats.words) || 0;
+  if (isRequestedLengthRegression({
+    afterStats,
+    beforeStats,
+    requestedLength
+  })) {
+    return false;
+  }
+  if (beforeWords > 0 && afterWords < beforeWords * STRUCTURE_REPAIR_SHRINK_MIN_RATIO) return false;
+  if (beforeWords >= STRUCTURE_REPAIR_SHRINK_MIN_WORDS && afterWords < STRUCTURE_REPAIR_SHRINK_MIN_WORDS) return false;
+  return true;
+}
+
+function isRequestedLengthRegression({ afterStats, beforeStats, requestedLength }) {
+  const requested = readPositiveInteger$o(requestedLength && requestedLength.value) || 0;
+  const statsKey = readString(requestedLength && requestedLength.statsKey) || "words";
+  if (!requested || !statsKey) return false;
+  const before = readPositiveInteger$o(beforeStats && beforeStats[statsKey]) || 0;
+  const after = readPositiveInteger$o(afterStats && afterStats[statsKey]) || 0;
+  if (!before || !after) return false;
+  const wasNearTarget = before >= Math.floor(requested * 0.95);
+  if (!wasNearTarget) return false;
+  return after < requested;
+}
+
+function detectRequestedLengthRegression(beforeStats, afterStats, requestedLength) {
+  const requested = readPositiveInteger$o(requestedLength && requestedLength.value) || 0;
+  const statsKey = readString(requestedLength && requestedLength.statsKey) || "words";
+  if (!requested || !statsKey) return null;
+  const before = readPositiveInteger$o(beforeStats && beforeStats[statsKey]) || 0;
+  const after = readPositiveInteger$o(afterStats && afterStats[statsKey]) || 0;
+  if (!before || !after) return null;
+  const wasNearTarget = before >= Math.floor(requested * 0.95);
+  const becameDeficit = after < requested;
+  const materialDrop = after <= Math.floor(before * 0.9);
+  if (!wasNearTarget || !becameDeficit || !materialDrop) return null;
+  return {
+    afterSize: after,
+    beforeSize: before,
+    ratio: Number((after / before).toFixed(3)),
+    reason: "requested_length_regression",
+    requestedLength: requested,
+    statsKey
+  };
+}
+
+function readRequestedLengthForWorkspace(runState, options = {}) {
+  const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
+    ? runState.researchReportLoop
+    : null;
+  const directPacket = loop && loop.acceptancePacket && typeof loop.acceptancePacket === "object"
+    ? loop.acceptancePacket
+    : null;
+  const gateSignal = loop && loop.gateSignal && typeof loop.gateSignal === "object"
+    ? loop.gateSignal
+    : null;
+  const gatedPacket = gateSignal && gateSignal.acceptancePacket && typeof gateSignal.acceptancePacket === "object"
+    ? gateSignal.acceptancePacket
+    : null;
+  const packet = directPacket || gatedPacket;
+  const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
+    ? packet.requestedLength
+    : null;
+  const value = readPositiveInteger$o(requested && requested.value) || 0;
+  if (value) {
+    const unit = readString(requested && requested.unit);
+    const statsKey = readString(requested && requested.statsKey) ||
+      (unit === "words" ? "words" : unit === "cjk_chars" ? "cjkChars" : unit === "chars" ? "chars" : "");
+    return {
+      statsKey: statsKey || "words",
+      value
+    };
+  }
+  const promptRequested = extractRequestedLengthContract(readString(options.prompt));
+  if (!promptRequested) return null;
+  return {
+    statsKey: readString(promptRequested.statsKey) || "words",
+    value: readPositiveInteger$o(promptRequested.value) || 0
   };
 }
 
@@ -432,10 +553,10 @@ function insertAfterWorkspaceSection(runState, path, heading, content, options =
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "insert_after_section",
-      path: readString$1C(path) || "<unset>",
+      path: readString(path) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return invalidArgsResult({
@@ -453,7 +574,7 @@ function insertAfterWorkspaceSection(runState, path, heading, content, options =
       path: filePath,
       status: "invalid_args",
       summary: options.summary || `heading is empty for ${filePath}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return invalidArgsResult({
@@ -465,21 +586,21 @@ function insertAfterWorkspaceSection(runState, path, heading, content, options =
     });
   }
   const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-  const current = readString$1C(file.content);
-  const addition = readString$1C(content);
+  const current = readString(file.content);
+  const addition = readString(content);
   const insertResult = insertAfterMarkdownSection(current, targetHeading, addition, options);
   const beforeStructure = inspectWorkspaceCandidateStructure(current);
   const afterStructure = inspectWorkspaceCandidateStructure(insertResult.content);
-  const finalCandidatePath = readString$1C(workspace.quality && workspace.quality.finalCandidatePath) || "final_candidate.md";
+  const finalCandidatePath = readString(workspace.quality && workspace.quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
   const structureRisk = insertResult.changed && filePath === finalCandidatePath && isStructureMaybeWorse(beforeStructure, afterStructure)
     ? "structure_maybe_worse"
     : null;
-  const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
+  const maxFileChars = readPositiveInteger$o(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
   workspace.files[filePath] = {
-    content: truncate$2(insertResult.content, maxFileChars),
+    content: truncate$3(insertResult.content, maxFileChars),
     path: filePath,
     updatedAt: insertResult.changed ? new Date().toISOString() : file.updatedAt || null,
-    version: insertResult.changed ? (readPositiveInteger$j(file.version) || 0) + 1 : readPositiveInteger$j(file.version) || 0
+    version: insertResult.changed ? (readPositiveInteger$o(file.version) || 0) + 1 : readPositiveInteger$o(file.version) || 0
   };
   if (insertResult.changed) {
     workspace.version += 1;
@@ -487,9 +608,13 @@ function insertAfterWorkspaceSection(runState, path, heading, content, options =
   appendWorkspaceOperation(workspace, {
     action: "insert_after_section",
     path: filePath,
-    status: insertResult.changed ? "ok" : "not_found",
-    summary: options.summary || (insertResult.changed ? `inserted after ${heading} in ${filePath}` : `section not found in ${filePath}`),
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    status: insertResult.changed
+      ? "ok"
+      : readString(insertResult.status) === "ambiguous" ? "ambiguous" : "not_found",
+    summary: options.summary || (insertResult.changed
+      ? `inserted after ${heading} in ${filePath}`
+      : readString(insertResult.message) || `section not found in ${filePath}`),
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   if (insertResult.changed) {
     recordWorkspaceCandidateWrite(workspace, filePath, { action: "insert_after_section" });
@@ -501,11 +626,13 @@ function insertAfterWorkspaceSection(runState, path, heading, content, options =
   syncRunStateCandidatePathMismatchSignal(runState, workspace);
   return {
     changed: insertResult.changed,
-    status: insertResult.changed ? "ok" : "heading_not_found",
+    status: insertResult.changed ? "ok" : readString(insertResult.status) || "heading_not_found",
     availableHeadings: Array.isArray(insertResult.availableHeadings) ? insertResult.availableHeadings : [],
     requestedHeading: targetHeading,
     file: workspace.files[filePath],
     heading: targetHeading,
+    matchCount: typeof insertResult.matchCount === "number" ? insertResult.matchCount : null,
+    message: readString(insertResult.message) || null,
     structureRisk,
     structureAfter: summarizePatchStructure(afterStructure),
     structureBefore: summarizePatchStructure(beforeStructure)
@@ -522,10 +649,10 @@ function removeWorkspaceFile(runState, path, options = {}) {
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "remove",
-      path: readString$1C(path) || "<unset>",
+      path: readString(path) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return {
@@ -533,12 +660,12 @@ function removeWorkspaceFile(runState, path, options = {}) {
       status: "invalid_args",
       error: pathValidation.error,
       message: describeWorkspacePathError(pathValidation.error),
-      file: { ...createWorkspaceFile(readString$1C(path) || "", "") }
+      file: { ...createWorkspaceFile(readString(path) || "", "") }
     };
   }
   const filePath = pathValidation.path;
   const file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-  const hadContent = readString$1C(file.content).length > 0;
+  const hadContent = readString(file.content).length > 0;
   workspace.files[filePath] = createWorkspaceFile(filePath, "");
   if (hadContent) {
     workspace.version += 1;
@@ -548,7 +675,7 @@ function removeWorkspaceFile(runState, path, options = {}) {
     path: filePath,
     status: hadContent ? "ok" : "noop",
     summary: options.summary || (hadContent ? `removed ${filePath}` : `${filePath} already empty`),
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   refreshWorkspaceQuality(workspace);
   return { removed: hadContent, file: workspace.files[filePath] };
@@ -564,10 +691,10 @@ function moveWorkspaceFile(runState, from, to, options = {}) {
   if (!fromValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "move",
-      path: readString$1C(from) || "<unset>",
+      path: readString(from) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(fromValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return { moved: false, status: "invalid_args", error: fromValidation.error, message: describeWorkspacePathError(fromValidation.error), fromFile: null, toFile: null };
@@ -579,7 +706,7 @@ function moveWorkspaceFile(runState, from, to, options = {}) {
       path: fromValidation.path,
       status: "invalid_args",
       summary: options.summary || `destination: ${describeWorkspacePathError(toValidation.error)}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return { moved: false, status: "invalid_args", error: toValidation.error, message: `destination: ${describeWorkspacePathError(toValidation.error)}`, fromFile: null, toFile: null };
@@ -592,32 +719,32 @@ function moveWorkspaceFile(runState, from, to, options = {}) {
       path: fromPath,
       status: "same_path",
       summary: options.summary || `source and destination are the same: ${fromPath}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return { moved: false, status: "same_path", error: "same_path", message: `workspace_move source and destination are the same: ${fromPath}`, fromFile: workspace.files[fromPath] || null, toFile: null };
   }
   const fromFile = workspace.files[fromPath] || createWorkspaceFile(fromPath, "");
-  const sourceContent = readString$1C(fromFile.content);
+  const sourceContent = readString(fromFile.content);
   if (!sourceContent) {
     appendWorkspaceOperation(workspace, {
       action: "move",
       path: fromPath,
       status: "source_not_found",
       summary: options.summary || `source ${fromPath} has no content`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return { moved: false, status: "source_not_found", error: "source_not_found", message: `workspace_move source ${fromPath} has no content`, fromFile: workspace.files[fromPath] || null, toFile: null };
   }
   const toFile = workspace.files[toPath] || createWorkspaceFile(toPath, "");
-  if (readString$1C(toFile.content) && options.overwrite !== true) {
+  if (readString(toFile.content) && options.overwrite !== true) {
     appendWorkspaceOperation(workspace, {
       action: "move",
       path: fromPath,
       status: "target_exists",
       summary: options.summary || `target ${toPath} already has content`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return { moved: false, status: "target_exists", error: "target_exists", message: `workspace_move target ${toPath} already has content; pass overwrite:true to replace it`, fromFile: workspace.files[fromPath] || null, toFile: workspace.files[toPath] || null };
@@ -627,7 +754,7 @@ function moveWorkspaceFile(runState, from, to, options = {}) {
     content: sourceContent,
     path: toPath,
     updatedAt: now,
-    version: (readPositiveInteger$j(toFile.version) || 0) + 1
+    version: (readPositiveInteger$o(toFile.version) || 0) + 1
   };
   workspace.files[fromPath] = createWorkspaceFile(fromPath, "");
   workspace.version += 1;
@@ -636,7 +763,7 @@ function moveWorkspaceFile(runState, from, to, options = {}) {
     path: fromPath,
     status: "ok",
     summary: options.summary || `moved ${fromPath} → ${toPath}`,
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   recordWorkspaceCandidateWrite(workspace, toPath, { action: "move" });
   refreshWorkspaceQuality(workspace);
@@ -655,10 +782,10 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
       action: "replace",
-      path: readString$1C(path) || "<unset>",
+      path: readString(path) || "<unset>",
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return invalidArgsResult({
@@ -680,7 +807,7 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
       path: filePath,
       status: "invalid_args",
       summary: options.summary || `find text is empty or whitespace-only for ${filePath}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return invalidArgsResult({
@@ -703,7 +830,7 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
       path: filePath,
       status: "not_found",
       summary: options.summary || `find text not found in ${filePath}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     // Track repeated not_found on the same find string within one run. After
@@ -714,7 +841,7 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
     const findKey = makeReplaceFindKey(needle, filePath);
     const prior = failureMap[findKey] || { count: 0, findPreview: needle.slice(0, 80) };
     prior.count += 1;
-    prior.lastCycle = readPositiveInteger$j(runState && runState.cycleCount) || 0;
+    prior.lastCycle = readPositiveInteger$o(runState && runState.cycleCount) || 0;
     failureMap[findKey] = prior;
     const status = prior.count >= 2 ? "repeated_find_vetoed" : "not_found";
     return {
@@ -734,7 +861,7 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
       path: filePath,
       status: "ambiguous",
       summary: options.summary || `find text matches ${fuzzy.matchCount} occurrences in ${filePath}`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return {
@@ -748,12 +875,12 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
   }
 
   const next = current.split(fuzzy.needle).join(replacement);
-  const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
+  const maxFileChars = readPositiveInteger$o(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
   workspace.files[filePath] = {
-    content: truncate$2(next, maxFileChars),
+    content: truncate$3(next, maxFileChars),
     path: filePath,
     updatedAt: new Date().toISOString(),
-    version: (readPositiveInteger$j(file.version) || 0) + 1
+    version: (readPositiveInteger$o(file.version) || 0) + 1
   };
   workspace.version += 1;
   appendWorkspaceOperation(workspace, {
@@ -763,7 +890,7 @@ function replaceWorkspaceFile(runState, path, find, replace, options = {}) {
     summary: options.summary || (fuzzy.matchCount > 1
       ? `replaced ${fuzzy.matchCount} occurrences in ${filePath}`
       : `replaced text in ${filePath}`),
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   recordWorkspaceCandidateWrite(workspace, filePath, { action: "replace" });
   refreshWorkspaceQuality(workspace);
@@ -788,7 +915,7 @@ function proposeWorkspacePatch(runState, path, operations, options = {}) {
   const pathValidation = validateWorkspacePathRecoverable(path);
   if (!pathValidation.ok) {
     const patch = createInvalidPendingPatch({
-      path: readString$1C(path) || "",
+      path: readString(path) || "",
       status: "invalid_args",
       riskFlags: ["not_found"],
       message: describeWorkspacePathError(pathValidation.error)
@@ -801,32 +928,39 @@ function proposeWorkspacePatch(runState, path, operations, options = {}) {
   const current = typeof file.content === "string" ? file.content : "";
   const operationList = normalizePatchOperations(operations);
   const preview = previewWorkspacePatchContent(current, operationList, options);
-  const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
-  const afterContent = truncate$2(preview.content, maxFileChars);
+  const maxFileChars = readPositiveInteger$o(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
+  const afterContent = truncate$3(preview.content, maxFileChars);
   const beforeStats = summarizeTextStats$2(current);
   const afterStats = summarizeTextStats$2(afterContent);
   const beforeStructure = inspectWorkspaceCandidateStructure(current);
   const afterStructure = inspectWorkspaceCandidateStructure(afterContent);
   const structureImproved = isStructureImproved(beforeStructure, afterStructure);
   const structureRepairOperation = operationList.some((operation) => operation && operation.type === "normalize_headings");
+  const headingOnlyStructureRepair = operationList.length > 0 &&
+    operationList.every((operation) => operation && operation.type === "normalize_headings");
+  const contentStructureIssueStillOpen = headingOnlyStructureRepair &&
+    hasContentStructureIssue(beforeStructure) &&
+    hasContentStructureIssue(afterStructure);
   const changed = current !== afterContent;
   const riskFlags = Array.from(new Set([
     ...preview.riskFlags,
     ...(changed ? [] : ["no_growth"]),
     ...(afterStats.words <= beforeStats.words && !(structureRepairOperation && structureImproved) ? ["no_growth"] : []),
     ...(afterStats.words < beforeStats.words ? ["shrinks_candidate"] : []),
+    ...(contentStructureIssueStillOpen ? ["content_structure_not_repaired"] : []),
     ...(isStructureMaybeWorse(beforeStructure, afterStructure) ? ["structure_maybe_worse"] : [])
   ])).filter(Boolean);
   const valid = changed && !riskFlags.some((flag) => (
     flag === "not_found" ||
     flag === "ambiguous" ||
     flag === "no_growth" ||
+    flag === "content_structure_not_repaired" ||
     flag === "structure_maybe_worse"
   ));
   const patch = {
     afterHash: hashText(afterContent),
     afterWords: afterStats.words,
-    baseVersion: readPositiveInteger$j(file.version) || 0,
+    baseVersion: readPositiveInteger$o(file.version) || 0,
     beforeHash: hashText(current),
     beforeHashFuzzy: hashText(fuzzyNormalizeContent(current)),
     beforeWords: beforeStats.words,
@@ -871,11 +1005,11 @@ function applyWorkspacePatch(runState, patchId, options = {}) {
       error: "pending_patch_missing",
       file: null,
       message: "workspace_apply_patch requires a valid pending patch from workspace_propose_patch.",
-      patchId: readString$1C(patchId) || null,
+      patchId: readString(patchId) || null,
       status: "missing_pending_patch"
     };
   }
-  const requestedPatchId = readString$1C(patchId);
+  const requestedPatchId = readString(patchId);
   if (requestedPatchId && requestedPatchId !== pending.patchId) {
     return {
       changed: false,
@@ -900,7 +1034,7 @@ function applyWorkspacePatch(runState, patchId, options = {}) {
   }
   const file = workspace.files[pending.path] || createWorkspaceFile(pending.path, "");
   const current = typeof file.content === "string" ? file.content : "";
-  const currentVersion = readPositiveInteger$j(file.version) || 0;
+  const currentVersion = readPositiveInteger$o(file.version) || 0;
   const exactMatch = currentVersion === pending.baseVersion && hashText(current) === pending.beforeHash;
   const fuzzyMatch = !exactMatch && typeof pending.beforeHashFuzzy === "string"
     && hashText(fuzzyNormalizeContent(current)) === pending.beforeHashFuzzy;
@@ -939,7 +1073,7 @@ function applyWorkspacePatch(runState, patchId, options = {}) {
     path: pending.path,
     status: "ok",
     summary: options.summary || `applied ${pending.patchId} to ${pending.path}`,
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   recordWorkspaceCandidateWrite(workspace, pending.path, { action: "apply_patch" });
   workspace.pendingPatch = null;
@@ -1002,12 +1136,12 @@ function createInvalidPendingPatch(options = {}) {
     kind: "virtual_workspace_pending_patch",
     operations: [],
     patchId: `patch-${Date.now()}-invalid`,
-    path: readString$1C(options.path),
-    previewSummary: readString$1C(options.message) || "Patch preview could not be created.",
-    riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString$1C).filter(Boolean) : [],
+    path: readString(options.path),
+    previewSummary: readString(options.message) || "Patch preview could not be created.",
+    riskFlags: Array.isArray(options.riskFlags) ? options.riskFlags.map(readString).filter(Boolean) : [],
     structureAfter: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
     structureBefore: summarizePatchStructure(inspectWorkspaceCandidateStructure("")),
-    status: readString$1C(options.status) || "preview_blocked",
+    status: readString(options.status) || "preview_blocked",
     valid: false,
     version: 1,
     afterContent: ""
@@ -1018,7 +1152,7 @@ function normalizeHeadingPatchEntries(value) {
   return (Array.isArray(value) ? value : [])
     .map((entry) => {
       const source = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {};
-      const lineNumber = readPositiveInteger$j(source.lineNumber || source.line || source.atLine);
+      const lineNumber = readPositiveInteger$o(source.lineNumber || source.line || source.atLine);
       const text = typeof source.text === "string"
         ? source.text
         : (typeof source.heading === "string" ? source.heading : "");
@@ -1037,7 +1171,7 @@ function normalizePatchOperations(value) {
   return source
     .map((operation) => {
       const op = operation && typeof operation === "object" && !Array.isArray(operation) ? operation : {};
-      const type = readString$1C(op.type || op.operation || op.action);
+      const type = readString(op.type || op.operation || op.action);
       if (type === "replace") {
         return {
           type,
@@ -1105,7 +1239,7 @@ function previewWorkspacePatchContent(current, operations, options = {}) {
       continue;
     }
     if (operation.type === "append") {
-      const addition = readString$1C(operation.content);
+      const addition = readString(operation.content);
       if (!addition) {
         riskFlags.push("no_growth");
         diagnostics.push({ status: "empty_content", type: operation.type });
@@ -1118,7 +1252,7 @@ function previewWorkspacePatchContent(current, operations, options = {}) {
     }
     if (operation.type === "insert_after_section") {
       const targetHeading = normalizeInsertableSectionText(operation.heading);
-      const addition = readString$1C(operation.content);
+      const addition = readString(operation.content);
       if (!targetHeading || !addition) {
         riskFlags.push("not_found");
         diagnostics.push({ status: "invalid_args", type: operation.type });
@@ -1165,7 +1299,7 @@ function previewWorkspacePatchContent(current, operations, options = {}) {
 
 function summarizePatchOperation(operation) {
   if (!operation || typeof operation !== "object") return null;
-  const type = readString$1C(operation.type);
+  const type = readString(operation.type);
   if (!type) return null;
   if (type === "replace") {
     return {
@@ -1193,7 +1327,7 @@ function summarizePatchOperation(operation) {
       type,
       headingCount: Array.isArray(operation.headings) ? operation.headings.length : 0,
       lineNumbers: Array.isArray(operation.headings)
-        ? operation.headings.map((entry) => readPositiveInteger$j(entry && entry.lineNumber)).filter((lineNumber) => lineNumber != null).slice(0, 12)
+        ? operation.headings.map((entry) => readPositiveInteger$o(entry && entry.lineNumber)).filter((lineNumber) => lineNumber != null).slice(0, 12)
         : []
     };
   }
@@ -1201,7 +1335,7 @@ function summarizePatchOperation(operation) {
 }
 
 function summarizePatchPreview(operations, facts) {
-  const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString$1C(operation && operation.type)).filter(Boolean);
+  const opTypes = (Array.isArray(operations) ? operations : []).map((operation) => readString(operation && operation.type)).filter(Boolean);
   const beforeWords = facts && facts.beforeStats ? facts.beforeStats.words : 0;
   const afterWords = facts && facts.afterStats ? facts.afterStats.words : 0;
   const riskFlags = Array.isArray(facts && facts.riskFlags) ? facts.riskFlags : [];
@@ -1223,7 +1357,7 @@ function summarizePatchPreview(operations, facts) {
 // { changed: false } when there's nothing to do or when the file has issues
 // other than duplicate_section_numbers (those need AI repair).
 function tryAutoNormalizeSectionNumbers(content, filePath) {
-  const text = readString$1C(content);
+  const text = readString(content);
   if (!text) return { changed: false, changedCount: 0, content: text };
   const structure = inspectWorkspaceCandidateStructure(text);
   if (!structure || structure.ok === true) {
@@ -1261,12 +1395,12 @@ function tryAutoNormalizeSectionNumbers(content, filePath) {
       // prefix with level `#`s. applyNormalizeHeadingsPatch uses the
       // existing line's level when text has no leading `#`, so we send the
       // bare "<newNum>. title" form to keep it level-agnostic.
-      const raw = readString$1C(hint.raw);
-      const currentNumber = readString$1C(hint.currentNumber);
-      const candidateNumber = readString$1C(hint.candidateNumber);
+      const raw = readString(hint.raw);
+      const currentNumber = readString(hint.currentNumber);
+      const candidateNumber = readString(hint.candidateNumber);
       const titlePart = raw.replace(new RegExp(`^${escapeRegExp$3(currentNumber)}\\.\\s*`), "");
       const newText = `${candidateNumber}. ${titlePart}`.trim();
-      return { lineNumber: readPositiveInteger$j(hint.lineNumber), text: newText };
+      return { lineNumber: readPositiveInteger$o(hint.lineNumber), text: newText };
     })
     .filter((change) => change.lineNumber && change.text);
   if (changes.length === 0) {
@@ -1287,7 +1421,7 @@ function tryAutoNormalizeSectionNumbers(content, filePath) {
 }
 
 function escapeRegExp$3(value) {
-  return readString$1C(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return readString(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function applyNormalizeHeadingsPatch(current, operation) {
@@ -1300,7 +1434,7 @@ function applyNormalizeHeadingsPatch(current, operation) {
   const seen = new Set();
   let changedCount = 0;
   for (const change of changes) {
-    const lineNumber = readPositiveInteger$j(change && change.lineNumber);
+    const lineNumber = readPositiveInteger$o(change && change.lineNumber);
     if (lineNumber == null || lineNumber <= 0 || seen.has(lineNumber)) continue;
     seen.add(lineNumber);
     const index = lineNumber - 1;
@@ -1330,8 +1464,8 @@ function applyNormalizeHeadingsPatch(current, operation) {
 }
 
 function formatNormalizedHeadingLine(currentLine, replacement) {
-  const current = readString$1C(currentLine);
-  const text = readString$1C(replacement);
+  const current = readString(currentLine);
+  const text = readString(replacement);
   if (!current || !text) return "";
   if (/^#{1,6}\s+\S/.test(text)) {
     return text.replace(/\s+#+\s*$/, "").trim();
@@ -1345,19 +1479,29 @@ function formatNormalizedHeadingLine(currentLine, replacement) {
 function summarizePatchStructure(value) {
   const structure = value && typeof value === "object" ? value : inspectWorkspaceCandidateStructure("");
   return {
-    duplicateHeadingCount: readPositiveInteger$j(structure.duplicateHeadingCount) || 0,
-    duplicateNumberCount: readPositiveInteger$j(structure.duplicateNumberCount) || 0,
-    headingCount: readPositiveInteger$j(structure.headingCount) || 0,
-    issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString$1C).filter(Boolean).slice(0, 8) : [],
+    duplicateHeadingCount: readPositiveInteger$o(structure.duplicateHeadingCount) || 0,
+    duplicateNumberCount: readPositiveInteger$o(structure.duplicateNumberCount) || 0,
+    headingCount: readPositiveInteger$o(structure.headingCount) || 0,
+    issueCodes: Array.isArray(structure.issueCodes) ? structure.issueCodes.map(readString).filter(Boolean).slice(0, 8) : [],
     ok: structure.ok === true,
     repeatedHeadingContexts: normalizeStructureContexts$1(structure.repeatedHeadingContexts, "heading"),
     repeatedHeadingSamples: normalizeRepeatedHeadingSamples(structure.repeatedHeadingSamples),
     repeatedNumberContexts: normalizeStructureContexts$1(structure.repeatedNumberContexts, "number"),
     repeatedNumberSamples: normalizeRepeatedNumberSamples(structure.repeatedNumberSamples),
+    bodyAfterFinalSectionContexts: normalizeSimpleStructureContexts(structure.bodyAfterFinalSectionContexts),
     sectionNumberRepairHints: normalizeSectionNumberRepairHints$1(structure.sectionNumberRepairHints),
     sectionSequenceRepairHints: normalizeSectionNumberRepairHints$1(structure.sectionSequenceRepairHints),
-    status: readString$1C(structure.status) || "unknown"
+    semanticDuplicateHeadingContexts: normalizeSemanticDuplicateHeadingContexts$3(structure.semanticDuplicateHeadingContexts),
+    status: readString(structure.status) || "unknown"
   };
+}
+
+function hasContentStructureIssue(structure) {
+  const issueCodes = Array.isArray(structure && structure.issueCodes)
+    ? structure.issueCodes.map(readString).filter(Boolean)
+    : [];
+  return issueCodes.includes("semantic_duplicate_headings") ||
+    issueCodes.includes("body_after_final_section");
 }
 
 function isStructureMaybeWorse(beforeStructure, afterStructure) {
@@ -1367,8 +1511,8 @@ function isStructureMaybeWorse(beforeStructure, afterStructure) {
   const beforeIssueCount = Array.isArray(before.issueCodes) ? before.issueCodes.length : 0;
   const afterIssueCount = Array.isArray(after.issueCodes) ? after.issueCodes.length : 0;
   if (afterIssueCount > beforeIssueCount) return true;
-  const beforeDuplicates = (readPositiveInteger$j(before.duplicateHeadingCount) || 0) + (readPositiveInteger$j(before.duplicateNumberCount) || 0);
-  const afterDuplicates = (readPositiveInteger$j(after.duplicateHeadingCount) || 0) + (readPositiveInteger$j(after.duplicateNumberCount) || 0);
+  const beforeDuplicates = (readPositiveInteger$o(before.duplicateHeadingCount) || 0) + (readPositiveInteger$o(before.duplicateNumberCount) || 0);
+  const afterDuplicates = (readPositiveInteger$o(after.duplicateHeadingCount) || 0) + (readPositiveInteger$o(after.duplicateNumberCount) || 0);
   return afterDuplicates > beforeDuplicates;
 }
 
@@ -1379,8 +1523,8 @@ function isStructureImproved(beforeStructure, afterStructure) {
   const beforeIssueCount = Array.isArray(before.issueCodes) ? before.issueCodes.length : 0;
   const afterIssueCount = Array.isArray(after.issueCodes) ? after.issueCodes.length : 0;
   if (afterIssueCount < beforeIssueCount) return true;
-  const beforeDuplicates = (readPositiveInteger$j(before.duplicateHeadingCount) || 0) + (readPositiveInteger$j(before.duplicateNumberCount) || 0);
-  const afterDuplicates = (readPositiveInteger$j(after.duplicateHeadingCount) || 0) + (readPositiveInteger$j(after.duplicateNumberCount) || 0);
+  const beforeDuplicates = (readPositiveInteger$o(before.duplicateHeadingCount) || 0) + (readPositiveInteger$o(before.duplicateNumberCount) || 0);
+  const afterDuplicates = (readPositiveInteger$o(after.duplicateHeadingCount) || 0) + (readPositiveInteger$o(after.duplicateNumberCount) || 0);
   return afterDuplicates < beforeDuplicates;
 }
 
@@ -1563,7 +1707,7 @@ function locateByBlockAnchor(content, needle) {
 }
 
 function normalizeWorkspaceQuotes(value) {
-  return readString$1C(value)
+  return readString(value)
     .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
     .replace(/[\u201C\u201D\u201E\u201F]/g, "\"")
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, "-");
@@ -1695,7 +1839,7 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
     force: true,
     prompt: options.prompt
   });
-  const resolvedPath = readString$1C(path) || "final_candidate.md";
+  const resolvedPath = readString(path) || DEFAULT_FINAL_CANDIDATE_PATH;
   const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
   if (!pathValidation.ok) {
     appendWorkspaceOperation(workspace, {
@@ -1703,7 +1847,7 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
       path: resolvedPath,
       status: "invalid_args",
       summary: options.summary || describeWorkspacePathError(pathValidation.error),
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     refreshWorkspaceQuality(workspace);
     return {
@@ -1715,15 +1859,15 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
   }
   const filePath = pathValidation.path;
   let file = workspace.files[filePath] || createWorkspaceFile(filePath, "");
-  if (filePath === "final_candidate.md" && !readString$1C(file.content)) {
+  if (filePath === DEFAULT_FINAL_CANDIDATE_PATH && !readString(file.content)) {
     const draft = workspace.files["draft.md"] || createWorkspaceFile("draft.md", "");
-    const draftContent = readString$1C(draft.content);
+    const draftContent = readString(draft.content);
     if (draftContent) {
       file = {
         content: draftContent,
         path: filePath,
         updatedAt: new Date().toISOString(),
-        version: (readPositiveInteger$j(file.version) || 0) + 1
+        version: (readPositiveInteger$o(file.version) || 0) + 1
       };
       workspace.files[filePath] = file;
       workspace.version += 1;
@@ -1732,7 +1876,7 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
         path: filePath,
         status: "ok",
         summary: "promoted draft.md to final_candidate.md",
-        cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+        cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
       }, options);
       recordWorkspaceCandidateWrite(workspace, filePath, { action: "promote" });
     }
@@ -1752,12 +1896,12 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
   // repair via the existing signals.
   const autoNormalizeAttempt = tryAutoNormalizeSectionNumbers(file.content);
   if (autoNormalizeAttempt && autoNormalizeAttempt.changed) {
-    const maxFileChars = readPositiveInteger$j(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
+    const maxFileChars = readPositiveInteger$o(options.maxFileChars) || DEFAULT_MAX_FILE_CHARS$1;
     file = {
-      content: truncate$2(autoNormalizeAttempt.content, maxFileChars),
+      content: truncate$3(autoNormalizeAttempt.content, maxFileChars),
       path: filePath,
       updatedAt: new Date().toISOString(),
-      version: (readPositiveInteger$j(file.version) || 0) + 1
+      version: (readPositiveInteger$o(file.version) || 0) + 1
     };
     workspace.files[filePath] = file;
     workspace.version += 1;
@@ -1766,12 +1910,12 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
       path: filePath,
       status: "ok",
       summary: `runtime auto-renumbered ${autoNormalizeAttempt.changedCount} duplicate section number(s) before finalize`,
-      cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+      cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
     }, options);
     recordWorkspaceCandidateWrite(workspace, filePath, { action: "auto_normalize_headings" });
   }
 
-  const ready = readString$1C(file.content).length > 0;
+  const ready = readString(file.content).length > 0;
   workspace.quality.finalCandidatePath = filePath;
   workspace.quality.finalCandidateReady = ready;
   refreshWorkspaceQuality(workspace, { prompt: options.prompt });
@@ -1780,7 +1924,7 @@ function finalizeWorkspaceCandidate(runState, path, options = {}) {
     path: filePath,
     status: ready ? "ok" : "empty",
     summary: options.summary || (ready ? `marked ${filePath} ready` : `${filePath} is empty`),
-    cycle: readPositiveInteger$j(runState && runState.cycleCount) || 0
+    cycle: readPositiveInteger$o(runState && runState.cycleCount) || 0
   }, options);
   recordWorkspaceCandidateFinalize(workspace, filePath, { action: "finalize_candidate" });
   syncRunStateCandidatePathMismatchSignal(runState, workspace);
@@ -1791,10 +1935,10 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
   const source = normalizeVirtualWorkspace(workspace);
   if (!source || source.enabled !== true) return "";
   const opts = options && typeof options === "object" ? options : {};
-  const maxFilePreviewChars = readPositiveInteger$j(opts.maxFilePreviewChars) || 1800;
-  const maxFiles = readPositiveInteger$j(opts.maxFiles) || 5;
-  const cyclesUsed = readPositiveInteger$j(opts.cyclesUsed);
-  const cyclesMax = readPositiveInteger$j(opts.cyclesMax);
+  const maxFilePreviewChars = readPositiveInteger$o(opts.maxFilePreviewChars) || 1800;
+  const maxFiles = readPositiveInteger$o(opts.maxFiles) || 5;
+  const cyclesUsed = readPositiveInteger$o(opts.cyclesUsed);
+  const cyclesMax = readPositiveInteger$o(opts.cyclesMax);
   const cyclesRemaining = cyclesMax != null && cyclesUsed != null
     ? Math.max(0, cyclesMax - cyclesUsed)
     : null;
@@ -1806,7 +1950,7 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
     : null;
   const terminalRepairActive = terminalRepairState && terminalRepairState.active === true;
   const terminalRepairAllowedActions = terminalRepairActive
-    ? readStringArray$7(terminalRepairState.allowedActions)
+    ? readStringArray$5(terminalRepairState.allowedActions)
     : [];
   const quality = source.quality && typeof source.quality === "object" ? source.quality : {};
   const finalCandidatePath = readFinalCandidatePath(source);
@@ -1816,7 +1960,7 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
     ? opts.candidatePathMismatchSignal
     : candidateProjection.candidatePathMismatchSignal;
   const finalCandidateFile = source.files[finalCandidatePath] || null;
-  const finalCandidateContent = readString$1C(finalCandidateFile && finalCandidateFile.content);
+  const finalCandidateContent = readString(finalCandidateFile && finalCandidateFile.content);
   const finalCandidateStats = summarizeTextStats$2(finalCandidateContent);
   const finalCandidateStatus = readFinalCandidateStatus(source, finalCandidatePath, quality);
   const inspectedFinalCandidateStructure = inspectWorkspaceCandidateStructure(finalCandidateContent);
@@ -1831,6 +1975,7 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
     ? qualityFinalCandidateStructure
     : inspectedFinalCandidateStructure;
   const publishProtocol = inspectWorkspacePublishProtocol(source, finalCandidatePath);
+  const candidateReviewFreshness = inspectWorkspaceCandidateReviewFreshness(source, finalCandidatePath);
   const candidateReview = quality.candidateReview && typeof quality.candidateReview === "object"
     ? quality.candidateReview
     : null;
@@ -1842,9 +1987,9 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
     : null;
   const checks = Array.isArray(quality.checks)
     ? quality.checks.map((check) => {
-      const code = readString$1C(check && check.code);
-      const status = readString$1C(check && check.status);
-      const reason = readString$1C(check && check.reason);
+      const code = readString(check && check.code);
+      const status = readString(check && check.status);
+      const reason = readString(check && check.reason);
       return [code, status, reason].filter(Boolean).join("=");
     }).filter(Boolean).slice(0, 12)
     : [];
@@ -1859,11 +2004,11 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
       const stats = summarizeTextStats$2(file.content);
       return [
         `${file.path} v${file.version} stats=${formatTextStats$1(stats)}:`,
-        truncate$2(file.content, maxFilePreviewChars)
+        truncate$3(file.content, maxFilePreviewChars)
       ].join("\n");
     });
   const contentFileCount = Object.keys(source.files)
-    .filter((path) => readString$1C(source.files[path] && source.files[path].content))
+    .filter((path) => readString(source.files[path] && source.files[path].content))
     .length;
   if (files.length === 0) {
     return "";
@@ -1883,7 +2028,7 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
       : null,
     [
       "Virtual workspace advisory state:",
-      `quality_status=${readString$1C(quality.status) || "n/a"}`,
+      `quality_status=${readString(quality.status) || "n/a"}`,
       `final_candidate_path=${finalCandidatePath}`,
       `candidate_lifecycle=activePath:${candidateLifecycle.activePath || "n/a"}, draftPaths:${candidateLifecycle.draftPaths.length > 0 ? candidateLifecycle.draftPaths.join(",") : "none"}, lastWrittenPath:${candidateLifecycle.lastWrittenPath || "none"}, lastReadPath:${candidateLifecycle.lastReadPath || "none"}, finalizedPath:${candidateLifecycle.finalizedPath || "none"}, publishedPath:${candidateLifecycle.publishedPath || "none"}, status:${candidateLifecycle.status || "n/a"}`,
       candidatePathMismatchSignal
@@ -1913,9 +2058,15 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
       finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.sectionNumberRepairHints) && finalCandidateStructure.sectionNumberRepairHints.length > 0
         ? `section_number_repair_context=${formatSectionNumberRepairHints(finalCandidateStructure.sectionNumberRepairHints)}`
         : null,
+      finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.semanticDuplicateHeadingContexts) && finalCandidateStructure.semanticDuplicateHeadingContexts.length > 0
+        ? `semantic_duplicate_heading_context=${formatSemanticDuplicateHeadingContexts(finalCandidateStructure.semanticDuplicateHeadingContexts)}`
+        : null,
+      finalCandidateStructure.status === "fail" && Array.isArray(finalCandidateStructure.bodyAfterFinalSectionContexts) && finalCandidateStructure.bodyAfterFinalSectionContexts.length > 0
+        ? `body_after_final_section_context=${formatSimpleStructureContexts(finalCandidateStructure.bodyAfterFinalSectionContexts)}`
+        : null,
       `publish_protocol_state=finalized_after_write:${publishProtocol.finalizedAfterLatestWrite ? "yes" : "no"}, read_after_finalize:${publishProtocol.readAfterFinalize ? "yes" : "no"}`,
       candidateReview
-        ? `candidate_review=path:${candidateReview.path || "n/a"}, readyToPublish:${candidateReview.readyToPublish === true ? "yes" : "no"}, issueCount:${readPositiveInteger$j(candidateReview.issueCount) || 0}, checklistCount:${Array.isArray(candidateReview.requirementsChecklist) ? candidateReview.requirementsChecklist.length : 0}, finalSectionTitle:${candidateReview.finalSectionTitle || "none"}`
+        ? `candidate_review=path:${candidateReview.path || "n/a"}, readyToPublish:${candidateReview.readyToPublish === true ? "yes" : "no"}, issueCount:${readPositiveInteger$o(candidateReview.issueCount) || 0}, checklistCount:${Array.isArray(candidateReview.requirementsChecklist) ? candidateReview.requirementsChecklist.length : 0}, fileVersion:${readPositiveInteger$o(candidateReview.fileVersion) || 0}, freshForCurrentVersion:${candidateReviewFreshness.fresh ? "yes" : "no"}, finalSectionTitle:${candidateReview.finalSectionTitle || "none"}`
         : "candidate_review=none",
       candidateReview && Array.isArray(candidateReview.requirementsChecklist) && candidateReview.requirementsChecklist.length > 0
         ? `candidate_requirements_checklist=${formatCandidateRequirementsChecklist(candidateReview.requirementsChecklist)}`
@@ -1923,6 +2074,7 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
       candidateQualitySignal
         ? `candidate_quality_signal=status:${candidateQualitySignal.status || "unknown"}, blockingIssues:${Array.isArray(candidateQualitySignal.blockingIssueCodes) && candidateQualitySignal.blockingIssueCodes.length > 0 ? candidateQualitySignal.blockingIssueCodes.join(",") : "none"}, advisoryIssues:${Array.isArray(candidateQualitySignal.advisoryIssueCodes) && candidateQualitySignal.advisoryIssueCodes.length > 0 ? candidateQualitySignal.advisoryIssueCodes.join(",") : "none"}`
         : "candidate_quality_signal=none",
+      formatCandidatePublishReadinessObservation(candidateQualitySignal),
       pendingPatch
         ? `pending_patch=patchId:${pendingPatch.patchId}, path:${pendingPatch.path}, status:${pendingPatch.status}, deltaWords:${pendingPatch.deltaWords}, riskFlags:${Array.isArray(pendingPatch.riskFlags) && pendingPatch.riskFlags.length > 0 ? pendingPatch.riskFlags.join(",") : "none"}`
         : "pending_patch=none",
@@ -1930,7 +2082,7 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
       cyclesUsed != null ? `cycles_used=${cyclesUsed}` : null,
       cyclesMax != null ? `cycles_max=${cyclesMax}` : null,
       cyclesRemaining != null
-        ? `cycles_remaining=${cyclesRemaining}${cyclesRemaining <= 5 ? " (LOW BUDGET — runtime will not auto-extend; if you keep retrying without progress the run will hit maxSteps and force-stop with an error)" : ""}`
+        ? `cycles_remaining=${cyclesRemaining}${cyclesRemaining <= lowCycleRemainingThreshold(cyclesMax) ? " (LOW BUDGET — runtime will not auto-extend; if you keep retrying without progress the run will hit maxSteps and force-stop with an error)" : ""}`
         : null,
       publishBlockSignal && publishBlockSignal.count > 0
         ? `publish_attempts_blocked=${publishBlockSignal.count} (lastStatus=${publishBlockSignal.lastStatus || "n/a"}, byStatus=${formatPublishBlockStatusCounts(publishBlockSignal.statusCounts)})${publishBlockSignal.count >= 3 ? " — META-PATTERN: you have been blocked 3+ times. Read the lastStatus and choose a corrected action sequence; do not repeat the same failing publish loop." : ""}`
@@ -1943,23 +2095,117 @@ function buildVirtualWorkspacePromptBlock(workspace, options = {}) {
   ].filter(Boolean).join("\n\n");
 }
 
+// AGRUN-548 — publish-readiness coherence observation. When the candidate
+// already clears every mechanical acceptance gate (length, structure, source)
+// and the ONLY remaining publish blockers are the review→publish handshake, the
+// bare `candidate_quality_signal=status:blocked` leaves the model with no
+// coherent "you are done — just finish the handshake" signal. A
+// perfectionist/weak model (deepseek-v4-flash high, live 2026-06-18) reads
+// "blocked", keeps editing, and every edit makes its last review stale so
+// missing_latest_candidate_review never clears — the run burns to maxSteps with
+// a 100/100 candidate it never ships. This surfaces the FACT (gates pass) and
+// the terminal handshake (review→publish, or limited publish) without forcing
+// any action: the AI still owns the next move. Topic-agnostic — derived purely
+// from the existing quality-signal issue codes, no section/topic names baked in.
+const REVIEW_HANDSHAKE_BLOCKING_CODES = Object.freeze([
+  "missing_latest_candidate_review",
+  "ai_review_not_ready",
+  "objective_requirement_unmet"
+]);
+
+const SOURCE_READINESS_ADVISORY_CODES = Object.freeze([
+  "blocked_source_cited",
+  "missing_required_cited_urls",
+  "unread_cited_url"
+]);
+
+function formatCandidatePublishReadinessObservation(candidateQualitySignal) {
+  if (!candidateQualitySignal || typeof candidateQualitySignal !== "object") return null;
+  const blocking = Array.isArray(candidateQualitySignal.blockingIssueCodes)
+    ? candidateQualitySignal.blockingIssueCodes.filter(Boolean)
+    : [];
+  if (blocking.length === 0) return null;
+  // Fire only when EVERY blocker is review-handshake — any content/structure
+  // blocker means the candidate is not actually complete, so do not claim it is.
+  if (!blocking.every((code) => REVIEW_HANDSHAKE_BLOCKING_CODES.includes(code))) return null;
+  // Never tell the model it is "complete" while length is still short.
+  const advisory = Array.isArray(candidateQualitySignal.advisoryIssueCodes)
+    ? candidateQualitySignal.advisoryIssueCodes
+    : [];
+  if (advisory.includes("external_word_count_below_target")) return null;
+  const sourceAdvisories = advisory
+    .filter((code) => SOURCE_READINESS_ADVISORY_CODES.includes(code));
+  if (sourceAdvisories.length > 0) {
+    return "candidate_publish_readiness=review-handshake blockers remain "
+      + `(${blocking.join(",")}); source advisories are still present (${sourceAdvisories.join(",")}), `
+      + "so source readiness is not asserted as pass. "
+      + "A candidate review goes stale after any later content edit, which re-raises missing_latest_candidate_review. "
+      + "A limited workspace_publish_candidate (finalReadiness.decision='limited' with concrete remainingGaps and "
+      + "false flags for any unmet dimension) stays valid when the AI judges real gaps remain.";
+  }
+  // Fact-only, AI-first (AGRUN-246-C): state the coherence facts, do not
+  // prescribe an action sequence. The model composes its own next move.
+  return "candidate_publish_readiness=mechanical acceptance gates currently pass (length, structure, source); "
+    + `the only remaining publish blockers are review-handshake state (${blocking.join(",")}), not content deficits. `
+    + "A candidate review goes stale after any later content edit, which re-raises missing_latest_candidate_review. "
+    + "A limited workspace_publish_candidate (finalReadiness.decision='limited' with concrete remainingGaps and "
+    + "false flags for any unmet dimension) stays valid when the AI judges real gaps remain.";
+}
+
 function formatStructureRepairAdvisory(finalCandidateStructure, allowedActions) {
-  const reason = readString$1C(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
+  const reason = readString(finalCandidateStructure && finalCandidateStructure.reason) || "structure_not_ready";
   const actions = Array.isArray(allowedActions) ? allowedActions : [];
-  const canPatch = actions.includes("workspace_propose_patch") || actions.includes("workspace_apply_patch");
-  const canRewrite = actions.includes("workspace_write") || actions.includes("workspace_replace");
+  const canPatch = actions.includes(WORKSPACE_PROPOSE_PATCH_ACTION) || actions.includes(WORKSPACE_APPLY_PATCH_ACTION);
+  const canRewrite = actions.includes(WORKSPACE_WRITE_ACTION) || actions.includes(WORKSPACE_REPLACE_ACTION);
+  const issueCodes = Array.isArray(finalCandidateStructure && finalCandidateStructure.issueCodes)
+    ? finalCandidateStructure.issueCodes.map(readString).filter(Boolean)
+    : [];
+  if (issueCodes.includes("semantic_duplicate_headings") || issueCodes.includes("body_after_final_section")) {
+    return `structure_repair_required=${reason}. Semantic duplicate sections or body after the final section cannot be fixed by normalize_headings alone. Merge or remove duplicate-purpose section blocks with a targeted replace/patch, then read/review before publishing.`;
+  }
   if (canPatch && !canRewrite) {
     return `structure_repair_required=${reason}. Use workspace_propose_patch first and workspace_apply_patch only for a valid preview. Do not append or insert new sections when length is already satisfied.`;
   }
   return `structure_repair_required=${reason}. Produce one coherent candidate with unique section headings before publishing. If the selected candidate text is already projected or was just read, do not repeat workspace_read; use workspace_write or workspace_replace for a full-outline repair.`;
 }
 
+function formatSemanticDuplicateHeadingContexts(contexts) {
+  return (Array.isArray(contexts) ? contexts : [])
+    .map((context) => {
+      const first = context && typeof context === "object" ? context.first : null;
+      const second = context && typeof context === "object" ? context.second : null;
+      const relation = readString(context && context.relation) || "similar";
+      const firstLine = first && typeof first === "object"
+        ? `lineNumber ${first.lineNumber} raw "${readString(first.raw)}"`
+        : "";
+      const secondLine = second && typeof second === "object"
+        ? `lineNumber ${second.lineNumber} raw "${readString(second.raw)}"`
+        : "";
+      return firstLine && secondLine ? `${relation}: ${firstLine} <-> ${secondLine}` : null;
+    })
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(" | ");
+}
+
+function formatSimpleStructureContexts(contexts) {
+  return (Array.isArray(contexts) ? contexts : [])
+    .map((context) => {
+      const lineNumber = readPositiveInteger$o(context && context.lineNumber);
+      const raw = readString(context && context.raw);
+      return lineNumber && raw ? `lineNumber ${lineNumber} raw "${raw}"` : null;
+    })
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(" | ");
+}
+
 function formatStructureContextLine(contexts, key) {
   return (Array.isArray(contexts) ? contexts : [])
     .map((context) => {
-      const label = readString$1C(context && context[key]);
+      const label = readString(context && context[key]);
       const occurrences = (Array.isArray(context && context.occurrences) ? context.occurrences : [])
-        .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString$1C(occurrence.raw)}"`)
+        .map((occurrence) => `lineNumber ${occurrence.lineNumber} raw "${readString(occurrence.raw)}"`)
         .filter(Boolean)
         .join(", ");
       return label && occurrences ? `${label} -> ${occurrences}` : null;
@@ -1973,17 +2219,17 @@ function formatCandidateRequirementsChecklist(checklist) {
   return (Array.isArray(checklist) ? checklist : [])
     .map((item) => {
       const source = item && typeof item === "object" ? item : {};
-      const id = readString$1C(source.id) || "requirement";
-      const kind = readString$1C(source.kind) || "unknown";
-      const status = readString$1C(source.status) || "unknown";
-      const requirement = readString$1C(source.requirement).replace(/\s+/g, " ");
-      const gap = readString$1C(source.remainingGap).replace(/\s+/g, " ");
-      const repair = readString$1C(source.repairAction).replace(/\s+/g, " ");
+      const id = readString(source.id) || "requirement";
+      const kind = readString(source.kind) || "unknown";
+      const status = readString(source.status) || "unknown";
+      const requirement = readString(source.requirement).replace(/\s+/g, " ");
+      const gap = readString(source.remainingGap).replace(/\s+/g, " ");
+      const repair = readString(source.repairAction).replace(/\s+/g, " ");
       return [
         `${id}:${kind}:${status}`,
-        requirement ? `requirement=${truncate$2(requirement, 120)}` : "",
-        gap ? `gap=${truncate$2(gap, 120)}` : "",
-        repair ? `repair=${truncate$2(repair, 120)}` : ""
+        requirement ? `requirement=${truncate$3(requirement, 120)}` : "",
+        gap ? `gap=${truncate$3(gap, 120)}` : "",
+        repair ? `repair=${truncate$3(repair, 120)}` : ""
       ].filter(Boolean).join(" ");
     })
     .filter(Boolean)
@@ -1994,10 +2240,10 @@ function formatCandidateRequirementsChecklist(checklist) {
 function formatSectionNumberRepairHints(hints) {
   return (Array.isArray(hints) ? hints : [])
     .map((hint) => {
-      const lineNumber = readPositiveInteger$j(hint && hint.lineNumber);
-      const currentNumber = readString$1C(hint && hint.currentNumber);
-      const candidateNumber = readString$1C(hint && (hint.candidateNumber || hint.suggestedNumber));
-      const raw = truncate$2(readString$1C(hint && hint.raw), 160);
+      const lineNumber = readPositiveInteger$o(hint && hint.lineNumber);
+      const currentNumber = readString(hint && hint.currentNumber);
+      const candidateNumber = readString(hint && (hint.candidateNumber || hint.suggestedNumber));
+      const raw = truncate$3(readString(hint && hint.raw), 160);
       if (lineNumber == null || !currentNumber || !candidateNumber || !raw) return null;
       return `lineNumber ${lineNumber} currentNumber ${currentNumber} candidateNumber ${candidateNumber} raw "${raw}"`;
     })
@@ -2007,15 +2253,15 @@ function formatSectionNumberRepairHints(hints) {
 }
 
 function selectWorkspacePromptFiles(source, options = {}) {
-  const finalCandidatePath = readString$1C(options.finalCandidatePath) || "final_candidate.md";
-  const maxFiles = readPositiveInteger$j(options.maxFiles) || 5;
+  const finalCandidatePath = readString(options.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
+  const maxFiles = readPositiveInteger$o(options.maxFiles) || 5;
   const files = Object.keys(source.files)
     .sort()
     .map((path) => source.files[path])
-    .filter((file) => readString$1C(file && file.content));
+    .filter((file) => readString(file && file.content));
   const selected = files.slice(-maxFiles);
-  const finalCandidate = files.find((file) => readString$1C(file && file.path) === finalCandidatePath);
-  if (!finalCandidate || selected.some((file) => readString$1C(file && file.path) === finalCandidatePath)) {
+  const finalCandidate = files.find((file) => readString(file && file.path) === finalCandidatePath);
+  if (!finalCandidate || selected.some((file) => readString(file && file.path) === finalCandidatePath)) {
     return selected;
   }
   return selected.length >= maxFiles
@@ -2099,13 +2345,13 @@ function evaluateWorkspaceQuality(workspace, options = {}) {
   // advisory-only and AI decides what to do with it.
   const fileContent = (path) => {
     const file = workspace.files && workspace.files[path];
-    return readString$1C(file && file.content);
+    return readString(file && file.content);
   };
   const outline = fileContent("outline.md");
   const evidence = fileContent("evidence.json");
   const draft = fileContent("draft.md");
   const critique = fileContent("critique.md");
-  const finalCandidatePath = readString$1C(options.finalCandidatePath) || readFinalCandidatePath(workspace);
+  const finalCandidatePath = readString(options.finalCandidatePath) || readFinalCandidatePath(workspace);
   const finalCandidate = fileContent(finalCandidatePath);
   const finalCandidateSameAsOutline = Boolean(outline && finalCandidate && normalizeComparableText$4(outline) === normalizeComparableText$4(finalCandidate));
   const draftSameAsOutline = Boolean(outline && draft && normalizeComparableText$4(outline) === normalizeComparableText$4(draft));
@@ -2142,8 +2388,8 @@ function evaluateWorkspaceQuality(workspace, options = {}) {
 }
 
 function inspectWorkspaceCandidateStructure(text, options = {}) {
-  const value = readString$1C(text);
-  const maxSamples = readPositiveInteger$j(options.maxSamples) || 5;
+  const value = readString(text);
+  const maxSamples = readPositiveInteger$o(options.maxSamples) || 5;
   if (!value) {
     return {
       duplicateHeadingCount: 0,
@@ -2194,7 +2440,7 @@ function inspectWorkspaceCandidateStructure(text, options = {}) {
         })
         .map((heading) => ({
           lineNumber: heading.lineNumber,
-          raw: truncate$2(heading.raw, 160)
+          raw: truncate$3(heading.raw, 160)
         }))
         .slice(0, 8)
     }));
@@ -2206,7 +2452,7 @@ function inspectWorkspaceCandidateStructure(text, options = {}) {
         .filter((heading) => heading.number === sample.number && heading.level <= 3)
         .map((heading) => ({
           lineNumber: heading.lineNumber,
-          raw: truncate$2(heading.raw, 160)
+          raw: truncate$3(heading.raw, 160)
         }))
         .slice(0, 8)
     }));
@@ -2228,9 +2474,11 @@ function inspectWorkspaceCandidateStructure(text, options = {}) {
   const sectionSequenceRepairHints = nonMonotonic || gapped
     ? buildSectionSequenceRepairHints(headings)
     : [];
+  const semanticDuplicateHeadingContexts = collectSemanticDuplicateHeadingContexts(headings, maxSamples);
+  const bodyAfterFinalSectionContexts = collectBodyAfterFinalSectionContexts(headings, maxSamples);
   const firstHeading = headings[0] || null;
-  const title = readString$1C(firstHeading && firstHeading.raw);
-  const normalizedTitle = readString$1C(firstHeading && firstHeading.normalized);
+  const title = readString(firstHeading && firstHeading.raw);
+  const normalizedTitle = readString(firstHeading && firstHeading.normalized);
   const rawPromptTitle = Boolean(
     title.length > 140
   );
@@ -2240,8 +2488,11 @@ function inspectWorkspaceCandidateStructure(text, options = {}) {
   if (repeatedNumberSamples.length > 0) issueCodes.push("duplicate_section_numbers");
   if (nonMonotonic) issueCodes.push("non_monotonic_section_numbers");
   if (gapped) issueCodes.push("gapped_section_numbers");
+  if (semanticDuplicateHeadingContexts.length > 0) issueCodes.push("semantic_duplicate_headings");
+  if (bodyAfterFinalSectionContexts.length > 0) issueCodes.push("body_after_final_section");
   const ok = issueCodes.length === 0;
   return {
+    bodyAfterFinalSectionContexts,
     duplicateHeadingCount: repeatedHeadingSamples.reduce((sum, entry) => sum + entry.count - 1, 0),
     duplicateNumberCount: repeatedNumberSamples.reduce((sum, entry) => sum + entry.count - 1, 0),
     headingCount: headings.length,
@@ -2254,11 +2505,189 @@ function inspectWorkspaceCandidateStructure(text, options = {}) {
     repeatedHeadingSamples,
     repeatedNumberContexts,
     repeatedNumberSamples,
+    semanticDuplicateHeadingContexts,
     sectionNumberRepairHints,
     sectionSequenceRepairHints,
     status: ok ? "pass" : "fail",
     title: title || normalizedTitle
   };
+}
+
+// AGRUN-543 — mechanical post-mutation structure echo. After a content
+// mutation the planner otherwise only sees length/diff stats; the current
+// heading structure (and any duplicate / semantic-duplicate / body-after-final
+// sections it JUST created) stays invisible until a separate workspace_read or
+// finalize recomputes quality.finalCandidateStructure. Live evidence
+// (gemini/gpt-5.4-mini/deepseek, 2026-06-17): models duplicate sections via
+// repeated write/insert and never SEE it before publishing limited. This echo
+// is a READ-ONLY observation attached to every content-mutation output: a
+// mechanical heading scan plus the duplicate/semantic/body-after-final contexts
+// with line numbers and a plain-language guidance line. It NEVER judges content
+// quality or forces a repair — the AI owns the dedup decision (AGRUN-244:
+// structure is an observable signal, not a forced-repair deficit). Returns null
+// when the content is clean of content-level structure issues, so a healthy
+// write adds no noise.
+function buildWorkspaceStructureEcho(content) {
+  const structure = inspectWorkspaceCandidateStructure(content);
+  if (!structure || structure.ok === true) return null;
+  const issueCodes = Array.isArray(structure.issueCodes) ? structure.issueCodes : [];
+  const contentIssueCodes = issueCodes.filter((code) => (
+    code === "duplicate_headings" ||
+    code === "semantic_duplicate_headings" ||
+    code === "body_after_final_section" ||
+    code === "duplicate_section_numbers"
+  ));
+  if (contentIssueCodes.length === 0) return null;
+  return {
+    kind: "workspace_structure_echo",
+    issueCodes: contentIssueCodes,
+    headingCount: readPositiveInteger$o(structure.headingCount) || 0,
+    repeatedHeadingSamples: Array.isArray(structure.repeatedHeadingSamples)
+      ? structure.repeatedHeadingSamples.slice(0, 6)
+      : [],
+    semanticDuplicateHeadingContexts: Array.isArray(structure.semanticDuplicateHeadingContexts)
+      ? structure.semanticDuplicateHeadingContexts.slice(0, 6)
+      : [],
+    bodyAfterFinalSectionContexts: Array.isArray(structure.bodyAfterFinalSectionContexts)
+      ? structure.bodyAfterFinalSectionContexts.slice(0, 6)
+      : [],
+    guidance: buildWorkspaceStructureEchoGuidance(contentIssueCodes)
+  };
+}
+
+function buildWorkspaceStructureEchoGuidance(codes) {
+  const parts = ["Structure scan of the content you just wrote detected repeated sections."];
+  if (codes.includes("semantic_duplicate_headings")) {
+    parts.push("Two sections cover the same purpose (semantic duplicate), even if the heading text differs.");
+  }
+  if (codes.includes("duplicate_headings")) {
+    parts.push("The same heading text appears more than once.");
+  }
+  if (codes.includes("body_after_final_section")) {
+    parts.push("There is body content after what reads as the final/conclusion section.");
+  }
+  if (codes.includes("duplicate_section_numbers")) {
+    parts.push("A section number repeats.");
+  }
+  parts.push("This is a read-only observation, not a block. If the repeat is unintended, merge or remove the duplicate block with workspace_replace/workspace_multi_edit before you finalize; otherwise continue.");
+  return parts.join(" ");
+}
+
+function collectSemanticDuplicateHeadingContexts(headings, maxSamples) {
+  const topLevel = (Array.isArray(headings) ? headings : [])
+    .filter((heading) => heading && (heading.level === 2 || heading.level === 3))
+    .map((heading) => ({
+      heading,
+      tokens: normalizeHeadingPurposeTokenSet(heading.raw)
+    }))
+    .filter((entry) => entry.tokens.size > 0);
+  const contexts = [];
+  for (let i = 0; i < topLevel.length; i += 1) {
+    for (let j = i + 1; j < topLevel.length; j += 1) {
+      const relation = readHeadingPurposeRelation(topLevel[i].tokens, topLevel[j].tokens);
+      if (!relation) continue;
+      contexts.push({
+        first: {
+          lineNumber: topLevel[i].heading.lineNumber,
+          raw: truncate$3(topLevel[i].heading.raw, 160)
+        },
+        relation,
+        second: {
+          lineNumber: topLevel[j].heading.lineNumber,
+          raw: truncate$3(topLevel[j].heading.raw, 160)
+        }
+      });
+      if (contexts.length >= maxSamples) return contexts;
+    }
+  }
+  return contexts;
+}
+
+function collectBodyAfterFinalSectionContexts(headings, maxSamples) {
+  const topLevel = (Array.isArray(headings) ? headings : [])
+    .filter((heading) => heading && heading.level === 2);
+  const finalIndex = topLevel.findIndex((heading) => isFinalSectionHeading(heading.raw));
+  if (finalIndex < 0 || finalIndex >= topLevel.length - 1) return [];
+  return topLevel
+    .slice(finalIndex + 1)
+    .filter((heading) => !isBackMatterHeading(heading.raw))
+    .map((heading) => ({
+      lineNumber: heading.lineNumber,
+      raw: truncate$3(heading.raw, 160)
+    }))
+    .slice(0, maxSamples);
+}
+
+const STRUCTURE_PURPOSE_STOPWORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "by", "for", "from", "how", "in",
+  "into", "is", "of", "on", "or", "the", "to", "with",
+  "advanced", "additional", "common", "defining", "designing",
+  "extra", "further", "instrumentation", "more", "section", "strategies", "the"
+]);
+const STRUCTURE_PURPOSE_NEGATION_RE = /^(?:anti|non|un|counter|dis)(?:-|$)|^(?:not|without|versus|vs)$/iu;
+
+function normalizeHeadingPurposeTokenSet(rawHeading) {
+  const value = readString(rawHeading)
+    .toLowerCase()
+    .replace(/^\d+(?:\.\d+)*[\s.)-]*/, "")
+    .replace(/[^a-z0-9'-]+/g, " ")
+    .trim();
+  const tokens = value
+    ? value.split(/\s+/)
+      .map((token) => token.endsWith("ies") && token.length > 4
+        ? `${token.slice(0, -3)}y`
+        : token.endsWith("s") && token.length > 4
+          ? token.slice(0, -1)
+          : token)
+      .filter((token) => token.length > 1 && !STRUCTURE_PURPOSE_STOPWORDS.has(token))
+    : [];
+  return new Set(tokens);
+}
+
+function readHeadingPurposeRelation(first, second) {
+  if (!(first instanceof Set) || !(second instanceof Set) || first.size === 0 || second.size === 0) return null;
+  let intersection = 0;
+  for (const token of first) {
+    if (second.has(token)) intersection += 1;
+  }
+  const union = first.size + second.size - intersection;
+  const jaccard = union > 0 ? intersection / union : 0;
+  const [small, large] = first.size <= second.size ? [first, second] : [second, first];
+  const diff = [...large].filter((token) => !small.has(token));
+  const subsetDuplicate = small.size >= 1 &&
+    small.size < large.size &&
+    diff.length <= 2 &&
+    !hasStructurePurposeNegationToken(diff) &&
+    setIsSubset(small, large);
+  if (subsetDuplicate) return "subset";
+  return jaccard >= 0.6 ? "equivalent" : null;
+}
+
+function hasStructurePurposeNegationToken(tokens) {
+  for (const token of Array.isArray(tokens) ? tokens : []) {
+    if (STRUCTURE_PURPOSE_NEGATION_RE.test(token)) return true;
+  }
+  return false;
+}
+
+function setIsSubset(small, large) {
+  for (const token of small) {
+    if (!large.has(token)) return false;
+  }
+  return true;
+}
+
+function isFinalSectionHeading(rawHeading) {
+  const tokens = normalizeHeadingPurposeTokenSet(rawHeading);
+  const label = readString(rawHeading).toLowerCase().replace(/^\d+(?:\.\d+)*[\s.)-]*/, "");
+  return tokens.has("conclusion") ||
+    /\b(final thoughts?|closing thoughts?)\b/.test(label) ||
+    /^\s*(summary|final summary)\s*$/.test(label);
+}
+
+function isBackMatterHeading(rawHeading) {
+  const label = readString(rawHeading).toLowerCase().replace(/^\d+(?:\.\d+)*[\s.)-]*/, "");
+  return /\b(references?|sources?|bibliography|appendix|appendices)\b/.test(label);
 }
 
 // Returns true when the top-level numbered headings (## level 2 with a
@@ -2293,10 +2722,18 @@ function collectTopLevelNumberedHeadings(headings) {
   const out = [];
   for (const heading of headings) {
     if (!heading || heading.level !== 2) continue;
-    const number = readString$1C(heading.number);
+    const number = readString(heading.number);
     if (!number) continue;
-    const major = number.split(".")[0];
-    const parsed = Number.parseInt(major, 10);
+    // AGRUN-545 — a dotted number (## 2.1) is a SUB-section authored at H2
+    // depth, not a top-level sequence entry. extractMarkdownSectionNumber
+    // strips the trailing dot, so a genuine top-level heading is a bare
+    // integer ("2") while a sub-section keeps its dot ("2.1"). Folding "2.1"
+    // to a top-level "2" made [1, 2, 2.1, 2.2, 3] read as [1, 2, 2, 2, 3] and
+    // mis-fired non_monotonic/gapped, trapping weak models in an unfixable
+    // renumber loop (gemini-3.1-flash-lite live, 2026-06-18). Only bare
+    // integers participate in the top-level sequence; sub-sections are ignored.
+    if (number.includes(".")) continue;
+    const parsed = Number.parseInt(number, 10);
     if (!Number.isFinite(parsed)) continue;
     out.push({ ...heading, parsedNumber: parsed });
   }
@@ -2320,7 +2757,7 @@ function buildSectionSequenceRepairHints(headings) {
       level: heading.level,
       lineNumber: heading.lineNumber,
       occurrenceIndex: 1,
-      raw: truncate$2(heading.raw, 160)
+      raw: truncate$3(heading.raw, 160)
     });
   }
   return hints;
@@ -2328,17 +2765,17 @@ function buildSectionSequenceRepairHints(headings) {
 
 function buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSamples) {
   const repeatedNumbers = new Set((Array.isArray(repeatedNumberSamples) ? repeatedNumberSamples : [])
-    .map((entry) => readString$1C(entry && entry.number))
+    .map((entry) => readString(entry && entry.number))
     .filter(Boolean));
   if (repeatedNumbers.size === 0) return [];
   const occupiedNumbers = new Set((Array.isArray(headings) ? headings : [])
-    .map((heading) => readString$1C(heading && heading.number))
+    .map((heading) => readString(heading && heading.number))
     .filter(Boolean));
   const repeatedOccurrences = new Map();
   return (Array.isArray(headings) ? headings : [])
     .filter((heading) => heading && heading.number != null && heading.level <= 3)
     .map((heading) => {
-      const currentNumber = readString$1C(heading.number);
+      const currentNumber = readString(heading.number);
       if (!repeatedNumbers.has(currentNumber)) return null;
       const occurrenceIndex = (repeatedOccurrences.get(currentNumber) || 0) + 1;
       repeatedOccurrences.set(currentNumber, occurrenceIndex);
@@ -2351,18 +2788,18 @@ function buildSectionNumberRepairHints(headings, repeatedNumberSamples, maxSampl
       return {
         candidateNumber: suggestedNumber,
         currentNumber,
-        level: readPositiveInteger$j(heading.level) || 0,
+        level: readPositiveInteger$o(heading.level) || 0,
         lineNumber: heading.lineNumber,
         occurrenceIndex,
-        raw: truncate$2(heading.raw, 160)
+        raw: truncate$3(heading.raw, 160)
       };
     })
     .filter(Boolean)
-    .slice(0, Math.max(1, readPositiveInteger$j(maxSamples) || 5) * 3);
+    .slice(0, Math.max(1, readPositiveInteger$o(maxSamples) || 5) * 3);
 }
 
 function suggestNextSectionNumber(currentNumber, occupiedNumbers) {
-  const value = readString$1C(currentNumber);
+  const value = readString(currentNumber);
   const parts = value.split(".").map((part) => Number.parseInt(part, 10));
   if (parts.length === 0 || parts.some((part) => !Number.isInteger(part) || part < 0)) {
     return value;
@@ -2383,9 +2820,9 @@ function readFinalCandidatePath(workspace) {
   const quality = workspace && typeof workspace === "object" && workspace.quality && typeof workspace.quality === "object"
     ? workspace.quality
     : {};
-  const path = readString$1C(quality.finalCandidatePath);
+  const path = readString(quality.finalCandidatePath);
   if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) {
-    return "final_candidate.md";
+    return DEFAULT_FINAL_CANDIDATE_PATH;
   }
   return path;
 }
@@ -2395,7 +2832,7 @@ function createCheck(name, status, reason) {
 }
 
 function normalizeComparableText$4(value) {
-  return readString$1C(value)
+  return readString(value)
     .toLowerCase()
     .replace(/[`*_#>-]/g, "")
     .replace(/\s+/g, " ")
@@ -2417,8 +2854,8 @@ function syncWorkspaceLastReadToFile(workspace, file) {
     workspace.quality = createWorkspaceQuality();
   }
   workspace.quality.lastRead = {
-    observedAt: readString$1C(file.updatedAt) || new Date().toISOString(),
-    path: readString$1C(file.path),
+    observedAt: readString(file.updatedAt) || new Date().toISOString(),
+    path: readString(file.path),
     textStats: summarizeTextStats$2(file.content)
   };
 }
@@ -2431,7 +2868,7 @@ function syncWorkspaceLastReadToFile(workspace, file) {
 // are included because weak live models often draft long reports with
 // bare section labels such as `Definition` or `**Conclusion**`.
 function collectMarkdownHeadings(text) {
-  const value = readString$1C(text);
+  const value = readString(text);
   if (!value) return [];
   const lines = value.split(/\r?\n/);
   const headings = [];
@@ -2448,15 +2885,15 @@ function collectMarkdownHeadings(text) {
 }
 
 function collectMarkdownHeadingsDetailed(text) {
-  const value = readString$1C(text);
+  const value = readString(text);
   if (!value) return [];
   const lines = value.split(/\r?\n/);
   const headings = [];
   for (let index = 0; index < lines.length; index += 1) {
     const level = readHeadingLevel(lines[index]);
     if (level == null) continue;
-    const raw = readString$1C(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
-    const normalized = normalizeHeadingText(lines[index]);
+    const raw = readString(lines[index]).replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "").trim();
+    const normalized = normalizeHeadingText$1(lines[index]);
     headings.push({
       labelNormalized: normalizeHeadingLabelText(raw),
       level,
@@ -2470,7 +2907,7 @@ function collectMarkdownHeadingsDetailed(text) {
 }
 
 function extractMarkdownSectionNumber(rawHeadingText) {
-  const value = readString$1C(rawHeadingText);
+  const value = readString(rawHeadingText);
   const match = value.match(/^(\d{1,3}(?:\.\d{1,3})*)\.?(?=\s|$)/);
   return match ? match[1] : null;
 }
@@ -2480,7 +2917,7 @@ function createWorkspaceQuality() {
     candidateQualitySignal: null,
     candidateReview: null,
     checks: [],
-    finalCandidatePath: "final_candidate.md",
+    finalCandidatePath: DEFAULT_FINAL_CANDIDATE_PATH,
     finalCandidateReady: false,
     finalCandidateStructure: inspectWorkspaceCandidateStructure(""),
     finalCandidateStats: summarizeTextStats$2(""),
@@ -2492,7 +2929,7 @@ function createWorkspaceQuality() {
 
 function createWorkspaceFile(path, content) {
   return {
-    content: readString$1C(content),
+    content: readString(content),
     path,
     updatedAt: null,
     version: 0
@@ -2500,28 +2937,28 @@ function createWorkspaceFile(path, content) {
 }
 
 function appendWorkspaceOperation(workspace, operation, options = {}) {
-  const maxOperations = readPositiveInteger$j(options.maxOperations) || DEFAULT_MAX_OPERATIONS;
+  const maxOperations = readPositiveInteger$o(options.maxOperations) || DEFAULT_MAX_OPERATIONS;
   const next = {
-    action: readString$1C(operation.action) || "workspace",
+    action: readString(operation.action) || "workspace",
     createdAt: new Date().toISOString(),
-    cycle: readPositiveInteger$j(operation.cycle) || 0,
+    cycle: readPositiveInteger$o(operation.cycle) || 0,
     id: `vw-${Date.now()}-${workspace.operations.length + 1}`,
-    path: readString$1C(operation.path) || null,
-    status: readString$1C(operation.status) || "ok",
-    summary: truncate$2(readString$1C(operation.summary), DEFAULT_MAX_OPERATION_CHARS)
+    path: readString(operation.path) || null,
+    status: readString(operation.status) || "ok",
+    summary: truncate$3(readString(operation.summary), DEFAULT_MAX_OPERATION_CHARS)
   };
   workspace.operations = normalizeOperations(workspace.operations).concat(next).slice(-maxOperations);
 }
 
 function summarizeWorkspaceFile(file) {
-  const content = readString$1C(file && file.content);
+  const content = readString(file && file.content);
   return {
     hasContent: content.length > 0,
-    path: readString$1C(file && file.path),
+    path: readString(file && file.path),
     size: content.length,
     textStats: summarizeTextStats$2(content),
-    updatedAt: readString$1C(file && file.updatedAt) || null,
-    version: readPositiveInteger$j(file && file.version) || 0
+    updatedAt: readString(file && file.updatedAt) || null,
+    version: readPositiveInteger$o(file && file.version) || 0
   };
 }
 
@@ -2538,13 +2975,13 @@ function normalizeOperations(value) {
     .map((entry, index) => {
       if (!entry || typeof entry !== "object") return null;
       return {
-        action: readString$1C(entry.action) || "workspace",
-        createdAt: readString$1C(entry.createdAt) || null,
-        cycle: readPositiveInteger$j(entry.cycle) || 0,
-        id: readString$1C(entry.id) || `vw-${index + 1}`,
-        path: readString$1C(entry.path) || null,
-        status: readString$1C(entry.status) || "ok",
-        summary: truncate$2(readString$1C(entry.summary), DEFAULT_MAX_OPERATION_CHARS)
+        action: readString(entry.action) || "workspace",
+        createdAt: readString(entry.createdAt) || null,
+        cycle: readPositiveInteger$o(entry.cycle) || 0,
+        id: readString(entry.id) || `vw-${index + 1}`,
+        path: readString(entry.path) || null,
+        status: readString(entry.status) || "ok",
+        summary: truncate$3(readString(entry.summary), DEFAULT_MAX_OPERATION_CHARS)
       };
     })
     .filter(Boolean)
@@ -2556,30 +2993,30 @@ function normalizePendingPatch(value) {
   if (!source) return null;
   const pathValidation = validateWorkspacePathRecoverable(source.path);
   if (!pathValidation.ok) return null;
-  const patchId = readString$1C(source.patchId);
+  const patchId = readString(source.patchId);
   if (!patchId) return null;
   return {
     afterContent: typeof source.afterContent === "string" ? source.afterContent : "",
-    afterHash: readString$1C(source.afterHash),
-    afterWords: readPositiveInteger$j(source.afterWords) || 0,
-    baseVersion: readPositiveInteger$j(source.baseVersion) || 0,
-    beforeHash: readString$1C(source.beforeHash),
-    beforeHashFuzzy: readString$1C(source.beforeHashFuzzy) || null,
-    beforeWords: readPositiveInteger$j(source.beforeWords) || 0,
+    afterHash: readString(source.afterHash),
+    afterWords: readPositiveInteger$o(source.afterWords) || 0,
+    baseVersion: readPositiveInteger$o(source.baseVersion) || 0,
+    beforeHash: readString(source.beforeHash),
+    beforeHashFuzzy: readString(source.beforeHashFuzzy) || null,
+    beforeWords: readPositiveInteger$o(source.beforeWords) || 0,
     changed: source.changed === true,
-    createdAt: readString$1C(source.createdAt) || null,
+    createdAt: readString(source.createdAt) || null,
     deltaWords: typeof source.deltaWords === "number" && Number.isFinite(source.deltaWords) ? source.deltaWords : 0,
     kind: "virtual_workspace_pending_patch",
     operations: Array.isArray(source.operations) ? source.operations.map(summarizePatchOperation).filter(Boolean).slice(0, 8) : [],
     patchId,
     path: pathValidation.path,
-    previewSummary: readString$1C(source.previewSummary),
-    riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString$1C).filter(Boolean).slice(0, 8) : [],
+    previewSummary: readString(source.previewSummary),
+    riskFlags: Array.isArray(source.riskFlags) ? source.riskFlags.map(readString).filter(Boolean).slice(0, 8) : [],
     structureAfter: summarizePatchStructure(source.structureAfter),
     structureBefore: summarizePatchStructure(source.structureBefore),
-    status: readString$1C(source.status) || "preview_blocked",
+    status: readString(source.status) || "preview_blocked",
     valid: source.valid === true,
-    version: readPositiveInteger$j(source.version) || 1
+    version: readPositiveInteger$o(source.version) || 1
   };
 }
 
@@ -2592,31 +3029,31 @@ function normalizeWorkspaceQuality(value) {
       .map((check) => {
         if (!check || typeof check !== "object") return null;
         return {
-          name: readString$1C(check.name) || "check",
-          reason: readString$1C(check.reason) || "n/a",
-          status: readString$1C(check.status) || "unknown"
+          name: readString(check.name) || "check",
+          reason: readString(check.reason) || "n/a",
+          status: readString(check.status) || "unknown"
         };
       })
       .filter(Boolean),
-    finalCandidatePath: readString$1C(source.finalCandidatePath) || "final_candidate.md",
+    finalCandidatePath: readString(source.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH,
     finalCandidateReady: source.finalCandidateReady === true,
     finalCandidateStructure: normalizeWorkspaceCandidateStructure(source.finalCandidateStructure),
     finalCandidateStats: normalizeTextStats$3(source.finalCandidateStats),
     lastRead: normalizeWorkspaceLastRead(source.lastRead),
     lastIssueCodes: Array.isArray(source.lastIssueCodes)
-      ? source.lastIssueCodes.map(readString$1C).filter(Boolean)
+      ? source.lastIssueCodes.map(readString).filter(Boolean)
       : [],
-    status: readString$1C(source.status) || "needs_draft"
+    status: readString(source.status) || "needs_draft"
   };
 }
 
 function normalizeWorkspaceLastRead(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const path = readString$1C(source.path);
+  const path = readString(source.path);
   if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
   return {
-    observedAt: readString$1C(source.observedAt) || null,
+    observedAt: readString(source.observedAt) || null,
     path,
     textStats: normalizeTextStats$3(source.textStats)
   };
@@ -2625,39 +3062,39 @@ function normalizeWorkspaceLastRead(value) {
 function normalizeCandidateReview(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const path = readString$1C(source.path);
+  const path = readString(source.path);
   if (!path || path.startsWith("/") || path.includes("..") || /[\\]/.test(path)) return null;
   return {
-    fileUpdatedAt: readString$1C(source.fileUpdatedAt) || null,
-    fileVersion: readPositiveInteger$j(source.fileVersion) || 0,
-    finalSectionTitle: readString$1C(source.finalSectionTitle) || null,
-    issueCount: readPositiveInteger$j(source.issueCount) || 0,
+    fileUpdatedAt: readString(source.fileUpdatedAt) || null,
+    fileVersion: readPositiveInteger$o(source.fileVersion) || 0,
+    finalSectionTitle: readString(source.finalSectionTitle) || null,
+    issueCount: readPositiveInteger$o(source.issueCount) || 0,
     issues: Array.isArray(source.issues)
       ? source.issues.map(normalizeCandidateReviewIssue).filter(Boolean).slice(0, 24)
       : [],
     path,
     readyToPublish: source.readyToPublish === true,
-    repairPlan: readString$1C(source.repairPlan) || null,
+    repairPlan: readString(source.repairPlan) || null,
     requirementsChecklist: normalizeCandidateRequirementsChecklist(source.requirementsChecklist),
-    reviewedAt: readString$1C(source.reviewedAt) || null,
-    summary: readString$1C(source.summary) || null,
+    reviewedAt: readString(source.reviewedAt) || null,
+    summary: readString(source.summary) || null,
     textStats: normalizeTextStats$3(source.textStats)
   };
 }
 
 function normalizeCandidateReviewIssue(value) {
   if (typeof value === "string") {
-    const text = readString$1C(value);
-    return text ? { code: "ai_review_issue", severity: "advisory", summary: truncate$2(text, 240) } : null;
+    const text = readString(value);
+    return text ? { code: "ai_review_issue", severity: "advisory", summary: truncate$3(text, 240) } : null;
   }
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const summary = readString$1C(source.summary || source.message || source.issue);
-  const code = readString$1C(source.code) || "ai_review_issue";
+  const summary = readString(source.summary || source.message || source.issue);
+  const code = readString(source.code) || "ai_review_issue";
   return {
     code,
-    severity: readString$1C(source.severity) === "blocking" ? "blocking" : "advisory",
-    summary: truncate$2(summary || code, 240)
+    severity: readString(source.severity) === "blocking" ? "blocking" : "advisory",
+    summary: truncate$3(summary || code, 240)
   };
 }
 
@@ -2672,31 +3109,31 @@ function normalizeCandidateRequirementsChecklist(value) {
 function normalizeCandidateRequirement(value, index) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const requirement = readString$1C(source.requirement || source.summary || source.text);
+  const requirement = readString(source.requirement || source.summary || source.text);
   if (!requirement) return null;
-  const id = readString$1C(source.id) || `requirement_${index + 1}`;
+  const id = readString(source.id) || `requirement_${index + 1}`;
   const kind = normalizeCandidateRequirementKind(source.kind || source.type);
   const status = normalizeCandidateRequirementStatus(source.status || source.result);
   return {
-    evidence: truncate$2(readString$1C(source.evidence), 360) || null,
-    id: truncate$2(id, 80),
+    evidence: truncate$3(readString(source.evidence), 360) || null,
+    id: truncate$3(id, 80),
     kind,
-    remainingGap: truncate$2(readString$1C(source.remainingGap || source.gap), 360) || null,
-    repairAction: truncate$2(readString$1C(source.repairAction || source.repairPlan), 360) || null,
-    requirement: truncate$2(requirement, 360),
+    remainingGap: truncate$3(readString(source.remainingGap || source.gap), 360) || null,
+    repairAction: truncate$3(readString(source.repairAction || source.repairPlan), 360) || null,
+    requirement: truncate$3(requirement, 360),
     status
   };
 }
 
 function normalizeCandidateRequirementKind(value) {
-  const text = readString$1C(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (text === "objective" || text === "fact" || text === "measurable") return "objective";
   if (text === "subjective" || text === "editorial" || text === "quality") return "subjective";
   return "unknown";
 }
 
 function normalizeCandidateRequirementStatus(value) {
-  const text = readString$1C(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (text === "met" || text === "pass" || text === "passed" || text === "done") return "met";
   if (text === "partial" || text === "partially_met" || text === "partly_met") return "partial";
   if (text === "unmet" || text === "fail" || text === "failed" || text === "missing") return "unmet";
@@ -2709,38 +3146,38 @@ function normalizeStoredCandidateQualitySignal(value) {
   const issues = Array.isArray(source.issues)
     ? source.issues.map((issue) => {
         const item = issue && typeof issue === "object" && !Array.isArray(issue) ? issue : {};
-        const code = readString$1C(item.code);
+        const code = readString(item.code);
         if (!code) return null;
         return {
           code,
-          message: readString$1C(item.message) || code,
-          severity: readString$1C(item.severity) === "advisory" ? "advisory" : "blocking",
-          path: readString$1C(item.path) || null,
-          requirementId: readString$1C(item.requirementId) || null,
-          status: readString$1C(item.status) || null,
-          url: readString$1C(item.url) || null
+          message: readString(item.message) || code,
+          severity: readString(item.severity) === "advisory" ? "advisory" : "blocking",
+          path: readString(item.path) || null,
+          requirementId: readString(item.requirementId) || null,
+          status: readString(item.status) || null,
+          url: readString(item.url) || null
         };
       }).filter(Boolean).slice(0, 24)
     : [];
   const blockingIssueCodes = Array.isArray(source.blockingIssueCodes)
-    ? source.blockingIssueCodes.map(readString$1C).filter(Boolean).slice(0, 24)
+    ? source.blockingIssueCodes.map(readString).filter(Boolean).slice(0, 24)
     : issues.filter((issue) => issue.severity === "blocking").map((issue) => issue.code);
   return {
     advisoryIssueCodes: Array.isArray(source.advisoryIssueCodes)
-      ? source.advisoryIssueCodes.map(readString$1C).filter(Boolean).slice(0, 24)
+      ? source.advisoryIssueCodes.map(readString).filter(Boolean).slice(0, 24)
       : issues.filter((issue) => issue.severity !== "blocking").map((issue) => issue.code),
     blockingIssueCodes,
     hasBlockingIssues: blockingIssueCodes.length > 0,
     issueCodes: Array.isArray(source.issueCodes)
-      ? source.issueCodes.map(readString$1C).filter(Boolean).slice(0, 24)
+      ? source.issueCodes.map(readString).filter(Boolean).slice(0, 24)
       : issues.map((issue) => issue.code),
     issues,
     kind: "candidate_quality_signal",
     ok: source.ok === true && blockingIssueCodes.length === 0,
-    path: readString$1C(source.path) || null,
+    path: readString(source.path) || null,
     requirementsChecklist: normalizeCandidateRequirementsChecklist(source.requirementsChecklist),
     reviewRequired: source.reviewRequired === true,
-    status: readString$1C(source.status) || (blockingIssueCodes.length > 0 ? "blocked" : "pass"),
+    status: readString(source.status) || (blockingIssueCodes.length > 0 ? "blocked" : "pass"),
     version: 1
   };
 }
@@ -2749,40 +3186,82 @@ function normalizeWorkspaceCandidateStructure(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return inspectWorkspaceCandidateStructure("");
   return {
-    duplicateHeadingCount: readPositiveInteger$j(source.duplicateHeadingCount) || 0,
-    duplicateNumberCount: readPositiveInteger$j(source.duplicateNumberCount) || 0,
-    headingCount: readPositiveInteger$j(source.headingCount) || 0,
+    bodyAfterFinalSectionContexts: normalizeSimpleStructureContexts(source.bodyAfterFinalSectionContexts),
+    duplicateHeadingCount: readPositiveInteger$o(source.duplicateHeadingCount) || 0,
+    duplicateNumberCount: readPositiveInteger$o(source.duplicateNumberCount) || 0,
+    headingCount: readPositiveInteger$o(source.headingCount) || 0,
     issueCodes: Array.isArray(source.issueCodes)
-      ? source.issueCodes.map(readString$1C).filter(Boolean).slice(0, 12)
+      ? source.issueCodes.map(readString).filter(Boolean).slice(0, 12)
       : [],
     ok: source.ok === true,
-    reason: readString$1C(source.reason) || "n/a",
+    reason: readString(source.reason) || "n/a",
     repeatedHeadingContexts: normalizeStructureContexts$1(source.repeatedHeadingContexts, "heading"),
     repeatedHeadingSamples: normalizeRepeatedHeadingSamples(source.repeatedHeadingSamples),
     repeatedNumberContexts: normalizeStructureContexts$1(source.repeatedNumberContexts, "number"),
     repeatedNumberSamples: normalizeRepeatedNumberSamples(source.repeatedNumberSamples),
+    semanticDuplicateHeadingContexts: normalizeSemanticDuplicateHeadingContexts$3(source.semanticDuplicateHeadingContexts),
     sectionNumberRepairHints: normalizeSectionNumberRepairHints$1(source.sectionNumberRepairHints),
     sectionSequenceRepairHints: normalizeSectionNumberRepairHints$1(source.sectionSequenceRepairHints),
-    status: readString$1C(source.status) || "unknown",
-    title: truncate$2(readString$1C(source.title), 200)
+    status: readString(source.status) || "unknown",
+    title: truncate$3(readString(source.title), 200)
   };
+}
+
+function normalizeSemanticDuplicateHeadingContexts$3(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((entry) => {
+      const source = entry && typeof entry === "object" ? entry : null;
+      const first = source && source.first && typeof source.first === "object" ? source.first : null;
+      const second = source && source.second && typeof source.second === "object" ? source.second : null;
+      const firstRaw = readString(first && first.raw);
+      const secondRaw = readString(second && second.raw);
+      if (!firstRaw || !secondRaw) return null;
+      return {
+        first: {
+          lineNumber: readPositiveInteger$o(first && first.lineNumber) || 0,
+          raw: truncate$3(firstRaw, 160)
+        },
+        relation: readString(source && source.relation) || "similar",
+        second: {
+          lineNumber: readPositiveInteger$o(second && second.lineNumber) || 0,
+          raw: truncate$3(secondRaw, 160)
+        }
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeSimpleStructureContexts(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((entry) => {
+      const source = entry && typeof entry === "object" ? entry : null;
+      const raw = readString(source && source.raw);
+      if (!raw) return null;
+      return {
+        lineNumber: readPositiveInteger$o(source && source.lineNumber) || 0,
+        raw: truncate$3(raw, 160)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
 }
 
 function normalizeSectionNumberRepairHints$1(value) {
   return (Array.isArray(value) ? value : [])
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
-      const lineNumber = readPositiveInteger$j(entry.lineNumber);
-      const candidateNumber = readString$1C(entry.candidateNumber || entry.suggestedNumber);
-      const currentNumber = readString$1C(entry.currentNumber);
-      const raw = readString$1C(entry.raw);
+      const lineNumber = readPositiveInteger$o(entry.lineNumber);
+      const candidateNumber = readString(entry.candidateNumber || entry.suggestedNumber);
+      const currentNumber = readString(entry.currentNumber);
+      const raw = readString(entry.raw);
       if (lineNumber == null || !candidateNumber || !currentNumber || !raw) return null;
       return {
         candidateNumber,
         currentNumber,
-        level: readPositiveInteger$j(entry.level) || 0,
+        level: readPositiveInteger$o(entry.level) || 0,
         lineNumber,
-        raw: truncate$2(raw, 160)
+        raw: truncate$3(raw, 160)
       };
     })
     .filter(Boolean)
@@ -2793,11 +3272,11 @@ function normalizeRepeatedHeadingSamples(value) {
   return (Array.isArray(value) ? value : [])
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
-      const heading = readString$1C(entry.heading);
+      const heading = readString(entry.heading);
       if (!heading) return null;
       return {
-        count: readPositiveInteger$j(entry.count) || 1,
-        heading: truncate$2(heading, 120)
+        count: readPositiveInteger$o(entry.count) || 1,
+        heading: truncate$3(heading, 120)
       };
     })
     .filter(Boolean)
@@ -2808,10 +3287,10 @@ function normalizeRepeatedNumberSamples(value) {
   return (Array.isArray(value) ? value : [])
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
-      const number = readString$1C(entry.number);
+      const number = readString(entry.number);
       if (!number) return null;
       return {
-        count: readPositiveInteger$j(entry.count) || 1,
+        count: readPositiveInteger$o(entry.count) || 1,
         number
       };
     })
@@ -2823,24 +3302,24 @@ function normalizeStructureContexts$1(value, key) {
   return (Array.isArray(value) ? value : [])
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
-      const label = readString$1C(entry[key]);
+      const label = readString(entry[key]);
       if (!label) return null;
       const occurrences = (Array.isArray(entry.occurrences) ? entry.occurrences : [])
         .map((occurrence) => {
           if (!occurrence || typeof occurrence !== "object") return null;
-          const lineNumber = readPositiveInteger$j(occurrence.lineNumber);
-          const raw = readString$1C(occurrence.raw);
+          const lineNumber = readPositiveInteger$o(occurrence.lineNumber);
+          const raw = readString(occurrence.raw);
           if (lineNumber == null || !raw) return null;
           return {
             lineNumber,
-            raw: truncate$2(raw, 160)
+            raw: truncate$3(raw, 160)
           };
         })
         .filter(Boolean)
         .slice(0, 8);
       return {
-        count: readPositiveInteger$j(entry.count) || occurrences.length || 1,
-        [key]: key === "number" ? label : truncate$2(label, 120),
+        count: readPositiveInteger$o(entry.count) || occurrences.length || 1,
+        [key]: key === "number" ? label : truncate$3(label, 120),
         occurrences
       };
     })
@@ -2853,13 +3332,13 @@ function hasVirtualWorkspace(workspace) {
   if (!source || source.enabled !== true) return false;
   if (Array.isArray(source.operations) && source.operations.length > 0) return true;
   return Object.values(source.files || {}).some((file) => (
-    file && typeof file === "object" && readString$1C(file.content)
+    file && typeof file === "object" && readString(file.content)
   ));
 }
 
-function truncate$2(value, maxChars) {
-  const text = readString$1C(value);
-  const limit = readPositiveInteger$j(maxChars) || DEFAULT_MAX_FILE_CHARS$1;
+function truncate$3(value, maxChars) {
+  const text = readString(value);
+  const limit = readPositiveInteger$o(maxChars) || DEFAULT_MAX_FILE_CHARS$1;
   return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 3))}...`;
 }
 
@@ -2868,20 +3347,74 @@ function readWorkspaceAppendSeparator(value) {
   return value.length > 0 ? value : "\n\n";
 }
 
+// AGRUN-547 — strip EVERY heading in insert content that duplicates the target
+// section or an existing heading, turning a duplicate-creating "expand a section"
+// insert into a clean in-section append. A weak model repeats the section heading
+// not only on the first line but also after a lead-in sentence or several times
+// over, so we scan the whole addition, not just the leading line. Only the
+// DUPLICATE heading lines (and one trailing blank each) are dropped; all body
+// text and any genuinely NEW section heading are preserved. Never returns empty
+// (falls back to the original content if stripping would erase everything).
+function stripDuplicateHeadingsForInsert(addition, normalizedTargetHeading, currentLines) {
+  const lines = readString(addition).split(/\r?\n/);
+  const existingHeadings = new Set([normalizedTargetHeading]);
+  for (let index = 0; index < currentLines.length; index += 1) {
+    if (readInsertableSectionLevel(currentLines, index) != null) {
+      const normalized = normalizeInsertableSectionText(currentLines[index]);
+      if (normalized) existingHeadings.add(normalized);
+    }
+  }
+  const out = [];
+  let removed = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (readInsertableSectionLevel(lines, index) != null) {
+      const normalized = normalizeInsertableSectionText(lines[index]);
+      if (normalized && existingHeadings.has(normalized)) {
+        removed = true;
+        if (index + 1 < lines.length && lines[index + 1].trim() === "") index += 1;
+        continue;
+      }
+      if (normalized) existingHeadings.add(normalized);
+    }
+    out.push(lines[index]);
+  }
+  if (!removed) return addition;
+  const result = out.join("\n").replace(/^\n+/, "");
+  return result.trim() ? result : addition;
+}
+
 function insertAfterMarkdownSection(text, targetHeading, addition, options = {}) {
-  const current = readString$1C(text);
-  const insertText = readString$1C(addition);
+  const current = readString(text);
+  let insertText = readString(addition);
   if (!current || !insertText) {
-    return { changed: false, content: current, availableHeadings: collectMarkdownHeadings(current) };
+    return { changed: false, content: current, availableHeadings: collectMarkdownHeadings(current), status: "heading_not_found" };
   }
   const lines = current.split(/\r?\n/);
-  const headingIndex = lines.findIndex((line, index) => (
-    readInsertableSectionLevel(lines, index) != null &&
-    normalizeInsertableSectionText(line) === targetHeading
-  ));
-  if (headingIndex === -1) {
-    return { changed: false, content: current, availableHeadings: collectMarkdownHeadings(current) };
+  const availableHeadings = collectMarkdownHeadings(current);
+  const headingMatches = availableHeadings.filter((heading) => heading && heading.text === targetHeading);
+  if (headingMatches.length > 1) {
+    return {
+      changed: false,
+      content: current,
+      availableHeadings,
+      matchCount: headingMatches.length,
+      message: `Heading "${targetHeading}" is ambiguous; ${headingMatches.length} matching sections exist.`,
+      status: "ambiguous"
+    };
   }
+  if (headingMatches.length === 0) {
+    return { changed: false, content: current, availableHeadings, status: "heading_not_found" };
+  }
+  const headingIndex = headingMatches[0].lineNumber - 1;
+  // AGRUN-547 — a weak model "expands a section" by passing content that repeats
+  // the section's own heading. insert_after_section already located section X, so
+  // a leading "## X" in the body only manufactures a duplicate heading and traps
+  // the model in an endless insert->duplicate->merge loop (gemini-3.1-flash-lite
+  // live, 2026-06-18). Treat a leading heading that duplicates the target section
+  // OR any existing heading as an in-section append: strip that heading line and
+  // keep the body. A genuinely NEW section heading (not already in the document)
+  // is preserved, so legitimate new-section inserts are unaffected.
+  insertText = stripDuplicateHeadingsForInsert(insertText, targetHeading, lines);
   const headingLevel = readInsertableSectionLevel(lines, headingIndex);
   let insertIndex = lines.length;
   for (let index = headingIndex + 1; index < lines.length; index += 1) {
@@ -2901,12 +3434,12 @@ function insertAfterMarkdownSection(text, targetHeading, addition, options = {})
 }
 
 function readHeadingLevel(value) {
-  const match = readString$1C(value).match(/^(#{1,6})\s+\S/);
+  const match = readString(value).match(/^(#{1,6})\s+\S/);
   return match ? match[1].length : null;
 }
 
 function readInsertableSectionLevel(lines, index) {
-  const line = readString$1C(Array.isArray(lines) ? lines[index] : "");
+  const line = readString(Array.isArray(lines) ? lines[index] : "");
   if (!line) return null;
   const markdownLevel = readHeadingLevel(line);
   if (markdownLevel != null) return markdownLevel;
@@ -2915,7 +3448,7 @@ function readInsertableSectionLevel(lines, index) {
 }
 
 function isStandaloneSectionLine(lines, index) {
-  const line = readString$1C(Array.isArray(lines) ? lines[index] : "");
+  const line = readString(Array.isArray(lines) ? lines[index] : "");
   if (!line || line.length > 120) return false;
   if (/^(?:[-*+]|\d+[.)])\s+/.test(line)) return false;
   if (/^https?:\/\//i.test(line)) return false;
@@ -2924,14 +3457,14 @@ function isStandaloneSectionLine(lines, index) {
   if (!normalized) return false;
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
   if (wordCount > 10) return false;
-  const previous = index > 0 ? readString$1C(lines[index - 1]) : "";
-  const next = index < lines.length - 1 ? readString$1C(lines[index + 1]) : "";
+  const previous = index > 0 ? readString(lines[index - 1]) : "";
+  const next = index < lines.length - 1 ? readString(lines[index + 1]) : "";
   return (!previous || readHeadingLevel(lines[index - 1]) != null)
     && (!next || readHeadingLevel(lines[index + 1]) == null);
 }
 
-function normalizeHeadingText(value) {
-  return readString$1C(value)
+function normalizeHeadingText$1(value) {
+  return readString(value)
     .replace(/^#{1,6}\s+/, "")
     .replace(/\s+#+\s*$/, "")
     .toLowerCase()
@@ -2942,7 +3475,7 @@ function normalizeHeadingText(value) {
 }
 
 function normalizeHeadingLabelText(value) {
-  return normalizeHeadingText(value)
+  return normalizeHeadingText$1(value)
     .replace(/^\d{1,3}(?:\.\d{1,3})*\.?\s+/, "")
     .trim();
 }
@@ -2967,7 +3500,7 @@ function inspectWorkspacePublishProtocol(workspace, path) {
   // Read-only inspector — invalid path returns a neutral protocol view
   // so the planner block stays observable without throwing. Callers that
   // care about validity (publish action) check filePath themselves.
-  const resolvedPath = readString$1C(path) || "final_candidate.md";
+  const resolvedPath = readString(path) || DEFAULT_FINAL_CANDIDATE_PATH;
   const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
   const filePath = pathValidation.ok ? pathValidation.path : resolvedPath;
   const source = normalizeVirtualWorkspace(workspace);
@@ -2978,13 +3511,19 @@ function inspectWorkspacePublishProtocol(workspace, path) {
   let latestReviewIndex = -1;
   operations.forEach((operation, index) => {
     if (!operation || operation.path !== filePath) return;
+    const status = readString(operation.status);
+    const contentChanged = !status || status === "ok";
     if (
-      operation.action === "apply_patch" ||
-      operation.action === "write" ||
-      operation.action === "replace" ||
-      operation.action === "append" ||
-      operation.action === "insert_after_section" ||
-      operation.action === "promote"
+      contentChanged &&
+      (
+        operation.action === "apply_patch" ||
+        operation.action === "write" ||
+        operation.action === "replace" ||
+        operation.action === "append" ||
+        operation.action === "insert_after_section" ||
+        operation.action === "promote" ||
+        operation.action === "auto_normalize_headings"
+      )
     ) {
       latestWriteIndex = index;
     }
@@ -3012,17 +3551,64 @@ function inspectWorkspacePublishProtocol(workspace, path) {
   };
 }
 
+function inspectWorkspaceCandidateReviewFreshness(workspace, path) {
+  const resolvedPath = readString(path) || DEFAULT_FINAL_CANDIDATE_PATH;
+  const pathValidation = validateWorkspacePathRecoverable(resolvedPath);
+  const filePath = pathValidation.ok ? pathValidation.path : resolvedPath;
+  const source = normalizeVirtualWorkspace(workspace);
+  const quality = source && source.quality && typeof source.quality === "object"
+    ? source.quality
+    : {};
+  const file = source && source.files && source.files[filePath] && typeof source.files[filePath] === "object"
+    ? source.files[filePath]
+    : null;
+  const review = quality.candidateReview && typeof quality.candidateReview === "object"
+    ? quality.candidateReview
+    : null;
+  const fileVersion = readPositiveInteger$o(file && file.version) || 0;
+  const reviewedFileVersion = readPositiveInteger$o(review && review.fileVersion) || 0;
+  const protocol = inspectWorkspacePublishProtocol(source, filePath);
+  const reviewPathMatches = Boolean(review && readString(review.path) === filePath);
+  const versionMatches = Boolean(reviewPathMatches && reviewedFileVersion === fileVersion && fileVersion > 0);
+  const protocolFresh = Boolean(
+    protocol.reviewAfterLatestContentChange === true &&
+    protocol.reviewAfterRead === true
+  );
+  const fresh = Boolean(versionMatches && protocolFresh);
+  let reason = "review_missing";
+  if (fresh) {
+    reason = "fresh_review_exists";
+  } else if (review && !reviewPathMatches) {
+    reason = "review_path_mismatch";
+  } else if (reviewPathMatches && !versionMatches) {
+    reason = "review_version_stale";
+  } else if (reviewPathMatches && !protocolFresh) {
+    reason = "review_protocol_stale";
+  }
+  return {
+    fileVersion,
+    fresh,
+    kind: "workspace_candidate_review_freshness",
+    path: filePath,
+    protocol,
+    reason,
+    reviewedAt: readString(review && review.reviewedAt) || null,
+    reviewedFileVersion,
+    status: fresh ? "fresh" : "stale"
+  };
+}
+
 function readFinalCandidateStatus(source, finalCandidatePath, quality) {
   const file = source && source.files ? source.files[finalCandidatePath] : null;
   if (!file) return "missing";
-  const content = readString$1C(file && file.content);
+  const content = readString(file && file.content);
   if (!content) return "empty";
   if (quality && quality.finalCandidateReady === true) return "ready";
   return "drafted";
 }
 
 function summarizeTextStats$2(value) {
-  const text = readString$1C(value);
+  const text = readString(value);
   const latinWords = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
   const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
   return {
@@ -3036,10 +3622,10 @@ function summarizeTextStats$2(value) {
 function normalizeTextStats$3(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
-    chars: readPositiveInteger$j(source.chars) || 0,
-    cjkChars: readPositiveInteger$j(source.cjkChars) || 0,
-    nonWhitespaceChars: readPositiveInteger$j(source.nonWhitespaceChars) || 0,
-    words: readPositiveInteger$j(source.words) || 0
+    chars: readPositiveInteger$o(source.chars) || 0,
+    cjkChars: readPositiveInteger$o(source.cjkChars) || 0,
+    nonWhitespaceChars: readPositiveInteger$o(source.nonWhitespaceChars) || 0,
+    words: readPositiveInteger$o(source.words) || 0
   };
 }
 
@@ -3056,18 +3642,14 @@ function formatPublishBlockStatusCounts(value) {
   return entries.length > 0 ? `{${entries.join(",")}}` : "{}";
 }
 
-function readString$1C(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readStringArray$7(value) {
+function readStringArray$5(value) {
   return Array.isArray(value)
-    ? value.map(readString$1C).filter(Boolean)
+    ? value.map(readString).filter(Boolean)
     : [];
 }
 
-function readPositiveInteger$j(value) {
+function readPositiveInteger$o(value) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
-export { acquireWorkspaceMutex, applyWorkspacePatch, buildVirtualWorkspacePromptBlock, createEmptyVirtualWorkspace, createVirtualWorkspace, ensureVirtualWorkspace, finalizeWorkspaceCandidate, insertAfterWorkspaceSection, inspectWorkspaceCandidateStructure, inspectWorkspacePublishProtocol, listWorkspaceFiles, moveWorkspaceFile, normalizeVirtualWorkspace, normalizeVirtualWorkspaceConfig, projectWorkspaceCandidateLifecycle, proposeWorkspacePatch, publishWorkspaceEvent, readWorkspaceFile, readWorkspaceFinalCandidate, recordWorkspaceCandidateReview, recordWorkspacePublishCandidateLifecycle, recordWorkspaceRead, removeWorkspaceFile, replaceWorkspaceFile, shouldEnableVirtualWorkspace, stripInternalVirtualWorkspaceSections, validateWorkspacePath, validateWorkspacePathRecoverable, writeWorkspaceFile };
+export { acquireWorkspaceMutex, applyWorkspacePatch, buildVirtualWorkspacePromptBlock, buildWorkspaceStructureEcho, createEmptyVirtualWorkspace, createVirtualWorkspace, ensureVirtualWorkspace, finalizeWorkspaceCandidate, insertAfterWorkspaceSection, inspectWorkspaceCandidateReviewFreshness, inspectWorkspaceCandidateStructure, inspectWorkspacePublishProtocol, listWorkspaceFiles, moveWorkspaceFile, normalizeVirtualWorkspace, normalizeVirtualWorkspaceConfig, projectWorkspaceCandidateLifecycle, proposeWorkspacePatch, publishWorkspaceEvent, readWorkspaceFile, readWorkspaceFinalCandidate, recordWorkspaceCandidateReview, recordWorkspacePublishCandidateLifecycle, recordWorkspaceRead, removeWorkspaceFile, replaceWorkspaceFile, shouldEnableVirtualWorkspace, stripInternalVirtualWorkspaceSections, validateWorkspacePath, validateWorkspacePathRecoverable, writeWorkspaceFile };

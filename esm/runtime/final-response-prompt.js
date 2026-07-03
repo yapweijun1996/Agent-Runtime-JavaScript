@@ -3,9 +3,10 @@ import { analyzeCitationTargetCoverage } from './citation-source-coverage.js';
 import { isReadableEvidenceSource } from './read-source-quality.js';
 import { buildVirtualWorkspacePromptBlock } from './virtual-workspace.js';
 import { readVerificationState } from './web-search-verification.js';
+import { readString } from './semantic-json.js';
 
 function buildFinalResponsePrompt(originalPrompt, instruction, researchContext, sessionContext, toolContext, failedTools, budgetOverrides, options = {}) {
-  const normalizedInstruction = readString$p(instruction);
+  const normalizedInstruction = readString(instruction);
   const context = researchContext && typeof researchContext === "object" ? researchContext : {};
   const normalizedSearchResults = Array.isArray(context.searchResults) ? context.searchResults : [];
   const normalizedReadSources = Array.isArray(context.readSources) ? context.readSources : [];
@@ -91,9 +92,9 @@ function buildFinalResponsePrompt(originalPrompt, instruction, researchContext, 
     normalizedSearchResults.length > 0 ? "" : null,
     normalizedSearchResults.length > 0 ? "Search results:" : null,
     normalizedSearchResults.map((item, index) => {
-      const title = readString$p(item && item.title) || `Result ${index + 1}`;
-      const url = readString$p(item && item.url);
-      const snippet = readString$p(item && item.snippet) || readString$p(item && item.content);
+      const title = readString(item && item.title) || `Result ${index + 1}`;
+      const url = readString(item && item.url);
+      const snippet = readString(item && item.snippet) || readString(item && item.content);
 
       return [title, url, snippet].filter(Boolean).join("\n");
     }).join("\n\n"),
@@ -110,11 +111,11 @@ function buildResearchStateBlock(value) {
     ? state.sourceQuality
     : {};
   const gaps = Array.isArray(state.gaps)
-    ? state.gaps.map(readString$p).filter(Boolean)
+    ? state.gaps.map(readString).filter(Boolean)
     : [];
   return [
     "Research quality state:",
-    `phase=${readString$p(state.phase) || "n/a"} final_allowed=${state.finalAllowed === true ? "yes" : "no"} final_reason=${readString$p(state.finalReason) || "n/a"}`,
+    `phase=${readString(state.phase) || "n/a"} final_allowed=${state.finalAllowed === true ? "yes" : "no"} final_reason=${readString(state.finalReason) || "n/a"}`,
     `sources strong=${readNumber$2(sourceQuality.strong)} medium=${readNumber$2(sourceQuality.medium)} weak=${readNumber$2(sourceQuality.weak)} thin=${readNumber$2(sourceQuality.thin)} rejected=${readNumber$2(sourceQuality.rejected)}`,
     gaps.length > 0 ? `evidence_gaps=${gaps.join(",")}` : "evidence_gaps=none",
     state.finalAllowed === true
@@ -131,36 +132,36 @@ function buildResearchEvidenceGateBlock(graphValue, envelopeValue, loopValue) {
   const claimGraph = Array.isArray(graph.claimGraph) ? graph.claimGraph : [];
   const sourceArtifacts = Array.isArray(graph.sourceArtifacts) ? graph.sourceArtifacts : [];
   const includedClaimIds = Array.isArray(envelope.includedClaimIds)
-      ? envelope.includedClaimIds.map(readString$p).filter(Boolean)
+      ? envelope.includedClaimIds.map(readString).filter(Boolean)
     : claimGraph
       .filter((claim) => claim && claim.decision === "include")
-      .map((claim) => readString$p(claim.claimId || claim.id))
+      .map((claim) => readString(claim.claimId || claim.id))
       .filter(Boolean);
   const finalSourceIds = Array.isArray(envelope.finalSourceIds)
-    ? envelope.finalSourceIds.map(readString$p).filter(Boolean)
+    ? envelope.finalSourceIds.map(readString).filter(Boolean)
     : [];
   const finalSourceSet = new Set(finalSourceIds);
   const includedSourceUrls = sourceArtifacts
-    .filter((source) => finalSourceSet.has(readString$p(source && source.id)))
-    .map((source) => `${readString$p(source.id)}=${readString$p(source.title) || readString$p(source.url)} ${readString$p(source.url)}`.trim())
+    .filter((source) => finalSourceSet.has(readString(source && source.id)))
+    .map((source) => `${readString(source.id)}=${readString(source.title) || readString(source.url)} ${readString(source.url)}`.trim())
     .filter(Boolean)
     .slice(0, 8);
   const includedClaimSet = new Set(includedClaimIds);
   const includedClaims = claimGraph
-    .filter((claim) => includedClaimSet.has(readString$p(claim && (claim.claimId || claim.id))))
+    .filter((claim) => includedClaimSet.has(readString(claim && (claim.claimId || claim.id))))
     .map((claim) => {
       const ids = readClaimSourceIds(claim).join(",");
-      const claimId = readString$p(claim.claimId || claim.id);
-      return `${claimId} [${ids || "no_source"}] ${readString$p(claim.claim || claim.text)}`.trim();
+      const claimId = readString(claim.claimId || claim.id);
+      return `${claimId} [${ids || "no_source"}] ${readString(claim.claim || claim.text)}`.trim();
     })
     .filter(Boolean)
     .slice(0, 12);
   const gaps = Array.isArray(envelope.evidenceGaps)
-    ? envelope.evidenceGaps.map(readString$p).filter(Boolean)
+    ? envelope.evidenceGaps.map(readString).filter(Boolean)
     : Array.isArray(graph.evidenceGaps)
-      ? graph.evidenceGaps.map(readString$p).filter(Boolean)
+      ? graph.evidenceGaps.map(readString).filter(Boolean)
       : [];
-  const finalMode = readString$p(envelope.finalMode) || readString$p(loop.finalMode) || "final_with_limitations";
+  const finalMode = readString(envelope.finalMode) || readString(loop.finalMode) || "final_with_limitations";
 
   if (includedClaims.length === 0 && finalSourceIds.length === 0 && gaps.length === 0) return "";
 
@@ -185,13 +186,13 @@ function readClaimSourceIds(claim) {
   const collect = (list) => {
     if (!Array.isArray(list)) return;
     for (const item of list) {
-      const value = readString$p(item);
+      const value = readString(item);
       if (value && !values.includes(value)) values.push(value);
     }
   };
   collect(claim && claim.supportingSourceIds);
   collect(claim && claim.sourceIds);
-  const single = readString$p(claim && claim.sourceId);
+  const single = readString(claim && claim.sourceId);
   if (single && !values.includes(single)) values.push(single);
   return values;
 }
@@ -204,31 +205,31 @@ function buildResearchWorkspaceBlock(value) {
   const finalReadiness = workspace.finalReadiness && typeof workspace.finalReadiness === "object" ? workspace.finalReadiness : {};
   const sourceNotes = Array.isArray(workspace.sourceNotes) ? workspace.sourceNotes : [];
   const questions = Array.isArray(plan.questions)
-    ? plan.questions.map(readString$p).filter(Boolean).slice(0, 6)
+    ? plan.questions.map(readString).filter(Boolean).slice(0, 6)
     : [];
   const gaps = Array.isArray(finalReadiness.remainingGaps)
-    ? finalReadiness.remainingGaps.map(readString$p).filter(Boolean).slice(0, 8)
+    ? finalReadiness.remainingGaps.map(readString).filter(Boolean).slice(0, 8)
     : [];
   const sources = sourceNotes
     .map((source) => {
-      const title = readString$p(source && source.title) || readString$p(source && source.url);
-      const quality = readString$p(source && source.quality) || "unknown";
+      const title = readString(source && source.title) || readString(source && source.url);
+      const quality = readString(source && source.quality) || "unknown";
       return title ? `${title} (${quality})` : "";
     })
     .filter(Boolean)
     .slice(0, 8);
 
-  if (!readString$p(brief.topic) && questions.length === 0 && sources.length === 0 && gaps.length === 0) {
+  if (!readString(brief.topic) && questions.length === 0 && sources.length === 0 && gaps.length === 0) {
     return "";
   }
 
   return [
     "Research workspace:",
-    readString$p(brief.topic) ? `topic=${readString$p(brief.topic)}` : null,
+    readString(brief.topic) ? `topic=${readString(brief.topic)}` : null,
     questions.length > 0 ? `plan_questions=${questions.join(" | ")}` : null,
     sources.length > 0 ? `source_notes=${sources.join(" | ")}` : null,
     gaps.length > 0 ? `remaining_gaps=${gaps.join(",")}` : "remaining_gaps=none",
-    `final_readiness=${finalReadiness.allowed === true ? "ready" : "not_ready"} reason=${readString$p(finalReadiness.reason) || "n/a"}`,
+    `final_readiness=${finalReadiness.allowed === true ? "ready" : "not_ready"} reason=${readString(finalReadiness.reason) || "n/a"}`,
     [
       "Use this workspace as draft context only.",
       "Write only the final user-facing report.",
@@ -263,7 +264,7 @@ function buildFinalResponseSystemPrompt(systemPrompt) {
 }
 
 function ensureVisibleFinalReadinessDecisionLine(text, originalPrompt, finalReadiness) {
-  const normalized = readString$p(text);
+  const normalized = readString(text);
   const decision = readVisibleFinalReadinessDecision(finalReadiness, originalPrompt);
   if (decision !== "ready" && decision !== "limited") {
     return normalized;
@@ -303,12 +304,12 @@ function buildVisibleFinalReadinessLine(originalPrompt, finalReadiness) {
 }
 
 function readVisibleFinalReadinessDecision(finalReadiness, promptIntent) {
-  const structured = readString$p(finalReadiness && finalReadiness.decision);
+  const structured = readString(finalReadiness && finalReadiness.decision);
   if (structured === "ready" || structured === "limited") {
     return structured;
   }
 
-  const text = readString$p(promptIntent);
+  const text = readString(promptIntent);
   const explicitField = text.match(/finalReadiness\.decision\s*(?::|=|\bas\b|\bto\b)\s*(ready|limited)\b/i);
   if (explicitField) {
     return explicitField[1].toLowerCase();
@@ -324,17 +325,13 @@ function readVisibleFinalReadinessDecision(finalReadiness, promptIntent) {
 }
 
 function userRequestedVisibleFinalReadinessDecision(value) {
-  return /finalReadiness\.decision|final\s*readiness\s*decision/i.test(readString$p(value));
+  return /finalReadiness\.decision|final\s*readiness\s*decision/i.test(readString(value));
 }
 
 function hasExplicitVisibleReadinessDecision(value) {
-  const text = readString$p(value);
+  const text = readString(value);
   return /\bdecision\s*(?::|=|\bis\b|\bas\b|\bto\b)?\s*(ready|limited)\b/i.test(text) ||
     /\b(ready|limited)\s+decision\b/i.test(text);
-}
-
-function readString$p(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function buildSkillToolBlock(toolContext, budgetOverrides) {
@@ -364,11 +361,11 @@ function buildSkillToolBlock(toolContext, budgetOverrides) {
 }
 
 function buildReadSourcePromptBlock(item, index) {
-  const title = readString$p(item && item.url) || `Read source ${index + 1}`;
+  const title = readString(item && item.url) || `Read source ${index + 1}`;
   const status = typeof item.status === "number" ? String(item.status) : "n/a";
-  const contentType = readString$p(item && item.contentType) || "unknown";
-  const mode = readString$p(item && item.mode) || "auto";
-  const text = serializePromptValue$1(readString$p(item && item.text), 1800);
+  const contentType = readString(item && item.contentType) || "unknown";
+  const mode = readString(item && item.mode) || "auto";
+  const text = serializePromptValue$1(readString(item && item.text), 1800);
   const visualEvidence = hasReadSourceScreenshot(item) ? "yes" : "no";
   const textRange = formatReadSourceTextRange(item && item.textRange);
 
@@ -376,7 +373,7 @@ function buildReadSourcePromptBlock(item, index) {
     title,
     `status=${status} content_type=${contentType} mode=${mode} truncated=${item && item.truncated === true ? "yes" : "no"} screenshot=${visualEvidence}`,
     textRange ? `text_range=${textRange}` : null,
-    readString$p(item && item.title) ? `page_title=${readString$p(item.title)}` : null,
+    readString(item && item.title) ? `page_title=${readString(item.title)}` : null,
     text
   ].filter(Boolean).join("\n");
 }
@@ -407,10 +404,10 @@ function readRangeNumber(value) {
 function buildCitationCoverageBlock(coverage) {
   if (!coverage || coverage.required !== true) return "";
   const missing = Array.isArray(coverage.missingTargets)
-    ? coverage.missingTargets.map((target) => readString$p(target && target.label)).filter(Boolean)
+    ? coverage.missingTargets.map((target) => readString(target && target.label)).filter(Boolean)
     : [];
   const covered = Array.isArray(coverage.coveredTargets)
-    ? coverage.coveredTargets.map((target) => readString$p(target && target.label)).filter(Boolean)
+    ? coverage.coveredTargets.map((target) => readString(target && target.label)).filter(Boolean)
     : [];
   if (missing.length === 0) {
     return covered.length > 0
@@ -445,8 +442,8 @@ function buildFinalResponseParts(researchContext, currentParts) {
       continue;
     }
 
-    const screenshotDataUrl = readString$p(source.screenshotDataUrl);
-    const screenshotMimeType = readString$p(source.screenshotMimeType) || "image/jpeg";
+    const screenshotDataUrl = readString(source.screenshotDataUrl);
+    const screenshotMimeType = readString(source.screenshotMimeType) || "image/jpeg";
     if (!screenshotDataUrl) {
       continue;
     }
@@ -472,15 +469,15 @@ function buildFinalResponseParts(researchContext, currentParts) {
 }
 
 function buildReadSourceScreenshotCaption(source) {
-  const url = readString$p(source && source.url) || "read source";
-  const title = readString$p(source && source.title);
+  const url = readString(source && source.url) || "read source";
+  const title = readString(source && source.title);
   return title
     ? `Screenshot evidence for ${url}. Page title: ${title}.`
     : `Screenshot evidence for ${url}.`;
 }
 
 function createScreenshotFilename(source) {
-  const title = readString$p(source && source.title);
+  const title = readString(source && source.title);
   if (title) {
     return `${title.slice(0, 48)}.jpg`;
   }
@@ -489,7 +486,7 @@ function createScreenshotFilename(source) {
 }
 
 function hasReadSourceScreenshot(item) {
-  return readString$p(item && item.screenshotDataUrl).startsWith("data:image/");
+  return readString(item && item.screenshotDataUrl).startsWith("data:image/");
 }
 
 function buildFailedToolsBlock(failedTools) {
@@ -497,8 +494,8 @@ function buildFailedToolsBlock(failedTools) {
   if (tools.length === 0) return "";
 
   const lines = tools.map((entry) => {
-    const tool = readString$p(entry.tool) || "unknown";
-    const reason = readString$p(entry.reason) || "unknown error";
+    const tool = readString(entry.tool) || "unknown";
+    const reason = readString(entry.reason) || "unknown error";
     return `- ${tool}: ${reason}`;
   });
 

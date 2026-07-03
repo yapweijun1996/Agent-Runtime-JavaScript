@@ -4,7 +4,7 @@
 // including host-provided corePattern/extendedPattern hooks, are deliberately
 // removed so the runtime cannot reclassify user intent from raw prompt text.
 
-function readString$12(value) {
+function readString$2(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -12,4 +12,4 @@ function isTodoShapedRun(runState) {
   return !!(runState && runState.todoState);
 }
 
-export { isTodoShapedRun, readString$12 as readString };
+export { isTodoShapedRun, readString$2 as readString };

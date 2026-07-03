@@ -1,10 +1,11 @@
 import { cloneValue } from '../runtime/utils.js';
+import { readString } from '../runtime/semantic-json.js';
 
 const MAX_CANDIDATE_SOURCES = 5;
 const RESOLVED_CLARIFICATION_KINDS = new Set(["confirm", "explicit_answer", "option_select"]);
 
 function isResolvedClarificationKind(value) {
-  return RESOLVED_CLARIFICATION_KINDS.has(readString$1X(value));
+  return RESOLVED_CLARIFICATION_KINDS.has(readString(value));
 }
 
 function normalizeCandidateSource(value) {
@@ -12,23 +13,23 @@ function normalizeCandidateSource(value) {
     return null;
   }
 
-  const url = readString$1X(value.url);
+  const url = readString(value.url);
 
   if (!url) {
     return null;
   }
 
   return {
-    domain: readString$1X(value.domain),
-    engine: readString$1X(value.engine),
+    domain: readString(value.domain),
+    engine: readString(value.engine),
     passIndex: typeof value.passIndex === "number" ? value.passIndex : null,
-    query: readString$1X(value.query),
+    query: readString(value.query),
     rank: typeof value.rank === "number" ? value.rank : null,
-    source: readString$1X(value.source),
-    sourceCategory: readString$1X(value.sourceCategory),
+    source: readString(value.source),
+    sourceCategory: readString(value.sourceCategory),
     sourceScore: typeof value.sourceScore === "number" ? value.sourceScore : null,
-    snippet: readString$1X(value.snippet) || readString$1X(value.content),
-    title: readString$1X(value.title),
+    snippet: readString(value.snippet) || readString(value.content),
+    title: readString(value.title),
     url
   };
 }
@@ -38,7 +39,7 @@ function normalizeReadSource(value) {
     return null;
   }
 
-  const url = readString$1X(value.url);
+  const url = readString(value.url);
 
   if (!url) {
     return null;
@@ -46,19 +47,19 @@ function normalizeReadSource(value) {
 
   return {
     bytes: typeof value.bytes === "number" ? value.bytes : 0,
-    contentType: readString$1X(value.contentType),
-    error: readString$1X(value.error),
-    message: readString$1X(value.message),
-    mode: readString$1X(value.mode),
+    contentType: readString(value.contentType),
+    error: readString(value.error),
+    message: readString(value.message),
+    mode: readString(value.mode),
     ok: value.ok !== false,
     originStatus: typeof value.originStatus === "number" ? value.originStatus : null,
-    platform: readString$1X(value.platform),
-    reason: readString$1X(value.reason),
+    platform: readString(value.platform),
+    reason: readString(value.reason),
     status: typeof value.status === "number" ? value.status : null,
-    text: readString$1X(value.text),
+    text: readString(value.text),
     textRange: normalizeTextRange$4(value.textRange),
-    tier: readString$1X(value.tier),
-    title: readString$1X(value.title),
+    tier: readString(value.tier),
+    title: readString(value.title),
     truncated: value.truncated === true,
     url
   };
@@ -85,7 +86,7 @@ function inferSelectedSource(candidateSources, fallback) {
 
 function normalizePendingClarification(value, fallbackQuestion) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    const fallback = readString$1X(fallbackQuestion);
+    const fallback = readString(fallbackQuestion);
 
     if (!fallback) {
       return null;
@@ -101,14 +102,14 @@ function normalizePendingClarification(value, fallbackQuestion) {
     };
   }
 
-  const question = readString$1X(value.question);
+  const question = readString(value.question);
 
   if (!question) {
     return null;
   }
 
   return {
-    id: readString$1X(value.id) || `clarify:${question.toLowerCase()}`,
+    id: readString(value.id) || `clarify:${question.toLowerCase()}`,
     kind: readPendingKind(value.kind) || "clarification",
     options: Array.isArray(value.options)
       ? value.options
@@ -116,8 +117,8 @@ function normalizePendingClarification(value, fallbackQuestion) {
         .filter(Boolean)
       : [],
     question,
-    source: readString$1X(value.source) || "structured",
-    sourceTurn: readString$1X(value.sourceTurn) || "history"
+    source: readString(value.source) || "structured",
+    sourceTurn: readString(value.sourceTurn) || "history"
   };
 }
 
@@ -126,7 +127,7 @@ function normalizeClarificationResolution(value) {
     return null;
   }
 
-  const kind = readString$1X(value.kind);
+  const kind = readString(value.kind);
 
   if (!kind) {
     return null;
@@ -134,7 +135,7 @@ function normalizeClarificationResolution(value) {
 
   return {
     kind,
-    sourceTurn: readString$1X(value.sourceTurn) || null,
+    sourceTurn: readString(value.sourceTurn) || null,
     value: value.value == null ? null : cloneValue(value.value)
   };
 }
@@ -144,8 +145,8 @@ function normalizeOption(value) {
     return null;
   }
 
-  const key = readString$1X(value.key);
-  const text = readString$1X(value.text);
+  const key = readString(value.key);
+  const text = readString(value.text);
 
   if (!key || !text) {
     return null;
@@ -206,7 +207,7 @@ function summarizeReadSourceForDirection(readSource, options) {
 
   let truncated = false;
   const capLong = (value) => {
-    const s = readString$1X(value);
+    const s = readString(value);
     if (!s) return "";
     if (s.length <= snippetBudget) return s;
     truncated = true;
@@ -215,32 +216,28 @@ function summarizeReadSourceForDirection(readSource, options) {
 
   const projected = {
     bytes: typeof readSource.bytes === "number" ? readSource.bytes : 0,
-    contentType: readString$1X(readSource.contentType),
+    contentType: readString(readSource.contentType),
     error: capLong(readSource.error),
     message: capLong(readSource.message),
-    mode: readString$1X(readSource.mode),
+    mode: readString(readSource.mode),
     ok: readSource.ok !== false,
     originStatus: typeof readSource.originStatus === "number" ? readSource.originStatus : null,
-    platform: readString$1X(readSource.platform),
-    reason: readString$1X(readSource.reason),
+    platform: readString(readSource.platform),
+    reason: readString(readSource.reason),
     snippet: capLong(readSource.snippet),
     status: typeof readSource.status === "number" ? readSource.status : null,
     text: capLong(readSource.text),
     textRange: normalizeTextRange$4(readSource.textRange),
-    tier: readString$1X(readSource.tier),
-    title: readString$1X(readSource.title),
+    tier: readString(readSource.tier),
+    title: readString(readSource.title),
     truncated: readSource.truncated === true || truncated,
-    url: readString$1X(readSource.url)
+    url: readString(readSource.url)
   };
 
   if (truncated) {
     projected._truncatedForDirection = true;
   }
   return projected;
-}
-
-function readString$1X(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeTextRange$4(value) {

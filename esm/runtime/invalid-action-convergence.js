@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // ADR-0034 — Invalid-Action Loop Convergence as AI-Visible Observation.
 //
 // Tracks repeated planner-invalid-action / planner-repair-failed cycles
@@ -11,6 +13,7 @@
 // via the planner-prompt observation block. There is NO runtime-side
 // curated subset (no "suggestedNextMoves" hardcoded category list).
 // The AI sees the full set the host actually allows and picks itself.
+
 
 const ESCALATION_THRESHOLD = 4;
 const ACTIVE_THRESHOLD = 2;
@@ -38,7 +41,7 @@ function createInvalidActionConvergenceState() {
 function refreshInvalidActionConvergence(runState, options = {}) {
   if (!runState || typeof runState !== "object") return null;
   const previous = normalizeState(runState.invalidActionConvergence);
-  const event = readString$1v(options.event);
+  const event = readString(options.event);
   const cycle = readNullableNumber$1(runState.cycleCount);
 
   let next;
@@ -115,7 +118,7 @@ function applyInvalidActionConvergenceOnSuccess(runState, pushStep) {
 
 function applyInvalidEvent(previous, options, cycle, event) {
   const actionName = readActionName$2(options.actionName);
-  const reason = readString$1v(options.reason) || null;
+  const reason = readString(options.reason) || null;
   const sameName = actionName && actionName === previous.lastInvalidActionName;
 
   const consecutiveInvalidCount = event === "planner_invalid_action"
@@ -130,8 +133,8 @@ function applyInvalidEvent(previous, options, cycle, event) {
   const active = driver >= ACTIVE_THRESHOLD && Boolean(lastInvalidActionName);
   const escalation = driver >= ESCALATION_THRESHOLD ? "hard_signal" : "advisory";
 
-  const availableActions = readStringArray$5(options.availableActions).slice(0, 24);
-  const availableAgentSkillIds = readStringArray$5(options.availableAgentSkillIds).slice(0, 32);
+  const availableActions = readStringArray$3(options.availableActions).slice(0, 24);
+  const availableAgentSkillIds = readStringArray$3(options.availableAgentSkillIds).slice(0, 32);
 
   const disabledActionsEncountered = mergeDisabledActions$2(
     previous.disabledActionsEncountered,
@@ -177,7 +180,7 @@ function mergeDisabledActions$2(previousList, actionName, options) {
 }
 
 function isLikelyDisabled(actionName, options) {
-  const available = readStringArray$5(options.availableActions);
+  const available = readStringArray$3(options.availableActions);
   // If the planner emitted an action name that is NOT in the
   // post-filter availableActions surface, the host has disabled it.
   return available.length > 0 && !available.includes(actionName);
@@ -193,29 +196,25 @@ function normalizeState(value) {
     consecutiveInvalidCount: readNonNegativeInteger$4(value.consecutiveInvalidCount),
     consecutiveRepairFailureCount: readNonNegativeInteger$4(value.consecutiveRepairFailureCount),
     lastInvalidActionName: readActionName$2(value.lastInvalidActionName) || null,
-    lastInvalidReason: readString$1v(value.lastInvalidReason) || null,
-    disabledActionsEncountered: readStringArray$5(value.disabledActionsEncountered).slice(0, 12),
-    availableActions: readStringArray$5(value.availableActions).slice(0, 24),
-    availableAgentSkillIds: readStringArray$5(value.availableAgentSkillIds).slice(0, 32),
+    lastInvalidReason: readString(value.lastInvalidReason) || null,
+    disabledActionsEncountered: readStringArray$3(value.disabledActionsEncountered).slice(0, 12),
+    availableActions: readStringArray$3(value.availableActions).slice(0, 24),
+    availableAgentSkillIds: readStringArray$3(value.availableAgentSkillIds).slice(0, 32),
     firstObservedAtCycle: readNullableNumber$1(value.firstObservedAtCycle),
     lastObservedAtCycle: readNullableNumber$1(value.lastObservedAtCycle),
     escalation: value.escalation === "hard_signal" ? "hard_signal" : "advisory",
-    status: readString$1v(value.status) || "tracking",
-    clearedReason: readString$1v(value.clearedReason) || null,
+    status: readString(value.status) || "tracking",
+    clearedReason: readString(value.clearedReason) || null,
     version: 1
   };
 }
 
-function readString$1v(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readActionName$2(value) {
-  const text = readString$1v(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   return text || null;
 }
 
-function readStringArray$5(value) {
+function readStringArray$3(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
   const out = [];

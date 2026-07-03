@@ -138,9 +138,8 @@ Direction note:
 The current MVP proves that the library can:
 
 - create a runtime instance from a small config object
-- accept different turn input shapes through one public `run(input)` API
-- route first through registered executable skills
-- continue into planner/action execution for provider-style turns when no direct skill match exists
+- accept a tool-loop provider request (or an approval resolution) through one public `run(input)` API
+- drive the multi-cycle planner/action loop for every tool-loop provider request, with skills participating through planner/tool actions and engaged skill capabilities (there is no direct-skill-match bypass)
 - execute multi-cycle runs up to `maxSteps`
 - return structured, UI-consumable results instead of raw execution output
 - persist multi-turn session history and semantic session memory

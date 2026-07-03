@@ -1,6 +1,7 @@
 import { loadAgentSkillFromProvider, findAgentSkill, createAgentSkillSummary } from '../agent-skills.js';
 import { getPolicyManifestForSkill, evaluateSkillPolicy, emitSkillPolicyStep, createSkillPolicyError } from '../skill-policy.js';
 import { STANDALONE_PLAN_ACTION } from '../action-plan-contract.js';
+import { readString } from '../semantic-json.js';
 
 function createReadAgentSkillAction(agentSkills, agentSkillIndexProvider) {
   const firstSkill = Array.isArray(agentSkills) && agentSkills[0] ? agentSkills[0] : null;
@@ -30,7 +31,7 @@ function createReadAgentSkillAction(agentSkills, agentSkillIndexProvider) {
       controls: ["continue"]
     },
     execute: async (context, args) => {
-      const requestedSkill = readString$T(args && (args.skillName || args.name));
+      const requestedSkill = readString(args && (args.skillName || args.name));
       const manifest = await getPolicyManifestForSkill(context, requestedSkill);
       const policyDecision = evaluateSkillPolicy({
         manifest,
@@ -62,10 +63,6 @@ function createReadAgentSkillAction(agentSkills, agentSkillIndexProvider) {
       };
     }
   });
-}
-
-function readString$T(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createReadAgentSkillAction };

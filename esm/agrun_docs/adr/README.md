@@ -90,5 +90,7 @@ Status legend: **Accepted** = active decision; **Superseded** = replaced by a la
 | [0051](./0051-output-guardrail-host-policy.md) | 2026-06-04 | Accepted (slice 1) | Host-defined output guardrails (OpenAI-Agents-SDK `defineOutputGuardrail` shape, adapted: block→re-plan not halt): move publish/quality POLICY out of the runtime, consolidate the sprawled publish-readiness facts into one SSOT bundle; validation-only (distinct from the ADR-0030-rejected authoring hook) (AGRUN-297) |
 | [0053](./0053-research-source-minimum-pack-default.md) | 2026-06-09 | Accepted | Research source-minimum default is pack policy, not a kernel constant |
 | [0054](./0054-kernel-seam-removal-portable-skills-only.md) | 2026-06-09 | Accepted | Remove the kernel-seam runtime-hook mechanism; agrun is general runtime + portable skills/tools only |
+| [0055](./0055-stream-event-kebab-case.md) | 2026-06-10 | Accepted | Stream event type names are kebab-case |
+| [0056](./0056-virtual-workspace-is-general-infrastructure.md) | 2026-06-14 | Accepted | virtual-workspace is general infrastructure (stays in core); research coupling is a data-gated seam; closes hardcode-roadmap §3, downgrades H4 to H1-class |
 
 **Current architecture SSOT:** When ADRs conflict, prefer the later number. [ADR-0023](./0023-harness-as-tool-provider-only.md) is the controlling decision for the runtime/AI ownership boundary; [ADR-0012](./0012-long-research-belongs-to-skill.md) is the controlling decision for long-research. See [`../architecture-ssot.md`](../architecture-ssot.md) for the full authority order.

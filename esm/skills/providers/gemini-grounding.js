@@ -1,4 +1,5 @@
 import { fetchWithRetry, DEFAULT_GROUNDING_TIMEOUT_MS, fetchWithTimeout } from './fetch-resilience.js';
+import { readString } from '../../runtime/semantic-json.js';
 
 const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_LIMIT = 5;
@@ -86,7 +87,7 @@ function readAuthMode$1(value) {
 }
 
 function readGeminiGroundingEndpoint(endpoint, model, authMode) {
-  const normalizedEndpoint = readString$J(endpoint);
+  const normalizedEndpoint = readString(endpoint);
   if (normalizedEndpoint) {
     return normalizedEndpoint;
   }
@@ -119,7 +120,7 @@ async function normalizeGroundingItems(metadata, options = {}) {
     const web = chunk && typeof chunk === "object" && chunk.web && typeof chunk.web === "object"
       ? chunk.web
       : null;
-    const rawUrl = readString$J(web && web.uri);
+    const rawUrl = readString(web && web.uri);
     const url = await resolveGroundingRedirectUrl(rawUrl, {
       authMode: options.authMode,
       fetch: options.fetch,
@@ -135,7 +136,7 @@ async function normalizeGroundingItems(metadata, options = {}) {
       engine: "gemini_grounding",
       snippet: supportsByIndex.get(index) || "",
       source: readDomain(url) || "gemini_grounding",
-      title: readString$J(web && web.title) || `Source ${items.length + 1}`,
+      title: readString(web && web.title) || `Source ${items.length + 1}`,
       url
     });
 
@@ -148,7 +149,7 @@ async function normalizeGroundingItems(metadata, options = {}) {
 }
 
 async function resolveGroundingRedirectUrl(url, options = {}) {
-  const normalized = readString$J(url);
+  const normalized = readString(url);
   if (!normalized || !isGroundingRedirectUrl(normalized)) {
     return normalized;
   }
@@ -179,7 +180,7 @@ async function resolveGroundingRedirectUrl(url, options = {}) {
       timeoutMs: REDIRECT_RESOLVE_TIMEOUT_MS,
       signal: options.signal
     });
-    const finalUrl = readString$J(response && response.url);
+    const finalUrl = readString(response && response.url);
     return finalUrl && !isGroundingRedirectUrl(finalUrl) ? finalUrl : normalized;
   } catch (error) {
     return normalized;
@@ -187,7 +188,7 @@ async function resolveGroundingRedirectUrl(url, options = {}) {
 }
 
 function isGroundingRedirectUrl(value) {
-  const normalized = readString$J(value);
+  const normalized = readString(value);
   if (!normalized) return false;
   try {
     const parsed = new URL(normalized);
@@ -256,7 +257,7 @@ function collectSupportSnippets(metadata) {
       continue;
     }
 
-    const segmentText = readString$J(support.segment && support.segment.text);
+    const segmentText = readString(support.segment && support.segment.text);
     const chunkIndices = Array.isArray(support.groundingChunkIndices)
       ? support.groundingChunkIndices.filter((value) => Number.isInteger(value) && value >= 0)
       : [];
@@ -284,7 +285,7 @@ function buildGroundingPrompt(query) {
 }
 
 function readRequiredString(value, name) {
-  const normalized = readString$J(value);
+  const normalized = readString(value);
   if (!normalized) {
     throw new Error(`Web search requires a non-empty "${name}".`);
   }
@@ -292,13 +293,9 @@ function readRequiredString(value, name) {
   return normalized;
 }
 
-function readString$J(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readDomain(value) {
   try {
-    return new URL(readString$J(value)).hostname;
+    return new URL(readString(value)).hostname;
   } catch {
     return "";
   }

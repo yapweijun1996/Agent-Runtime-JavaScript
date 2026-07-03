@@ -1,5 +1,6 @@
 import { createContextSnapshot } from '../session/context-snapshot-normalize.js';
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 import { readSkillIdentity, HANDOFF_CYCLE_KIND, normalizeHandoffChain, createHandoffCycleDetail, buildNextHandoffChain } from './handoff-chain.js';
 
 const SESSION_MEMORY_TEXT_FIELDS = Object.freeze([
@@ -20,9 +21,9 @@ function normalizeHandoffInputFilters(value) {
 
   const filters = {};
   for (const [rawName, filter] of Object.entries(value)) {
-    const name = readString$Z(rawName);
+    const name = readString(rawName);
     if (!name) continue;
-    if (typeof filter === "function" || isFilterSpec(filter) || readString$Z(filter)) {
+    if (typeof filter === "function" || isFilterSpec(filter) || readString(filter)) {
       filters[name] = filter;
     }
   }
@@ -103,7 +104,15 @@ async function applyHandoffInputFilter(session, output) {
   const sourcePacket = createHandoffHistoryPacket(session);
   let nextPacket = null;
   if (resolved.type === "function") {
-    nextPacket = await resolved.filter(cloneValue(sourcePacket), {
+    // AGRUN-497 (audit M14) — pass sourcePacket directly. It is already a fresh,
+    // single-use deep clone (every field cloneValue'd in createHandoffHistoryPacket),
+    // so the prior `cloneValue(sourcePacket)` re-cloned the heavy readSources/
+    // toolHistory payload a second time for nothing. The declarative branch below
+    // already passes sourcePacket directly; this makes the two branches consistent.
+    // The runState clone stays: it is passed to a HOST-supplied filter that may read
+    // any field, so it must be an isolated copy (a projection would break the public
+    // filter contract).
+    nextPacket = await resolved.filter(sourcePacket, {
       filterName: resolved.name,
       fromSkill: output && output.fromSkill || null,
       inputFilter: cloneValue(requested),
@@ -171,7 +180,7 @@ function applyDeclarativeHandoffFilter(packet, spec) {
   applyArrayRule(next, "searchResults", filterSpec.searchResults);
 
   const toolRule = readKeepLastRule(filterSpec.toolHistory || filterSpec.tools);
-  if (toolRule === 0 && !hasOwn$1(filterSpec, "lastToolResult")) {
+  if (toolRule === 0 && !hasOwn$2(filterSpec, "lastToolResult")) {
     next.lastToolResult = null;
   } else if (isClearRule(filterSpec.lastToolResult)) {
     next.lastToolResult = null;
@@ -186,7 +195,7 @@ function resolveHandoffInputFilter(inputFilter, registry, seen = new Set()) {
     return { name: null, spec: inputFilter, type: "spec" };
   }
 
-  const name = readString$Z(inputFilter);
+  const name = readString(inputFilter);
   if (!name) return null;
   if (seen.has(name)) return null;
   seen.add(name);
@@ -198,8 +207,8 @@ function resolveHandoffInputFilter(inputFilter, registry, seen = new Set()) {
   if (isFilterSpec(filter)) {
     return { name, spec: filter, type: "spec" };
   }
-  if (readString$Z(filter)) {
-    return resolveHandoffInputFilter(readString$Z(filter), registry, seen);
+  if (readString(filter)) {
+    return resolveHandoffInputFilter(readString(filter), registry, seen);
   }
   return null;
 }
@@ -218,7 +227,7 @@ function writeHandoffHistoryPacket(session, packet) {
   if (Array.isArray(packet.toolHistory)) {
     runState.toolContext.history = cloneValue(packet.toolHistory);
   }
-  if (hasOwn$1(packet, "lastToolResult")) {
+  if (hasOwn$2(packet, "lastToolResult")) {
     runState.toolContext.lastResult = cloneValue(packet.lastToolResult || null);
   }
 
@@ -259,7 +268,7 @@ function applySessionMemoryRule(packet, rule) {
 
   if (!isFilterSpec(rule)) return;
   for (const field of SESSION_MEMORY_TEXT_FIELDS) {
-    if (!hasOwn$1(rule, field)) continue;
+    if (!hasOwn$2(rule, field)) continue;
     const fieldRule = rule[field];
     if (isClearRule(fieldRule)) {
       memory[field] = "";
@@ -267,14 +276,14 @@ function applySessionMemoryRule(packet, rule) {
     }
     const maxChars = readMaxChars(fieldRule);
     if (maxChars != null) {
-      memory[field] = keepLastChars(readString$Z(memory[field]), maxChars);
+      memory[field] = keepLastChars(readString(memory[field]), maxChars);
     }
   }
   packet.contextSnapshot.sessionMemory = memory;
 }
 
 function readKeepLastRule(rule) {
-  if (rule == null || rule === true || readString$Z(rule) === "keep") return null;
+  if (rule == null || rule === true || readString(rule) === "keep") return null;
   if (isClearRule(rule)) return 0;
   if (Number.isInteger(rule) && rule >= 0) return rule;
   if (!isFilterSpec(rule)) return null;
@@ -295,7 +304,7 @@ function readMaxChars(rule) {
 }
 
 function keepLastChars(value, maxChars) {
-  const text = readString$Z(value);
+  const text = readString(value);
   if (maxChars <= 0) return "";
   return text.length > maxChars ? text.slice(-maxChars) : text;
 }
@@ -309,8 +318,8 @@ function readHistoryCounts(session) {
     actionHistoryCount: packet.actionHistory.length,
     readSourceCount: packet.readSources.length,
     searchResultCount: packet.searchResults.length,
-    sessionHistoryChars: readString$Z(memory.history).length,
-    sessionRecentTurnsChars: readString$Z(memory.recentTurns).length,
+    sessionHistoryChars: readString(memory.history).length,
+    sessionRecentTurnsChars: readString(memory.recentTurns).length,
     toolHistoryCount: packet.toolHistory.length
   };
 }
@@ -322,12 +331,12 @@ function emitInputFilterStep(session, type, detail) {
 }
 
 function summarizeInputFilter(value) {
-  if (readString$Z(value)) return readString$Z(value);
+  if (readString(value)) return readString(value);
   return isFilterSpec(value) ? cloneValue(value) : null;
 }
 
 function hasInputFilter(value) {
-  return Boolean(readString$Z(value)) || isFilterSpec(value);
+  return Boolean(readString(value)) || isFilterSpec(value);
 }
 
 function isFilterSpec(value) {
@@ -335,23 +344,19 @@ function isFilterSpec(value) {
 }
 
 function isClearRule(value) {
-  const text = readString$Z(value);
+  const text = readString(value);
   return value === false || text === "clear" || text === "drop" || text === "remove";
 }
 
 function toSnakeCase(value) {
-  return readString$Z(value).replace(/([A-Z])/g, (_, char) => `_${char.toLowerCase()}`);
+  return readString(value).replace(/([A-Z])/g, (_, char) => `_${char.toLowerCase()}`);
 }
 
 function toCamelCase(value) {
-  return readString$Z(value).replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+  return readString(value).replace(/_([a-z])/g, (_, char) => char.toUpperCase());
 }
 
-function readString$Z(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function hasOwn$1(value, key) {
+function hasOwn$2(value, key) {
   return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
 }
 

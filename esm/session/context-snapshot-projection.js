@@ -1,6 +1,7 @@
 import { cloneValue } from '../runtime/utils.js';
 import { createContextSnapshot, normalizeInquiryContext } from './context-snapshot-normalize.js';
 import { normalizePendingClarification, normalizeClarificationResolution, isResolvedClarificationKind } from './context-snapshot-fields.js';
+import { readString } from '../runtime/semantic-json.js';
 
 function projectSessionContextFromSnapshot(snapshot) {
   const normalizedSnapshot = createContextSnapshot(snapshot);
@@ -58,10 +59,10 @@ function summarizeInquiryContext(inquiryContext) {
     activeTopic: context.activeTopic || null,
     candidateSourceCount: context.candidateSources.length,
     hasPendingClarification: Boolean(context.pendingClarification),
-    lastClarificationResolutionKind: readString$1U(
+    lastClarificationResolutionKind: readString(
       context.lastClarificationResolution && context.lastClarificationResolution.kind
     ) || null,
-    lastReadSourceUrl: readString$1U(context.lastReadSource && context.lastReadSource.url) || null,
+    lastReadSourceUrl: readString(context.lastReadSource && context.lastReadSource.url) || null,
     selectedSource: context.selectedSource
       ? {
           title: context.selectedSource.title || null,
@@ -75,10 +76,6 @@ function cloneStructuredValue$2(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? cloneValue(value)
     : null;
-}
-
-function readString$1U(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createSessionContextViewFromSnapshot, projectSessionContextFromSnapshot, summarizeInquiryContext };

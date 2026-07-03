@@ -1,17 +1,31 @@
 import { resolveBlockedPolicyDecision } from './hooks/policy-hook.js';
+import { EXECUTE_SKILL_TOOL_ACTION, PUBLISH_DIRECT_ACTION } from './action-names.js';
 import { ensureSessionHookRunner } from './hooks/session-hooks.js';
 import { maybeBlockActionPatternRepeat } from './action-loop-action.js';
-import { PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
 import { emitSkillPolicyStep, evaluateSkillPolicy } from './skill-policy.js';
 import { readActionArgs, readWebSearchEndpoint } from './action-loop-utils.js';
 import { normalizeThrownError } from './errors.js';
 import { validateActionArgs } from './action-args-validation.js';
 import { readPlanActionContract } from './action-plan-contract.js';
-import { selectPlannerActions, isWorkspacePublishCandidateGatedForMode } from './planner-action-surface.js';
+import { resolveClosedNamespaceForAction, ACTION_NAMESPACE_CLOSED_CODE } from './action-namespace-gate.js';
+import { selectPlannerActions } from './planner-action-surface.js';
+import { resolveTerminalAvailability } from './terminal-repair/availability.js';
+import { readString, readStringArray } from './semantic-json.js';
 
 const ACTION_POLICY_NOT_ALLOW_IN_PLAN_FEEDBACK = Object.freeze({
   code: "action_policy_not_allow_in_plan",
-  detail: "Approval-gated or denied actions cannot appear inside a plan envelope. Emit the approval-gated action as a standalone action envelope first (shape: {\"type\":\"action\",\"name\":\"read_url\",\"args\":{...}}) so the host approval flow can run; use plan only for independent actions whose actionPolicy is allow."
+  detail: "Approval-gated actions cannot appear inside a plan envelope. Emit the approval-gated action as a standalone action envelope first (shape: {\"type\":\"action\",\"name\":\"read_url\",\"args\":{...}}) so the host approval flow can run; use plan only for independent actions whose actionPolicy is allow."
+});
+
+// AGRUN-562 — a "deny" policy is never grantable (no host approval flow to
+// route to), unlike "ask" above. Sharing ACTION_POLICY_NOT_ALLOW_IN_PLAN_FEEDBACK's
+// "so the host approval flow can run" wording for deny would send the planner
+// to retry standalone expecting an approval prompt that will never come —
+// now that the single-action door gives "ask" and "deny" genuinely different
+// outcomes (handlePolicyBlock), the plan door's feedback needs to match.
+const ACTION_POLICY_DENIED_IN_PLAN_FEEDBACK = Object.freeze({
+  code: "action_policy_denied_in_plan",
+  detail: "This action is permanently denied by policy — it cannot run standalone or inside a plan, and no host approval can grant it. Do not retry it. Choose a different action, or if the request cannot be completed without it, finalize with an honest answer explaining the limitation."
 });
 
 async function validatePlan(session, decision) {
@@ -37,13 +51,30 @@ async function validatePlan(session, decision) {
     if (!entry || typeof entry !== "object" || entry.type !== "action") {
       return { ok: false, error: `Plan action ${index} must be a type:\"action\" envelope.` };
     }
-    const actionName = readString$n(entry.name);
+    const actionName = readString(entry.name);
     const action = session.actionRegistry.get(actionName);
     if (!action) {
       return { ok: false, error: `Plan action ${index} references unknown action "${actionName || "unknown"}".` };
     }
     if (!isActionAvailable(actionName, session.availableActions)) {
       return { ok: false, error: `Plan action ${index} references disabled action "${actionName}".` };
+    }
+    // ADR-0057 Phase 1 — closed-namespace gate, plan-batch door. The SAME
+    // shared predicate + word-for-word `hint` + error code as the
+    // single-action door (action-loop-session-loop.js), per the CLAUDE.md
+    // Dispatch-Path Parity rule. Ordering: availability precedes permission —
+    // it sits with the availability checks here, BEFORE the runPreToolCall
+    // policy hook below, and BEFORE validateRuntimeActionSurface so the
+    // namespace-specific hint wins over the generic surface detail.
+    const closedNamespace = resolveClosedNamespaceForAction(session.runState, session.runtimeConfig, actionName);
+    if (closedNamespace) {
+      return createPlanValidationError(
+        `Plan action ${index} "${actionName}" is in the closed namespace "${closedNamespace.namespace}".`,
+        {
+          code: ACTION_NAMESPACE_CLOSED_CODE,
+          detail: closedNamespace.hint
+        }
+      );
     }
     const actionSurfaceValidation = validateRuntimeActionSurface(session, actionName, index);
     if (!actionSurfaceValidation.ok) {
@@ -59,7 +90,7 @@ async function validatePlan(session, decision) {
         }
       );
     }
-    if (decision.synthesize_per_action === true && !readString$n(entry.section && entry.section.prompt)) {
+    if (decision.synthesize_per_action === true && !readString(entry.section && entry.section.prompt)) {
       // AGRUN-214o P5 — tag the error with a recovery code so
       // executePlan can attempt an auto-strip retry without burning a
       // cycle on planner re-prompt. The detail is targeted feedback the
@@ -82,7 +113,9 @@ async function validatePlan(session, decision) {
     if (blockedPolicyDecision) {
       return createPlanValidationError(
         `Plan action ${index} "${actionName}" is policy "${blockedPolicyDecision.action}", not allow.`,
-        ACTION_POLICY_NOT_ALLOW_IN_PLAN_FEEDBACK
+        blockedPolicyDecision.action === "deny"
+          ? ACTION_POLICY_DENIED_IN_PLAN_FEEDBACK
+          : ACTION_POLICY_NOT_ALLOW_IN_PLAN_FEEDBACK
       );
     }
     let args = readActionArgs(entry);
@@ -185,13 +218,13 @@ async function validatePlan(session, decision) {
 }
 
 function evaluateSkillPolicyForPlanAction(session, actionName, args) {
-  if (actionName !== "execute_skill_tool") return null;
-  const skillName = readString$n(args && args.skillName) ||
-    readString$n(session.runState.agentSkillContext && session.runState.agentSkillContext.activeSkill && (
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) return null;
+  const skillName = readString(args && args.skillName) ||
+    readString(session.runState.agentSkillContext && session.runState.agentSkillContext.activeSkill && (
       session.runState.agentSkillContext.activeSkill.skillId ||
       session.runState.agentSkillContext.activeSkill.name
     ));
-  const toolName = readString$n(args && args.toolName);
+  const toolName = readString(args && args.toolName);
   const manifest = findManifest(session.runtimeConfig.agentSkills, skillName);
   return evaluateSkillPolicy({
     manifest,
@@ -204,11 +237,11 @@ function evaluateSkillPolicyForPlanAction(session, actionName, args) {
 }
 
 function findManifest(manifests, skillIdOrName) {
-  const target = readString$n(skillIdOrName).toLowerCase();
+  const target = readString(skillIdOrName).toLowerCase();
   if (!target) return null;
   return (Array.isArray(manifests) ? manifests : []).find((manifest) => (
-    readString$n(manifest && manifest.skillId).toLowerCase() === target ||
-    readString$n(manifest && manifest.name).toLowerCase() === target
+    readString(manifest && manifest.skillId).toLowerCase() === target ||
+    readString(manifest && manifest.name).toLowerCase() === target
   )) || null;
 }
 
@@ -242,7 +275,7 @@ function validateRuntimeActionSurface(session, actionName, index) {
   if (isActionAvailable(actionName, selectedActions)) {
     return { ok: true };
   }
-  const selectedActionNames = selectedActions.map((action) => readString$n(action && action.name)).filter(Boolean);
+  const selectedActionNames = selectedActions.map((action) => readString(action && action.name)).filter(Boolean);
   const detail = buildRuntimeActionSurfaceDetail(session, selectedActionNames, actionName);
   return createPlanValidationError(
     `Plan action ${index} "${actionName}" is currently hidden by the runtime action surface.`,
@@ -257,19 +290,22 @@ function buildRuntimeActionSurfaceDetail(session, allowedActionNames, blockedAct
   const runState = session && session.runState && typeof session.runState === "object"
     ? session.runState
     : {};
+  // AGRUN-559 — routed through resolveTerminalAvailability (the terminal-door
+  // SSOT; it delegates to isWorkspacePublishCandidateGatedForMode) so this
+  // plan door reads the SAME fact object as the single-action door and the
+  // prompt-side readEnvelopeTerminalPolicy (the Dispatch-Path Parity rule).
   if (
     blockedActionName === PUBLISH_DIRECT_ACTION &&
-    isWorkspacePublishCandidateGatedForMode({
+    resolveTerminalAvailability(runState, {
       activeAgentSkill: runState && runState.agentSkillContext
         ? runState.agentSkillContext.activeSkill
         : null,
       lastReadAgentSkill: runState && runState.agentSkillContext
         ? runState.agentSkillContext.lastReadSkill
         : null,
-      runState,
       runtimeConfig: session && session.runtimeConfig,
       terminalRepairState: runState && runState.terminalRepairState
-    })
+    }).publishOpen === false
   ) {
     // AGRUN-256 — publish-candidate mode gate. Tell the planner the
     // structural reason and the concrete next move, plus the host opt-out
@@ -284,17 +320,17 @@ function buildRuntimeActionSurfaceDetail(session, allowedActionNames, blockedAct
     ? runState.terminalRepairState
     : null;
   if (terminalRepairState && terminalRepairState.active === true) {
-    const repairAllowed = readStringArray$1(terminalRepairState.allowedActions);
+    const repairAllowed = readStringArray(terminalRepairState.allowedActions);
     return [
       "The active terminalRepairState is constraining the next action surface.",
       repairAllowed.length > 0
         ? `Choose one of these allowed repair actions: ${repairAllowed.join(", ")}.`
         : "Choose a repair action currently exposed by the planner action surface.",
-      readString$n(terminalRepairState.reason)
-        ? `Repair reason: ${readString$n(terminalRepairState.reason)}.`
+      readString(terminalRepairState.reason)
+        ? `Repair reason: ${readString(terminalRepairState.reason)}.`
         : "",
-      readString$n(terminalRepairState.requiredRepair)
-        ? `Required repair: ${readString$n(terminalRepairState.requiredRepair)}.`
+      readString(terminalRepairState.requiredRepair)
+        ? `Required repair: ${readString(terminalRepairState.requiredRepair)}.`
         : ""
     ].filter(Boolean).join(" ");
   }
@@ -400,23 +436,15 @@ function createActionContext(session) {
 
 function isActionAvailable(actionName, availableActions) {
   return (Array.isArray(availableActions) ? availableActions : []).some(
-    (action) => action && typeof action === "object" && readString$n(action.name) === actionName
+    (action) => action && typeof action === "object" && readString(action.name) === actionName
   );
-}
-
-function readString$n(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readStringArray$1(value) {
-  return Array.isArray(value) ? value.map(readString$n).filter(Boolean) : [];
 }
 
 function isDrillHint$1(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value)) &&
-    Boolean(readString$n(value.match_header)) &&
-    Boolean(readString$n(value.label)) &&
-    Boolean(readString$n(value.prompt));
+    Boolean(readString(value.match_header)) &&
+    Boolean(readString(value.label)) &&
+    Boolean(readString(value.prompt));
 }
 
 export { createActionContext, validatePlan };

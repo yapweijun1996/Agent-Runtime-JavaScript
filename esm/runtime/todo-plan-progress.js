@@ -1,4 +1,5 @@
 import { applyTodoPlan, createTodoState } from './todo-state.js';
+import { WEB_SEARCH_ACTION, READ_URL_ACTION, EXECUTE_SKILL_TOOL_ACTION, ASK_CLARIFICATION_ACTION } from './action-names.js';
 import { normalizeTodoAutopilotConfig } from './todo-autopilot.js';
 import { isTodoShapedRun, readString } from './todo-detection.js';
 
@@ -48,10 +49,10 @@ function buildPlanItems(decision, actions) {
 
 function labelForAction(action) {
   const name = readString(action && action.name);
-  if (name === "web_search") return "Search the web for relevant evidence";
-  if (name === "read_url") return "Read selected source pages";
-  if (name === "execute_skill_tool") return "Run the selected skill tool";
-  if (name === "ask_clarification") return "Resolve the open clarification";
+  if (name === WEB_SEARCH_ACTION) return "Search the web for relevant evidence";
+  if (name === READ_URL_ACTION) return "Read selected source pages";
+  if (name === EXECUTE_SKILL_TOOL_ACTION) return "Run the selected skill tool";
+  if (name === ASK_CLARIFICATION_ACTION) return "Resolve the open clarification";
   if (name.startsWith("todo_")) return "";
   return name ? `Run ${name}` : "";
 }

@@ -50,6 +50,27 @@ function isTransientProviderError(error, providerHint) {
 }
 
 /**
+ * AGRUN-568 — timeout-class detection for retry-budget escalation.
+ *
+ * A timeout is categorically different from the other transient reasons
+ * (rate_limit / network / upstream): those are environment hiccups where the
+ * SAME request budget is fine on retry, but a timeout is direct evidence the
+ * call needs MORE time than the current budget. Retrying a
+ * deterministically-slow call with an identical deadline is provably wasted
+ * work — captured live (deepseek-v4-flash, 2026-07-02): a planner cycle that
+ * needed >120s timed out at 120s, retried on the same 120s budget, timed out
+ * again, and failed the whole run (observed gap exactly 120 + 0.5 backoff +
+ * 120 = 240.5s). requestProviderCompletion doubles the budget before a
+ * timeout-class retry.
+ *
+ * @returns {boolean} true when `error` classifies as a provider timeout.
+ */
+function isTimeoutProviderError(error, providerHint) {
+  const normalized = readProviderError(error, providerHint);
+  return Boolean(normalized && normalized.reason === "timeout");
+}
+
+/**
  * Linear backoff: attempt 1 waits backoffMs, attempt 2 waits 2*backoffMs, …
  * Bounded by MAX_ALLOWED_RETRIES so the worst case stays small and predictable.
  */
@@ -75,4 +96,4 @@ function readBoundedInteger(value, min, max, fallback) {
   return floored;
 }
 
-export { isTransientProviderError, normalizeProviderRetry, providerRetryDelayMs, waitMs };
+export { isTimeoutProviderError, isTransientProviderError, normalizeProviderRetry, providerRetryDelayMs, waitMs };

@@ -1,7 +1,9 @@
 import { recordObservation, startEvaluatePhase, completeEvaluatePhase } from './finalizer.js';
 import { completePhase } from './oodae.js';
 import { createEvaluationState } from './task-state.js';
+import './action-names.js';
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 import { handleDirectFinal } from './action-loop-terminal.js';
 import { handlePlanSynthesize } from './action-loop-plan-terminal.js';
 import { askBeforeFinalizeHook } from './action-loop-session-terminals.js';
@@ -11,6 +13,7 @@ import { runPlanActions } from './action-loop-plan-actions.js';
 import { synthesizePlanPerAction } from './action-loop-plan-synthesize.js';
 import { normalizeThrownError } from './errors.js';
 import { maybeSeedTodoStateFromPlanDecision } from './todo-plan-progress.js';
+import { refreshActionPatternConvergence, shouldEmitActionPatternConvergenceRefreshed } from './action-pattern-convergence.js';
 
 // ADR-0023 — `executeStandaloneRecoveredAction` + `createStandaloneMutatorRecovery`
 // deleted (runtime no longer auto-extracts a single mutator action from a
@@ -95,6 +98,35 @@ async function runValidatedPlan(options, startedAt) {
           : validation.error
       });
     }
+    // AGRUN-590 — a rejected plan is a burned cycle with zero progress, but
+    // this path never fed the convergence evaluator, so N consecutive
+    // rejections looked like nothing to the read-only-planning guard (the
+    // deepseek probe burned 4 in a row invisibly). Mirror the session-loop
+    // web_search_repeat_blocked precedent: refresh with a blocked outcome so
+    // stepsWithoutObservableProgress accumulates and the guard's normal
+    // advisory -> hard_veto ladder can engage.
+    const rejectedActionName = readString(
+      Array.isArray(decision.actions) && decision.actions[0] && decision.actions[0].name
+    ) || "plan";
+    const evaluator = refreshActionPatternConvergence(session.runState, {
+      actionName: rejectedActionName,
+      decision,
+      output: { blocked: true, kind: "plan_validation_rejected", reason: validation.code || "plan_validation" },
+      runtimeConfig: session.runtimeConfig,
+      status: "plan_validation_rejected"
+    });
+    if (shouldEmitActionPatternConvergenceRefreshed(evaluator)) {
+      const signal = evaluator.convergenceSignal;
+      session.pushStep("action-pattern-convergence-refreshed", {
+        actionName: rejectedActionName,
+        forbiddenMove: signal ? signal.forbiddenMove : null,
+        patternKind: signal ? signal.patternKind : null,
+        repeatedFingerprintCount: evaluator.repeatedFingerprintCount,
+        repeatedSemanticFingerprintCount: evaluator.repeatedSemanticFingerprintCount,
+        status: evaluator.status,
+        stepsWithoutObservableProgress: evaluator.stepsWithoutObservableProgress
+      });
+    }
     return continueAfterPlanObservation({
       cycleRecord,
       kind: "plan_validation_error",
@@ -153,9 +185,9 @@ async function runValidatedPlan(options, startedAt) {
 
   const finalizeDecision = {
     finalReadiness: decision.finalReadiness || null,
-    instruction: readString$j(decision.synthesize_instruction) ||
+    instruction: readString(decision.synthesize_instruction) ||
       "Synthesize the planned tool results into a clear, helpful answer for the user.",
-    reasoning: readString$j(decision.reasoning) || "Plan executed successfully."};
+    reasoning: readString(decision.reasoning) || "Plan executed successfully."};
 
   if (effectiveDecision.synthesize_per_action === true) {
     // AGRUN-457 — `plan_finalize` source: consult the host hook BEFORE the
@@ -229,7 +261,7 @@ async function runValidatedPlan(options, startedAt) {
     };
   }
 
-  if (readString$j(decision.synthesize_instruction) === "direct") {
+  if (readString(decision.synthesize_instruction) === "direct") {
     return continueAfterPlanObservation({
       cycleRecord,
       kind: "plan_executed",
@@ -272,7 +304,7 @@ function findPlanDirectFinal(session, outputs) {
 
 function continueAfterPlanObservation(options) {
   const { cycleRecord, kind, message, output, session } = options;
-  const summary = readString$j(message) || kind;
+  const summary = readString(message) || kind;
 
   session.actionHistory.push({ actionName: "plan", kind, summary });
   if (kind === "plan_validation_error") {
@@ -353,10 +385,6 @@ function createPlanResultOutput(results) {
 
 function readErrorMessage$1(error) {
   return normalizeThrownError(error).message;
-}
-
-function readString$j(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 // 2026-05-09 — `stripSynthesizePerActionIfSafe` deleted (was AGRUN-214o P5

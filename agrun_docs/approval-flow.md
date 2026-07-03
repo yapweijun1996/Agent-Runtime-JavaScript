@@ -15,8 +15,8 @@ Planner selects action
 evaluateActionPolicy()
         ↓
     ┌─── allow → execute immediately
-    ├─── ask   → return pending approval to host
-    └─── deny  → return policy block to host
+    ├─── ask   → return pending approval to host (human-in-the-loop pause)
+    └─── deny  → record denial, continue loop (no host round-trip — see Policy Denial below)
 
         (host approves or denies)
         ↓
@@ -64,6 +64,43 @@ Valid policy values: `allow`, `ask`, `deny`.
 1. Check if a host override exists for the action name
 2. If not, infer from the action's tier
 3. Return `{ action, actionName, tier }`
+
+## Policy Denial (Non-Blocking)
+
+When an action's policy evaluates to `deny`, the runtime does **not** pause the
+run or return an envelope for the host to resolve — there is no host approval
+flow that could ever grant a permanent denial (AGRUN-562). Instead the OODAE
+loop recovers on its own, in the same turn:
+
+```text
+mid-run state (loop continues — nothing below is returned to the host)
+ ├ actionHistory: [..., { actionName, kind: "denied", summary }]
+ ├ runState.observation:
+ │  ├ kind       — "tool_rejection"
+ │  ├ message    — 'Action "<name>" is denied by policy and can never be
+ │  │              used this session...'
+ │  ├ policy     — "deny"
+ │  └ resolution — "denied"
+ └ runState.turnControl:
+    ├ signal — "run_again"
+    └ source — "policy"
+```
+
+`runState.status` and `runState.pendingApproval` are left untouched (never
+set to `"blocked"`, never populated). The planner sees the denied action via
+`loopState.deniedActions` on its next cycle — the same mechanism described in
+[Deny Handling](#deny-handling) below — and picks an alternative action,
+`finalize`, or an honest `final` explaining the limitation. The `RunResult`
+the host actually receives is whatever the planner produces next, typically
+`output.kind: "planner_final"` or `"final_response"`.
+
+This is the single-action dispatch door's behavior
+(`action-loop-terminal.js` `handlePolicyBlock` → `handlePolicyDenied`). The
+plan-batch door (`action-loop-plan-validation.js`) never lets a `deny`-tier
+action into a plan in the first place — it rejects the whole plan envelope
+with structured planner feedback (`action_policy_denied_in_plan`) telling the
+planner to choose a different action, since (unlike an `ask`-tier action)
+there is no standalone retry that could ever succeed.
 
 ## Pending Approval Envelope
 
@@ -114,6 +151,18 @@ ResumeToken
     └ sig             — HMAC-SHA256 base64url over the full token minus _meta.sig
 ```
 
+> **Security (AGRUN-523): the resume token carries NO provider secret.** Every
+> secret-keyed field (e.g. `request.apiKey`, `webSearchApiKey`, any
+> `*token`/`*secret`/`authorization`) is redacted to `"[redacted]"` on the
+> returned `result.output.pendingApproval` **and** `result.runState.pendingApproval`
+> before the token is signed — so a host that logs, persists, or renders the
+> approval surface never stores a usable key. The signature is computed over the
+> redacted bytes, so `sign → verify` still validates on resume. **Consequence:**
+> for client-auth providers the host MUST re-supply the credential on resume (see
+> below); the runtime no longer falls back to a key embedded in the token. A
+> server-auth (`authMode:"server"`) token never carried a client key and is
+> unaffected.
+
 ### Resume Token Signing
 
 By default, resume tokens are emitted as plain JSON. When a runtime is created with
@@ -153,9 +202,17 @@ runtime.run({
   type: "approval_resolution",
   decision: "approve",  // or "deny"
   resumeToken: result.runState.pendingApproval.resumeToken,
-  // client-auth may re-inject apiKey/fetch; Gemini server-auth resumes from endpoint metadata
+  apiKey: "...",  // REQUIRED for client-auth (AGRUN-523): the token no longer
+                  // carries the key. Also re-supply fetch/endpoints as needed.
+                  // Gemini server-auth resumes from endpoint metadata — no key.
 });
 ```
+
+If a client-auth resume omits `apiKey`, the restored provider request has
+`apiKey: null` and the provider call fails — this is the intended secure default,
+not a regression. The reference host
+(`examples/browser/src/runtime/approval-controller.ts`) re-supplies the key from
+its settings on every approve.
 
 For Gemini `authMode: "server"`, the resume token preserves proxy transport fields (`authMode`, `endpoint`, `streamEndpoint`, `cachedContentMode`) and must not serialize or require a provider `apiKey`. Gemini grounded search proxy fields (`searchProvider`, `webSearchAuthMode`, `webSearchEndpoint`, `webSearchModel`) are also preserved for approval resume.
 
@@ -190,7 +247,13 @@ This prevents the action loop from re-entering approval state after the action e
 
 ### Deny Handling
 
-When the user denies:
+This section covers the **resolution-side** denial: the host denying a
+pending `ask` approval via `approval_resolution`. A `deny`-tier action
+produces the identical actionHistory/observation/turnControl shape without
+ever creating a pending approval in the first place — see
+[Policy Denial (Non-Blocking)](#policy-denial-non-blocking) above.
+
+When the host denies:
 
 1. A `{ kind: "denied", actionName }` entry is pushed to `actionHistory`
 2. An observation is recorded: `{ kind: "tool_rejection", resolution: "denied", message }`

@@ -1,4 +1,5 @@
 import { readPlanActionFallbackArgs } from './plan-args-fallback.js';
+import { EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
 
 function isValidDecision(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -40,7 +41,7 @@ function readActionArgs(decision) {
     base.toolName = decision.toolName;
   }
   if (fallbackArgs) {
-    if (actionName === "execute_skill_tool") {
+    if (actionName === EXECUTE_SKILL_TOOL_ACTION) {
       if (!readObject$1(base.args)) {
         base.args = fallbackArgs;
       }

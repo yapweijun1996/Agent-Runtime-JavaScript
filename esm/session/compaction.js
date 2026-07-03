@@ -3,19 +3,30 @@ import { normalizeThrownError, createStructuredError, ERROR_CODES } from '../run
 import { applyCompactionPolicyToHistory, mergeCompactionWindows } from './compaction-policy.js';
 import { buildContextWindowPlan } from './context-window-plan.js';
 import { readContextSnapshot, normalizeInquiryContext, createContextSnapshot } from './context-snapshot-normalize.js';
+import { readString } from '../runtime/semantic-json.js';
 import { projectSessionContextFromSnapshot, createSessionContextViewFromSnapshot } from './context-snapshot-projection.js';
 import { estimateStructuredSummaryTokens, formatStructuredSummary } from './context-window-summary.js';
 import { filterMessagesByThread, sliceAfterSummary, selectCompactionMessages, summarizeSessionContextMeta, buildCompactionPrompt } from './prompt.js';
 import { buildProviderConversation } from './provider-conversation.js';
+import { readSessionParts } from './content.js';
 import { isCompactionMessage } from './messages.js';
 import { buildSessionMemorySnapshot } from './session-memory.js';
 import { DEFAULT_THREAD_ID } from './thread.js';
 import { evaluateProviderPromptBudget } from './token-budget.js';
 
+// AGRUN-424 — observer-compaction quality. The first line is load-bearing: the
+// request classifier (test/helpers/request-classifiers.js) identifies a
+// compaction call by it, so it must stay verbatim. The rest is tuned to reduce
+// the main failure mode of LLM compaction — silently dropping load-bearing
+// detail. It instructs the model to carry the prior summary forward, keep every
+// concrete identifier verbatim, and never drop an unresolved open question.
 const COMPACTION_SYSTEM_PROMPT = [
   "You compress agrun.js session history.",
   "Produce a compact plain-text summary for future turns.",
-  "Preserve goals, constraints, facts, decisions, and open questions.",
+  "Carry everything in the existing summary forward; never drop a fact, decision, constraint, or open question because it is older.",
+  "Keep every concrete identifier verbatim: names, numbers, dates, amounts, currencies, URLs, file paths, and IDs — these are the highest-loss items.",
+  "Keep every unresolved open question. An answered question may be dropped; an open one may not.",
+  "Merge duplicates and omit greetings and filler.",
   "Do not invent details."
 ].join("\n");
 
@@ -75,7 +86,7 @@ async function prepareProviderSessionContext(options) {
   });
   let planMessages = sliceAfterSummary(policyScopedMessages, summaryRecord);
   let contextSnapshot = createPreparedSnapshot(input, sessionRecord, sessionMemory);
-  let evaluatedBudget = evaluateContextBudget(input, projectSessionContextFromSnapshot(contextSnapshot), sessionPolicy);
+  let evaluatedBudget = evaluateContextBudget(input, projectSessionContextFromSnapshot(contextSnapshot), sessionPolicy, planMessages);
   let plan = buildPlan({
     completedMessages: planMessages,
     contextSnapshot,
@@ -174,7 +185,7 @@ async function prepareProviderSessionContext(options) {
         });
         planMessages = sliceAfterSummary(policyScopedMessages, summaryRecord);
         contextSnapshot = createPreparedSnapshot(input, sessionRecord, sessionMemory);
-        evaluatedBudget = evaluateContextBudget(input, projectSessionContextFromSnapshot(contextSnapshot), sessionPolicy);
+        evaluatedBudget = evaluateContextBudget(input, projectSessionContextFromSnapshot(contextSnapshot), sessionPolicy, planMessages);
         plan = buildPlan({
           completedMessages: planMessages,
           contextSnapshot,
@@ -238,11 +249,13 @@ async function prepareProviderSessionContext(options) {
   if (plan.budget.estimatedPromptTokensAfter <= plan.budget.inputBudgetTokens) {
     const prepared = createPreparedContextResult(
       input,
-      // AGRUN-145 Slice C + AGRUN-290 — Feed the provider-conversation
-      // builder the thread-scoped and host-policy-scoped window. The final
-      // model prompt then carries only the active topic plus any host
-      // compaction trimming.
-      policyScopedMessages,
+      // AGRUN-145 Slice C + AGRUN-290 + AGRUN-586 — Feed the provider-
+      // conversation builder the post-summary window (thread- and host-policy-
+      // scoped messages not yet covered by the compaction summary). The model
+      // prompt then carries the summary via sessionContext plus every
+      // uncompacted message verbatim — nothing is silently dropped between
+      // the summary boundary and the current turn.
+      planMessages,
       sessionPolicy,
       contextSnapshot,
       plan,
@@ -270,7 +283,7 @@ async function prepareProviderSessionContext(options) {
     compactionWindow,
     contextSnapshot,
     error: createPromptBudgetError(input, plan.budget, sessionContextMeta && sessionContextMeta.contextWindow),
-    input: buildPreparedProviderInput(input, policyScopedMessages, sessionPolicy, contextSnapshot, plan),
+    input: buildPreparedProviderInput(input, planMessages, sessionPolicy, contextSnapshot, plan),
     sessionContextMeta,
     sessionContextView: createSessionContextView(contextSnapshot),
     summaryUpdatedAt
@@ -293,11 +306,11 @@ function createSessionContextView(value) {
   }
 
   return {
-    clarificationStatus: readString$6(context.clarificationStatus),
-    currentGoal: readString$6(context.currentGoal),
-    currentTopic: readString$6(context.currentTopic),
+    clarificationStatus: readString(context.clarificationStatus),
+    currentGoal: readString(context.currentGoal),
+    currentTopic: readString(context.currentTopic),
     lastResolution: cloneNullable(context.lastResolution),
-    openAmbiguity: readString$6(context.openAmbiguity),
+    openAmbiguity: readString(context.openAmbiguity),
     pendingClarification: cloneNullable(context.pendingClarification)
   };
 }
@@ -415,7 +428,7 @@ function buildMemoryVariant(options) {
 }
 
 function buildPreparedProviderInput(input, messages, sessionPolicy, contextSnapshot, plan) {
-  const providerConversation = buildProviderConversation(messages, input, sessionPolicy);
+  const providerConversation = buildProviderConversation(messages, input);
 
   return {
     ...input,
@@ -451,21 +464,35 @@ function createPreparedContextResult(
   };
 }
 
-function evaluateContextBudget(input, sessionContext, sessionPolicy) {
+// AGRUN-586 — the compaction trigger must count the provider conversation.
+// The conversation now carries the whole post-summary window (no fixed
+// message-count slice), so its token weight is what drives needsCompaction;
+// ignoring it (the pre-586 behavior, safe only under the old 6-message cap)
+// would let the prompt grow unbounded.
+function evaluateContextBudget(input, sessionContext, sessionPolicy, conversationMessages) {
   return evaluateProviderPromptBudget({
     ...input,
+    conversation: toBudgetConversation(conversationMessages),
     sessionContext
   }, sessionPolicy);
+}
+
+function toBudgetConversation(messages) {
+  return (Array.isArray(messages) ? messages : [])
+    .map((message) => (message && typeof message === "object"
+      ? { parts: readSessionParts(message.content), role: readString(message.role) || "user" }
+      : null))
+    .filter(Boolean);
 }
 
 function buildPlan(options) {
   return buildContextWindowPlan({
     contextSnapshot: options.contextSnapshot,
     evaluate(sessionContext) {
-      return evaluateContextBudget(options.input, sessionContext, options.policy);
+      return evaluateContextBudget(options.input, sessionContext, options.policy, options.completedMessages);
     },
     fitEvaluator(sessionContext) {
-      const evaluated = evaluateContextBudget(options.input, sessionContext, options.policy);
+      const evaluated = evaluateContextBudget(options.input, sessionContext, options.policy, options.completedMessages);
       return evaluated.withinBudget;
     },
     initialBudget: options.initialBudget,
@@ -525,10 +552,6 @@ function createPromptBudgetError(input, budget, contextWindow) {
   );
 }
 
-function readString$6(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function computeBudgetRatio(budget) {
   const inputBudgetTokens = budget && typeof budget.inputBudgetTokens === "number"
     ? budget.inputBudgetTokens
@@ -559,4 +582,4 @@ function cloneNullable(value) {
   return value == null ? null : JSON.parse(JSON.stringify(value));
 }
 
-export { createSessionContextView, prepareProviderSessionContext, resolveSummaryWrite };
+export { COMPACTION_SYSTEM_PROMPT, createSessionContextView, prepareProviderSessionContext, resolveSummaryWrite };

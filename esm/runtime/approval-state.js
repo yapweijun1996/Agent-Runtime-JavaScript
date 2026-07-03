@@ -1,6 +1,7 @@
 import { cloneValue } from './utils.js';
 import { projectSessionContextFromPlannerState } from './session-context-projection.js';
 import { createContextSnapshot } from '../session/context-snapshot-normalize.js';
+import { readString } from './semantic-json.js';
 import { projectSessionContextFromSnapshot } from '../session/context-snapshot-projection.js';
 import { stripSigningMeta } from './approval-signing.js';
 
@@ -36,8 +37,8 @@ async function normalizeApprovalResolutionInput(rawInput, options) {
       throw new Error(`Approval resumeToken rejected: ${verification.reason}.`);
     }
     if (enforceSessionBinding) {
-      const claimedSessionId = readString$1T(rawToken.sessionId);
-      const providedSessionId = readString$1T(rawInput.agrunSessionId);
+      const claimedSessionId = readString(rawToken.sessionId);
+      const providedSessionId = readString(rawInput.agrunSessionId);
       if (claimedSessionId && providedSessionId && claimedSessionId !== providedSessionId) {
         throw new Error("Approval resumeToken session binding mismatch.");
       }
@@ -68,7 +69,7 @@ function createPendingApproval(options) {
   } = options;
   const reason = `Action "${actionName}" requires approval.`;
   const resumable = policy === "ask";
-  const sessionId = readString$1T(rawInput && rawInput.agrunSessionId) || readString$1T(request && request.agrunSessionId);
+  const sessionId = readString(rawInput && rawInput.agrunSessionId) || readString(request && request.agrunSessionId);
   const projectedContextSnapshot = runState && runState.contextSnapshot
     ? createContextSnapshot(runState.contextSnapshot)
     : request && request.contextSnapshot
@@ -130,7 +131,7 @@ function normalizePendingApproval(value) {
     return null;
   }
 
-  const actionName = readString$1T(value.actionName);
+  const actionName = readString(value.actionName);
   const policy = readPolicy$1(value.policy);
   const resolution = readResolution(value.resolution) || "pending";
   const resumeToken = readResumeToken(value.resumeToken);
@@ -142,7 +143,7 @@ function normalizePendingApproval(value) {
   return {
     actionName,
     policy,
-    reason: readString$1T(value.reason) || `Action "${actionName}" requires approval.`,
+    reason: readString(value.reason) || `Action "${actionName}" requires approval.`,
     resumable: value.resumable === true,
     resolution,
     resumeToken
@@ -162,13 +163,18 @@ function restoreApprovalRequest(resumeToken, overrides) {
 
   return {
     ...sourceRequest,
-    agrunSessionId: readString$1T(overrides.agrunSessionId) || readString$1T(source.sessionId) || null,
-    apiKey: isServerAuth ? null : readString$1T(overrides.apiKey) || readString$1T(sourceRequest.apiKey) || null,
+    agrunSessionId: readString(overrides.agrunSessionId) || readString(source.sessionId) || null,
+    // AGRUN-523 — the resume token no longer carries the provider apiKey (it is
+    // redacted at handlePolicyBlock before signing), so resume now REQUIRES the
+    // host to re-supply the credential via overrides. Do NOT fall back to
+    // sourceRequest.apiKey: post-redaction it is the literal "[redacted]"
+    // placeholder, which must never be forwarded to a provider.
+    apiKey: isServerAuth ? null : readString(overrides.apiKey) || null,
     authMode,
     cachedContentMode: readCachedContentMode$1(overrides.cachedContentMode) || readCachedContentMode$1(sourceRequest.cachedContentMode) || (isServerAuth ? "disabled" : "client"),
-    endpoint: readString$1T(overrides.endpoint) || readString$1T(sourceRequest.endpoint) || null,
+    endpoint: readString(overrides.endpoint) || readString(sourceRequest.endpoint) || null,
     fetch: typeof overrides.fetch === "function" ? overrides.fetch : null,
-    streamEndpoint: readString$1T(overrides.streamEndpoint) || readString$1T(sourceRequest.streamEndpoint) || null
+    streamEndpoint: readString(overrides.streamEndpoint) || readString(sourceRequest.streamEndpoint) || null
   };
 }
 
@@ -179,7 +185,7 @@ function createResumeRequest(rawInput, request, projectedSessionContext, context
   const webSearchAuthMode = rawInput && typeof rawInput === "object" && typeof rawInput.webSearchAuthMode === "string"
     ? rawInput.webSearchAuthMode.trim()
     : null;
-  const agrunSessionId = readString$1T(rawInput && rawInput.agrunSessionId) || readString$1T(request && request.agrunSessionId);
+  const agrunSessionId = readString(rawInput && rawInput.agrunSessionId) || readString(request && request.agrunSessionId);
   const authMode = readAuthMode$2(request && request.authMode);
   const isServerAuth = authMode === "server";
 
@@ -205,7 +211,7 @@ function createResumeRequest(rawInput, request, projectedSessionContext, context
 
 function normalizeResumeDecision(decision, actionName) {
   if (decision && typeof decision === "object" && !Array.isArray(decision)) {
-    if (decision.type === "clarify" && readString$1T(decision.question)) {
+    if (decision.type === "clarify" && readString(decision.question)) {
       return {
         question: decision.question.trim(),
         type: "clarify"
@@ -217,7 +223,7 @@ function normalizeResumeDecision(decision, actionName) {
         args: decision.args && typeof decision.args === "object" && !Array.isArray(decision.args)
           ? cloneValue(decision.args)
           : {},
-        name: readString$1T(decision.name) || actionName,
+        name: readString(decision.name) || actionName,
         type: "action"
       };
     }
@@ -235,7 +241,7 @@ function readResumeToken(value) {
     return null;
   }
 
-  const actionName = readString$1T(value.actionName);
+  const actionName = readString(value.actionName);
   const policy = readPolicy$1(value.policy);
   const request = value.request && typeof value.request === "object" && !Array.isArray(value.request)
     ? cloneValue(value.request)
@@ -257,7 +263,7 @@ function readResumeToken(value) {
       : null,
     plannerInvalidCount: typeof value.plannerInvalidCount === "number" ? value.plannerInvalidCount : 0,
     policy,
-    reason: readString$1T(value.reason),
+    reason: readString(value.reason),
     request,
     stepCount: typeof value.stepCount === "number" ? value.stepCount : 0,
     turnControl: cloneRecordOrNull$1(value.turnControl),
@@ -276,7 +282,7 @@ function readResumeToken(value) {
     candidatePathMismatchSignal: cloneRecordOrNull$1(value.candidatePathMismatchSignal),
     virtualWorkspace: cloneRecordOrNull$1(value.virtualWorkspace),
     sessionContextMode: readSessionContextMode(value.sessionContextMode),
-    sessionId: readString$1T(value.sessionId) || null,
+    sessionId: readString(value.sessionId) || null,
     todoState: value.todoState && typeof value.todoState === "object" && !Array.isArray(value.todoState)
       ? cloneValue(value.todoState)
       : null,
@@ -321,10 +327,6 @@ function readResolutionDecision(value) {
   return value === "approve" || value === "deny"
     ? value
     : "";
-}
-
-function readString$1T(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function readAuthMode$2(value) {

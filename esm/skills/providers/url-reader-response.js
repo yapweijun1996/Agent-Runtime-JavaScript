@@ -1,23 +1,24 @@
 import { readHeaderValue } from './url-reader-utils.js';
 import { readReadUrlResponseMeta } from './read-url-service-fetch.js';
+import { readString } from '../../runtime/semantic-json.js';
 
 function createReadUrlSuccess(options) {
   return {
     bytes: options.bytes,
     contentType: options.contentType || "",
     kind: "read_url_result",
-    message: readString$Q(options.meta && options.meta.message),
+    message: readString(options.meta && options.meta.message),
     mode: options.mode,
     ok: true,
     originStatus: typeof options.meta?.originStatus === "number" ? options.meta.originStatus : null,
-    platform: readString$Q(options.meta && options.meta.platform),
-    screenshotDataUrl: readString$Q(options.meta && options.meta.screenshotDataUrl),
-    screenshotMimeType: readString$Q(options.meta && options.meta.screenshotMimeType),
+    platform: readString(options.meta && options.meta.platform),
+    screenshotDataUrl: readString(options.meta && options.meta.screenshotDataUrl),
+    screenshotMimeType: readString(options.meta && options.meta.screenshotMimeType),
     status: typeof options.response.status === "number" ? options.response.status : null,
     statusText: typeof options.response.statusText === "string" ? options.response.statusText : "",
     text: options.text,
     textRange: normalizeTextRange(options.textRange),
-    title: readString$Q(options.meta && options.meta.title),
+    title: readString(options.meta && options.meta.title),
     truncated: options.truncated === true,
     url: options.url
   };
@@ -100,12 +101,12 @@ function readResponseMeta(response) {
       readHeaderValue(response && response.headers, "x-agrun-read-url-origin-status")
     ) || (typeof meta.originStatus === "number" ? meta.originStatus : null),
     platform: platform || "browser",
-    screenshotDataUrl: readString$Q(meta.screenshotDataUrl),
-    screenshotMimeType: readString$Q(meta.screenshotMimeType),
+    screenshotDataUrl: readString(meta.screenshotDataUrl),
+    screenshotMimeType: readString(meta.screenshotMimeType),
     textRange: normalizeTextRange(meta.textRange) || headerTextRange,
     textWindowApplied: meta.textWindowApplied === true ||
       readHeaderValue(response && response.headers, "x-agrun-read-url-window-applied") === "true",
-    title: readString$Q(meta.title)
+    title: readString(meta.title)
   };
 }
 
@@ -160,10 +161,6 @@ function detectReadQualityFailure(options) {
   }
 
   return null;
-}
-
-function readString$Q(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeTextRange(value) {

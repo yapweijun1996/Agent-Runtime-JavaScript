@@ -23,7 +23,57 @@ function shouldExtractSessionMemory(userMessage, assistantMessage, result, prepa
   );
 }
 
+// AGRUN-517 — host-policy gate for the per-turn memory-extraction LLM call.
+//
+// `shouldExtractSessionMemory` decides whether a turn is *structurally eligible*
+// (completed tool-loop turn). This evaluates the host's optional
+// `memoryExtractionPolicy` to decide whether to actually SPEND the extraction
+// provider call on an eligible turn. agrun ships NO prompt heuristic of its own:
+// with no policy the answer is always "extract", preserving memory quality and
+// the historical default. A host whose simple-chat profile does not need
+// per-turn cross-session mining supplies a policy that returns `false`
+// (or `{ extract: false, reason }`) to skip the call — eliminating the extra
+// provider round-trip the live smoke flagged.
+//
+// Fail-open: a throwing host policy must never silently drop memory, so an error
+// is reported (via the returned `error`) and the turn still extracts.
+//
+// Returns `{ extract, reason?, error? }`.
+async function evaluateMemoryExtractionPolicy(policy, context) {
+  if (typeof policy !== "function") {
+    return { extract: true };
+  }
+
+  let decision;
+  try {
+    decision = await policy(context);
+  } catch (error) {
+    return { extract: true, error: normalizeThrownError(error).message };
+  }
+
+  if (decision === false) {
+    return { extract: false, reason: "" };
+  }
+  if (decision && typeof decision === "object" && decision.extract === false) {
+    return {
+      extract: false,
+      reason: typeof decision.reason === "string" ? decision.reason : ""
+    };
+  }
+  return { extract: true };
+}
+
+// AGRUN-514 — pure extraction + sync-only result mutation.
+//
+// Returns `{ entries, status }` where `status` is the extraction outcome
+// (`{ status: "completed", entryCount }` or `{ status: "failed", message }`).
+// The returned `result.runState.semanticState.memoryExtraction` is written ONLY
+// when `options.mutateResult === true` (the sync, default path). On the async
+// path the result object has already been handed back to the caller, so mutating
+// it would make a returned value change after the fact; instead the caller
+// records the returned `status` into a host-visible memory diagnostic.
 async function extractMemoryEntries(options) {
+  const mutateResult = options.mutateResult === true;
   const sessionContext = options.result &&
     options.result.runState &&
     options.result.runState.contextSnapshot
@@ -39,30 +89,27 @@ async function extractMemoryEntries(options) {
       sessionContext,
       userMessage: options.userMessage
     });
-    const semanticState = options.result.runState.semanticState && typeof options.result.runState.semanticState === "object"
-      ? options.result.runState.semanticState
-      : {};
-    options.result.runState.semanticState = {
-      ...semanticState,
-      memoryExtraction: {
-        entryCount: entries.length,
-        status: "completed"
-      }
-    };
-    return entries;
+    const status = { entryCount: entries.length, status: "completed" };
+    if (mutateResult) writeMemoryExtractionState(options.result.runState, status);
+    return { entries, status };
   } catch (error) {
-    const semanticState = options.result.runState.semanticState && typeof options.result.runState.semanticState === "object"
-      ? options.result.runState.semanticState
-      : {};
-    options.result.runState.semanticState = {
-      ...semanticState,
-      memoryExtraction: {
-        message: normalizeThrownError(error).message,
-        status: "failed"
-      }
-    };
-    return [];
+    const status = { message: normalizeThrownError(error).message, status: "failed" };
+    if (mutateResult) writeMemoryExtractionState(options.result.runState, status);
+    return { entries: [], status };
   }
+}
+
+// SSOT for stamping the extraction outcome onto the turn's runState — used only
+// on the sync path so the returned result stays stable once handed back.
+function writeMemoryExtractionState(runState, status) {
+  if (!runState || typeof runState !== "object") return;
+  const semanticState = runState.semanticState && typeof runState.semanticState === "object"
+    ? runState.semanticState
+    : {};
+  runState.semanticState = {
+    ...semanticState,
+    memoryExtraction: { ...status }
+  };
 }
 
 /**
@@ -136,4 +183,4 @@ function createSessionFailureResult(options) {
   };
 }
 
-export { createSessionFailureResult, extractMemoryEntries, shouldExtractSessionMemory };
+export { createSessionFailureResult, evaluateMemoryExtractionPolicy, extractMemoryEntries, shouldExtractSessionMemory };

@@ -3,6 +3,7 @@ import { normalizeApprovalResolutionInput } from '../runtime/approval-state.js';
 import { cloneValue } from '../runtime/utils.js';
 import { prepareProviderSessionContext, createSessionContextView } from './compaction.js';
 import { readContextSnapshot, createContextSnapshot } from './context-snapshot-normalize.js';
+import { readString } from '../runtime/semantic-json.js';
 import { projectSessionContextFromSnapshot } from './context-snapshot-projection.js';
 import { summarizeSessionContextMeta } from './prompt.js';
 
@@ -18,9 +19,9 @@ async function prepareSessionApprovalResumeInput(options) {
   const fallbackContext = fallbackSnapshot
     ? projectSessionContextFromSnapshot(fallbackSnapshot)
     : readSessionContext(baseRequest && baseRequest.sessionContext);
-  const sessionId = readString$5(options.sessionId);
+  const sessionId = readString(options.sessionId);
 
-  approvalRequest.resumeToken.sessionId = readString$5(approvalRequest.resumeToken.sessionId) || sessionId;
+  approvalRequest.resumeToken.sessionId = readString(approvalRequest.resumeToken.sessionId) || sessionId;
 
   if (baseRequest) {
     const prepared = await prepareProviderSessionContext({
@@ -181,10 +182,6 @@ function readSessionContext(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? cloneValue(value)
     : null;
-}
-
-function readString$5(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { prepareSessionApprovalResumeInput };

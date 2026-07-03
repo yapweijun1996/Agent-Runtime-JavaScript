@@ -1,4 +1,5 @@
 import { requestSemanticJudge } from './semantic-judge.js';
+import { USE_AGENT_SKILL_ACTION, EXECUTE_SKILL_TOOL_ACTION, READ_URL_ACTION } from './action-names.js';
 import { readString, parseLooseJsonValue, readObject } from './semantic-json.js';
 import { buildEnvelopeLines, readEnvelopeTerminalPolicy } from './planner-envelope-lines.js';
 import { normalizeFinalReadiness } from './final-readiness.js';
@@ -106,7 +107,13 @@ async function requestPlannerEnvelopeRepair(options) {
     plannerMode: options && options.plannerMode,
     request: options && options.request,
     runState: options && options.runState,
-    todoState: options && options.todoState
+    todoState: options && options.todoState,
+    // AGRUN-551 — forward the publish-gate inputs so allowFinalize matches the
+    // gate: the finalize example must appear in the repair prompt whenever
+    // publish is gated (otherwise the prompt and the rejection check desync).
+    runtimeConfig: options && options.runtimeConfig,
+    activeAgentSkill: options && options.activeAgentSkill,
+    lastReadAgentSkill: options && options.lastReadAgentSkill
   };
   const envelopeExamples = buildEnvelopeLines(options && options.availableActions, envelopeOptions);
   const terminalPolicy = readEnvelopeTerminalPolicy(options && options.availableActions, envelopeOptions);
@@ -399,7 +406,12 @@ function shouldRejectTerminalEnvelope(envelope, options) {
     plannerMode: options && options.plannerMode,
     request: options && options.request,
     runState: options && options.runState,
-    todoState: options && options.todoState
+    todoState: options && options.todoState,
+    // AGRUN-551 — forward the publish-gate inputs so the finalize REJECTION check
+    // agrees with the prompt: when publish is gated, finalize must NOT be rejected.
+    runtimeConfig: options && options.runtimeConfig,
+    activeAgentSkill: options && options.activeAgentSkill,
+    lastReadAgentSkill: options && options.lastReadAgentSkill
   });
   return terminalPolicy.allowFinalize === false;
 }
@@ -410,7 +422,7 @@ function applyDeterministicPlannerGuards(envelope, options) {
   }
 
   if (
-    envelope.name === "use_agent_skill" &&
+    envelope.name === USE_AGENT_SKILL_ACTION &&
     isAlreadyActiveSkill(envelope.args && envelope.args.skillName, options && options.activeAgentSkill)
   ) {
     return {
@@ -421,7 +433,7 @@ function applyDeterministicPlannerGuards(envelope, options) {
   }
 
   if (
-    envelope.name === "execute_skill_tool" &&
+    envelope.name === EXECUTE_SKILL_TOOL_ACTION &&
     isMissingRequiredSkillToolFields(envelope.args, options && options.activeAgentSkill)
   ) {
     // Missing skillName AND toolName with no active skill — envelope is invalid.
@@ -430,7 +442,7 @@ function applyDeterministicPlannerGuards(envelope, options) {
   }
 
   if (
-    envelope.name === "execute_skill_tool" &&
+    envelope.name === EXECUTE_SKILL_TOOL_ACTION &&
     hasReusableToolResult(envelope.args, options && options.toolContext)
   ) {
     return {
@@ -441,7 +453,7 @@ function applyDeterministicPlannerGuards(envelope, options) {
   }
 
   if (
-    envelope.name === "read_url" &&
+    envelope.name === READ_URL_ACTION &&
     hasReadableSourceForUrl(envelope.args && envelope.args.url, options && options.readSources)
   ) {
     return {

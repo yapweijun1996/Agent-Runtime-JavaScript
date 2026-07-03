@@ -1,10 +1,12 @@
 import { readEvidencePolicy, countStructuredToolEvidence } from './evidence-policy.js';
+import { isSuccessfulReadUrlArtifact } from './read-source-quality.js';
+import { readString, readFiniteNumber } from './semantic-json.js';
 
 function normalizeFinalReadiness(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
-  const decision = readString$1I(value.decision);
+  const decision = readString(value.decision);
   if (decision !== "ready" && decision !== "limited") {
     return null;
   }
@@ -13,8 +15,8 @@ function normalizeFinalReadiness(value) {
   );
   const normalized = {
     decision,
-    evidenceMode: readString$1I(value.evidenceMode) || null,
-    limitations: readString$1I(value.limitations) || null
+    evidenceMode: readString(value.evidenceMode) || null,
+    limitations: readString(value.limitations) || null
   };
   if (requirementsAssessment) {
     normalized.requirementsAssessment = requirementsAssessment;
@@ -39,9 +41,9 @@ function createFinalReadinessAssessment(options = {}) {
     finalCandidateReady: quality.finalCandidateReady === true,
     finalCandidateStats,
     researchFinalAllowed: researchState.finalAllowed === true,
-    researchFinalReason: readString$1I(researchState.finalReason) || null,
+    researchFinalReason: readString(researchState.finalReason) || null,
     researchGaps: Array.isArray(researchState.gaps)
-      ? researchState.gaps.map(readString$1I).filter(Boolean).slice(0, 12)
+      ? researchState.gaps.map(readString).filter(Boolean).slice(0, 12)
       : [],
     researchQualityGateRequired: researchState.qualityGateRequired === true,
     successfulEvidenceCount,
@@ -60,15 +62,10 @@ function countSuccessfulReadUrlArtifacts(runState) {
   const readSources = Array.isArray(runState && runState.researchContext && runState.researchContext.readSources)
     ? runState.researchContext.readSources
     : [];
-  return readSources.filter((source) => {
-    if (!source || typeof source !== "object") return false;
-    if (source.ok === false) return false;
-    const status = typeof source.status === "number" ? source.status : null;
-    const originStatus = typeof source.originStatus === "number" ? source.originStatus : null;
-    if (status != null && status >= 400) return false;
-    if (originStatus != null && originStatus >= 400) return false;
-    return Boolean(readString$1I(source.text) || readString$1I(source.title));
-  }).length;
+  // AGRUN-491 (audit M12) — the transport-success predicate is the SSOT
+  // isSuccessfulReadUrlArtifact in read-source-quality.js (co-located with the
+  // content-quality isReadableEvidenceSource so the two layers stay explicit).
+  return readSources.filter(isSuccessfulReadUrlArtifact).length;
 }
 
 function normalizeRequirementsAssessment(value) {
@@ -82,17 +79,17 @@ function normalizeRequirementsAssessment(value) {
     checkedWorkspaceStats: value.checkedWorkspaceStats === true,
     evidenceSatisfied: typeof value.evidenceSatisfied === "boolean" ? value.evidenceSatisfied : null,
     lengthSatisfied: typeof value.lengthSatisfied === "boolean" ? value.lengthSatisfied : null,
-    observedLength: readFiniteNumber$6(value.observedLength) ?? readFiniteNumber$6(value.actualLength),
+    observedLength: readFiniteNumber(value.observedLength) ?? readFiniteNumber(value.actualLength),
     observedLengthUnit: normalizeLengthUnit$1(value.observedLengthUnit || value.lengthUnit),
     remainingGaps: Array.isArray(value.remainingGaps)
-      ? value.remainingGaps.map(readString$1I).filter(Boolean).slice(0, 12)
+      ? value.remainingGaps.map(readString).filter(Boolean).slice(0, 12)
       : [],
-    requestedLength: readFiniteNumber$6(value.requestedLength),
+    requestedLength: readFiniteNumber(value.requestedLength),
     requirementSatisfied: typeof value.requirementSatisfied === "boolean" ? value.requirementSatisfied : null,
-    summary: readString$1I(value.summary) || null,
-    successfulEvidenceCount: readFiniteNumber$6(value.successfulEvidenceCount),
-    successfulReadUrlCount: readFiniteNumber$6(value.successfulReadUrlCount),
-    userRequirementSummary: readString$1I(value.userRequirementSummary) || null
+    summary: readString(value.summary) || null,
+    successfulEvidenceCount: readFiniteNumber(value.successfulEvidenceCount),
+    successfulReadUrlCount: readFiniteNumber(value.successfulReadUrlCount),
+    userRequirementSummary: readString(value.userRequirementSummary) || null
   };
 }
 
@@ -111,15 +108,15 @@ function normalizeTextStats$5(value) {
   const hasAny = ["chars", "nonWhitespaceChars", "cjkChars", "words"].some((key) => Number.isFinite(source[key]));
   if (!hasAny) return null;
   return {
-    chars: readNumber$k(source.chars),
-    cjkChars: readNumber$k(source.cjkChars),
-    nonWhitespaceChars: readNumber$k(source.nonWhitespaceChars),
-    words: readNumber$k(source.words)
+    chars: readNumber$l(source.chars),
+    cjkChars: readNumber$l(source.cjkChars),
+    nonWhitespaceChars: readNumber$l(source.nonWhitespaceChars),
+    words: readNumber$l(source.words)
   };
 }
 
 function normalizeLengthUnit$1(value) {
-  const text = readString$1I(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (text === "word" || text === "words") return "words";
   if (text === "token" || text === "tokens") return "tokens";
   if (text === "cjk_chars" || text.includes("\u4e2d\u6587") || text === "\u5b57" || text === "\u5b57\u6570") return "cjk_chars";
@@ -127,16 +124,8 @@ function normalizeLengthUnit$1(value) {
   return "chars";
 }
 
-function readFiniteNumber$6(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readNumber$k(value) {
+function readNumber$l(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function readString$1I(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { countSuccessfulEvidenceArtifacts, countSuccessfulReadUrlArtifacts, createFinalReadinessAssessment, normalizeFinalReadiness };

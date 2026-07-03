@@ -1,6 +1,7 @@
 import { summarizeTodoStateForPrompt } from './todo-state.js';
 import { isTodoPlanningPlaceholder } from './todo-planning-placeholder.js';
 import { normalizeTodoPromptStrings, DEFAULT_TODO_PROMPT_STRINGS } from './todo-prompt-strings.js';
+import { readString } from './semantic-json.js';
 
 /**
  * AGRUN-212a Phase E — Build the planner-system-prompt block that
@@ -25,6 +26,7 @@ import { normalizeTodoPromptStrings, DEFAULT_TODO_PROMPT_STRINGS } from './todo-
  */
 
 
+
 // 2026-04-27: header / footer / placeholder copy moved into
 // todo-prompt-strings.js so hosts can override per-model without
 // touching this file. Defaults preserve historical wording verbatim
@@ -38,10 +40,6 @@ function statusGlyph(status, isActive) {
   if (status === "blocked") return "⨯";
   if (status === "abandoned") return "·";
   return "○";
-}
-
-function readString$q(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 /**
@@ -97,7 +95,7 @@ function buildTodoStateBlockForCycle(runState, options) {
 }
 
 function compactDuplicateGoal(goal, requestPrompt) {
-  const value = readString$q(goal);
+  const value = readString(goal);
   const requestKey = normalizePromptDuplicateKey(requestPrompt);
   if (!value || !requestKey) return value;
   return normalizePromptDuplicateKey(value) === requestKey
@@ -106,7 +104,7 @@ function compactDuplicateGoal(goal, requestPrompt) {
 }
 
 function normalizePromptDuplicateKey(value) {
-  return readString$q(value).replace(/\s+/g, " ").trim().toLowerCase();
+  return readString(value).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function resolvePromptStrings(options) {

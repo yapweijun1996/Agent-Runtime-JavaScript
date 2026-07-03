@@ -1,5 +1,6 @@
 import { cloneValue } from '../runtime/utils.js';
 import { SessionVersionConflictError } from './errors.js';
+import { upsertSessionMemoryEntry } from './memory-slot.js';
 import { ensureSummaryKeyFields, composeSummaryKey } from './summary-key.js';
 
 // AGRUN-206 — CAS check helper shared between store implementations.
@@ -214,8 +215,12 @@ function createInMemorySessionStore(options) {
     },
 
     async appendMemory(sessionId, entry) {
+      // AGRUN-494 (audit M17) — upsert by (kind, slot) so a re-confirmed slot
+      // REPLACES its stale row instead of accumulating duplicates (only the
+      // latest per slot is ever wanted; the read merge already assumes one row
+      // per slot). Slot-less entries stay append-only.
       const list = memoryEntries.get(sessionId) || [];
-      list.push(cloneValue(entry));
+      upsertSessionMemoryEntry(list, cloneValue(entry));
       memoryEntries.set(sessionId, list);
       touch(sessionId);
       return cloneValue(entry);

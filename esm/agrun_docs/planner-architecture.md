@@ -287,7 +287,7 @@ Auto mode uses `src/runtime/provider-capabilities.js` as the SSOT for planner-mo
 configuredMode → resolvePlannerMode() → effectivePlannerMode
 ```
 
-Since ADR-0031 (2026-05-16), the resolver no longer inspects provider/model/action surfaces. `plannerMode: "auto"` (and any omitted / unknown value) resolves to `effectiveMode: "envelope"` with `reason: "default_envelope"`. Explicit `plannerMode: "native_tools"` and `plannerMode: "envelope"` are still honored with `reason: "explicit"`. Native mode is an advanced/debug opt-in only; envelope is the canonical PASS path.
+Since ADR-0058 (2026-07-02, supersedes ADR-0031), the resolver still inspects nothing but configuredMode. `plannerMode: "auto"` (and any omitted / unknown value) resolves to `effectiveMode: "native_tools"` with `reason: "default_native_tools"`. Explicit `plannerMode: "native_tools"` and `plannerMode: "envelope"` are honored with `reason: "explicit"`. Envelope remains fully supported as the explicit opt-out (weak models, ADR-0035 envelope prompt-override users) and as the automatic per-call fallback via `nativeToolsFailurePolicy: "fallback_to_envelope"` (default).
 
 ### Lite Model Compact Envelope
 
@@ -371,7 +371,7 @@ ADR-0031 (2026-05-16) supersedes AGRUN-213q. `plannerMode: "auto"` now resolves 
 - native tools still support single action, `ask_clarification`, `finalize`, `final_answer`, and `plan`, and native `plan` still parses into the same `type:"plan"` decision shape that reuses `validatePlan()` / `executePlan()`
 - broad native-readiness live coverage previously passed OpenAI/Gemini native action, clarify, finalize, approval, search, and TodoState, but Gemini native preview endpoints were observed to be unstable under sustained long-running native requests on 2026-05-16, which is the primary driver for the envelope default
 - native planner failures still default to `nativeToolsFailurePolicy: "fallback_to_envelope"` when a host explicitly opts into native; `"hard_fail"` is available when hosts want native-mode failure to stop immediately
-- debug surfaces still expose configured mode (`auto`/`envelope`/`native_tools`), effective mode, and resolver reason (`default_envelope` / `explicit`) so hosts can observe agrun's choice
+- debug surfaces still expose configured mode (`auto`/`envelope`/`native_tools`), effective mode, and resolver reason (`default_native_tools` / `explicit`) so hosts can observe agrun's choice
 
 The readiness matrix and blocker list live in [native-tools-readiness.md](./native-tools-readiness.md). The default-mode decision is recorded in [ADR-0003](./adr/0003-native-tools-default-readiness.md).
 

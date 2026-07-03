@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // ADR-0037 — spawn_subagent orchestrator/worker capability.
 //
 // Constructs the `spawnSubagent` callable that the action handler invokes
@@ -17,6 +19,7 @@
 // Child sessions are in-memory only (no sessionRecord persisted). Lineage
 // lives entirely in step / ledger events. Persisting child sessionRecords
 // is deferred to a future ADR if hosts need it.
+
 
 const SUBAGENT_ACTION_NAME = "spawn_subagent";
 const DEFAULT_CHILD_MAX_STEPS = 15;
@@ -95,12 +98,12 @@ function createSpawnSubagentCapability({
   }
 
   let childSequence = 0;
-  const parentSessionId = readString$C(parentOptions.sessionId);
-  const parentRunId = readString$C(parentOptions.runId) || "run";
+  const parentSessionId = readString(parentOptions.sessionId);
+  const parentRunId = readString(parentOptions.runId) || "run";
   const knownActionNames = collectActionNames(actionRegistryActions);
 
   return async function spawnSubagent(args) {
-    const task = readString$C(args && args.task);
+    const task = readString(args && args.task);
     if (!task) {
       return failureEnvelope({
         code: "SUBAGENT_INVALID_ARGS",
@@ -137,7 +140,7 @@ function createSpawnSubagentCapability({
     } catch (error) {
       return failureEnvelope({
         code: "SUBAGENT_RUN_ERROR",
-        message: readString$C(error && error.message) || "spawn_subagent execution threw",
+        message: readString(error && error.message) || "spawn_subagent execution threw",
         childSessionId,
         childRunId
       });
@@ -189,6 +192,15 @@ function buildChildOptions({
     ? parentOptions.runtimeConfig
     : {};
   const childRuntimeConfig = {
+    // ADR-0057 Phase 1 triage (dispatch-matrix third door, audit §5 "write it
+    // down") — `deferredNamespaces` is DELIBERATELY inherited via this parent
+    // config spread: the host's deferral posture is createRuntime capability
+    // config, not parent run-state. The parent's OPEN state does NOT leak:
+    // `runState.actionNamespaceContext` rides runState, which the
+    // CHILD_PARENT_STATE_BLANKLIST above blanks (`runState` + `resumeState`),
+    // so the child builds a fresh runState and starts with every deferred
+    // namespace CLOSED — fresh discovery per ADR-0057 §4. The child's own
+    // registry re-registers open_action_namespace from this inherited config.
     ...parentRuntimeConfig,
     maxSteps: childMaxSteps,
     // Child must not re-trigger spawn_subagent via runtimeConfig default
@@ -262,6 +274,7 @@ function buildChildOptions({
     onStep: undefined,
     onStreamEvent: undefined,
     onToken: undefined,
+    onReasoning: undefined,
     onPlannerDecision: undefined,
     onToolResult: undefined,
     onInvalidPlannerOutput: undefined,
@@ -303,7 +316,10 @@ const CHILD_RAW_INPUT_ALLOWLIST = Object.freeze([
   "webSearchEndpoint", "webSearchApiKey", "webSearchProvider", "webSearchModel", "webSearchAuthMode",
   "readUrlEndpoint", "readUrlApiKey",
   "authMode",
-  "signal"
+  "signal",
+  // AGRUN-518 — a subagent runs at the same wall-clock as its parent, so it
+  // inherits the host-provided time context rather than guessing.
+  "timeContext"
 ]);
 
 function buildChildRawInput(parentRawInput, task, parentSessionId, parentRequest) {
@@ -356,7 +372,8 @@ const REQUEST_BACKFILL_FIELDS = Object.freeze([
   "searchProvider",
   "reasoningEffort",
   "timeoutMs",
-  "systemPrompt"
+  "systemPrompt",
+  "timeContext"
 ]);
 
 // AGRUN-255 — build child's actionPolicy by inheriting parent's policy
@@ -422,15 +439,15 @@ function clampChildMaxSteps(requested, parentOptions) {
   // a focused worker, not a full main loop. Caller can request more via
   // `maxSteps`, but the child is always clamped to the parent's overall
   // ceiling so a delegated worker cannot escape the parent's budget.
-  const parentMax = readPositiveInteger$d(parentOptions && parentOptions.runtimeConfig && parentOptions.runtimeConfig.maxSteps);
-  const requestedMax = readPositiveInteger$d(requested);
+  const parentMax = readPositiveInteger$b(parentOptions && parentOptions.runtimeConfig && parentOptions.runtimeConfig.maxSteps);
+  const requestedMax = readPositiveInteger$b(requested);
   const desired = requestedMax || DEFAULT_CHILD_MAX_STEPS;
   return parentMax ? Math.min(desired, parentMax) : desired;
 }
 
 function normalizeChildResult({ childResult, childSessionId, childRunId }) {
   const runState = childResult && childResult.runState ? childResult.runState : {};
-  const status = readString$C(runState.status) || "unknown";
+  const status = readString(runState.status) || "unknown";
   const cycleCount = Number.isInteger(runState.cycleCount) ? runState.cycleCount : 0;
   const usage = childResult && childResult.lastTokenUsage
     ? childResult.lastTokenUsage
@@ -447,7 +464,7 @@ function normalizeChildResult({ childResult, childSessionId, childRunId }) {
   const outputStatus = effectiveError
     ? "failed"
     : (status === "completed" ? "completed" : status);
-  const errorCode = readString$C(effectiveError && effectiveError.code) || "SUBAGENT_FAILED";
+  const errorCode = readString(effectiveError && effectiveError.code) || "SUBAGENT_FAILED";
 
   return {
     control: "continue",
@@ -462,7 +479,7 @@ function normalizeChildResult({ childResult, childSessionId, childRunId }) {
       error: effectiveError
         ? {
             code: errorCode,
-            message: readString$C(effectiveError.message) || "Subagent run did not complete cleanly."
+            message: readString(effectiveError.message) || "Subagent run did not complete cleanly."
           }
         : null
     },
@@ -494,9 +511,9 @@ function readChildFinalResponse(childResult, runState) {
   const output = childResult && childResult.output;
   const outputText = output && typeof output === "object" && !Array.isArray(output)
     && (output.kind === "final_response" || output.kind === "planner_final")
-    ? readString$C(output.text)
-    : readString$C(output);
-  return outputText || readString$C(runState && runState.lastPlannerFinalText) || "";
+    ? readString(output.text)
+    : readString(output);
+  return outputText || readString(runState && runState.lastPlannerFinalText) || "";
 }
 
 function failureEnvelope({ code, message, childSessionId, childRunId }) {
@@ -538,15 +555,11 @@ function mergeUniqueStrings(...sources) {
   return Array.from(out);
 }
 
-function readString$C(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readArray(value) {
   return Array.isArray(value) ? value.slice() : [];
 }
 
-function readPositiveInteger$d(value) {
+function readPositiveInteger$b(value) {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 

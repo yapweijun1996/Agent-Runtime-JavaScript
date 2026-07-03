@@ -2,6 +2,7 @@ import { readUrl } from '../../skills/providers/url-reader.js';
 import { explainReadSourceQuality } from '../read-source-quality.js';
 import { DEFAULT_READ_URL_MAX_BYTES, normalizeHttpUrl, normalizeReadUrlMethod, normalizeReadUrlMode, normalizePositiveInteger, DEFAULT_READ_URL_TIMEOUT_MS } from '../../skills/providers/url-reader-utils.js';
 import { isRetryableReadUrlResult, classifyReadUrlFailure } from '../read-url-recovery-signal.js';
+import { readString } from '../semantic-json.js';
 
 const READ_URL_MAX_RETRIES = 1;
 const READ_URL_RETRY_DELAY_MS = 1500;
@@ -102,9 +103,9 @@ async function executeReadUrlAction(context, args) {
 
 function normalizeReadUrlArgs(args, request) {
   const prompt = request && typeof request.prompt === "string" ? request.prompt : "";
-  const rawMethod = readString$P(args && args.method).toUpperCase();
+  const rawMethod = readString(args && args.method).toUpperCase();
   const url = normalizeHttpUrl(
-    readString$P(args && args.url) ||
+    readString(args && args.url) ||
     extractFirstUrl(prompt) ||
     readSnapshotSelectedUrl(request)
   );
@@ -169,7 +170,7 @@ function createInvalidReadUrlOutput(error, message, mode, url) {
 
 function createReadUrlRecovery(output, args) {
   const classification = classifyReadUrlFailure(output);
-  const reason = readString$P(output && (output.reason || output.error));
+  const reason = readString(output && (output.reason || output.error));
   return {
     kind: "read_url_recovery",
     retryable: classification.retryable === true,
@@ -200,7 +201,7 @@ async function maybeReadAlternateCandidate(context, output, normalizedArgs, read
   if (typeof context?.pushStep === "function") {
     context.pushStep("read-url-fallback-attempt", {
       fromUrl: normalizedArgs.url,
-      reason: readString$P(output && (output.reason || output.error)) || "read_url_failed",
+      reason: readString(output && (output.reason || output.error)) || "read_url_failed",
       url: candidate.url
     });
   }
@@ -213,7 +214,7 @@ async function maybeReadAlternateCandidate(context, output, normalizedArgs, read
     selectedTitle: candidate.title || "",
     selectedDomain: candidate.domain || "",
     result: {
-      error: readString$P(fallbackOutput && fallbackOutput.error),
+      error: readString(fallbackOutput && fallbackOutput.error),
       ok: fallbackOutput && fallbackOutput.ok !== false,
       status: typeof fallbackOutput?.status === "number" ? fallbackOutput.status : null,
       originStatus: typeof fallbackOutput?.originStatus === "number" ? fallbackOutput.originStatus : null
@@ -249,7 +250,7 @@ function shouldUseAlternateCandidateFallback(context) {
   // Approval resumes should execute exactly the approved URL. Alternate-source
   // recovery belongs to autonomous runs where the host has already allowed
   // tier-1 research actions.
-  return readString$P(context?.request?.type) !== "approval_resolution";
+  return readString(context?.request?.type) !== "approval_resolution";
 }
 
 function findAlternateCandidate(context, failedUrl) {
@@ -296,17 +297,17 @@ function readFailedUrlKeys(context, failedUrl) {
 
 function normalizeCandidate(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const url = normalizeHttpUrl(readString$P(value.url));
+  const url = normalizeHttpUrl(readString(value.url));
   if (!url) return null;
   return {
-    domain: readString$P(value.domain) || readDomain$1(url),
-    title: readString$P(value.title) || url,
+    domain: readString(value.domain) || readDomain$1(url),
+    title: readString(value.title) || url,
     url
   };
 }
 
 function normalizeUrlKey(value) {
-  const url = normalizeHttpUrl(readString$P(value));
+  const url = normalizeHttpUrl(readString(value));
   if (!url) return "";
   try {
     const parsed = new URL(url);
@@ -327,10 +328,6 @@ function readDomain$1(url) {
 
 function readArray$1(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function readString$P(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeNonNegativeInteger$1(value, fallbackValue) {
@@ -365,7 +362,7 @@ function readSnapshotSelectedUrl(request) {
     ? inquiryContext.candidateSources[0]
     : null;
 
-  return readString$P(selectedSource && selectedSource.url) || readString$P(singleCandidate && singleCandidate.url);
+  return readString(selectedSource && selectedSource.url) || readString(singleCandidate && singleCandidate.url);
 }
 
 export { executeReadUrlAction, normalizeReadUrlArgs, readUrlAction };

@@ -7,7 +7,8 @@
 // (name-free). The legacy `researchActivation` MODE flag was removed
 // (breaking serialization/input change): the kernel no longer knows a "long research"
 // mode by name. A skill that needs long-running convergence declares the generic
-// `requiresEvidenceConvergence` capability (it ships in @agrun/skills-research); the
+// `requiresEvidenceConvergence` capability (a research skill declares it — see the
+// in-tree DATA default-research-skills.js); the
 // capability rides on the engaged skill OBJECT (agentSkillContext.activeSkill /
 // lastReadSkill, co-populated when the agent engages the skill via use_agent_skill /
 // read_agent_skill). This is the same object-capability mechanism

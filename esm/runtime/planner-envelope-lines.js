@@ -1,7 +1,8 @@
 import { resolvePlannerMode } from './provider-capabilities.js';
-import { PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
+import { EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
 import { formatStandalonePlanActionNames } from './action-plan-contract.js';
-import { normalizeVirtualWorkspace } from './virtual-workspace.js';
+import { resolveTerminalAvailability } from './terminal-repair/availability.js';
+import { readString } from './semantic-json.js';
 
 function buildEnvelopeLines(availableActions, options) {
   const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
@@ -47,7 +48,7 @@ function buildEnvelopeLines(availableActions, options) {
     }
   }
 
-  if (actionDefinitions.some((action) => action.name === "execute_skill_tool")) {
+  if (actionDefinitions.some((action) => action.name === EXECUTE_SKILL_TOOL_ACTION)) {
     const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
     envelopeLines.push(`Plan envelope actions must be independent non-mutating tool calls that do not require approval (actionPolicy=allow). Actions marked standalone-only by action metadata must not appear inside plan.actions: ${standaloneActionNames}. Approval-gated actions must also be standalone.`);
     envelopeLines.push(compactExamples
@@ -60,7 +61,7 @@ function buildEnvelopeLines(availableActions, options) {
               skillName: "skill-name",
               toolName: "first_tool"
             },
-            name: "execute_skill_tool",
+            name: EXECUTE_SKILL_TOOL_ACTION,
             reasoning: "...",
             section: {
               prompt: "Write this result as a complete markdown section.",
@@ -74,7 +75,7 @@ function buildEnvelopeLines(availableActions, options) {
               skillName: "skill-name",
               toolName: "second_tool"
             },
-            name: "execute_skill_tool",
+            name: EXECUTE_SKILL_TOOL_ACTION,
             reasoning: "...",
             section: {
               prompt: "Write this result as a complete markdown section.",
@@ -129,7 +130,7 @@ function buildCompactActionArgsReference(actionDefinitions) {
   const entries = actionDefinitions
     .filter((action) => action && action.decisionType !== "clarify")
     .map((action) => {
-      const name = readString$w(action.name);
+      const name = readString(action.name);
       if (!name) return null;
       return `${name} args=${JSON.stringify(action.argsExample || {})}`;
     })
@@ -140,12 +141,32 @@ function buildCompactActionArgsReference(actionDefinitions) {
 function readEnvelopeTerminalPolicy(availableActions, options) {
   const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
   const opts = options && typeof options === "object" ? options : {};
-  const modeSelection = readEnvelopeModeSelection(actionDefinitions, opts);
-  if (hasWorkspacePublishCandidatePathRequired(actionDefinitions, opts.runState)) {
+  const modeSelection = readEnvelopeModeSelection(opts);
+  // AGRUN-551 — disable finalize to force the publish path ONLY when publish is
+  // actually executable. If workspace_publish_candidate is gated (publishCandidate
+  // gate active with no evidence-convergence / publish-readiness opt-in and no
+  // terminal-repair override), disabling finalize would leave the model with NO
+  // terminal at all — it cannot publish (gated) and cannot finalize — so it loops
+  // on invalid terminals (publish_candidate_gated + finalize_not_allowed) to the
+  // deadline and returns EMPTY (deepseek-v4-flash high, live 2026-06-25 repro-1).
+  // When publish is gated, keep finalize available so the model always has one
+  // terminal path; the runtime finalizer delivers the drafted answer.
+  //
+  // AGRUN-559 — that rule now lives in resolveTerminalAvailability, the SSOT
+  // fact object every terminal door consults, so this prompt-side policy can
+  // never again disagree with the dispatch-side publish gate (the AGRUN-551
+  // bug shape: two gates reading different input bags).
+  const availability = resolveTerminalAvailability(opts.runState, {
+    availableActions: actionDefinitions,
+    runtimeConfig: opts.runtimeConfig,
+    activeAgentSkill: opts.activeAgentSkill,
+    lastReadAgentSkill: opts.lastReadAgentSkill
+  });
+  if (!availability.finalizeOpen) {
     return Object.freeze({
       allowFinalize: false,
       effectivePlannerMode: modeSelection.effectiveMode,
-      reason: "workspace_publish_path_required"
+      reason: availability.finalizeClosedReason
     });
   }
 
@@ -156,39 +177,23 @@ function readEnvelopeTerminalPolicy(availableActions, options) {
   });
 }
 
-function hasWorkspacePublishCandidatePathRequired(actionDefinitions, runState) {
-  if (!actionDefinitions.some((action) => action && action.name === PUBLISH_DIRECT_ACTION)) {
-    return false;
-  }
-  const workspace = normalizeVirtualWorkspace(runState && runState.virtualWorkspace);
-  if (!workspace || workspace.enabled !== true) return false;
-  const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
-  if (quality.finalCandidateReady === true) return true;
-  return Object.values(workspace.files || {}).some((file) => (
-    readString$w(file && file.content).length > 0
-  ));
-}
-
-function readEnvelopeModeSelection(actionDefinitions, opts) {
-  const effectivePlannerMode = readString$w(opts.effectivePlannerMode);
+function readEnvelopeModeSelection(opts) {
+  const effectivePlannerMode = readString(opts.effectivePlannerMode);
   if (effectivePlannerMode === "native_tools" || effectivePlannerMode === "envelope") {
     return Object.freeze({
-      configuredMode: readString$w(opts.plannerMode) || "auto",
+      configuredMode: readString(opts.plannerMode) || "auto",
       effectiveMode: effectivePlannerMode,
-      reason: readString$w(opts.plannerModeReason) || "caller_effective_mode"
+      reason: readString(opts.plannerModeReason) || "caller_effective_mode"
     });
   }
 
-  const request = opts.request && typeof opts.request === "object" ? opts.request : {};
+  // resolvePlannerMode is a pure function of configuredMode only (explicit ->
+  // that mode; auto -> envelope). It does NOT branch on actions/model/provider —
+  // those were a model-name heuristic removed in AGRUN-294I/ADR-0033. Passing
+  // them here was dead API surface (AGRUN-416).
   return resolvePlannerMode({
-    configuredMode: opts.plannerMode,
-    model: request.model,
-    provider: request.provider
+    configuredMode: opts.plannerMode
   });
-}
-
-function readString$w(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { buildEnvelopeLines, readEnvelopeTerminalPolicy };

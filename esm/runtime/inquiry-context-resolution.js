@@ -1,4 +1,5 @@
 import { normalizeInquiryContext, createContextSnapshot } from '../session/context-snapshot-normalize.js';
+import { readString } from './semantic-json.js';
 import { refreshProjectedSessionContext } from './session-context-state.js';
 import { looksLikeTopicPrompt } from './topic-like-task.js';
 import { readResolvedInputContext, cloneResolution, clonePendingClarification, normalizeAnchorText, looksLikeAffirmativePrompt, inferClarifiedTopic, matchesClarificationAnswer, matchClarificationOption, countTokenOverlap, hasStandaloneTopicAnchor, overlapsCurrentDirection } from './inquiry-context-helpers.js';
@@ -8,9 +9,9 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
   const normalizedPrompt = normalizeAnchorText(prompt);
   if (!normalizedPrompt) {
     return {
-      activeGoal: readString$19(context.activeGoal),
-      activeQuery: readString$19(context.activeQuery),
-      activeTopic: readString$19(context.activeTopic),
+      activeGoal: readString(context.activeGoal),
+      activeQuery: readString(context.activeQuery),
+      activeTopic: readString(context.activeTopic),
       continuityKind: "preserve",
       hasUserClarification: false,
       lastClarificationResolution: cloneResolution(context.lastClarificationResolution),
@@ -19,9 +20,9 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
     };
   }
 
-  const currentGoal = readString$19(context.activeGoal);
-  const currentQuery = readString$19(context.activeQuery);
-  const currentTopic = readString$19(context.activeTopic);
+  const currentGoal = readString(context.activeGoal);
+  const currentQuery = readString(context.activeQuery);
+  const currentTopic = readString(context.activeTopic);
   const pendingClarification = context.pendingClarification && typeof context.pendingClarification === "object"
     ? context.pendingClarification
     : null;
@@ -29,7 +30,7 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
     && typeof options.turnIntent === "object"
     ? options.turnIntent
     : null;
-  const turnIntentKind = readString$19(turnIntent && turnIntent.kind);
+  const turnIntentKind = readString(turnIntent && turnIntent.kind);
 
   if (turnIntentKind === "new_task") {
     return {
@@ -64,14 +65,22 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
       };
     }
 
+    // AGRUN-595 — an affirmative reply answers the question even when no
+    // topic could be inferred from it: resolve instead of preserving, or the
+    // next planner prompt still says "clarification pending" and an obedient
+    // model re-asks.
     return {
       activeGoal: currentGoal || normalizedPrompt,
       activeQuery: currentQuery || currentTopic || normalizedPrompt,
       activeTopic: currentTopic || currentGoal || normalizedPrompt,
       continuityKind: "clarification_acknowledged",
       hasUserClarification: true,
-      lastClarificationResolution: cloneResolution(context.lastClarificationResolution),
-      pendingClarification: clonePendingClarification(context.pendingClarification),
+      lastClarificationResolution: {
+        kind: "confirm",
+        sourceTurn: "current_input",
+        value: true
+      },
+      pendingClarification: null,
       turnKind: "follow_up"
     };
   }
@@ -132,6 +141,32 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
       lastClarificationResolution: null,
       pendingClarification: null,
       turnKind: "new_task"
+    };
+  }
+
+  // AGRUN-595 — a reply to a pending clarification IS the answer by default.
+  // The specific matchers above (affirmative / inferred-topic / option /
+  // breakout) cover crisp shapes; every other contentful reply used to fall
+  // through to the continuity branches below WITH pendingClarification
+  // preserved, so the next planner prompt still said "clarification pending"
+  // and an obedient model re-asked the same question verbatim (live browser
+  // loop: "Global headlines please. Yes, run the web search now." got the
+  // identical question again). Only a breakout to a clearly new topic
+  // (above) or an upstream new_task escapes resolution.
+  if (pendingClarification) {
+    return {
+      activeGoal: currentGoal || normalizedPrompt,
+      activeQuery: normalizedPrompt,
+      activeTopic: currentTopic || normalizedPrompt,
+      continuityKind: "clarification_free_form_answer",
+      hasUserClarification: true,
+      lastClarificationResolution: {
+        kind: "free_form_answer",
+        sourceTurn: "current_input",
+        value: normalizedPrompt
+      },
+      pendingClarification: null,
+      turnKind: "follow_up"
     };
   }
 
@@ -200,9 +235,9 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
 }
 
 function syncPromptInquiryContext(runState, request, options) {
-  const prompt = readString$19(request && request.prompt);
+  const prompt = readString(request && request.prompt);
 
-  if (!runState || !prompt || readString$19(request && request.type) === "approval_resolution") {
+  if (!runState || !prompt || readString(request && request.type) === "approval_resolution") {
     return;
   }
 
@@ -239,10 +274,6 @@ function ensureContextSnapshot$1(runState) {
   const snapshot = createContextSnapshot({});
   runState.contextSnapshot = snapshot;
   return snapshot;
-}
-
-function readString$19(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { resolvePromptInquiryContext, syncPromptInquiryContext };

@@ -1,5 +1,5 @@
 import { normalizeTodoAutopilotConfig } from './todo-autopilot.js';
-import { FINALIZE_CANDIDATE_ACTION } from './kernel-terminal-actions.js';
+import { READ_URL_ACTION, FINALIZE_CANDIDATE_ACTION, TODO_RUN_NEXT_ACTION } from './action-names.js';
 import { readString } from './todo-detection.js';
 import { findActiveTodoItem } from './todo-queries.js';
 
@@ -24,7 +24,7 @@ function maybeCreateTodoActionProgressDecision(runState, config, context) {
   // todo_inspect loop after a failed read; auto-advancing on failure
   // would have made the loop worse by promoting the work item without
   // real progress.
-  if (actionName === "read_url") {
+  if (actionName === READ_URL_ACTION) {
     const lastReadSource = runState
       && runState.contextSnapshot
       && runState.contextSnapshot.inquiryContext
@@ -67,7 +67,7 @@ function maybeCreateTodoActionProgressDecision(runState, config, context) {
 
   return {
     type: "action",
-    name: "todo_run_next",
+    name: TODO_RUN_NEXT_ACTION,
     args: {
       note: `Action completed (${actionName}): ${label}`
     }

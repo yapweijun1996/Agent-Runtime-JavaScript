@@ -1,4 +1,5 @@
 import { tokenizeTopicText } from '../session/thread.js';
+import { readString } from './semantic-json.js';
 
 /**
  * Shared structural-signal helpers for the topic-router and the turn-intent
@@ -10,7 +11,7 @@ import { tokenizeTopicText } from '../session/thread.js';
 function collectThreadTokens(thread) {
   const bag = new Set();
   if (!thread || typeof thread !== "object") return bag;
-  const topic = readString$h(thread.topic);
+  const topic = readString(thread.topic);
   if (topic) {
     for (const token of tokenizeTopicText(topic)) bag.add(token);
   }
@@ -74,10 +75,6 @@ function totalThreadVocab(threads) {
     total += collectThreadTokens(thread).size;
   }
   return total;
-}
-
-function readString$h(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { anyThreadHasDistinctiveTokens, collectThreadTokens, jaccard$1 as jaccard, scoreThreads, totalThreadVocab };

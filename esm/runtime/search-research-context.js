@@ -1,6 +1,7 @@
 import { aggregateRankedSearchResults } from '../skills/providers/web-search-ranking.js';
 import { cloneValue } from './utils.js';
 import { normalizeCandidateSource } from '../session/context-snapshot-fields.js';
+import { readString } from './semantic-json.js';
 import { createSearchVerification, readVerificationState } from './web-search-verification.js';
 import { resolveSearchPassesCap, DEFAULT_SEARCH_PASSES_CAP, resolveReadSourcesCap, DEFAULT_READ_SOURCES_CAP } from './evidence-policy.js';
 
@@ -48,7 +49,7 @@ function appendWebSearchOutput(researchContext, output, runtimeConfig) {
   const readSources = Array.isArray(context.readSources) ? context.readSources.slice() : [];
   const aggregatedSearchResults = aggregateRankedSearchResults(combinedPasses);
   const verification = createSearchVerification({
-    query: readString$14(output && output.query) || readString$14(context && context.lastQuery),
+    query: readString(output && output.query) || readString(context && context.lastQuery),
     rankedItems: aggregatedSearchResults,
     readSources,
     strategy: output && output.searchPlan ? output.searchPlan.strategy : ""
@@ -57,7 +58,7 @@ function appendWebSearchOutput(researchContext, output, runtimeConfig) {
 
   return {
     aggregatedSearchResults: cloneValue(aggregatedSearchResults),
-    lastQuery: readString$14(output && output.lastExecutedQuery) || readString$14(output && output.query) || null,
+    lastQuery: readString(output && output.lastExecutedQuery) || readString(output && output.query) || null,
     readSources,
     searchPasses: combinedPasses,
     searchPlan: cloneValue(output && output.searchPlan) || null,
@@ -84,10 +85,6 @@ function readOutputArray(output, ...keys) {
   }
 
   return [];
-}
-
-function readString$14(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { appendResearchReadSource, appendWebSearchOutput, createSearchInquirySources };

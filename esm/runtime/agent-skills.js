@@ -1,4 +1,5 @@
 import { copySchemaEnum } from './tool-schema.js';
+import { readString } from './semantic-json.js';
 
 // AGRUN-313 Phase 1 — the concrete bundled-skill data (`bundledAgentSkills`,
 // `getBundledAgentSkill`) moved to ./default-agent-skills.js so this file holds
@@ -19,9 +20,9 @@ function normalizeAgentSkill(skill) {
     return null;
   }
 
-  const skillId = readString$1Q(skill.skillId) || readString$1Q(skill.id) || readString$1Q(skill.name);
-  const name = readString$1Q(skill.name);
-  const instructions = readString$1Q(skill.instructions);
+  const skillId = readString(skill.skillId) || readString(skill.id) || readString(skill.name);
+  const name = readString(skill.name);
+  const instructions = readString(skill.instructions);
 
   if (!name || !instructions) {
     return null;
@@ -30,25 +31,25 @@ function normalizeAgentSkill(skill) {
   return {
     availability: normalizeAvailability$1(skill.availability),
     capabilities: normalizeCapabilities(skill.capabilities),
-    category: readString$1Q(skill.category),
-    checksum: readString$1Q(skill.checksum),
-    description: readString$1Q(skill.description),
+    category: readString(skill.category),
+    checksum: readString(skill.checksum),
+    description: readString(skill.description),
     instructions,
     inputTypes: normalizeStringArray$2(skill.inputTypes),
     name,
-    namespace: readString$1Q(skill.namespace),
+    namespace: readString(skill.namespace),
     requires: normalizeStringArray$2(skill.requires),
     riskTier: normalizeRiskTier(skill.riskTier),
     skillId,
-    sourcePath: readString$1Q(skill.sourcePath),
+    sourcePath: readString(skill.sourcePath),
     tags: normalizeStringArray$2(skill.tags),
     tools: normalizeAgentTools(skill.tools),
-    version: readString$1Q(skill.version)
+    version: readString(skill.version)
   };
 }
 
 function findAgentSkill(skills, name) {
-  const target = readString$1Q(name).toLowerCase();
+  const target = readString(name).toLowerCase();
 
   if (!target) {
     return null;
@@ -64,8 +65,8 @@ function normalizeSkillManifest(skill) {
     return null;
   }
 
-  const name = readString$1Q(skill.name);
-  const skillId = readString$1Q(skill.skillId) || readString$1Q(skill.id) || name;
+  const name = readString(skill.name);
+  const skillId = readString(skill.skillId) || readString(skill.id) || name;
 
   if (!name || !skillId) {
     return null;
@@ -74,19 +75,19 @@ function normalizeSkillManifest(skill) {
   return {
     availability: normalizeAvailability$1(skill.availability),
     capabilities: normalizeCapabilities(skill.capabilities),
-    category: readString$1Q(skill.category),
-    checksum: readString$1Q(skill.checksum),
-    description: readString$1Q(skill.description),
+    category: readString(skill.category),
+    checksum: readString(skill.checksum),
+    description: readString(skill.description),
     inputTypes: normalizeStringArray$2(skill.inputTypes),
     name,
-    namespace: readString$1Q(skill.namespace),
+    namespace: readString(skill.namespace),
     requires: normalizeStringArray$2(skill.requires),
     riskTier: normalizeRiskTier(skill.riskTier),
     skillId,
-    sourcePath: readString$1Q(skill.sourcePath),
+    sourcePath: readString(skill.sourcePath),
     tags: normalizeStringArray$2(skill.tags),
     tools: normalizeAgentToolSummaries(skill.tools),
-    version: readString$1Q(skill.version)
+    version: readString(skill.version)
   };
 }
 
@@ -153,7 +154,7 @@ function buildActiveAgentSkillSystemPrompt(skill) {
 
 function findAgentSkillTool(skill, toolName) {
   const resolvedSkill = normalizeAgentSkill(skill);
-  const target = readString$1Q(toolName).toLowerCase();
+  const target = readString(toolName).toLowerCase();
 
   if (!resolvedSkill || !target) {
     return null;
@@ -169,7 +170,7 @@ function createInMemorySkillIndexProvider(skills) {
 
   return Object.freeze({
     getManifest(skillIdOrName) {
-      const target = readString$1Q(skillIdOrName).toLowerCase();
+      const target = readString(skillIdOrName).toLowerCase();
       if (!target) return null;
       const manifest = manifests.find((item) => matchesSkillKey(item, target));
       return manifest ? createAgentSkillSummary(manifest) : null;
@@ -180,7 +181,7 @@ function createInMemorySkillIndexProvider(skills) {
     },
 
     loadSkill(skillIdOrName) {
-      const target = readString$1Q(skillIdOrName).toLowerCase();
+      const target = readString(skillIdOrName).toLowerCase();
       if (!target) return null;
       return normalizedSkills.find((skill) => matchesSkillKey(skill, target)) || null;
     }
@@ -259,8 +260,8 @@ function normalizeAgentTool(tool) {
     return null;
   }
 
-  const name = readString$1Q(tool.name);
-  const description = readString$1Q(tool.description);
+  const name = readString(tool.name);
+  const description = readString(tool.description);
   const func = typeof tool.func === "function" ? tool.func : null;
 
   if (!name || !description || !func) {
@@ -291,8 +292,8 @@ function normalizeAgentToolSummary(tool) {
     return null;
   }
 
-  const name = readString$1Q(tool.name);
-  const description = readString$1Q(tool.description);
+  const name = readString(tool.name);
+  const description = readString(tool.description);
 
   if (!name || !description) {
     return null;
@@ -304,8 +305,8 @@ function normalizeAgentToolSummary(tool) {
     parameters: normalizeToolParameters(tool.parameters)
   };
 
-  if (readString$1Q(tool.resultKind)) {
-    summary.resultKind = readString$1Q(tool.resultKind);
+  if (readString(tool.resultKind)) {
+    summary.resultKind = readString(tool.resultKind);
   }
   if (normalizeRiskTier(tool.riskTier) != null) {
     summary.riskTier = normalizeRiskTier(tool.riskTier);
@@ -329,8 +330,8 @@ function normalizeToolParameters(parameters) {
     }
 
     const prop = {
-      description: readString$1Q(value.description),
-      type: readString$1Q(value.type)
+      description: readString(value.description),
+      type: readString(value.type)
     };
     copySchemaEnum(prop, value);
     copySchemaAliases(prop, value);
@@ -342,8 +343,8 @@ function normalizeToolParameters(parameters) {
       for (const [nk, nv] of Object.entries(value.properties)) {
         if (nv && typeof nv === "object" && !Array.isArray(nv)) {
           const nestedProp = copySchemaEnum({
-            description: readString$1Q(nv.description),
-            type: readString$1Q(nv.type)
+            description: readString(nv.description),
+            type: readString(nv.type)
           }, nv);
           copySchemaAliases(nestedProp, nv);
           nested[nk] = nestedProp;
@@ -362,7 +363,7 @@ function normalizeToolParameters(parameters) {
     required: Array.isArray(source.required)
       ? source.required.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
       : [],
-    type: readString$1Q(source.type) || "object"
+    type: readString(source.type) || "object"
   };
 }
 
@@ -407,10 +408,6 @@ function copySchemaAliases(target, source) {
   return target;
 }
 
-function readString$1Q(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function normalizeRiskTier(value) {
   return Number.isInteger(value) && value >= 0 && value <= 3 ? value : null;
 }
@@ -435,7 +432,7 @@ function normalizeCapabilities(value) {
     : {};
   const capabilities = {};
   for (const [key, entry] of Object.entries(source)) {
-    const name = readString$1Q(key);
+    const name = readString(key);
     if (!name) continue;
     if (
       typeof entry === "boolean" ||
@@ -474,7 +471,7 @@ function assertUniqueSkillIds(skills) {
   const seen = new Set();
 
   for (const skill of Array.isArray(skills) ? skills : []) {
-    const key = readString$1Q(skill && (skill.skillId || skill.name)).toLowerCase();
+    const key = readString(skill && (skill.skillId || skill.name)).toLowerCase();
     if (!key) continue;
     if (seen.has(key)) {
       throw new Error(`Duplicate agent skill id "${key}".`);
@@ -485,8 +482,8 @@ function assertUniqueSkillIds(skills) {
 
 function matchesSkillKey(skill, target) {
   if (!skill || !target) return false;
-  return readString$1Q(skill.skillId).toLowerCase() === target ||
-    readString$1Q(skill.name).toLowerCase() === target;
+  return readString(skill.skillId).toLowerCase() === target ||
+    readString(skill.name).toLowerCase() === target;
 }
 
 function normalizeMaybeAsync(value, normalize) {

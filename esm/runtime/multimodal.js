@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 const CURRENT_IMAGE_LIMITS = {
   maxCount: 4,
   maxSingleBytes: 5 * 1024 * 1024,
@@ -28,7 +30,7 @@ function normalizeMultimodalParts(value) {
 }
 
 function buildCurrentTurnParts(prompt, parts) {
-  const normalizedPrompt = readString$1P(prompt);
+  const normalizedPrompt = readString(prompt);
   const normalizedParts = normalizeMultimodalParts(parts);
   const imageAndExtraParts = normalizedParts.filter((part) => (
     part.type === "image" ||
@@ -95,7 +97,7 @@ function describeImagePart(part) {
   }
 
   const label = readImageLabel(part);
-  const mimeType = readString$1P(part.mimeType) || "image/*";
+  const mimeType = readString(part.mimeType) || "image/*";
   const bytes = readImageBytes(part);
   return bytes > 0
     ? `${label} (${mimeType}, ${bytes} bytes)`
@@ -103,7 +105,7 @@ function describeImagePart(part) {
 }
 
 function parseDataUrl(value) {
-  const source = readString$1P(value);
+  const source = readString(value);
   const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/i.exec(source);
 
   if (!match) {
@@ -112,7 +114,7 @@ function parseDataUrl(value) {
 
   return {
     data: match[2],
-    mimeType: readString$1P(match[1]) || "application/octet-stream"
+    mimeType: readString(match[1]) || "application/octet-stream"
   };
 }
 
@@ -122,13 +124,13 @@ function normalizeMultimodalPart(part) {
   }
 
   if (part.type === "text") {
-    const text = readString$1P(part.text);
+    const text = readString(part.text);
     return text ? { type: "text", text } : null;
   }
 
   if (part.type === "image") {
-    const url = readString$1P(part.url);
-    const mimeType = readString$1P(part.mimeType);
+    const url = readString(part.url);
+    const mimeType = readString(part.mimeType);
 
     if (!url || !mimeType) {
       return null;
@@ -147,11 +149,11 @@ function normalizeMultimodalPart(part) {
 }
 
 function readImageLabel(part) {
-  return readString$1P(part && part.filename) || "Image";
+  return readString(part && part.filename) || "Image";
 }
 
 function estimateBase64Bytes(data) {
-  const text = readString$1P(data);
+  const text = readString(data);
 
   if (!text) {
     return 0;
@@ -170,7 +172,7 @@ function formatBytes(bytes) {
 }
 
 function readOptionalString$2(value) {
-  const text = readString$1P(value);
+  const text = readString(value);
   return text || null;
 }
 
@@ -178,10 +180,6 @@ function readPositiveNumber$3(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : null;
-}
-
-function readString$1P(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { buildCurrentTurnParts, describeImagePart, getCurrentImageLimits, getReplayImageLimits, isImagePart, normalizeMultimodalParts, parseDataUrl, readImageBytes, validateImageParts };

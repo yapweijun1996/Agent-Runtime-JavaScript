@@ -1,6 +1,7 @@
 import { cloneValue } from '../runtime/utils.js';
 import { normalizeCandidateSources, normalizeCandidateSource, inferSelectedSource, normalizePendingClarification, normalizeReadSource, normalizeClarificationResolution } from './context-snapshot-fields.js';
 export { isResolvedClarificationKind } from './context-snapshot-fields.js';
+import { readString } from '../runtime/semantic-json.js';
 
 function createContextSnapshot(options) {
   return {
@@ -37,28 +38,28 @@ function normalizeInquiryContext(value, fallbackLegacyContext) {
     return legacy;
   }
 
-  const candidateSources = hasOwn$2(source, "candidateSources")
+  const candidateSources = hasOwn$3(source, "candidateSources")
     ? normalizeCandidateSources(source.candidateSources, [])
     : normalizeCandidateSources(undefined, legacy.candidateSources);
-  const selectedSource = hasOwn$2(source, "selectedSource")
+  const selectedSource = hasOwn$3(source, "selectedSource")
     ? normalizeCandidateSource(source.selectedSource)
     : normalizeCandidateSource(source.selectedSource) || inferSelectedSource(candidateSources, legacy.selectedSource);
 
   return {
-    activeGoal: hasOwn$2(source, "activeGoal") ? readAnchorText(source.activeGoal) : legacy.activeGoal,
-    activeQuery: hasOwn$2(source, "activeQuery") ? readString$1V(source.activeQuery) : legacy.activeQuery,
-    activeTopic: hasOwn$2(source, "activeTopic") ? readAnchorText(source.activeTopic) : legacy.activeTopic,
+    activeGoal: hasOwn$3(source, "activeGoal") ? readAnchorText(source.activeGoal) : legacy.activeGoal,
+    activeQuery: hasOwn$3(source, "activeQuery") ? readString(source.activeQuery) : legacy.activeQuery,
+    activeTopic: hasOwn$3(source, "activeTopic") ? readAnchorText(source.activeTopic) : legacy.activeTopic,
     candidateSources,
-    lastClarificationResolution: hasOwn$2(source, "lastClarificationResolution")
+    lastClarificationResolution: hasOwn$3(source, "lastClarificationResolution")
       ? normalizeClarificationResolution(source.lastClarificationResolution)
       : legacy.lastClarificationResolution,
-    lastReadSource: hasOwn$2(source, "lastReadSource")
+    lastReadSource: hasOwn$3(source, "lastReadSource")
       ? normalizeReadSource(source.lastReadSource)
       : legacy.lastReadSource,
-    lastSearchResults: hasOwn$2(source, "lastSearchResults")
+    lastSearchResults: hasOwn$3(source, "lastSearchResults")
       ? normalizeCandidateSources(source.lastSearchResults, [])
       : normalizeCandidateSources(undefined, legacy.lastSearchResults),
-    pendingClarification: hasOwn$2(source, "pendingClarification")
+    pendingClarification: hasOwn$3(source, "pendingClarification")
       ? normalizePendingClarification(source.pendingClarification)
       : normalizePendingClarification(undefined, legacy.pendingClarification),
     selectedSource: selectedSource || null
@@ -69,7 +70,7 @@ function adaptLegacySessionContext(value) {
   const source = value && typeof value === "object" && !Array.isArray(value)
     ? value
     : null;
-  const fallbackQuestion = readString$1V(source && source.openAmbiguity);
+  const fallbackQuestion = readString(source && source.openAmbiguity);
 
   return {
     ...createEmptyInquiryContext(),
@@ -118,10 +119,10 @@ function hasSnapshotShape(value) {
     typeof value === "object" &&
     !Array.isArray(value) &&
     (
-      hasOwn$2(value, "sessionMemory") ||
-      hasOwn$2(value, "inquiryContext") ||
-      hasOwn$2(value, "turnIntent") ||
-      hasOwn$2(value, "continuityResolution")
+      hasOwn$3(value, "sessionMemory") ||
+      hasOwn$3(value, "inquiryContext") ||
+      hasOwn$3(value, "turnIntent") ||
+      hasOwn$3(value, "continuityResolution")
     )
   );
 }
@@ -136,16 +137,16 @@ function normalizeSessionMemory(value) {
   }
 
   return {
-    compactedContext: readString$1V(source.compactedContext),
-    decisions: readString$1V(source.decisions),
+    compactedContext: readString(source.compactedContext),
+    decisions: readString(source.decisions),
     estimatedTokens: typeof source.estimatedTokens === "number" ? source.estimatedTokens : 0,
-    facts: readString$1V(source.facts),
-    history: readString$1V(source.history),
+    facts: readString(source.facts),
+    history: readString(source.history),
     items: Array.isArray(source.items) ? cloneValue(source.items) : [],
-    memory: readString$1V(source.memory),
-    preferences: readString$1V(source.preferences),
-    recentTurns: readString$1V(source.recentTurns),
-    summary: readString$1V(source.summary) || readString$1V(source.compactedContext)
+    memory: readString(source.memory),
+    preferences: readString(source.preferences),
+    recentTurns: readString(source.recentTurns),
+    summary: readString(source.summary) || readString(source.compactedContext)
   };
 }
 
@@ -154,7 +155,7 @@ function normalizeTurnIntent(value) {
     return null;
   }
 
-  const kind = readString$1V(value.kind);
+  const kind = readString(value.kind);
 
   if (!kind) {
     return null;
@@ -163,10 +164,10 @@ function normalizeTurnIntent(value) {
   return {
     clarificationReply: cloneStructuredValue$3(value.clarificationReply),
     followUpTarget: cloneStructuredValue$3(value.followUpTarget),
-    goal: readString$1V(value.goal),
+    goal: readString(value.goal),
     kind,
     needsClarification: value.needsClarification === true,
-    topic: readString$1V(value.topic)
+    topic: readString(value.topic)
   };
 }
 
@@ -175,7 +176,7 @@ function normalizeContinuityResolution(value) {
     return null;
   }
 
-  const kind = readString$1V(value.kind);
+  const kind = readString(value.kind);
 
   if (!kind) {
     return null;
@@ -186,8 +187,8 @@ function normalizeContinuityResolution(value) {
     decision: cloneStructuredValue$3(value.decision),
     kind,
     pendingClarification: cloneStructuredValue$3(value.pendingClarification),
-    selectedUrl: readString$1V(value.selectedUrl) || null,
-    source: readString$1V(value.source) || null
+    selectedUrl: readString(value.selectedUrl) || null,
+    source: readString(value.source) || null
   };
 }
 
@@ -197,16 +198,12 @@ function cloneStructuredValue$3(value) {
     : null;
 }
 
-function hasOwn$2(value, key) {
+function hasOwn$3(value, key) {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function readString$1V(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readAnchorText(value) {
-  return readString$1V(value).replace(/[.?!]+$/g, "").trim();
+  return readString(value).replace(/[.?!]+$/g, "").trim();
 }
 
 export { adaptLegacySessionContext, createContextSnapshot, createEmptyInquiryContext, createEmptySessionMemory, normalizeCandidateSource, normalizeCandidateSources, normalizeClarificationResolution, normalizeInquiryContext, normalizePendingClarification, normalizeReadSource, readContextSnapshot };

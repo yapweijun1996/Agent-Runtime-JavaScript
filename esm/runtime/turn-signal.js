@@ -1,4 +1,5 @@
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
 
 const TURN_SIGNALS = Object.freeze({
   FINAL_OUTPUT: "final_output",
@@ -16,9 +17,9 @@ function createTurnControl(options = {}) {
 
   return {
     signal,
-    source: readString$1r(options.source) || null,
+    source: readString(options.source) || null,
     cycle: readNonNegativeInteger$3(options.cycle),
-    actionName: readString$1r(options.actionName) || null,
+    actionName: readString(options.actionName) || null,
     pendingApproval: sanitizePendingApproval(options.pendingApproval),
     handoff: cloneRecordOrNull(options.handoff),
     output: cloneRecordOrNull(options.output),
@@ -61,33 +62,33 @@ function summarizeTurnControlForPrompt(value) {
 function summarizeOutput(output) {
   if (!output) return null;
   return {
-    kind: readString$1r(output.kind) || null,
-    text: readString$1r(output.text) || null
+    kind: readString(output.kind) || null,
+    text: readString(output.text) || null
   };
 }
 
 function summarizeObservation(observation) {
   if (!observation) return null;
   return {
-    actionName: readString$1r(observation.actionName) || null,
-    kind: readString$1r(observation.kind) || null,
-    policy: readString$1r(observation.policy) || null,
-    resolution: readString$1r(observation.resolution) || null,
-    message: readString$1r(observation.message) || null
+    actionName: readString(observation.actionName) || null,
+    kind: readString(observation.kind) || null,
+    policy: readString(observation.policy) || null,
+    resolution: readString(observation.resolution) || null,
+    message: readString(observation.message) || null
   };
 }
 
 function sanitizePendingApproval(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const actionName = readString$1r(value.actionName);
-  const policy = readString$1r(value.policy);
+  const actionName = readString(value.actionName);
+  const policy = readString(value.policy);
   if (!actionName || !policy) return null;
   return {
     actionName,
     policy,
-    reason: readString$1r(value.reason) || null,
+    reason: readString(value.reason) || null,
     resumable: value.resumable === true,
-    resolution: readString$1r(value.resolution) || "pending"
+    resolution: readString(value.resolution) || "pending"
   };
 }
 
@@ -103,10 +104,6 @@ function cloneRecordOrNull(value) {
 
 function readNonNegativeInteger$3(value) {
   return Number.isInteger(value) && value >= 0 ? value : null;
-}
-
-function readString$1r(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { TURN_SIGNALS, applyTurnControl, createTurnControl, projectTurnControl, summarizeTurnControlForPrompt };

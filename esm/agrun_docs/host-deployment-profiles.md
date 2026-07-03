@@ -168,10 +168,10 @@ shape end-to-end with `createFsStorage`.
   scaffolding; profile gating belongs to deployment shape, not model
   capability. See `feedback_no_model_gating` in the long-term memory.
 - **Do not** assume core loads domain skills by default. `agentSkills:
-  [customSkill]` means exactly that one custom skill. Import opt-in packs such
-  as `@agrun/skills-research` or `@agrun/skills-coder` and pass
-  `agentSkills: [...researchSkills, ...coderSkills, customSkill]` only when the
-  host intentionally wants those domain instructions.
+  [customSkill]` means exactly that one custom skill. Provide your own SKILL.md
+  agent skills and pass `agentSkills: [...domainSkills, customSkill]` only when
+  the host intentionally wants those domain instructions. (The `@agrun/skills-*`
+  packages were removed in AGRUN-522 — domain skills are host-supplied.)
 - **Do not** modify [`action-registry.js`](https://github.com/yapweijun1996/agrun/blob/main/0_development/src/runtime/action-registry.js)
   to add a new action just for one host. Bundle it as a skill tool and
   expose it via `execute_skill_tool` instead.

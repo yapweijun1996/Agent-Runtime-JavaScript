@@ -1,6 +1,7 @@
 import { hasSessionContext, buildSessionContextPromptBlock } from '../session/prompt.js';
+import { DEFAULT_FINAL_CANDIDATE_PATH } from './workspace-candidate-lifecycle.js';
 import { COMPACTED_OBSERVATIONS_KIND } from './action-history-compaction.js';
-import { PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
+import { PUBLISH_DIRECT_ACTION } from './action-names.js';
 import { projectSessionContextFromPlannerState } from './session-context-projection.js';
 import { shouldShowSkillSurface } from './planner-action-surface.js';
 import { buildRoleSystemPromptBlock } from './agent-roles.js';
@@ -14,17 +15,20 @@ import { summarizeActionPatternConvergence } from './action-pattern-convergence.
 import { summarizeReadUrlRecoverySignal } from './read-url-recovery-signal.js';
 import { summarizeResearchAcceptanceEvaluator } from './kernel-acceptance-evaluator.js';
 import { isEvidenceConvergenceRun } from './convergence-activation.js';
+import { summarizeTimeContextForPrompt } from './host-time-context.js';
 import { detectContinuedResearchThread, readStableResearchTopic } from './research-state.js';
 import { summarizeRequirementRecoveryEvaluator } from './requirement-recovery-evaluator.js';
-import { summarizeTerminalRepairState } from './terminal-repair-state.js';
+import { buildVirtualWorkspacePromptBlock } from './virtual-workspace.js';
+import { summarizeTerminalRepairState } from './terminal-repair/core.js';
 import { summarizeInvalidActionConvergence } from './invalid-action-convergence.js';
 import { buildInvalidActionPromptBlock } from './invalid-action-prompt-block.js';
 import { summarizeSearchResults, summarizeLastObservationForPrompt } from './planner-prompt-projection.js';
-import { buildVirtualWorkspacePromptBlock } from './virtual-workspace.js';
+import { renderClosedNamespaceHintLines, listClosedNamespaces } from './action-namespace-gate.js';
 import { formatStandalonePlanActionNames } from './action-plan-contract.js';
 import { summarizeTurnControlForPrompt } from './turn-signal.js';
 import { buildLines as buildLines$1 } from './prompts/planner-base-directives.js';
 import { buildLines } from './prompts/planner-compact-directives.js';
+import { isRequirementRecoverySummaryActionable } from './prompts/planner-directive-gates.js';
 import { buildLines as buildLines$2 } from './prompts/skill-directives.js';
 import { buildLines as buildLines$3 } from './prompts/workspace-directives.js';
 import { buildLines as buildLines$4 } from './prompts/research-directives.js';
@@ -94,14 +98,25 @@ function buildPlannerSystemPrompt(availableActions, options) {
       compactSystemPrompt,
       preferFinalizeOnLastResult: opts.preferFinalizeOnLastResult !== false,
       prompts: opts.prompts,
-      runtimeConfig: opts.runtimeConfig
+      runtimeConfig: opts.runtimeConfig,
+      // ADR-0057 Phase 1 — the closed-namespace hint reads the per-run open
+      // state; absent runState/deferredNamespaces renders nothing, so default
+      // prompts stay byte-identical.
+      runState: opts.runState
     }),
     ...buildEnvelopeLines(actionDefinitions, {
       compactExamples: opts.compactEnvelopeExamples !== false,
       effectivePlannerMode: opts.effectivePlannerMode,
       plannerMode: opts.plannerMode,
       request: opts.request,
-      runState: opts.runState
+      runState: opts.runState,
+      // AGRUN-551 — forward publish-gate inputs so the main planner prompt's
+      // finalize availability matches the gate (no finalize/publish deadlock when
+      // publish is gated). Keeps the prompt, the repair prompt, and the rejection
+      // check all consistent.
+      runtimeConfig: opts.runtimeConfig,
+      activeAgentSkill: opts.activeAgentSkill,
+      lastReadAgentSkill: opts.lastReadAgentSkill
     }),
     ...(compactSystemPrompt ? [] : buildGuidanceLines(actionDefinitions)),
     // Caller-supplied directives: appended last so override-by-recency applies.
@@ -123,7 +138,17 @@ function buildSystemPromptLines(availableActions, options) {
     availableActions: actionDefinitions,
     compactSystemPrompt,
     runtimeConfig: opts.runtimeConfig,
-    stripOodaeSignals: SPIKE_STRIP_OODAE_SIGNALS
+    // Phase B1 (ROADMAP 2026-07-02) — lets the base/compact directive builders
+    // gate their "If loopState.X ..." advisory lines on the signal actually
+    // being present this cycle (planner-directive-gates.js). Absent runState
+    // (host override previews, frozen defaults) renders the full text.
+    runState: opts.runState,
+    stripOodaeSignals: SPIKE_STRIP_OODAE_SIGNALS,
+    // AGRUN-492 (audit M11) — the qualityContext PROMPT instruction must be
+    // gated by the SAME flag as the qualityContext DATA field (line ~254). When
+    // SPIKE_WIRE_QUALITYCONTEXT is off (production default) the field is never
+    // injected, so the advisory must not instruct the AI to read it.
+    wireQualityContext: SPIKE_WIRE_QUALITYCONTEXT
   };
   const lines = [
     ...resolvePromptSection(
@@ -136,6 +161,13 @@ function buildSystemPromptLines(availableActions, options) {
   lines.push(`Current standalone-only actions for plan validation: ${standaloneActionNames}.`);
 
   lines.push(...resolvePromptSection(prompts.skillDirectives, buildLines$2, ctx));
+
+  // ADR-0057 Phase 1 — one hint line naming the currently-closed deferred
+  // namespaces, beside the ADR-0013 skill-discovery hint above (the closest
+  // precedent: both are terse "discover/open before use" pointers). Renders
+  // [] when nothing is closed, so hosts that never set deferredNamespaces see
+  // zero prompt change (prompt-snapshot.test.js byte-identity).
+  lines.push(...renderClosedNamespaceHintLines(listClosedNamespaces(opts.runState, opts.runtimeConfig)));
 
   lines.push(...resolvePromptSection(prompts.workspaceDirectives, buildLines$3, ctx));
 
@@ -268,6 +300,16 @@ function buildPlannerPrompt(options) {
     virtualWorkspace: summarizeVirtualWorkspace$1(virtualWorkspace)
   };
 
+  // AGRUN-518 — opt-in host time context. Only present when the host supplied
+  // it, so runs without it produce a byte-identical loopState (no snapshot churn).
+  const hostTime = summarizeTimeContextForPrompt(
+    (options.request && options.request.timeContext)
+    || (options.runState && options.runState.request && options.runState.request.timeContext)
+  );
+  if (hostTime) {
+    loopState.hostTime = hostTime;
+  }
+
   if (options.strictRetry === true) {
     loopState.invalidActionCount = options.invalidActionCount || 0;
   }
@@ -304,8 +346,25 @@ function buildPlannerPrompt(options) {
   // when it is active. The block is JSON-only (no MUST/SHOULD/NOW
   // imperatives) and clears automatically once a valid action executes.
   const invalidActionBlock = buildInvalidActionPromptBlock(loopState.invalidActionConvergence);
+  // AGRUN-518 — when host time is present, state plainly that it is trusted so
+  // the model uses it for date/time questions instead of guessing.
+  const hostTimeBlock = hostTime
+    ? `Host-provided current time (trusted — use this for any date/time question instead of guessing): ${JSON.stringify(hostTime)}`
+    : null;
 
+  // C4 (ROADMAP 2026-07-02, AGRUN-583) — cache-aligned section order:
+  // stable-first, volatile-last. Provider prompt caches (OpenAI automatic
+  // prefix, DeepSeek cache-hit, Gemini implicit) extend exactly as far as the
+  // first changed byte, so the user message is laid out stable head → mostly-
+  // append-only middle → volatile tail: User request / session context /
+  // Available actions / skill tools stay up front; Action history appends;
+  // Plan state, workspace, Normalization state, and the per-cycle Loop state
+  // JSON sit at the very end (which also gives the freshest signals recency
+  // position). The focused repair/research blocks stay FIRST on purpose:
+  // they only render mid-repair, where attention placement beats caching.
   return [
+    hostTimeBlock || null,
+    hostTimeBlock ? "" : null,
     focusedTerminalRepairBlock || null,
     focusedTerminalRepairBlock ? "" : null,
     focusedResearchPhaseBlock || null,
@@ -316,31 +375,17 @@ function buildPlannerPrompt(options) {
     (SPIKE_STRIP_OODAE_SIGNALS_WIDE || !sessionContextBlock) ? null : "",
     SPIKE_STRIP_OODAE_SIGNALS_WIDE ? null : (sessionContextBlock || null),
     "",
-    "Normalization state:",
-    JSON.stringify({
-      clarificationStatus: SPIKE_STRIP_OODAE_SIGNALS_WIDE
-        ? "none"
-        : (readString(plannerState.clarificationStatus) || "none"),
-      hasPendingClarification: Boolean(plannerState.pendingClarification),
-      evidenceState: SPIKE_STRIP_OODAE_SIGNALS
-        ? "none"
-        : (readString(plannerState.evidenceState) || "none")
-    }, null, 2),
-    "",
     "Available actions:",
     actionDescriptions,
-    "",
-    "Loop state:",
-    JSON.stringify(loopState),
     showSkillSurface ? "" : null,
     showSkillSurface ? "Active skill tools:" : null,
     showSkillSurface ? formatActiveSkillTools(options.activeAgentSkill) : null,
-    showSkillSurface ? "" : null,
+    "",
+    "Action history:",
+    historyBlock,
     resolvedTodoStateBlock ? "" : null,
     resolvedTodoStateBlock ? "Plan state:" : null,
     resolvedTodoStateBlock || null,
-    "Action history:",
-    historyBlock,
     virtualWorkspace ? "" : null,
     virtualWorkspace
         ? buildVirtualWorkspacePromptBlock(virtualWorkspace, {
@@ -354,7 +399,21 @@ function buildPlannerPrompt(options) {
             ? options.runState.publishBlockSignal
             : null
         })
-      : null
+      : null,
+    "",
+    "Normalization state:",
+    JSON.stringify({
+      clarificationStatus: SPIKE_STRIP_OODAE_SIGNALS_WIDE
+        ? "none"
+        : (readString(plannerState.clarificationStatus) || "none"),
+      hasPendingClarification: Boolean(plannerState.pendingClarification),
+      evidenceState: SPIKE_STRIP_OODAE_SIGNALS
+        ? "none"
+        : (readString(plannerState.evidenceState) || "none")
+    }, null, 2),
+    "",
+    "Loop state:",
+    JSON.stringify(pruneLoopStateForPrompt(loopState))
   ].filter((value) => value !== null).join("\n");
 }
 
@@ -389,6 +448,61 @@ function summarizeCandidatePathMismatchSignalForPrompt(signal) {
     status: readString(signal.status) || "observed",
     writtenPath: readSafeWorkspacePath(signal.writtenPath) || null
   };
+}
+
+// Phase B2 (ROADMAP 2026-07-02) — projection-only pruning of the serialized
+// "Loop state:" JSON. On idle cycles most of the ~34 keys are null / idle
+// signals (measured 3515 chars/turn in the 2026-07-02 benchmark).
+//
+// Explicit opt-in list: ONLY the per-signal summaries below are pruneable —
+// each renders null (or a documented idle "tracking" object) until its
+// subsystem activates, and its consumers (the B1-gated advisory lines, the
+// mocked-fetch matchers) all read it presence-conditionally. Keys referenced
+// by ALWAYS-ON directive lines or the test-helper loopState contract
+// (readSources, searchResults, toolContext, deniedActions, the skill-surface
+// block) are never pruned. Presence-only keys are an established pattern here
+// (hostTime, qualityContext, invalidActionCount all render only when set).
+// The in-memory loopState object is NOT mutated: the focused terminal-repair /
+// research-phase blocks above read the full object.
+const PRUNEABLE_LOOP_STATE_KEYS = new Set([
+  "actionFailureSignal",
+  "actionGuardrail",
+  "actionPatternConvergence",
+  "candidatePathMismatchSignal",
+  "inquiryContext",
+  "invalidActionConvergence",
+  "lastObservation",
+  "lastResolution",
+  "lengthExpansionSignal",
+  "pendingClarification",
+  "planValidationFeedback",
+  "plannerInvalidSignal",
+  "readAttemptSignal",
+  "readUrlRecoverySignal",
+  "requirementRecoveryEvaluator",
+  "researchAcceptanceEvaluator",
+  "researchReportLoop",
+  "terminalRepairState",
+  "turnControl",
+  "virtualWorkspace"
+]);
+
+function pruneLoopStateForPrompt(loopState) {
+  const pruned = {};
+  for (const [key, value] of Object.entries(loopState)) {
+    if (PRUNEABLE_LOOP_STATE_KEYS.has(key)) {
+      if (value === null || value === undefined) continue;
+      // Idle "tracking" objects from always-on summarizers; each predicate
+      // mirrors the condition its own consumers use (ADR-0034: the
+      // invalid-action block only surfaces when active; requirementRecovery
+      // shares its B1 advisory-line gate — field renders ⟺ line renders).
+      if (key === "requirementRecoveryEvaluator" && !isRequirementRecoverySummaryActionable(value)) continue;
+      if (key === "invalidActionConvergence" && value.active !== true) continue;
+      if (key === "researchReportLoop" && value.status === "idle") continue;
+    }
+    pruned[key] = value;
+  }
+  return pruned;
 }
 
 function summarizeActionGuardrailForPrompt(value) {
@@ -555,9 +669,9 @@ function normalizeToolContext(toolContext, projection = {}) {
   const source = toolContext && typeof toolContext === "object" ? toolContext : {};
   const history = Array.isArray(source.history) ? source.history : [];
   const deduplicated = history.length <= 1;
-  const lastResultChars = readPositiveInteger$c(projection.lastResultChars) || (deduplicated ? 2000 : 800);
-  const historyEntryChars = readPositiveInteger$c(projection.historyEntryChars) || 500;
-  const recentHistoryCount = readPositiveInteger$c(projection.recentHistoryCount) || 3;
+  const lastResultChars = readPositiveInteger$a(projection.lastResultChars) || (deduplicated ? 2000 : 800);
+  const historyEntryChars = readPositiveInteger$a(projection.historyEntryChars) || 500;
+  const recentHistoryCount = readPositiveInteger$a(projection.recentHistoryCount) || 3;
 
   return {
     historyCount: history.length,
@@ -568,8 +682,8 @@ function normalizeToolContext(toolContext, projection = {}) {
 
 function summarizeReadSources$1(value, projection = {}) {
   const sources = Array.isArray(value) ? value : [];
-  const sourceLimit = readPositiveInteger$c(projection.sourceLimit) || 3;
-  const previewChars = readPositiveInteger$c(projection.previewChars) || 220;
+  const sourceLimit = readPositiveInteger$a(projection.sourceLimit) || 3;
+  const previewChars = readPositiveInteger$a(projection.previewChars) || 220;
 
   return sources
     .slice(-sourceLimit)
@@ -714,15 +828,20 @@ function buildFocusedTerminalRepairPromptBlock(terminalRepairState) {
       : null;
     const actionOrderingSignals = Array.isArray(state.actionOrderingSignals) ? state.actionOrderingSignals.slice(0, 4) : [];
     const multiWriteSignal = actionOrderingSignals.find((signal) => signal && signal.kind === "multi_write_iteration_nudge");
+    const todoSyncNotSufficientSignal = actionOrderingSignals.find((signal) => signal && signal.kind === "todo_sync_not_sufficient");
     const workspaceRepairSignal = state.workspaceRepairSignal && typeof state.workspaceRepairSignal === "object"
       ? state.workspaceRepairSignal
       : null;
     const preferredExpansionActions = multiWriteSignal && Array.isArray(multiWriteSignal.preferredActions)
       ? multiWriteSignal.preferredActions.map(readString).filter((actionName) => allowedActions.includes(actionName))
       : [];
+    const preferredProductRepairActions = todoSyncNotSufficientSignal && Array.isArray(todoSyncNotSufficientSignal.preferredActions)
+      ? todoSyncNotSufficientSignal.preferredActions.map(readString).filter((actionName) => allowedActions.includes(actionName))
+      : [];
     const primaryAction = workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
       ? "workspace_read"
-      : preferredExpansionActions[0] ||
+      : preferredProductRepairActions[0] ||
+      preferredExpansionActions[0] ||
       (allowedActions.includes(PUBLISH_DIRECT_ACTION)
         ? PUBLISH_DIRECT_ACTION
         : (allowedActions[0] || null));
@@ -732,6 +851,8 @@ function buildFocusedTerminalRepairPromptBlock(terminalRepairState) {
       escalation: "hard_veto",
       rule: workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
         ? "Read the selected candidate first because workspaceRepairSignal says it was not inspected after the latest content change; then choose a targeted repair action."
+        : preferredProductRepairActions.length > 0
+        ? "TodoState sync is not enough while product deficits remain. Choose one preferred source/workspace repair action before using another Todo-only action."
         : preferredExpansionActions.length > 0
         ? "A length expansion ordering signal is active. Choose one preferred expansion action before limited publish unless recovery is not feasible."
         : allowedActions.includes(PUBLISH_DIRECT_ACTION)
@@ -967,14 +1088,14 @@ function readPromptCandidateLength(researchReportLoop, virtualWorkspace) {
   if (packetWords > 0) {
     return {
       observed: packetWords,
-      path: readString(packetCandidate.path) || "final_candidate.md",
+      path: readString(packetCandidate.path) || DEFAULT_FINAL_CANDIDATE_PATH,
       unit: "words"
     };
   }
   const files = virtualWorkspace && Array.isArray(virtualWorkspace.files)
     ? virtualWorkspace.files
     : [];
-  const finalFile = files.find((file) => readString(file && file.path) === "final_candidate.md") || files[0] || {};
+  const finalFile = files.find((file) => readString(file && file.path) === DEFAULT_FINAL_CANDIDATE_PATH) || files[0] || {};
   const stats = finalFile.textStats && typeof finalFile.textStats === "object" ? finalFile.textStats : {};
   return {
     observed: readNumber$4(stats.words),
@@ -1252,7 +1373,7 @@ function summarizeVirtualWorkspace$1(value) {
     : [];
   return {
     candidateLifecycle: lifecycle ? {
-      activePath: readSafeWorkspacePath(lifecycle.activePath) || "final_candidate.md",
+      activePath: readSafeWorkspacePath(lifecycle.activePath) || DEFAULT_FINAL_CANDIDATE_PATH,
       draftPaths: Array.isArray(lifecycle.draftPaths) ? lifecycle.draftPaths.map(readSafeWorkspacePath).filter(Boolean).slice(0, 12) : [],
       finalizedPath: readSafeWorkspacePath(lifecycle.finalizedPath) || null,
       lastReadPath: readSafeWorkspacePath(lifecycle.lastReadPath) || null,
@@ -1299,7 +1420,7 @@ function readNullableNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function readPositiveInteger$c(value) {
+function readPositiveInteger$a(value) {
   return Number.isInteger(value) && value > 0 ? value : 0;
 }
 

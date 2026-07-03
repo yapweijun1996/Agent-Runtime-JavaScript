@@ -1,5 +1,6 @@
 import { hasUsableSearchEvidence, classifySearchSourceCategory } from '../skills/providers/web-search-ranking.js';
 import { isReadableEvidenceSource } from './read-source-quality.js';
+import { readString } from './semantic-json.js';
 
 // AGRUN-246-E (C3.4): LOW_VALUE_CATEGORIES removed — categorical pre-filtering of
 // community/marketplace search results hides potentially relevant sources from
@@ -7,8 +8,8 @@ import { isReadableEvidenceSource } from './read-source-quality.js';
 // via item.sourceCategory and judges relevance itself.
 
 function createSearchVerification(options = {}) {
-  const strategy = readString$1k(options.strategy) || "general_lookup";
-  const query = readString$1k(options.query);
+  const strategy = readString(options.strategy) || "general_lookup";
+  const query = readString(options.query);
   const rankedItems = Array.isArray(options.rankedItems) ? options.rankedItems : [];
   const readSources = Array.isArray(options.readSources) ? options.readSources : [];
   const supportiveSources = collectSupportiveSources(rankedItems, readSources, query);
@@ -61,8 +62,8 @@ function createSearchVerification(options = {}) {
 
 function readVerificationState(value) {
   const state = value && typeof value === "object"
-    ? readString$1k(value.state)
-    : readString$1k(value);
+    ? readString(value.state)
+    : readString(value);
 
   return state || "none";
 }
@@ -87,15 +88,15 @@ function collectSupportiveSources(rankedItems, readSources, query) {
 }
 
 function normalizeSupportiveSource(item, query) {
-  const url = readString$1k(item && item.url);
+  const url = readString(item && item.url);
   if (!url) {
     return null;
   }
 
   const domain = readDomain$4(url);
-  const title = readString$1k(item && item.title);
-  const snippet = readString$1k(item && (item.snippet || item.text));
-  const sourceCategory = readString$1k(item && item.sourceCategory) || classifySearchSourceCategory({
+  const title = readString(item && item.title);
+  const snippet = readString(item && (item.snippet || item.text));
+  const sourceCategory = readString(item && item.sourceCategory) || classifySearchSourceCategory({
     domain,
     snippet,
     title,
@@ -146,7 +147,7 @@ function collectMatchingEntityTuples(entries, query) {
 }
 
 function extractEntityTuple(text, entityHint) {
-  const normalizedText = readString$1k(text);
+  const normalizedText = readString(text);
   if (!normalizedText) {
     return null;
   }
@@ -178,7 +179,7 @@ function extractEntityTuple(text, entityHint) {
 }
 
 function extractEntityHint(query) {
-  return readString$1k(query)
+  return readString(query)
     .toLowerCase()
     .replace(/\b(boss|ceo|director|founder|owner|managing director|who|is|the|of)\b/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
@@ -189,7 +190,7 @@ function extractEntityHint(query) {
 }
 
 function normalizeEntityValue(value) {
-  return readString$1k(value)
+  return readString(value)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -201,14 +202,10 @@ function uniqueStrings(values) {
 
 function readDomain$4(value) {
   try {
-    return new URL(readString$1k(value)).hostname.toLowerCase();
+    return new URL(readString(value)).hostname.toLowerCase();
   } catch {
     return "";
   }
-}
-
-function readString$1k(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createSearchVerification, readVerificationState };

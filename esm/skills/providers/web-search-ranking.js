@@ -1,3 +1,5 @@
+import { readString } from '../../runtime/semantic-json.js';
+
 const COMMUNITY_PATTERNS = [
   /community\./i,
   /forum/i,
@@ -47,17 +49,17 @@ const CATEGORY_WEIGHTS = {
 };
 
 function normalizeSearchPassItems(items, options = {}) {
-  const query = readString$1l(options.query);
-  const baseQuery = readString$1l(options.baseQuery) || query;
+  const query = readString(options.query);
+  const baseQuery = readString(options.baseQuery) || query;
   const passIndex = typeof options.passIndex === "number" ? options.passIndex : 0;
   const entityTokens = extractEntityTokens(baseQuery);
 
   return (Array.isArray(items) ? items : []).map((item, index) => {
-    const url = readString$1l(item && item.url);
-    const title = readString$1l(item && item.title) || `Result ${index + 1}`;
-    const snippet = readString$1l(item && item.snippet) || readString$1l(item && item.content);
+    const url = readString(item && item.url);
+    const title = readString(item && item.title) || `Result ${index + 1}`;
+    const snippet = readString(item && item.snippet) || readString(item && item.content);
     const domain = readDomain$5(url);
-    const engine = readString$1l(item && item.engine) || readString$1l(item && item.source);
+    const engine = readString(item && item.engine) || readString(item && item.source);
     const sourceCategory = classifySearchSourceCategory({
       domain,
       entityTokens,
@@ -108,10 +110,10 @@ function aggregateRankedSearchResults(searchPasses, options = {}) {
 }
 
 function classifySearchSourceCategory(options = {}) {
-  const domain = readString$1l(options.domain).toLowerCase();
-  const title = readString$1l(options.title).toLowerCase();
-  const snippet = readString$1l(options.snippet).toLowerCase();
-  const url = readString$1l(options.url).toLowerCase();
+  const domain = readString(options.domain).toLowerCase();
+  const title = readString(options.title).toLowerCase();
+  const snippet = readString(options.snippet).toLowerCase();
+  const url = readString(options.url).toLowerCase();
   const haystack = `${domain} ${title} ${snippet} ${url}`;
   const entityTokens = Array.isArray(options.entityTokens) ? options.entityTokens : [];
 
@@ -148,7 +150,7 @@ function countTokenOverlap$1(query, haystack) {
     return 0;
   }
 
-  const normalizedHaystack = readString$1l(haystack).toLowerCase();
+  const normalizedHaystack = readString(haystack).toLowerCase();
   let count = 0;
 
   for (const token of queryTokens) {
@@ -165,11 +167,11 @@ function hasUsableSearchEvidence(items) {
     if (!item || typeof item !== "object") return false;
 
     // Synthetic items (grounded model answer, no URL) count as usable evidence.
-    if (!readString$1l(item.url) && readString$1l(item.snippet)) return true;
+    if (!readString(item.url) && readString(item.snippet)) return true;
 
-    return readString$1l(item.url) &&
-      readString$1l(item.sourceCategory) !== "community" &&
-      readString$1l(item.sourceCategory) !== "marketplace" &&
+    return readString(item.url) &&
+      readString(item.sourceCategory) !== "community" &&
+      readString(item.sourceCategory) !== "marketplace" &&
       typeof item.sourceScore === "number" &&
       (typeof item.queryOverlap !== "number" || readNumber$8(item.queryOverlap) >= 2) &&
       item.sourceScore >= 3;
@@ -177,11 +179,11 @@ function hasUsableSearchEvidence(items) {
 }
 
 function scoreSearchResult(options) {
-  const domain = readString$1l(options.domain);
-  const title = readString$1l(options.title);
-  const snippet = readString$1l(options.snippet);
-  readString$1l(options.url);
-  const category = readString$1l(options.sourceCategory) || "unknown";
+  const domain = readString(options.domain);
+  const title = readString(options.title);
+  const snippet = readString(options.snippet);
+  readString(options.url);
+  const category = readString(options.sourceCategory) || "unknown";
   const overlap = readNumber$8(options.queryOverlap);
   const exactPhraseMatches = readNumber$8(options.exactPhraseMatches);
   let score = CATEGORY_WEIGHTS[category] || CATEGORY_WEIGHTS.unknown;
@@ -209,11 +211,11 @@ function dedupeByUrl(items) {
   const syntheticItems = [];
 
   for (const item of items) {
-    const url = readString$1l(item && item.url);
+    const url = readString(item && item.url);
 
     // Synthetic items (no URL but have snippet) are kept as-is, not deduped.
     if (!url) {
-      if (readString$1l(item && item.snippet)) {
+      if (readString(item && item.snippet)) {
         syntheticItems.push({ ...item });
       }
       continue;
@@ -250,7 +252,7 @@ function diversifyByDomain(items) {
 
     for (let index = 0; index < remaining.length; index += 1) {
       const item = remaining[index];
-      const domain = readString$1l(item && item.domain);
+      const domain = readString(item && item.domain);
       const domainPenalty = (domainCounts.get(domain) || 0) * 1.5;
       const diversifiedScore = readNumber$8(item && item.sourceScore) - domainPenalty;
 
@@ -261,7 +263,7 @@ function diversifyByDomain(items) {
     }
 
     const next = remaining.splice(bestIndex, 1)[0];
-    const domain = readString$1l(next && next.domain);
+    const domain = readString(next && next.domain);
     domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
     ordered.push(next);
   }
@@ -270,7 +272,7 @@ function diversifyByDomain(items) {
 }
 
 function looksOfficialDomain(domain, entityTokens) {
-  const normalizedDomain = readString$1l(domain).replace(/^www\./i, "");
+  const normalizedDomain = readString(domain).replace(/^www\./i, "");
   if (!normalizedDomain) {
     return false;
   }
@@ -293,7 +295,7 @@ function extractEntityTokens(query) {
 }
 
 function tokenize$2(value) {
-  return splitMixedScriptBoundaries(readString$1l(value))
+  return splitMixedScriptBoundaries(readString(value))
     .toLowerCase()
     .split(/[^a-z0-9\u4e00-\u9fff]+/i)
     .filter((token) => token.length >= 2);
@@ -302,7 +304,7 @@ function tokenize$2(value) {
 function countExactQueryPhraseMatches(query, haystack) {
   const phrases = extractQueryPhrases(query);
   if (phrases.length === 0) return 0;
-  const normalizedHaystack = splitMixedScriptBoundaries(readString$1l(haystack))
+  const normalizedHaystack = splitMixedScriptBoundaries(readString(haystack))
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fff]+/gi, " ")
     .replace(/\s+/g, " ")
@@ -337,7 +339,7 @@ const GENERIC_QUERY_PHRASE_TOKENS = new Set([
 ]);
 
 function splitMixedScriptBoundaries(value) {
-  return readString$1l(value)
+  return readString(value)
     .replace(/([\u4e00-\u9fff])([a-z0-9])/gi, "$1 $2")
     .replace(/([a-z0-9])([\u4e00-\u9fff])/gi, "$1 $2");
 }
@@ -350,7 +352,7 @@ function normalizeLimit(value, fallback) {
 
 function readDomain$5(value) {
   try {
-    return new URL(readString$1l(value)).hostname.toLowerCase();
+    return new URL(readString(value)).hostname.toLowerCase();
   } catch {
     return "";
   }
@@ -358,10 +360,6 @@ function readDomain$5(value) {
 
 function readNumber$8(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function readString$1l(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { aggregateRankedSearchResults, classifySearchSourceCategory, countTokenOverlap$1 as countTokenOverlap, hasUsableSearchEvidence, normalizeSearchPassItems };

@@ -2,6 +2,7 @@ import { cloneValue } from './utils.js';
 import { prepareRuntimeStepDetail } from './runtime-events.js';
 import './tool-schema.js';
 import './action-pattern-convergence.js';
+import './action-names.js';
 import './runtime-event-classifier.js';
 import { projectTodoTaskLifecycle } from './todo-task-lifecycle.js';
 

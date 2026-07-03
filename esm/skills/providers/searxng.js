@@ -119,7 +119,21 @@ function readResultDomain(item) {
 
 function readEndpoint(endpoint) {
   if (typeof endpoint === "string" && endpoint.trim().length > 0) {
-    return endpoint.trim();
+    const trimmed = endpoint.trim();
+    // ROADMAP D4 — the endpoint is host/user configuration that reaches
+    // fetch verbatim; only http(s) is a search backend. Reject file:,
+    // javascript:, data:, chrome-extension: and friends up front with a
+    // clear message instead of whatever the fetch layer would do with them.
+    let parsed;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      throw new Error(`Web search endpoint is not a valid URL: "${trimmed.slice(0, 80)}".`);
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`Web search endpoint must use http or https, got "${parsed.protocol}".`);
+    }
+    return trimmed;
   }
 
   throw new Error('Web search requires a non-empty "endpoint".');

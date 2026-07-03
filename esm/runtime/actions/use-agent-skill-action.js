@@ -1,6 +1,7 @@
 import { normalizeAgentSkill, loadAgentSkillFromProvider, findAgentSkill } from '../agent-skills.js';
 import { getPolicyManifestForSkill, evaluateSkillPolicy, emitSkillPolicyStep, createSkillPolicyError } from '../skill-policy.js';
 import { STANDALONE_PLAN_ACTION } from '../action-plan-contract.js';
+import { readString } from '../semantic-json.js';
 
 function createUseAgentSkillAction(agentSkills, agentSkillIndexProvider) {
   const firstSkill = Array.isArray(agentSkills) && agentSkills[0] ? agentSkills[0] : null;
@@ -30,7 +31,7 @@ function createUseAgentSkillAction(agentSkills, agentSkillIndexProvider) {
       controls: ["continue"]
     },
     execute: async (context, args) => {
-      const requestedSkill = readString$O(args && (args.skillName || args.name));
+      const requestedSkill = readString(args && (args.skillName || args.name));
       const lastReadSkill = context.agentSkillContext && context.agentSkillContext.lastReadSkill;
       const normalizedLastReadSkill = normalizeAgentSkill(lastReadSkill);
       let selectedSkill = !requestedSkill || matchesSkillName(normalizedLastReadSkill, requestedSkill)
@@ -55,7 +56,7 @@ function createUseAgentSkillAction(agentSkills, agentSkillIndexProvider) {
       if (!selectedSkill && context.agentSkillIndexProvider) {
         selectedSkill = await loadAgentSkillFromProvider(
           context.agentSkillIndexProvider,
-          requestedSkill || readString$O(lastReadSkill && (lastReadSkill.skillId || lastReadSkill.name))
+          requestedSkill || readString(lastReadSkill && (lastReadSkill.skillId || lastReadSkill.name))
         );
       }
 
@@ -100,15 +101,11 @@ function createUseAgentSkillAction(agentSkills, agentSkillIndexProvider) {
   });
 }
 
-function readString$O(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function matchesSkillName(skill, requestedSkill) {
-  const target = readString$O(requestedSkill).toLowerCase();
+  const target = readString(requestedSkill).toLowerCase();
   if (!skill || !target) return false;
-  return readString$O(skill.name).toLowerCase() === target ||
-    readString$O(skill.skillId).toLowerCase() === target;
+  return readString(skill.name).toLowerCase() === target ||
+    readString(skill.skillId).toLowerCase() === target;
 }
 
 export { createUseAgentSkillAction };

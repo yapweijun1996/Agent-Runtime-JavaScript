@@ -1,4 +1,6 @@
 import { createPendingApproval } from './approval-state.js';
+import { readString } from './semantic-json.js';
+import { redactSecretFields } from './secret-redaction.js';
 import { recordObservation, startEvaluatePhase, completeEvaluatePhase, finishRun } from './finalizer.js';
 import { completePhase } from './oodae.js';
 import { createEvaluationState } from './task-state.js';
@@ -6,6 +8,9 @@ import { syncPromptInquiryContext } from './inquiry-context-resolution.js';
 import { setTurnStateStatus } from './turn-state.js';
 import { createTurnControl, TURN_SIGNALS, applyTurnControl } from './turn-signal.js';
 import { cloneValue } from './utils.js';
+import { ERROR_CODES } from './errors.js';
+import { DEFAULT_FINAL_CANDIDATE_PATH } from './workspace-candidate-lifecycle.js';
+import { isResearchQualityGateRequired } from './convergence-activation.js';
 import { reconcileCitations, appendSourcesSection, collectResearchEvidenceUrls, collectFinalResponseSources, filterSourcesByEvidence } from './final-response-sources.js';
 import { normalizeFinalAnswerInternalProgress } from './final-answer-internal-progress.js';
 import { normalizeFinalResponseStructure } from './final-response-quality.js';
@@ -38,7 +43,8 @@ function collectScopedFinalResponseSources$1(runState, request, terminalProjecti
   const scopedUrls = readScopedEvidenceUrls$1(runState, terminalProjection);
   const sourceLimit = Array.isArray(scopedUrls) ? Math.max(3, scopedUrls.length) : undefined;
   const raw = collectFinalResponseSources(terminalProjection.researchContext, sourceLimit, {
-    prompt: readFinalSourcePrompt(runState, request)
+    prompt: readFinalSourcePrompt(runState, request),
+    requireReadEvidence: isResearchQualityGateRequired(runState)
   });
   return filterSourcesByEvidence(raw, scopedUrls);
 }
@@ -64,8 +70,8 @@ function isResearchEvidenceLoopActive$1(terminalProjection) {
     ? projection.researchReportLoop
     : null;
   if (!loop) return false;
-  const status = readString$16(loop.status);
-  return loop.enabled === true || Boolean(readString$16(loop.finalMode)) || Boolean(status && status !== "idle");
+  const status = readString(loop.status);
+  return loop.enabled === true || Boolean(readString(loop.finalMode)) || Boolean(status && status !== "idle");
 }
 
 function normalizeTerminalFinalText(rawText, runState, request, options = {}) {
@@ -127,12 +133,12 @@ function createCompiledReportSourcePayload(graph) {
   const sources = [];
   const seenUrls = new Set();
   for (const source of sourceArtifacts) {
-    const url = readString$16(source && source.url);
+    const url = readString(source && source.url);
     if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
     seenUrls.add(url);
     sources.push({
       kind: "research_evidence_graph",
-      title: readString$16(source && source.title) || url,
+      title: readString(source && source.title) || url,
       url
     });
     if (sources.length >= 8) break;
@@ -143,16 +149,13 @@ function createCompiledReportSourcePayload(graph) {
   };
 }
 
-function readString$16(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function handlePlannerFinal(options) {
   const {
     cycleRecord,
     decision,
     memoryEntriesAdded,
     normalizedInput,
+    onToken,
     pushStep,
     rawInput,
     request,
@@ -183,6 +186,17 @@ function handlePlannerFinal(options) {
     text: terminalText.text,
     usage: response.usage
   };
+
+  // Dispatch-path parity: direct_final (below) and the plan-path terminal
+  // (action-loop-plan-terminal.js) both surface the terminal text through
+  // onToken; planner_final — the most common simple-turn terminal — must too,
+  // or streaming hosts render nothing until the run resolves.
+  // C3c (AGRUN-585): when the native door already streamed the answer
+  // token-by-token (decision.answerStreamed), skip the one-shot — emitting
+  // it again would duplicate the text on streaming hosts.
+  if (typeof onToken === "function" && !(decision && decision.answerStreamed === true)) {
+    onToken(output.text);
+  }
 
   syncPromptInquiryContext(runState, request);
   runState.usedRuntimeFinalize = false;
@@ -432,6 +446,17 @@ async function handlePolicyBlock(options) {
     runtimeState,
     steps
   } = options;
+
+  // AGRUN-562 — "deny" is not "ask". Per agrun_docs/approval-flow.md, "ask"
+  // returns a pending approval to the host (human-in-the-loop pause) while
+  // "deny" returns a policy block the OODAE loop recovers from on its own —
+  // two different contracts. A denied action can never be granted, so
+  // pausing the run with an approval_required output (the code below,
+  // shared with "ask") implies a grantable approval that will never come.
+  if (policyDecision.action === "deny") {
+    return handlePolicyDenied({ actionHistory, actionName, cycleRecord, policyDecision, pushStep, runState });
+  }
+
   const pendingApproval = createPendingApproval({
     actionHistory,
     actionName,
@@ -455,6 +480,20 @@ async function handlePolicyBlock(options) {
   });
   if (pendingApproval && pendingApproval.resumeToken) {
     pendingApproval.resumeToken.turnControl = cloneValue(interruptionTurnControl);
+  }
+
+  // AGRUN-523 — the resume token snapshots the live provider `request` (and, via
+  // turnControl, a nested copy of itself), so its apiKey would otherwise ride
+  // back to the host on output.pendingApproval AND runState.pendingApproval — the
+  // two surfaces of EVERY approval_required turn. Redact every secret-keyed field
+  // (reusing the result.input SSOT, llm-trace.redactSecretFields) BEFORE the
+  // signer runs, so the signature covers the redacted token and sign->verify
+  // still validates the exact bytes the host carries back. Live in-memory state
+  // (session.request) is untouched — createResumeRequest already took a clone.
+  // Resume re-supplies credentials via overrides (restoreApprovalRequest now
+  // REQUIRES the host to re-supply, examples/browser approval-controller does).
+  if (pendingApproval && pendingApproval.resumeToken) {
+    pendingApproval.resumeToken = redactSecretFields(pendingApproval.resumeToken);
   }
 
   const signer = runtimeConfig && runtimeConfig.approvalSigner;
@@ -552,6 +591,183 @@ async function handlePolicyBlock(options) {
   });
 }
 
+// AGRUN-562 — graceful "deny" continuation, mirroring approval.js's
+// handleApprovalDenied (the "deny" resolution for a pending "ask" approval):
+// record the denial in actionHistory (feeds loopState.deniedActions and the
+// planner-prompt "never re-select a denied action" directive), record a
+// tool_rejection observation, signal RUN_AGAIN, and close out the act/evaluate
+// OODAE phases as a recoverable continuation — never runState.status =
+// "blocked", never a pendingApproval, never finishRun(). The { done: false }
+// sentinel tells the caller (action-loop-session-loop.js) to `continue` the
+// loop instead of returning a terminal RunResult; a real finishRun() result
+// has no `done` property, so callers can tell the two apart unambiguously.
+function handlePolicyDenied(options) {
+  const {
+    actionHistory,
+    actionName,
+    cycleRecord,
+    policyDecision,
+    pushStep,
+    runState
+  } = options;
+
+  pushStep("policy-denied", {
+    actionName,
+    policy: policyDecision.action,
+    reason: policyDecision.reason || null,
+    tier: policyDecision.tier
+  });
+
+  actionHistory.push({
+    actionName,
+    kind: "denied",
+    summary: `Policy denied "${actionName}".`
+  });
+
+  runState.pendingApproval = null;
+  const rejectionObservation = {
+    actionName,
+    kind: "tool_rejection",
+    message: `Action "${actionName}" is denied by policy and can never be used this session. Choose a different action, or give an honest final answer explaining the limitation.`,
+    policy: policyDecision.action,
+    resolution: "denied"
+  };
+  recordObservation(
+    runState,
+    pushStep,
+    rejectionObservation,
+    {
+      actionName,
+      cycle: runState.cycleCount,
+      kind: "tool_rejection"
+    }
+  );
+  applyTurnControl(runState, {
+    actionName,
+    cycle: runState.cycleCount,
+    observation: rejectionObservation,
+    signal: TURN_SIGNALS.RUN_AGAIN,
+    source: "policy"
+  });
+  completePhase(cycleRecord, pushStep, "act", {
+    actionName,
+    approvalStatus: policyDecision.action,
+    outcome: "denied",
+    resultKind: "denied"
+  });
+  startEvaluatePhase(runState, pushStep, null);
+  completeEvaluatePhase(cycleRecord, pushStep, {
+    nextPromptState: "continue",
+    observationKind: runState.observation.kind,
+    outcome: "denied_continue"
+  });
+
+  return { done: false };
+}
+
+// AGRUN-553 — never-return-empty backstop. The OODAE loop has three budget-
+// exhaustion exits (maxSteps, run deadline, cost budget) that otherwise return a
+// failure with output:null. When the model has already drafted a usable workspace
+// candidate but a terminal-handshake livelock (AGRUN-550/551/552 family) or a slow
+// run ate the budget before a clean publish/finalize, throwing that work away and
+// returning EMPTY is the worst outcome — especially for providers with no low-
+// effort tier (deepseek only supports high/max, so its high-variance terminal
+// thrash cannot be dodged by config). This delivers the drafted candidate as a
+// COMPLETED result instead, marked finalAnswerSource="budget_exhaustion_salvage"
+// (+ output.salvagedFrom / finishReason) so hosts can still tell the run was
+// truncated. Fires ONLY on the exhaustion codes AND only when a non-empty
+// candidate exists; a genuinely empty run (no candidate) still returns the
+// structured error, so the RUN_DEADLINE_EXCEEDED contract is unchanged there.
+const BUDGET_EXHAUSTION_SALVAGE_CODES = new Set([
+  ERROR_CODES.MAX_STEPS_EXCEEDED,
+  ERROR_CODES.RUN_DEADLINE_EXCEEDED,
+  ERROR_CODES.COST_BUDGET_EXCEEDED
+]);
+const BUDGET_EXHAUSTION_SALVAGE_LABELS = Object.freeze({
+  [ERROR_CODES.MAX_STEPS_EXCEEDED]: "step budget",
+  [ERROR_CODES.RUN_DEADLINE_EXCEEDED]: "time budget",
+  [ERROR_CODES.COST_BUDGET_EXCEEDED]: "cost budget"
+});
+
+function readSalvageableCandidate(runState) {
+  const workspace = runState && runState.virtualWorkspace;
+  if (!workspace || workspace.enabled !== true || !workspace.files || typeof workspace.files !== "object") {
+    return null;
+  }
+  const quality = workspace.quality && typeof workspace.quality === "object" ? workspace.quality : {};
+  const path = readString(quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
+  const file = workspace.files[path];
+  const text = file && typeof file.content === "string" ? file.content.trim() : "";
+  return text ? { path, text } : null;
+}
+
+function maybeSalvageBudgetExhaustedCandidate(session, code) {
+  if (!session || !session.runState) return null;
+  if (!BUDGET_EXHAUSTION_SALVAGE_CODES.has(code)) return null;
+  const candidate = readSalvageableCandidate(session.runState);
+  if (!candidate) return null;
+
+  const runState = session.runState;
+  const budgetLabel = BUDGET_EXHAUSTION_SALVAGE_LABELS[code] || "runtime budget";
+  const output = {
+    citations: [],
+    endpoint: null,
+    failedTools: Array.isArray(runState.failedTools) && runState.failedTools.length > 0
+      ? cloneValue(runState.failedTools) : [],
+    finishReason: "budget_exhaustion_salvage",
+    kind: "final_response",
+    limitations: `Delivered the drafted workspace candidate after the run reached its ${budgetLabel} before a clean publish/finalize completed.`,
+    model: null,
+    provider: null,
+    raw: null,
+    requestBody: null,
+    salvagedFrom: code,
+    status: null,
+    text: candidate.text,
+    usage: null
+  };
+
+  session.pushStep("budget-exhaustion-candidate-salvaged", {
+    candidateChars: candidate.text.length,
+    candidatePath: candidate.path,
+    code
+  });
+  // Mirror the max-steps continuation terminal (action-loop-continuation.js): set
+  // the completed terminal state directly, NOT via completeTerminalAction — we are
+  // past the OODAE act/evaluate phases at the budget-exhaustion exits, so the heavy
+  // phase machinery would have no valid cycleRecord to complete.
+  runState.status = "completed";
+  runState.usedRuntimeFinalize = false;
+  runState.finalAnswerSource = "budget_exhaustion_salvage";
+  runState.terminalizedBy = "budget_exhaustion_salvage";
+  runState.lastAction = "budget_exhaustion_salvage";
+  runState.evaluationState = {
+    actionName: "budget_exhaustion_salvage",
+    nextState: "stop",
+    outcome: "complete"
+  };
+  runState.observation = {
+    kind: "success",
+    output: cloneValue(output),
+    source: "budget_exhaustion_salvage"
+  };
+  session.pushStep("observation-recorded", {
+    cycle: runState.cycleCount,
+    kind: "success",
+    source: "budget_exhaustion_salvage"
+  });
+
+  return finishRun({
+    rawInput: session.rawInput,
+    normalizedInput: session.normalizedInput,
+    runState,
+    output,
+    memoryEntriesAdded: session.memoryEntriesAdded,
+    steps: session.steps,
+    runtimeState: session.runtimeState
+  });
+}
+
 function completeTerminalAction(options) {
   const {
     cycleRecord,
@@ -606,4 +822,4 @@ function completeTerminalAction(options) {
   });
 }
 
-export { handleDirectFinal, handlePlannerFinal, handlePolicyBlock, handleRuntimeFinalize };
+export { handleDirectFinal, handlePlannerFinal, handlePolicyBlock, handleRuntimeFinalize, maybeSalvageBudgetExhaustedCandidate };

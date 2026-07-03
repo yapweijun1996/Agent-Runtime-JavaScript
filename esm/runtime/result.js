@@ -1,11 +1,16 @@
 import { createLastRunSummary, snapshotRunState } from './state.js';
+import { ASK_CLARIFICATION_ACTION } from './action-names.js';
 import { normalizeFinalAnswerInternalProgress } from './final-answer-internal-progress.js';
 import { normalizeFinalResponseStructure } from './final-response-quality.js';
 import { appendSourcesSection, filterSourcesByEvidence, collectFinalResponseSources, collectResearchEvidenceUrls } from './final-response-sources.js';
 import { readFinalSourcePrompt } from './final-source-prompt.js';
+import { isResearchQualityGateRequired } from './convergence-activation.js';
 import { applyTerminalFinalContract } from './terminal-final-contract.js';
 import { projectTerminalRunState } from './run-state-projections.js';
 import { cloneValue } from './utils.js';
+import { readString } from './semantic-json.js';
+import { projectWorkingMemory } from './working-memory.js';
+import { redactSecretFields } from './secret-redaction.js';
 
 function applyFailure(runState, error, pushStep) {
   runState.status = "failed";
@@ -38,16 +43,22 @@ function finalizeResult(
   const result = {
     failedTools,
     finalAnswerSource: runState.finalAnswerSource || null,
-    input: rawInput,
+    // AGRUN-515 — echo the host input back WITHOUT its provider secrets. The
+    // result object is routinely logged / persisted / shown in an inspector;
+    // every other surface (steps, runState, errors) already scrubs the apiKey,
+    // and result.input was the one hole that re-exposed it.
+    input: redactSecretFields(rawInput),
     mode: runState.mode || "skill_loop",
-    normalizedInput: cloneValue(normalizedInput),
+    // normalizedInput.raw is the original input, so it carries the same secrets
+    // as `input` above — redact it too (redactSecretFields deep-clones).
+    normalizedInput: redactSecretFields(normalizedInput),
     selectedSkill: runState.selectedSkill,
     output: runState.status === "failed" ? null : cloneValue(output),
     runState: createResultRunStateSnapshot(runState),
     memoryEntriesAdded: cloneValue(memoryEntriesAdded),
     steps: cloneValue(steps),
     error: runState.error ? cloneValue(runState.error) : null,
-    diagnostics: createResultDiagnostics(runState)
+    diagnostics: createResultDiagnostics(runState, steps, memoryEntriesAdded)
   };
 
   runtimeState.lastRun = createLastRunSummary(runState, memoryEntriesAdded);
@@ -142,7 +153,8 @@ function collectTerminalOutputSources(runState, options = {}) {
   }
   return filterSourcesByEvidence(
     collectFinalResponseSources(terminalProjection.researchContext, options.sourceLimit, {
-      prompt: options.prompt
+      prompt: options.prompt,
+      requireReadEvidence: isResearchQualityGateRequired(runState)
     }),
     options.scopedEvidenceUrls
   );
@@ -172,12 +184,12 @@ function createCompiledReportSourcePayload$1(graph) {
   const sources = [];
   const seenUrls = new Set();
   for (const source of sourceArtifacts) {
-    const url = readString$1g(source && source.url);
+    const url = readString(source && source.url);
     if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
     seenUrls.add(url);
     sources.push({
       kind: "research_evidence_graph",
-      title: readString$1g(source && source.title) || url,
+      title: readString(source && source.title) || url,
       url
     });
     if (sources.length >= 8) break;
@@ -247,17 +259,102 @@ function normalizeTerminalMetadata(runState, output) {
     return;
   }
 
-  if (finalAnswerSource === "ask_clarification") {
+  if (finalAnswerSource === ASK_CLARIFICATION_ACTION) {
     runState.usedRuntimeFinalize = false;
     return;
   }
 }
 
-function readString$1g(value) {
-  return typeof value === "string" ? value.trim() : "";
+// AGRUN-439 — consolidate every permission denial into one host-facing array
+// for UX ("show what was denied and why") and analytics. Pure read-only
+// projection from the existing SSOTs — it adds NO new emission site and does
+// not change loop behavior. Two denial kinds today:
+//  - "approval": user/host denied an approval-gated action; recorded in
+//    actionHistory as { actionName, kind:"denied", summary } (approval.js).
+//  - "skill_policy": a skill/tool was policy-denied; emitted as a
+//    "skill-policy-denied" step whose detail carries reason + skillName/toolName
+//    (skill-policy.js sanitizeDecision).
+function readPermissionDenials(runState, steps) {
+  const denials = [];
+  const history = runState && Array.isArray(runState.actionHistory) ? runState.actionHistory : [];
+  for (const entry of history) {
+    if (entry && entry.kind === "denied" && typeof entry.actionName === "string") {
+      denials.push({
+        actionName: entry.actionName,
+        kind: "approval",
+        reason: readString(entry.summary) || null
+      });
+    }
+  }
+  const stepList = Array.isArray(steps) ? steps : [];
+  for (const step of stepList) {
+    if (step && step.type === "skill-policy-denied") {
+      const detail = step.detail && typeof step.detail === "object" ? step.detail : {};
+      denials.push({
+        actionName: readString(detail.skillName) || readString(detail.toolName) || "execute_skill_tool",
+        kind: "skill_policy",
+        reason: readString(detail.reason) || null
+      });
+    }
+  }
+  return denials;
 }
 
-function createResultDiagnostics(runState) {
+// AGRUN-438 — turn-scoped error digest. A browser-first runtime has no
+// process-wide error stream (each tab/run is its own scope), so instead of a
+// Claude-Code-style process ring buffer this is a read-only projection of the
+// errors THIS run already recorded: the structured failure entries in
+// actionHistory (the SSOT the planner itself sees) plus the terminal
+// runState.error. Bounded to the most recent RUN_ERROR_DIGEST_LIMIT (ring-buffer
+// watermark semantics) with a total count, so a host can show "what went wrong"
+// without scraping the open-ended step ledger. Denials are excluded — they are
+// surfaced separately as permissionDenials.
+const RUN_ERROR_HISTORY_KINDS = new Set([
+  "action_error",
+  "action_execute_error",
+  "action_loop_failure",
+  "action_envelope_protocol_error",
+  "plan_execution_error",
+  "plan_validation_error",
+  "planned_action_error",
+  "error"
+]);
+
+function readRunErrors(runState) {
+  const errors = [];
+  const terminal = runState && runState.error;
+  if (terminal) {
+    errors.push({
+      source: "run",
+      kind: "run_error",
+      actionName: null,
+      message: readErrorText(terminal)
+    });
+  }
+  const history = runState && Array.isArray(runState.actionHistory) ? runState.actionHistory : [];
+  for (const entry of history) {
+    if (!entry || typeof entry !== "object") continue;
+    if (!RUN_ERROR_HISTORY_KINDS.has(entry.kind)) continue;
+    errors.push({
+      source: "action",
+      kind: readString(entry.kind),
+      actionName: readString(entry.actionName) || null,
+      message: readString(entry.body && entry.body.error)
+        || readString(entry.summary)
+        || readString(entry.reason)
+        || null
+    });
+  }
+  return { count: errors.length, items: errors.slice(-20) };
+}
+
+function readErrorText(error) {
+  if (typeof error === "string") return error || null;
+  if (error && typeof error.message === "string") return error.message || null;
+  return null;
+}
+
+function createResultDiagnostics(runState, steps, memoryEntriesAdded) {
   // ADR-0014 PR 2 — surface bounded recovery state for hosts that want
   // to show "AI is having trouble parsing" UX without inspecting
   // internal runState. Read-only telemetry; hosts cannot influence
@@ -299,7 +396,16 @@ function createResultDiagnostics(runState) {
       issues: fqIssues,
       noteCount: fqNoteCount,
       lastSource: fqLastSource
-    }
+    },
+    permissionDenials: readPermissionDenials(runState, steps),
+    // AGRUN-426 — read-only JSON consolidation of the durable memory the AI
+    // extracted THIS run (facts/preferences/decisions keyed by slot). A host
+    // accumulating entries across turns can call projectWorkingMemory on its
+    // own list for a cross-turn working memory.
+    workingMemory: projectWorkingMemory(memoryEntriesAdded),
+    // AGRUN-438 — turn-scoped, bounded error digest ({ count, items }) from this
+    // run's actionHistory failures + terminal error. Read-only telemetry.
+    errors: readRunErrors(runState)
   };
 }
 
@@ -309,8 +415,8 @@ function isResearchEvidenceLoopActive$2(terminalProjection) {
     ? projection.researchReportLoop
     : null;
   if (!loop) return false;
-  const status = readString$1g(loop.status);
-  return loop.enabled === true || Boolean(readString$1g(loop.finalMode)) || Boolean(status && status !== "idle");
+  const status = readString(loop.status);
+  return loop.enabled === true || Boolean(readString(loop.finalMode)) || Boolean(status && status !== "idle");
 }
 
-export { applyFailure, finalizeResult };
+export { applyFailure, finalizeResult, readPermissionDenials, readRunErrors };

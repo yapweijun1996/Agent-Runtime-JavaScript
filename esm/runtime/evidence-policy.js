@@ -1,4 +1,7 @@
-const DEFAULT_WEB_RESEARCH_RECOVERY_ACTIONS = Object.freeze(["web_search", "read_url"]);
+import { readString } from './semantic-json.js';
+import { WEB_SEARCH_ACTION, READ_URL_ACTION } from './action-names.js';
+
+const DEFAULT_WEB_RESEARCH_RECOVERY_ACTIONS = Object.freeze([WEB_SEARCH_ACTION, READ_URL_ACTION]);
 // Audit H5 (AGRUN-483) — bound runState.toolContext.history growth. Default 50
 // most-recent entries; host-overridable via evidencePolicy.toolHistoryCap.
 const DEFAULT_TOOL_HISTORY_CAP = 50;
@@ -27,9 +30,9 @@ function normalizeEvidencePolicyConfig(value) {
     };
   }
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const profile = readString$1J(source.profile) || readString$1J(source.mode) || "web_research";
+  const profile = readString(source.profile) || readString(source.mode) || "web_research";
   const recoveryActions = Array.isArray(source.recoveryActions)
-    ? source.recoveryActions.map(readString$1J).filter(Boolean)
+    ? source.recoveryActions.map(readString).filter(Boolean)
     : profile === "web_research"
       ? DEFAULT_WEB_RESEARCH_RECOVERY_ACTIONS.slice()
       : [];
@@ -102,10 +105,6 @@ function hasStructuredEvidence(value, depth) {
     return Object.entries(output).some(([, item]) => hasStructuredEvidence(item, depth + 1));
   }
   return false;
-}
-
-function readString$1J(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { DEFAULT_READ_SOURCES_CAP, DEFAULT_SEARCH_PASSES_CAP, DEFAULT_TOOL_HISTORY_CAP, countStructuredToolEvidence, formatEvidenceRecoveryActions, normalizeEvidencePolicyConfig, readEvidencePolicy, readEvidenceRecoveryActions, resolveReadSourcesCap, resolveSearchPassesCap };

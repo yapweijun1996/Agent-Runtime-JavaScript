@@ -2,6 +2,7 @@ import { isDirectEvidenceUrl, isConcreteArticleSource } from './final-response-s
 import { readFinalSourcePrompt } from './final-source-prompt.js';
 import { isExternalSourceCoveragePrompt } from './external-source-intent.js';
 import { extractResearchCoverageTargets } from './research-coverage-guard.js';
+import { readString } from './semantic-json.js';
 
 /**
  * Single source of truth for finalize-time evidence aggregation.
@@ -68,13 +69,13 @@ function collectEvidencePackSources(researchContext, options = {}) {
   const seen = new Set();
   const pushSource = (item, fallback = {}) => {
     if (!item || typeof item !== "object") return;
-    const url = readString$1i(item.url);
+    const url = readString(item.url);
     if (!url || !isDirectEvidenceUrl(url) || seen.has(url)) return;
     const source = {
-      domain: readString$1i(item.domain) || readDomain$2(url),
-      query: readString$1i(item.query) || readString$1i(fallback.query),
-      snippet: readString$1i(item.snippet) || readString$1i(item.content) || readString$1i(fallback.snippet),
-      title: readString$1i(item.title) || readString$1i(fallback.title) || url,
+      domain: readString(item.domain) || readDomain$2(url),
+      query: readString(item.query) || readString(fallback.query),
+      snippet: readString(item.snippet) || readString(item.content) || readString(fallback.snippet),
+      title: readString(item.title) || readString(fallback.title) || url,
       url
     };
     if (requireConcreteArticle && !isConcreteArticleSource(source)) return;
@@ -86,7 +87,7 @@ function collectEvidencePackSources(researchContext, options = {}) {
   for (const item of readArray$2(context.aggregatedSearchResults)) pushSource(item);
   for (const item of readArray$2(context.searchResults)) pushSource(item);
   for (const pass of readArray$2(context.searchPasses)) {
-    const query = readString$1i(pass && pass.query);
+    const query = readString(pass && pass.query);
     for (const item of readArray$2(pass && pass.items)) {
       pushSource(item, { query });
     }
@@ -102,7 +103,7 @@ function sourceCoversTarget(source, target) {
     source && source.snippet,
     source && source.url,
     source && source.domain
-  ].map(readString$1i).join(" ");
+  ].map(readString).join(" ");
   return aliases.some((alias) => hasComparablePhrase(haystack, alias));
 }
 
@@ -122,24 +123,20 @@ function readArray$2(value) {
 
 function readDomain$2(url) {
   try {
-    return new URL(readString$1i(url)).hostname.replace(/^www\./i, "");
+    return new URL(readString(url)).hostname.replace(/^www\./i, "");
   } catch (error) {
     return "";
   }
 }
 
 function normalizeComparableText$1(value) {
-  return readString$1i(value)
+  return readString(value)
     .toLowerCase()
     .replace(/\bu\.s\.a\.\b/g, "usa")
     .replace(/\bu\.s\.\b/g, "us")
     .replace(/\bu\.k\.\b/g, "uk")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-}
-
-function readString$1i(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { buildEvidencePack, collectEvidencePackSources, sourceCoversTarget };

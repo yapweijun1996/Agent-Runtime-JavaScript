@@ -1,4 +1,6 @@
 import { isQuestionLikeText } from './topic-like-task.js';
+import { ASK_CLARIFICATION_ACTION } from './action-names.js';
+import { readString } from './semantic-json.js';
 
 const RESOLVED_KINDS = new Set(["confirm", "explicit_answer", "option_select"]);
 
@@ -16,7 +18,7 @@ function deriveClarificationStatus(pendingClarification, lastResolution, fallbac
 
 function deriveOpenAmbiguity(pendingClarification) {
   return isPendingClarification(pendingClarification)
-    ? readString$1d(pendingClarification.question)
+    ? readString(pendingClarification.question)
     : "";
 }
 
@@ -36,22 +38,22 @@ function deriveAmbiguityState(options) {
   }
 
   if (
-    readString$1d(options && options.currentGoal).length === 0 ||
-    readString$1d(options && options.currentTopic).length === 0 ||
-    readString$1d(options && options.goalQuality) !== "stable"
+    readString(options && options.currentGoal).length === 0 ||
+    readString(options && options.currentTopic).length === 0 ||
+    readString(options && options.goalQuality) !== "stable"
   ) {
     return "unresolved";
   }
 
-  if (readString$1d(options && options.evidenceState) !== "none") {
+  if (readString(options && options.evidenceState) !== "none") {
     return "inferable";
   }
 
-  if (readString$1d(options && options.promptSignal) !== "low") {
+  if (readString(options && options.promptSignal) !== "low") {
     return "unresolved";
   }
 
-  if (readString$1d(options && options.semanticHint) === "inferable") {
+  if (readString(options && options.semanticHint) === "inferable") {
     return "inferable";
   }
 
@@ -64,7 +66,7 @@ function deriveAmbiguityState(options) {
 }
 
 function detectClarificationLoopRisk(options) {
-  if (readString$1d(options && options.actionName) !== "ask_clarification") {
+  if (readString(options && options.actionName) !== ASK_CLARIFICATION_ACTION) {
     return false;
   }
 
@@ -82,8 +84,8 @@ function detectClarificationLoopRisk(options) {
     return false;
   }
 
-  const currentGoal = readString$1d(options && options.currentGoal);
-  const currentTopic = readString$1d(options && options.currentTopic);
+  const currentGoal = readString(options && options.currentGoal);
+  const currentTopic = readString(options && options.currentTopic);
   if (!currentGoal || !currentTopic) {
     return false;
   }
@@ -97,7 +99,7 @@ function detectClarificationLoopRisk(options) {
     )
   );
 
-  if (readString$1d(options && options.promptSignal) !== "low" || !repeatedClarification) {
+  if (readString(options && options.promptSignal) !== "low" || !repeatedClarification) {
     return false;
   }
 
@@ -105,7 +107,7 @@ function detectClarificationLoopRisk(options) {
     return true;
   }
 
-  return readString$1d(options && options.evidenceState) !== "none";
+  return readString(options && options.evidenceState) !== "none";
 }
 
 function isPendingClarification(value) {
@@ -113,22 +115,22 @@ function isPendingClarification(value) {
     value &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    readString$1d(value.question)
+    readString(value.question)
   );
 }
 
 function isResolvedResolution(value) {
-  const kind = readString$1d(value && value.kind);
+  const kind = readString(value && value.kind);
   return RESOLVED_KINDS.has(kind);
 }
 
 function readClarificationStatus(value) {
-  const text = readString$1d(value);
+  const text = readString(value);
   return text === "resolved" ? "resolved" : "none";
 }
 
 function readRecentTurnStats(text) {
-  const lines = readString$1d(text)
+  const lines = readString(text)
     .split(/\r?\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -157,7 +159,7 @@ function readRecentTurnStats(text) {
 }
 
 function hasOptionStyleAmbiguity(value) {
-  return /\([A-Z]\)/.test(readString$1d(value));
+  return /\([A-Z]\)/.test(readString(value));
 }
 
 function isLowSignalText(value) {
@@ -166,11 +168,7 @@ function isLowSignalText(value) {
 }
 
 function trimTrailingPunctuation$1(value) {
-  return readString$1d(value).replace(/[.?!]+$/g, "").trim();
-}
-
-function readString$1d(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return readString(value).replace(/[.?!]+$/g, "").trim();
 }
 
 export { deriveAmbiguityState, deriveClarificationStatus, deriveOpenAmbiguity, detectClarificationLoopRisk };

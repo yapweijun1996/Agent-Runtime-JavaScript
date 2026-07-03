@@ -4,7 +4,27 @@ Browser / real-LLM live test evidence. Each file is a verification record for a 
 
 **Total: 76 records (2026-04-26 to 2026-05-16).**
 
-> Last reviewed: 2026-05-16.
+> Last reviewed: 2026-06-15.
+
+---
+
+## Standing live regression gates (re-runnable, NOT frozen)
+
+Unlike the dated evidence below, these are **live commands** kept green as the codebase moves. Each hits real providers with the keys in `.env.local`, skips a provider cleanly (exit 0) when its key is absent (CI-safe, no secrets required), and exits non-zero only on a real regression. Run after any runtime change that touches the memory, secret-boundary, or approval paths.
+
+| Gate command | Guards | What it proves |
+|---|---|---|
+| `npm run test:live:multiturn` | **AGRUN-517** (+ live coverage for **514**/**515**) | A simple multi-turn chat is **≤1 LLM call/turn**. Runs the same 4-turn chat twice — baseline (no `memoryExtractionPolicy`, historical extract-every-turn) vs fixed (skip policy) — and asserts fixed == 1 provider call/turn while baseline still pays the extra extraction call. Also live-asserts `getMemoryState().lastExtraction` (514: skipped/completed) and no provider key in the returned result on completed turns (515). Evidence: [agrun-517-live-acceptance-2026-06-15](./agrun-517-live-acceptance-2026-06-15.md). |
+| `npm run test:live:secret-redaction` | **AGRUN-523** (closes the **515** approval-path gap) | A **blocked / approval_required** turn never hands a usable provider `apiKey` back to the host. Forces a `web_search` block under `actionPolicy { web_search: "ask" }`, then on BOTH doors (`runtime.run` + `session.run`) asserts the whole serialized result carries no real key and `…pendingApproval.resumeToken.request.apiKey === "[redacted]"`. Also proves the resume contract live: an approve that re-supplies the key proceeds past restore. Evidence: [agrun-523-live-acceptance-2026-06-15](./agrun-523-live-acceptance-2026-06-15.md). |
+
+Both gates depend on `dist/agrun.js` — run `npm run build` first. The no-key default behavior (517 skip-extraction profile) is additionally guarded without any key by `examples/browser/test/memory-extraction-policy.smoke.ts`; the 523 redaction contract is unit-guarded by `test/unit/approval-result-secret-redaction.test.js` (runs in `npm run check`, no key needed).
+
+---
+
+### Security / cost boundary (2026-06)
+- [agrun-517-live-acceptance-2026-06-15](./agrun-517-live-acceptance-2026-06-15.md) — per-turn memory-extraction overhead removed (≤1 LLM call/turn, both providers).
+- [agrun-523-live-acceptance-2026-06-15](./agrun-523-live-acceptance-2026-06-15.md) — provider `apiKey` redacted from the approval-turn resume token (both doors, both surfaces).
+- [live-quality-smoke-multiturn-report-2026-06-14](./live-quality-smoke-multiturn-report-2026-06-14.md) — the smoke run that first measured the 8-calls-for-4-turns overhead (origin of AGRUN-517).
 
 ---
 

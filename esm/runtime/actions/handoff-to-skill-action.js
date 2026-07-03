@@ -2,6 +2,7 @@ import { findAgentSkill, loadAgentSkillFromProvider, normalizeAgentSkill } from 
 import { STANDALONE_PLAN_ACTION } from '../action-plan-contract.js';
 import { HANDOFF_CYCLE_KIND, readSkillIdentity, normalizeHandoffChain, detectHandoffCycle, createHandoffCycleDetail, HANDOFF_CYCLE_ERROR_CODE, buildNextHandoffChain } from '../handoff-chain.js';
 import { cloneValue } from '../utils.js';
+import { readString } from '../semantic-json.js';
 
 // ADR-0043 — handoff_to_skill action.
 //
@@ -13,6 +14,7 @@ import { cloneValue } from '../utils.js';
 // State update (activeSkill + handoffContext + handoffChain) is handled by
 // shared action-loop side-effect helpers, matching the pattern used for
 // use_agent_skill.
+
 
 
 const handoffToSkillAction = Object.freeze({
@@ -48,8 +50,8 @@ const handoffToSkillAction = Object.freeze({
 });
 
 async function executeHandoffToSkill(context, args) {
-  const skillName = readString$K(args && (args.skillName || args.skill_name));
-  const handoffContext = readString$K(args && (args.handoffContext || args.handoff_context));
+  const skillName = readString(args && (args.skillName || args.skill_name));
+  const handoffContext = readString(args && (args.handoffContext || args.handoff_context));
   const inputFilter = readInputFilter(args && (args.inputFilter || args.input_filter));
   const skillContext = context && context.agentSkillContext && typeof context.agentSkillContext === "object"
     ? context.agentSkillContext
@@ -156,12 +158,8 @@ async function executeHandoffToSkill(context, args) {
   };
 }
 
-function readString$K(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readInputFilter(value) {
-  const name = readString$K(value);
+  const name = readString(value);
   if (name) return name;
   return value && typeof value === "object" && !Array.isArray(value)
     ? cloneValue(value)

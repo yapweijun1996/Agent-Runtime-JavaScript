@@ -1,4 +1,5 @@
 import { fingerprintAction, stableStringify, djb2Hash } from './action-fingerprint.js';
+import { readString } from './semantic-json.js';
 
 const DEFAULT_EXACT_FAILURE_BLOCK_AFTER = 3;
 const DEFAULT_SAME_ACTION_FAILURE_WARN_AFTER = 2;
@@ -14,11 +15,11 @@ function normalizeActionGuardrailConfig(value) {
   return {
     enabled: source.enabled !== false,
     hardStop: source.hardStop !== false,
-    exactFailureBlockAfter: readPositiveInteger$l(source.exactFailureBlockAfter, DEFAULT_EXACT_FAILURE_BLOCK_AFTER),
-    sameActionFailureWarnAfter: readPositiveInteger$l(source.sameActionFailureWarnAfter, DEFAULT_SAME_ACTION_FAILURE_WARN_AFTER),
-    sameActionFailureHaltAfter: readPositiveInteger$l(source.sameActionFailureHaltAfter, DEFAULT_SAME_ACTION_FAILURE_HALT_AFTER),
-    noProgressWarnAfter: readPositiveInteger$l(source.noProgressWarnAfter, DEFAULT_NO_PROGRESS_WARN_AFTER),
-    noProgressBlockAfter: readPositiveInteger$l(source.noProgressBlockAfter, DEFAULT_NO_PROGRESS_BLOCK_AFTER)
+    exactFailureBlockAfter: readPositiveInteger$n(source.exactFailureBlockAfter, DEFAULT_EXACT_FAILURE_BLOCK_AFTER),
+    sameActionFailureWarnAfter: readPositiveInteger$n(source.sameActionFailureWarnAfter, DEFAULT_SAME_ACTION_FAILURE_WARN_AFTER),
+    sameActionFailureHaltAfter: readPositiveInteger$n(source.sameActionFailureHaltAfter, DEFAULT_SAME_ACTION_FAILURE_HALT_AFTER),
+    noProgressWarnAfter: readPositiveInteger$n(source.noProgressWarnAfter, DEFAULT_NO_PROGRESS_WARN_AFTER),
+    noProgressBlockAfter: readPositiveInteger$n(source.noProgressBlockAfter, DEFAULT_NO_PROGRESS_BLOCK_AFTER)
   };
 }
 
@@ -144,7 +145,7 @@ function isFailedActionResult(result) {
   if (!result || typeof result !== "object") return true;
   const output = result.output && typeof result.output === "object" ? result.output : {};
   if (output.ok === false) return true;
-  return readString$1K(output.status) === "failed" || readString$1K(output.status) === "blocked";
+  return readString(output.status) === "failed" || readString(output.status) === "blocked";
 }
 
 function createActionSignature(action, args) {
@@ -166,7 +167,7 @@ function createAllowDecision(action) {
 function createDecision$2(action, code, actionValue, count, signature) {
   return {
     action,
-    actionName: readString$1K(actionValue && actionValue.name) || null,
+    actionName: readString(actionValue && actionValue.name) || null,
     code,
     count,
     message: createMessage(action, code, actionValue, count),
@@ -175,7 +176,7 @@ function createDecision$2(action, code, actionValue, count, signature) {
 }
 
 function createMessage(action, code, actionValue, count) {
-  const name = readString$1K(actionValue && actionValue.name) || "action";
+  const name = readString(actionValue && actionValue.name) || "action";
   if (code === "exact_failure_block") return `${name} repeated the same failing arguments ${count} time(s). Choose a different approach.`;
   if (code === "same_action_failure_halt") return `${name} failed ${count} time(s). Stop retrying this action path.`;
   if (code === "same_action_failure_warn") return `${name} has repeated failures. Inspect the failure and change strategy.`;
@@ -187,12 +188,12 @@ function createMessage(action, code, actionValue, count) {
 function normalizeDecision(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return {
-    action: readString$1K(value.action) || "allow",
-    actionName: readString$1K(value.actionName) || null,
-    code: readString$1K(value.code) || "allow",
-    count: readPositiveInteger$l(value.count, 0),
-    message: readString$1K(value.message),
-    signature: readString$1K(value.signature) || null
+    action: readString(value.action) || "allow",
+    actionName: readString(value.actionName) || null,
+    code: readString(value.code) || "allow",
+    count: readPositiveInteger$n(value.count, 0),
+    message: readString(value.message),
+    signature: readString(value.signature) || null
   };
 }
 
@@ -200,9 +201,9 @@ function normalizeCountMap(value) {
   const output = {};
   if (!value || typeof value !== "object" || Array.isArray(value)) return output;
   for (const [key, count] of Object.entries(value)) {
-    const normalizedKey = readString$1K(key);
+    const normalizedKey = readString(key);
     if (!normalizedKey) continue;
-    output[normalizedKey] = readPositiveInteger$l(count, 0);
+    output[normalizedKey] = readPositiveInteger$n(count, 0);
   }
   return output;
 }
@@ -212,23 +213,19 @@ function normalizeNoProgress(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return output;
   for (const [key, entry] of Object.entries(value)) {
     if (!entry || typeof entry !== "object") continue;
-    const normalizedKey = readString$1K(key);
-    const outputHash = readString$1K(entry.outputHash);
+    const normalizedKey = readString(key);
+    const outputHash = readString(entry.outputHash);
     if (!normalizedKey || !outputHash) continue;
     output[normalizedKey] = {
-      count: readPositiveInteger$l(entry.count, 0),
+      count: readPositiveInteger$n(entry.count, 0),
       outputHash
     };
   }
   return output;
 }
 
-function readPositiveInteger$l(value, fallback) {
+function readPositiveInteger$n(value, fallback) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
-}
-
-function readString$1K(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createActionGuardrailState, createActionGuardrailSyntheticResult, evaluateActionGuardrailBefore, normalizeActionGuardrailConfig, refreshActionGuardrail, refreshActionGuardrailAfter };

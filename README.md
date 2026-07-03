@@ -72,7 +72,7 @@ Run the required root verification:
 npm run check
 ```
 
-That command builds the full `dist/` tree (lib + example) and runs the smoke test suite.
+That command builds the full `dist/` tree (lib + example), runs the smoke test suite, and runs the deterministic mock-transport repro gates (`npm run test:repro` — no API keys, no cost; see [test/livekit/README.md](https://github.com/yapweijun1996/agrun/blob/main/0_development/test/livekit/README.md)).
 
 To generate a demo-ready distribution artifact without the full smoke suite:
 
@@ -173,6 +173,6 @@ The `sessionStore` interface also exposes `updateGlobalMemory(id, patch)`, `dele
 
 ## Verification Summary
 
-- Required for normal PRs: `npm run check` (which runs `npm run build` — lib + example + secret guard — then `dist:check` and smoke tests).
+- Required for normal PRs: `npm run check` (which runs `npm run build` — lib + example + secret guard — then `dist:check`, smoke tests, and the deterministic `test:repro` gates).
 - Required when browser example behavior or Web UI integration is affected: `npm run build:browser` (already covered by the default `npm run build`).
 - Optional manual verification for provider-backed behavior: see [agrun_docs/development-secrets.md](./agrun_docs/development-secrets.md)

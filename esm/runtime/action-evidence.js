@@ -1,4 +1,5 @@
 import { cloneValue } from './utils.js';
+import { EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
 import { stampThreadProvenance } from './thread-provenance.js';
 import { DEFAULT_TOOL_HISTORY_CAP } from './evidence-policy.js';
 
@@ -23,7 +24,7 @@ function isHostCustomEvidenceAction(actionName, runtimeConfig) {
 // structured tool-evidence context: the bundled-skill tool runner plus any
 // host custom evidence action permitted by evidencePolicy.
 function shouldRecordStructuredToolEvidence(actionName, runtimeConfig) {
-  return actionName === "execute_skill_tool" || isHostCustomEvidenceAction(actionName, runtimeConfig);
+  return actionName === EXECUTE_SKILL_TOOL_ACTION || isHostCustomEvidenceAction(actionName, runtimeConfig);
 }
 
 // Resolve the configured tool-history cap from runtimeConfig, falling back to

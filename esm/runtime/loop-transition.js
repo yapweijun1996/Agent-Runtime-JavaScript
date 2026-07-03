@@ -26,10 +26,14 @@ const LOOP_TRANSITIONS = Object.freeze({
   FINALIZE_DECISION_REPLAN: "finalize_decision_replan",
   PLAN_EXECUTED: "plan_executed",
   ACTION_DISABLED: "action_disabled",
+  // ADR-0057 Phase 1 — an AI-emitted action sits behind a closed deferred
+  // namespace; the loop surfaced the open_action_namespace hint and continued.
+  ACTION_NAMESPACE_CLOSED: "action_namespace_closed",
   PUBLISH_CANDIDATE_GATED: "publish_candidate_gated",
   UNKNOWN_ACTION: "unknown_action",
   WEB_SEARCH_REPEAT_SKIPPED: "web_search_repeat_skipped",
   WEB_SEARCH_REPEAT_ESCALATED: "web_search_repeat_escalated",
+  POLICY_DENIED_CONTINUE: "policy_denied_continue",
   // ── implicit fall-through (most common case) ────────────────────────────
   NEXT_TURN: "next_turn",
   // ── terminal returns (branch identity for the final iteration) ──────────

@@ -212,12 +212,77 @@ function reportQualityGuardrail(options = {}) {
   };
 }
 
-// Host adapter name for teams that wire an LLM verifier. Without `verify`, it
-// falls back to the deterministic report-quality checks above so live tests can
+// Named error the verifier-timeout race rejects with, so callers (and the
+// recipe itself) can tell a timeout apart from a verifier throw.
+const AI_VERIFIER_TIMEOUT_ERROR_NAME = "AiVerifierTimeoutError";
+
+// Race a host verify() call against a deadline. Like executeActionWithTimeout
+// (AGRUN-428) this does NOT cancel the underlying work — it unblocks the
+// guardrail so a slow verifier degrades to the deterministic base check
+// instead of consuming the whole publish action's shared timeout budget.
+function raceVerifyWithTimeout(verify, args, timeoutMs) {
+  let timer = null;
+  const verifyPromise = Promise.resolve().then(() => verify(args));
+  const timeoutPromise = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`AI verifier timed out after ${timeoutMs}ms`);
+      error.name = AI_VERIFIER_TIMEOUT_ERROR_NAME;
+      error.code = "ai_verifier_timeout";
+      reject(error);
+    }, timeoutMs);
+  });
+  return Promise.race([verifyPromise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+// Fail-OPEN posture: a verifier is a QUALITY gate, not a security gate, so a
+// throwing host error-callback must never break publish (mirrors the runtime's
+// guardrail policy in runOutputGuardrails).
+function reportVerifierError(onVerifierError, phase, error) {
+  if (typeof onVerifierError !== "function") return;
+  try {
+    onVerifierError({
+      phase,
+      error: error && error.message ? String(error.message) : String(error)
+    });
+  } catch (_ignored) {
+    // Swallow — observability must not become a new failure mode.
+  }
+}
+
+// Host adapter for teams that wire an LLM verifier. Without `verify`, it falls
+// back to the deterministic report-quality checks above so live tests can
 // exercise the same output-guardrail boundary without another provider call.
+//
+// AGRUN-412 — verifier failure handling. The async `verify` call has three
+// failure modes; all degrade fail-OPEN to the deterministic base check (a
+// quality gate must never trap publish), now observably:
+//   - throw      → onVerifierError({ phase: "error" }); without a callback the
+//                  throw still propagates to runOutputGuardrails, which emits an
+//                  `output-guardrail-error` step (unchanged prior behavior).
+//   - timeout    → only when `verifyTimeoutMs` is set; the verifier-local race
+//                  rejects, routed the same as a throw. This is FINER-GRAINED
+//                  than the AGRUN-428 per-action timeout (the global backstop
+//                  that already prevents a hung verifier from hanging the run);
+//                  it degrades just the verifier instead of failing the whole
+//                  publish action at its 30s budget.
+//   - malformed  → a non-object result no longer falls back SILENTLY:
+//                  onVerifierError({ phase: "malformed" }) fires when wired
+//                  (without a callback the fallback is unchanged, non-breaking).
+//
+// @param {object}   [options]
+// @param {function} [options.verify]          async (args) => { block, reason?, info? }
+// @param {number}   [options.verifyTimeoutMs] opt-in verifier-local deadline (ms); omit for none
+// @param {function} [options.onVerifierError] opt-in ({ phase, error }) observability callback
 function aiVerifierGuardrail(options = {}) {
   const opts = options && typeof options === "object" ? options : {};
   const verify = typeof opts.verify === "function" ? opts.verify : null;
+  const onVerifierError = typeof opts.onVerifierError === "function" ? opts.onVerifierError : null;
+  const verifyTimeoutMs = typeof opts.verifyTimeoutMs === "number"
+    && Number.isFinite(opts.verifyTimeoutMs) && opts.verifyTimeoutMs > 0
+    ? opts.verifyTimeoutMs
+    : null;
   const base = reportQualityGuardrail({ ...opts, name: opts.name || "ai-verifier" });
   return {
     name: base.name,
@@ -225,8 +290,25 @@ function aiVerifierGuardrail(options = {}) {
       const baseResult = base.execute(args);
       if (baseResult && baseResult.block === true) return baseResult;
       if (!verify) return baseResult;
-      const verifierResult = await verify(args);
-      if (!verifierResult || typeof verifierResult !== "object") return baseResult;
+      let verifierResult;
+      try {
+        verifierResult = verifyTimeoutMs
+          ? await raceVerifyWithTimeout(verify, args, verifyTimeoutMs)
+          : await verify(args);
+      } catch (error) {
+        const phase = error && error.name === AI_VERIFIER_TIMEOUT_ERROR_NAME ? "timeout" : "error";
+        if (onVerifierError) {
+          reportVerifierError(onVerifierError, phase, error);
+          return baseResult;
+        }
+        // No callback wired: preserve the prior observability channel — let the
+        // throw reach runOutputGuardrails' try/catch (output-guardrail-error).
+        throw error;
+      }
+      if (!verifierResult || typeof verifierResult !== "object") {
+        reportVerifierError(onVerifierError, "malformed", new Error("AI verifier returned a non-object result."));
+        return baseResult;
+      }
       if (verifierResult.block === true) {
         return {
           block: true,

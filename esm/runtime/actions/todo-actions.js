@@ -4,6 +4,7 @@ import { normalizeVerificationPattern, DEFAULT_VERIFICATION_PATTERN } from '../t
 import { normalizeTodoPromptStrings } from '../todo-prompt-strings.js';
 import { resetTodoAutopilotVetoOnProgress } from '../todo-autopilot.js';
 import { STANDALONE_PLAN_ACTION } from '../action-plan-contract.js';
+import { readString } from '../semantic-json.js';
 
 /**
  * AGRUN-212a Phase C — Planner actions for TodoState.
@@ -30,18 +31,15 @@ import { STANDALONE_PLAN_ACTION } from '../action-plan-contract.js';
  */
 
 
+
 // Threshold mirrors claude-code TodoWriteTool — for trivial 1-2 step
 // plans, the verifier nudge is not worth the loop cost.
 const VERIFIER_NUDGE_MIN_ITEMS = 3;
 
-function readString$$(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readProvenance(runState) {
   if (!runState || typeof runState !== "object") return null;
-  const threadId = readString$$(runState.threadId);
-  const turnId = readString$$(runState.runId);
+  const threadId = readString(runState.threadId);
+  const turnId = readString(runState.runId);
   if (!threadId && !turnId) return null;
   return { threadId: threadId || "default", turnId: turnId || null };
 }
@@ -133,7 +131,7 @@ function preflightTodoPlanAction(context, args) {
   const validItems = items.filter((item) => (
     item &&
     typeof item === "object" &&
-    readString$$(item.label)
+    readString(item.label)
   ));
   if (validItems.length === 0) {
     throw new Error("todo_plan requires at least one item with a non-empty label in native_tools mode.");
@@ -227,9 +225,9 @@ function isNativeToolsPlanner(context) {
  * re-anchor the goal because the planner forgot to.
  */
 function readGoalForPlan(args, runState, context) {
-  const explicit = readString$$(args && args.goal);
+  const explicit = readString(args && args.goal);
   if (explicit) return explicit;
-  const prompt = readString$$(
+  const prompt = readString(
     runState && runState.observationSummary && runState.observationSummary.prompt
   );
   if (prompt) {
@@ -294,11 +292,11 @@ async function executeTodoAdvanceAction(context, args) {
     throw new Error("todo_advance: runState is required");
   }
   const opts = args && typeof args === "object" ? args : {};
-  const itemId = readString$$(opts.itemId);
+  const itemId = readString(opts.itemId);
   if (!itemId) {
     throw new Error("todo_advance: itemId is required");
   }
-  const nextStatus = readString$$(opts.nextStatus);
+  const nextStatus = readString(opts.nextStatus);
   if (!nextStatus) {
     throw new Error("todo_advance: nextStatus is required");
   }
@@ -389,14 +387,14 @@ async function executeTodoCancelAction(context, args) {
   runState.todoState = next;
   emitTodoStateMutation(context, "cancel", next, {
     cancelledItemCount: next === current ? 0 : cancellableBefore,
-    reason: readString$$(opts.reason || opts.note) || null
+    reason: readString(opts.reason || opts.note) || null
   });
   return {
     control: "continue",
     output: {
       cancelledItemCount: next === current ? 0 : cancellableBefore,
       kind: "todo_cancel_result",
-      reason: readString$$(opts.reason || opts.note) || null,
+      reason: readString(opts.reason || opts.note) || null,
       todoState: serializeTodoState(next)
     },
     summary: `todo_cancel(items=${next === current ? 0 : cancellableBefore}, status=${next.status})`
@@ -643,10 +641,10 @@ function detectVerifierNudge(context, todoState) {
 
   const hasVerificationItem = items.some((item) => {
     if (!item) return false;
-    const label = readString$$(item.label);
+    const label = readString(item.label);
     if (label && pattern.test(label)) return true;
     const notes = Array.isArray(item.notes) ? item.notes : [];
-    return notes.some((note) => note && pattern.test(readString$$(note.text)));
+    return notes.some((note) => note && pattern.test(readString(note.text)));
   });
   if (hasVerificationItem) return null;
 
@@ -656,7 +654,7 @@ function detectVerifierNudge(context, todoState) {
       reason: "plan completed without any verify/test/check item"
     });
   }
-  return readString$$(nudgeFn({ itemCount: items.length })) || null;
+  return readString(nudgeFn({ itemCount: items.length })) || null;
 }
 
 function countCancellableTodoItems(todoState) {

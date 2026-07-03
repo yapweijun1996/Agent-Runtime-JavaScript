@@ -55,6 +55,7 @@ Important:
 - Do not deploy or share a build created with real secrets embedded.
 - Do not hardcode API keys in source files, even with reversible obfuscation such as XOR.
 - XOR is not acceptable for frontend default provider secrets because the key, ciphertext, and decrypt logic would all ship in the browser bundle.
+- AGRUN-515 — the `examples/browser` bundled `Default` demo gateway key is XOR-obfuscated (recoverable from source) and is therefore gated by build mode: it is only *used* in development. A production build (`import.meta.env.PROD`) refuses it, so a copied/deployed demo cannot silently route real traffic through the owner's gateway. To run an intentional public demo, opt in explicitly with `VITE_AGRUN_ENABLE_DEMO_GATEWAY=true`. When the demo key is disabled, the `Default` provider has no key and the example shows its usual "missing API key" state; real providers (OpenAI/Gemini/Custom) with host-supplied keys are unaffected. See `examples/browser/src/lib/default-gateway.ts` (`isDemoGatewayEnabled`). The right long-term fix remains a server-issued, origin-bound, short-lived token rather than any embedded key.
 - The read-url browser adapter accepts either a service base URL or a full `/read-url` URL, sends direct page reads to `POST /read-url`, attaches `x-api-key`, and leaves provider and web-search requests unchanged.
 
 ## Live provider check
@@ -107,6 +108,31 @@ npm run test:live -- --suite search    # web search scenarios
 npm run test:live -- --suite planner   # planner decision scenarios
 npm run test:live -- --suite session   # multi-turn session recall
 ```
+
+AGRUN-517 regression gate (per-turn memory-extraction overhead):
+
+```bash
+npm run test:live:multiturn      # both providers: proves a simple chat is <=1 LLM call/turn (baseline vs skip-policy)
+```
+
+`test:live:multiturn` runs the same 4-turn chat twice (baseline = no `memoryExtractionPolicy` vs fixed = skip policy) and asserts the fixed run is exactly one provider call per turn while the baseline still pays the extra extraction call. It skips a provider when its key is absent (CI-safe) and exits non-zero only on a real regression. See [live-tests/agrun-517-live-acceptance-2026-06-15.md](./live-tests/agrun-517-live-acceptance-2026-06-15.md).
+
+AGRUN-523 regression gate (provider key leak on the approval path):
+
+```bash
+npm run test:live:secret-redaction   # both providers: a blocked/approval_required turn carries no usable provider apiKey
+```
+
+`test:live:secret-redaction` forces a `web_search` block under `actionPolicy { web_search: "ask" }` and, on both `runtime.run` and `session.run`, asserts the whole returned result carries no real key and `…pendingApproval.resumeToken.request.apiKey === "[redacted]"`, then proves an approve that re-supplies the key still proceeds past restore. Same skip-on-missing-key / non-zero-only-on-regression behavior as `test:live:multiturn`. See [live-tests/agrun-523-live-acceptance-2026-06-15.md](./live-tests/agrun-523-live-acceptance-2026-06-15.md). The redaction contract is also unit-guarded (no key needed) by `test/unit/approval-result-secret-redaction.test.js`, which runs in `npm run check`.
+
+AGRUN-512 regression gate (trivial prompts must finalize directly, no workspace-authoring wander):
+
+```bash
+npm run test:live:authoring-discipline   # both providers: trivial/borderline prompts finalize directly with ZERO workspace authoring
+# options: --provider openai|gemini  --reps N  --skills  (loads bundled skills to match the original failure surface)
+```
+
+`test:live:authoring-discipline` runs trivial/borderline prompts in `plannerMode: native_tools` (`maxSteps=8`) in two modes — baseline (the AGRUN-512 authoring-discipline guidance line stripped via a prompts override) vs fixed (shipped) — and asserts the fixed runs finalize directly with zero `workspace_*` authoring decisions, within budget. **Honest note:** the original 2026-06-13 6/6 authoring wander is NOT reproducible on the current models (baseline == fixed, all clean), so this gate guards the discipline going forward rather than proving a flip; see [live-tests/agrun-512-authoring-discipline-2026-06-15.md](./live-tests/agrun-512-authoring-discipline-2026-06-15.md). The guidance presence + no-gating (all 9 authoring actions stay visible) is unit-guarded (no key needed) by `test/unit/workspace-authoring-discipline.test.js`.
 
 ### Test suites
 

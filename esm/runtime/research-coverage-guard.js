@@ -1,3 +1,4 @@
+import { readString } from './semantic-json.js';
 import { isNewsLikeSourceCoveragePrompt } from './external-source-intent.js';
 
 const LIST_INTRO_PATTERN = /\b(?:each\s+for|for|across|covering|in)\s+([^.;:\n]{3,220})/gi;
@@ -81,7 +82,7 @@ function extractResearchCoverageTargets(prompt) {
 function extractCandidateListSegments(prompt) {
   const segments = [];
   for (const match of prompt.matchAll(LIST_INTRO_PATTERN)) {
-    const raw = readString$1m(match[1]);
+    const raw = readString(match[1]);
     if (!raw) continue;
     const stopped = raw.split(SEGMENT_STOP_PATTERN)[0] || raw;
     segments.push(stopped);
@@ -100,7 +101,7 @@ function splitCandidateList(segment) {
 }
 
 function normalizeTarget(raw) {
-  const cleaned = collapseWhitespace$1(readString$1m(raw)
+  const cleaned = collapseWhitespace$1(readString(raw)
     .replace(/^the\s+/i, "")
     .replace(/\b(?:for|on|at)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{4}).*$/i, "")
     .replace(/\b(?:news|headlines?|report|research|briefing|roundup)\b.*$/i, ""));
@@ -141,11 +142,11 @@ function createTargetAliases(label, raw) {
       aliases.add(alias);
     }
   }
-  return Array.from(aliases).map((alias) => readString$1m(alias)).filter(Boolean);
+  return Array.from(aliases).map((alias) => readString(alias)).filter(Boolean);
 }
 
 function normalizeComparableText$3(value) {
-  return readString$1m(value)
+  return readString(value)
     .toLowerCase()
     .replace(/\bu\.s\.a\.\b/g, "usa")
     .replace(/\bu\.s\.\b/g, "us")
@@ -155,11 +156,7 @@ function normalizeComparableText$3(value) {
 }
 
 function collapseWhitespace$1(value) {
-  return readString$1m(value).replace(/\s+/g, " ").trim();
-}
-
-function readString$1m(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return readString(value).replace(/\s+/g, " ").trim();
 }
 
 export { extractResearchCoverageTargets };

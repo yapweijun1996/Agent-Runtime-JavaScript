@@ -6,6 +6,7 @@ import { mergeAbortSignals } from '../../runtime/abort-signal.js';
 import { DEFAULT_LLM_TIMEOUT_MS } from './fetch-resilience.js';
 import { filterHeadersByAllowList } from './header-allow-list.js';
 import { createProviderRequestTrace } from '../../runtime/llm-trace.js';
+import { pumpProviderFullStream } from './provider-stream-pump.js';
 import { jsonSchema } from '../../node_modules/@ai-sdk/provider-utils/dist/index.js';
 
 // AGRUN-207 — Allow-list of headers that may travel through the
@@ -165,13 +166,14 @@ function buildEmptyResponseRepairProviderOptions(providerOptions, request) {
   };
 }
 
-async function requestOpenAIChatCompletionStreaming(request, fetchImpl, onToken) {
+async function requestOpenAIChatCompletionStreaming(request, fetchImpl, onToken, onReasoning) {
   const openai = createOpenAIProvider(request, fetchImpl);
   const model = selectOpenAIModel(openai, request);
   const messages = buildAISDKMessages(request);
   const system = buildSystemPrompt(request);
   const tools = convertOpenAITools(request.tools);
   const safeOnToken = typeof onToken === "function" ? onToken : null;
+  const safeOnReasoning = typeof onReasoning === "function" ? onReasoning : null;
   const timeoutMs = request.timeoutMs || DEFAULT_LLM_TIMEOUT_MS;
   const abortSignal = mergeAbortSignals([request.signal, createTimeoutSignal(timeoutMs)]);
   const providerOptions = buildOpenAIProviderOptions(request);
@@ -205,11 +207,7 @@ async function requestOpenAIChatCompletionStreaming(request, fetchImpl, onToken)
       maxRetries: 1
     });
 
-    if (safeOnToken) {
-      for await (const delta of result.textStream) {
-        try { safeOnToken(delta); } catch (_ignored) { /* consumer error */ }
-      }
-    }
+    await pumpProviderFullStream(result, { onToken: safeOnToken, onReasoning: safeOnReasoning });
 
     const finalResult = await result.response;
     const fullText = await result.text;

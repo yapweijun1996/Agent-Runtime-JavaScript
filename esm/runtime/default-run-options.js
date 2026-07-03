@@ -5,6 +5,7 @@ const HOOK_KEYS = [
   "onCheckpoint",
   "onInvalidPlannerOutput",
   "onPlannerDecision",
+  "onReasoning",
   "onStep",
   "onStreamEvent",
   "onToken",
@@ -93,7 +94,7 @@ function pickRunOptions(value) {
 function mergeHook(defaultHook, localHook, key) {
   if (typeof defaultHook !== "function") return localHook;
   if (typeof localHook !== "function") return defaultHook;
-  if (key === "onStep" || key === "onToken" || key === "onStreamEvent" || key === "onCheckpoint") {
+  if (key === "onStep" || key === "onToken" || key === "onReasoning" || key === "onStreamEvent" || key === "onCheckpoint") {
     return (...args) => {
       // C2 (audit 2026-06-10) — defaultHook's return value is discarded here (the
       // merged hook returns only localHook's result). If a host registered an

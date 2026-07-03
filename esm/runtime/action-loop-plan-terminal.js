@@ -8,6 +8,7 @@ import { normalizeFinalResponseStructure } from './final-response-quality.js';
 import { appendSourcesSection, collectFinalResponseSources, filterSourcesByEvidence, collectResearchEvidenceUrls } from './final-response-sources.js';
 import { normalizeFinalAnswerInternalProgress } from './final-answer-internal-progress.js';
 import { readFinalSourcePrompt } from './final-source-prompt.js';
+import { isResearchQualityGateRequired } from './convergence-activation.js';
 import { applyTerminalFinalContract } from './terminal-final-contract.js';
 
 function handlePlanSynthesize(options) {
@@ -107,7 +108,8 @@ function collectScopedFinalResponseSources(runState, request, prompt) {
   const scopedUrls = readScopedEvidenceUrls(runState);
   const sourceLimit = Array.isArray(scopedUrls) ? Math.max(3, scopedUrls.length) : undefined;
   const raw = collectFinalResponseSources(runState && runState.researchContext, sourceLimit, {
-    prompt
+    prompt,
+    requireReadEvidence: isResearchQualityGateRequired(runState)
   });
   return filterSourcesByEvidence(raw, scopedUrls);
 }

@@ -1,5 +1,6 @@
 import { deriveClarificationStatus, deriveAmbiguityState, detectClarificationLoopRisk, deriveOpenAmbiguity } from './clarification-state.js';
 import { classifyGoalQuality } from './goal-quality.js';
+import { readString } from './semantic-json.js';
 
 function createObservationSummary(request, normalizedInput) {
   const prompt = readPrompt$2(request, normalizedInput);
@@ -20,7 +21,7 @@ function createPlannerState(request, observationSummary, inputResolution) {
   const inquiryContext = normalizedResolution.inquiryContext;
   const prompt = readPrompt$2(request, observationSummary);
   const turnIntent = normalizedResolution.turnIntent;
-  const executionClass = readString$1b(normalizedResolution.executionClass) || null;
+  const executionClass = readString(normalizedResolution.executionClass) || null;
   const goalQuality = classifyGoalQuality(inquiryContext.activeGoal, inquiryContext.activeTopic, {
         executionClass,
         prompt,
@@ -45,7 +46,7 @@ function createPlannerState(request, observationSummary, inputResolution) {
   });
 
   return {
-    activeQuery: readString$1b(normalizedResolution.activeQuery),
+    activeQuery: readString(normalizedResolution.activeQuery),
     activeTask: inquiryContext.activeGoal || prompt,
     ambiguityState,
     clarificationStatus,
@@ -70,11 +71,11 @@ function createPlannerState(request, observationSummary, inputResolution) {
 }
 
 function createEvaluationState(options) {
-  const actionName = readString$1b(options && options.actionName);
+  const actionName = readString(options && options.actionName);
   const plannerState = options && typeof options === "object" ? options.plannerState : null;
   const turnState = options && typeof options === "object" ? options.turnState : null;
-  const evidenceState = readString$1b(plannerState && plannerState.evidenceState) || "none";
-  const promptSignal = readString$1b(plannerState && plannerState.promptSignal) || "empty";
+  const evidenceState = readString(plannerState && plannerState.evidenceState) || "none";
+  const promptSignal = readString(plannerState && plannerState.promptSignal) || "empty";
   const pendingClarification = plannerState && plannerState.pendingClarification
     ? plannerState.pendingClarification
     : null;
@@ -87,11 +88,11 @@ function createEvaluationState(options) {
     plannerState && plannerState.clarificationStatus
   );
   const ambiguityState = deriveAmbiguityState({
-    currentGoal: readString$1b(plannerState && plannerState.currentGoal),
-    currentTopic: readString$1b(plannerState && plannerState.currentTopic),
+    currentGoal: readString(plannerState && plannerState.currentGoal),
+    currentTopic: readString(plannerState && plannerState.currentTopic),
     evidenceState,
     fallbackClarificationStatus: clarificationStatus,
-    goalQuality: readString$1b(plannerState && plannerState.goalQuality),
+    goalQuality: readString(plannerState && plannerState.goalQuality),
     lastResolution,
     pendingClarification,
     promptSignal,
@@ -99,13 +100,13 @@ function createEvaluationState(options) {
   });
   const clarificationLoopRisk = detectClarificationLoopRisk({
     actionName,
-    currentGoal: readString$1b(plannerState && plannerState.currentGoal),
-    currentTopic: readString$1b(plannerState && plannerState.currentTopic),
+    currentGoal: readString(plannerState && plannerState.currentGoal),
+    currentTopic: readString(plannerState && plannerState.currentTopic),
     evidenceState,
     lastResolution,
     pendingClarification,
     promptSignal,
-    recentTurns: readString$1b(options && options.sessionContext && options.sessionContext.recentTurns),
+    recentTurns: readString(options && options.sessionContext && options.sessionContext.recentTurns),
     semanticHint: ""
   });
 
@@ -119,9 +120,9 @@ function createEvaluationState(options) {
     hasUserClarification: Boolean(
       plannerState && plannerState.hasUserClarification
     ) || Boolean(turnState && turnState.hasUserClarification),
-    nextState: readString$1b(options && options.nextState) || null,
+    nextState: readString(options && options.nextState) || null,
     openAmbiguity: deriveOpenAmbiguity(pendingClarification) || null,
-    outcome: readString$1b(options && options.outcome) || null
+    outcome: readString(options && options.outcome) || null
   };
 }
 
@@ -173,15 +174,15 @@ function normalizeInputResolution(inputResolution, observationSummary) {
       };
 
   return {
-    activeQuery: readString$1b(source.activeQuery),
-    evidenceState: readString$1b(source.evidenceState) || "none",
+    activeQuery: readString(source.activeQuery),
+    evidenceState: readString(source.evidenceState) || "none",
     inquiryContext: normalizePlannerInquiryContext(
       source.inquiryContext && typeof source.inquiryContext === "object"
         ? source.inquiryContext
         : intentState
     ),
     shouldUseRecall: source.shouldUseRecall === true,
-    executionClass: readString$1b(source.executionClass) || null,
+    executionClass: readString(source.executionClass) || null,
     turnIntent: source.turnIntent && typeof source.turnIntent === "object"
       ? source.turnIntent
       : null,
@@ -211,7 +212,7 @@ function isLowSignalPrompt(value) {
 }
 
 function trimTrailingPunctuation(value) {
-  return readString$1b(value).replace(/[.?!]+$/g, "").trim();
+  return readString(value).replace(/[.?!]+$/g, "").trim();
 }
 
 function readPrompt$2(request, normalizedInput) {
@@ -227,7 +228,7 @@ function readPrompt$2(request, normalizedInput) {
 }
 
 function readPlannerPromptSignal(request, observationSummary) {
-  const explicit = readString$1b(observationSummary && observationSummary.promptSignal);
+  const explicit = readString(observationSummary && observationSummary.promptSignal);
   return explicit || classifyPromptSignal(readPrompt$2(request, null)).signal;
 }
 
@@ -235,18 +236,14 @@ function normalizePlannerInquiryContext(value) {
   const source = value && typeof value === "object" ? value : {};
 
   return {
-    activeGoal: readString$1b(source.activeGoal || source.goal),
-    activeQuery: readString$1b(source.activeQuery),
-    activeTopic: readString$1b(source.activeTopic || source.topic),
+    activeGoal: readString(source.activeGoal || source.goal),
+    activeQuery: readString(source.activeQuery),
+    activeTopic: readString(source.activeTopic || source.topic),
     lastClarificationResolution: source.lastClarificationResolution || source.lastResolution || null,
     pendingClarification: source.pendingClarification && typeof source.pendingClarification === "object"
       ? source.pendingClarification
       : null
   };
-}
-
-function readString$1b(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { classifyPromptSignal, createEvaluationState, createObservationSummary, createPlannerState };

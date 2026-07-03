@@ -1,6 +1,8 @@
 import { cloneValue } from '../runtime/utils.js';
 import { SessionVersionConflictError } from './errors.js';
+import { readSessionMemorySlotKey } from './memory-slot.js';
 import { ensureSummaryKeyFields, composeSummaryKey } from './summary-key.js';
+import { readString } from '../runtime/semantic-json.js';
 
 const DEFAULT_DB_NAME$1 = "agrun-session-store";
 const DEFAULT_OPEN_TIMEOUT_MS = 5000;
@@ -32,8 +34,16 @@ const SCHEMA$1 = Object.freeze({
 });
 
 function createIndexedDBSessionStore(options) {
-  const dbName = readString$1Z(options && options.dbName) || DEFAULT_DB_NAME$1;
-  const openTimeoutMs = readPositiveNumber$4(options && options.openTimeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
+  const dbName = readString(options && options.dbName) || DEFAULT_DB_NAME$1;
+  // `openTimeoutMs: Infinity` disables the wall-clock open deadline entirely
+  // (see openDb). Production hosts omit it and get DEFAULT_OPEN_TIMEOUT_MS; the
+  // Infinity opt-out exists so a controlled environment (the Node test runner,
+  // where a starved event loop can let wall-clock outrun a healthy fake-IDB
+  // open macrotask) can decouple liveness from wall-clock without weakening the
+  // browser default.
+  const openTimeoutMs = (options && options.openTimeoutMs === Infinity)
+    ? Infinity
+    : readPositiveNumber$4(options && options.openTimeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
   let dbPromise = null;
 
   return {
@@ -99,12 +109,27 @@ function createIndexedDBSessionStore(options) {
     },
 
     async appendMemory(sessionId, entry) {
+      // AGRUN-494 (audit M17) — upsert by (kind, slot): delete every prior row
+      // for this session that shares the slot key before inserting, so a
+      // re-confirmed slot replaces its stale value(s) instead of accumulating
+      // duplicates. Mirrors the in-memory adapter via the same SSOT key fn.
+      // Slot-less entries skip the lookup and stay append-only.
+      const db = await getDb();
+      const slotKey = readSessionMemorySlotKey(entry);
+      if (slotKey) {
+        const existing = await getAllByIndex$1(db, "memoryEntries", "sessionId", sessionId);
+        for (const record of existing) {
+          if (record && record.key && readSessionMemorySlotKey(record) === slotKey) {
+            await deleteRecord(db, "memoryEntries", record.key);
+          }
+        }
+      }
       const nextEntry = {
         ...cloneValue(entry),
-        key: `${sessionId}:${readString$1Z(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
+        key: `${sessionId}:${readString(entry.timestamp)}:${Math.random().toString(36).slice(2, 8)}`,
         sessionId
       };
-      await putRecord$1(await getDb(), "memoryEntries", nextEntry);
+      await putRecord$1(db, "memoryEntries", nextEntry);
       return cloneValue(entry);
     },
 
@@ -190,26 +215,35 @@ function createIndexedDBSessionStore(options) {
 function openDb$1(dbName, options) {
   return new Promise((resolve, reject) => {
     const request = globalThis.indexedDB.open(dbName, DB_VERSION$1);
-    const timeoutMs = readPositiveNumber$4(options && options.timeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
+    // `timeoutMs: Infinity` => no wall-clock deadline (timeoutId stays null).
+    // A finite positive value bounds a genuinely hung open (a blocked upgrade
+    // held by another tab); Infinity removes the wall-clock-vs-event-loop race
+    // that flakes the Node test runner under a starved loop.
+    const timeoutMs = (options && options.timeoutMs === Infinity)
+      ? Infinity
+      : readPositiveNumber$4(options && options.timeoutMs) || DEFAULT_OPEN_TIMEOUT_MS;
+    const hasDeadline = Number.isFinite(timeoutMs) && timeoutMs > 0;
     let settled = false;
-    const timeoutId = setTimeout(() => {
-      settleReject(createStorageOpenError(
-        "InvalidStateError",
-        `IndexedDB open timed out after ${timeoutMs}ms for "${dbName}".`
-      ));
-    }, timeoutMs);
+    const timeoutId = hasDeadline
+      ? setTimeout(() => {
+          settleReject(createStorageOpenError(
+            "InvalidStateError",
+            `IndexedDB open timed out after ${timeoutMs}ms for "${dbName}".`
+          ));
+        }, timeoutMs)
+      : null;
 
     function settleResolve(db) {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
+      if (timeoutId !== null) clearTimeout(timeoutId);
       resolve(db);
     }
 
     function settleReject(error) {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
+      if (timeoutId !== null) clearTimeout(timeoutId);
       reject(error);
     }
 
@@ -399,15 +433,11 @@ function compareTimestamp(left, right) {
     return leftTime - rightTime;
   }
 
-  return readString$1Z(left.id || left.key).localeCompare(readString$1Z(right.id || right.key));
+  return readString(left.id || left.key).localeCompare(readString(right.id || right.key));
 }
 
 function cloneNullable$2(value) {
   return value == null ? null : cloneValue(value);
-}
-
-function readString$1Z(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function readPositiveNumber$4(value) {

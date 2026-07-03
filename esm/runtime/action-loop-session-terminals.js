@@ -1,12 +1,13 @@
 import './tool-schema.js';
+import { readString } from './semantic-json.js';
 import './action-pattern-convergence.js';
+import { EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
 import './runtime-event-classifier.js';
 import { analyzeFinalResponseQuality, noteFinalResponseQualityIssues } from './final-response-quality.js';
 import { handlePlannerFinal, handleDirectFinal } from './action-loop-terminal.js';
 import { executeRuntimeFinalize } from './runtime-finalize.js';
 import { prepareDirectFinalResult } from './direct-final-result.js';
 import { callHostHookWithTimeout } from './host-hook-timeout.js';
-import { readString } from './semantic-json.js';
 
 // ADR-0023 — Harness-as-tool-provider. The runtime must not re-prompt the LLM
 // with runtime-authored repair instructions or synthesize the next research
@@ -45,6 +46,7 @@ async function handlePlannerFinalDecision(session, cycleRecord, decision, planne
       decision,
       memoryEntriesAdded: session.memoryEntriesAdded,
       normalizedInput: session.normalizedInput,
+      onToken: session.onToken,
       pushStep: session.pushStep,
       rawInput: session.rawInput,
       request: session.request,
@@ -69,6 +71,7 @@ async function handlePlannerFinalizeDecision(session, cycleRecord, decision) {
       decision,
       memoryEntriesAdded: session.memoryEntriesAdded,
       normalizedInput: session.normalizedInput,
+      onReasoning: session.onReasoning,
       onStreamEvent: session.onStreamEvent,
       onToken: session.onToken,
       pushStep: session.pushStep,
@@ -182,7 +185,7 @@ function capturePlannerFinalText(session, decision) {
 }
 
 async function maybeHandleDirectFinalAfterSkillTool(session, cycleRecord, actionName) {
-  if (actionName !== "execute_skill_tool") return null;
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) return null;
   const directFinal = prepareDirectFinalResult(session.runState.toolContext.lastResult);
   if (directFinal.kind === "ready") {
     // AGRUN-457 — `direct_final` source. The skill tool's own action

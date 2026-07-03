@@ -3,13 +3,14 @@ import { summarizeReadSourceForDirection } from './context-snapshot-fields.js';
 import { toTargetTokens } from './context-window-policy.js';
 import { createCompressedSummaryVariants, estimateStructuredSummaryTokens } from './context-window-summary.js';
 import { renderTurns, buildAnchoredRecentTurns } from './context-window-turns.js';
+import { readString } from '../runtime/semantic-json.js';
 
 function buildContextWindowPlan(options) {
   const policy = options.policy && options.policy.compaction;
-  const inputBudgetTokens = readPositiveInteger$5(options.inputBudgetTokens, 1);
-  const charsPerToken = readPositiveInteger$5(options.policy && options.policy.charsPerToken, 4);
+  const inputBudgetTokens = readPositiveInteger$4(options.inputBudgetTokens, 1);
+  const charsPerToken = readPositiveInteger$4(options.policy && options.policy.charsPerToken, 4);
   const working = createWorkingContext(options, inputBudgetTokens, charsPerToken);
-  let stage = readString$a(options.stage) || "initial";
+  let stage = readString(options.stage) || "initial";
 
   if (options.fitEvaluator(working.sessionContext)) {
     return finalizePlan(working, stage === "initial" ? "fit" : stage, false, options);
@@ -55,15 +56,15 @@ function createWorkingContext(options, inputBudgetTokens, charsPerToken) {
     : {};
   const compaction = options.policy.compaction;
   const direction = {
-    activeGoal: readString$a(inquiryContext.activeGoal),
-    activeQuery: readString$a(inquiryContext.activeQuery),
-    activeTopic: readString$a(inquiryContext.activeTopic),
+    activeGoal: readString(inquiryContext.activeGoal),
+    activeQuery: readString(inquiryContext.activeQuery),
+    activeTopic: readString(inquiryContext.activeTopic),
     lastReadSource: cloneNullable$1(inquiryContext.lastReadSource),
     lastResolution: cloneNullable$1(inquiryContext.lastClarificationResolution),
     pendingClarification: cloneNullable$1(inquiryContext.pendingClarification),
     selectedSource: cloneNullable$1(inquiryContext.selectedSource)
   };
-  const summaryText = readString$a(sessionMemory.compactedContext || sessionMemory.summary);
+  const summaryText = readString(sessionMemory.compactedContext || sessionMemory.summary);
   const memoryItems = Array.isArray(sessionMemory.items) ? sessionMemory.items.slice() : [];
   const confirmedMemory = selectConfirmedMemory(
     memoryItems,
@@ -80,12 +81,12 @@ function createWorkingContext(options, inputBudgetTokens, charsPerToken) {
     decisions: confirmedMemory.decisions,
     facts: confirmedMemory.facts,
     history: compaction.tiers.history.enabled === true
-      ? trimNumberedBlock(readString$a(sessionMemory.history), toTargetTokens(inputBudgetTokens, compaction.tiers.history.maxShare, 0), charsPerToken)
+      ? trimNumberedBlock(readString(sessionMemory.history), toTargetTokens(inputBudgetTokens, compaction.tiers.history.maxShare, 0), charsPerToken)
       : "",
     items: memoryItems,
     lastReadSource: direction.lastReadSource,
     lastResolution: direction.lastResolution,
-    memory: trimNumberedBlock(readString$a(sessionMemory.memory), toTargetTokens(inputBudgetTokens, compaction.tiers.otherMemory.maxShare, 0), charsPerToken),
+    memory: trimNumberedBlock(readString(sessionMemory.memory), toTargetTokens(inputBudgetTokens, compaction.tiers.otherMemory.maxShare, 0), charsPerToken),
     openAmbiguity: direction.pendingClarification && typeof direction.pendingClarification.question === "string"
       ? direction.pendingClarification.question
       : "",
@@ -134,7 +135,7 @@ function finalizePlan(working, stage, compacted, options) {
 function buildSegments(working, options) {
   const policy = options.policy.compaction;
   const inputBudgetTokens = working.inputBudgetTokens;
-  const charsPerToken = readPositiveInteger$5(options.policy && options.policy.charsPerToken, 4);
+  const charsPerToken = readPositiveInteger$4(options.policy && options.policy.charsPerToken, 4);
 
   return [
     createSegment("direction", 1, policy.tiers.direction.pinned, toTargetTokens(inputBudgetTokens, policy.tiers.direction.maxShare, 0), estimateObjectTokens(readDirectionObject(working.sessionContext), charsPerToken), readDirectionObject(working.sessionContext), false, false),
@@ -252,7 +253,7 @@ function selectConfirmedMemory(items, priorityOrder, tokenBudget, charsPerToken)
 }
 
 function trimNumberedBlock(text, tokenBudget, charsPerToken) {
-  const lines = readString$a(text)
+  const lines = readString(text)
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
@@ -274,7 +275,7 @@ function trimNumberedBlock(text, tokenBudget, charsPerToken) {
 }
 
 function trimTextByTokens(text, tokenBudget, charsPerToken) {
-  const normalized = readString$a(text);
+  const normalized = readString(text);
 
   if (!normalized) {
     return "";
@@ -285,7 +286,7 @@ function trimTextByTokens(text, tokenBudget, charsPerToken) {
 }
 
 function countRenderedTurns(value) {
-  const text = readString$a(value);
+  const text = readString(value);
   return text ? text.split(/\n\s*\n/).filter(Boolean).length : 0;
 }
 
@@ -314,15 +315,11 @@ function estimateObjectTokens(value, charsPerToken) {
 }
 
 function estimateTextTokens(value, charsPerToken) {
-  return Math.ceil(readString$a(value).length / charsPerToken);
+  return Math.ceil(readString(value).length / charsPerToken);
 }
 
-function readPositiveInteger$5(value, fallback) {
+function readPositiveInteger$4(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-function readString$a(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function cloneNullable$1(value) {

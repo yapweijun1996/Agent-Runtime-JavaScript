@@ -74,6 +74,17 @@ function wrapHookForAbort(fn, signal) {
   };
 }
 
+// AGRUN-465 — SSOT reader for the `abortSignal` run option. Both dispatch
+// doors (runtime.run in runtime.js and session.run in session/handle.js)
+// resolve the caller's signal through this one function so the validation
+// rule cannot drift between them.
+function readAbortSignal$1(options) {
+  if (!options || typeof options !== "object") return null;
+  const signal = options.abortSignal;
+  if (!isAbortSignal$1(signal)) return null;
+  return signal;
+}
+
 function isAbortSignal$1(value) {
   if (!value || typeof value !== "object") return false;
   if (typeof value.aborted !== "boolean") return false;
@@ -81,4 +92,4 @@ function isAbortSignal$1(value) {
   return true;
 }
 
-export { createAbortError$1 as createAbortError, isAbortSignalAborted, mergeAbortSignals$1 as mergeAbortSignals, wrapHookForAbort };
+export { createAbortError$1 as createAbortError, isAbortSignalAborted, mergeAbortSignals$1 as mergeAbortSignals, readAbortSignal$1 as readAbortSignal, wrapHookForAbort };

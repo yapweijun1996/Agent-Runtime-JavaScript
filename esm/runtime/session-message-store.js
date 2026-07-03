@@ -1,6 +1,9 @@
 import { stringifySessionContent, stableStringify } from '../session/content.js';
 import { cloneValue } from './utils.js';
-import { PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
+import { PUBLISH_DIRECT_ACTION } from './action-names.js';
+import { readString } from './semantic-json.js';
+import { DEFAULT_FINAL_CANDIDATE_PATH } from './workspace-candidate-lifecycle.js';
+import { createWriteQueue } from './durable-write-queue.js';
 
 const SESSION_MESSAGE_SCHEMA_VERSION = "agrun.message.v1";
 const SESSION_PART_SCHEMA_VERSION = "agrun.part.v1";
@@ -10,13 +13,30 @@ function createSessionMessageStore(options = {}) {
   if (!storage) return createDisabledSessionMessageStore();
 
   const state = {
+    // AGRUN-440 — assistant transcript writes off the critical path. Opt-in
+    // (default false = today's safe behavior: every write is awaited before the
+    // record* call resolves). When true, recordAssistantMessage enqueues its
+    // write and returns immediately; ordering, error-capture, and durability are
+    // owned by the write queue (host awaits store.flush() at a checkpoint).
+    asyncWrites: options.asyncWrites === true,
     errors: [],
     maxErrors: readPositiveInteger$1(options.maxErrors) || 20,
     onError: typeof options.onError === "function" ? options.onError : null,
     runs: new Map(),
     storage,
-    unsubscribe: null
+    unsubscribe: null,
+    writeQueue: null
   };
+  // All persistence flows through one ordered queue so concurrent record* calls
+  // (e.g. across sessions sharing this per-runtime store) never interleave their
+  // writePart/writeMessage calls, and a fire-and-forget assistant write can be
+  // flushed/observed. Job-level failures are already captured by safeStorageCall
+  // into state.errors; the queue onError is a backstop for anything thrown
+  // outside it.
+  state.writeQueue = createWriteQueue({
+    label: "writeMessage",
+    onError: ({ error, label }) => recordStorageError(state, label || "writeQueue", error)
+  });
 
   const runtimeEventBus = options.runtimeEventBus;
   if (runtimeEventBus && typeof runtimeEventBus.subscribe === "function") {
@@ -32,13 +52,13 @@ function createSessionMessageStore(options = {}) {
       if (!sessionRecord || typeof sessionRecord !== "object") return null;
       const session = {
         schemaVersion: "agrun.storage-session.v1",
-        parentSessionID: readString$2(sessionRecord.parentSessionId) || readString$2(context.parentSessionId) || null,
-        sessionID: readString$2(sessionRecord.id),
+        parentSessionID: readString(sessionRecord.parentSessionId) || readString(context.parentSessionId) || null,
+        sessionID: readString(sessionRecord.id),
         time: {
           created: readNumber$1(sessionRecord.createdAt) || Date.now(),
           updated: readNumber$1(sessionRecord.updatedAt) || Date.now()
         },
-        title: readString$2(context.title) || null
+        title: readString(context.title) || null
       };
       if (!session.sessionID) return null;
       await safeStorageCall(state, "createSession", () => state.storage.createSession(session));
@@ -48,16 +68,16 @@ function createSessionMessageStore(options = {}) {
     async recordUserMessage(context) {
       const message = context && context.message;
       if (!message || typeof message !== "object") return null;
-      const sessionID = readString$2(context.sessionId) || readString$2(message.sessionId);
+      const sessionID = readString(context.sessionId) || readString(message.sessionId);
       if (!sessionID) return null;
 
       const record = createMessageRecord({
         message,
         model: null,
         role: "user",
-        runId: readString$2(message.runId),
+        runId: readString(message.runId),
         sessionID,
-        status: readString$2(message.status) || "completed"
+        status: readString(message.status) || "completed"
       });
       const text = stringifySessionContent(message.content);
       const part = createPartRecord({
@@ -70,7 +90,10 @@ function createSessionMessageStore(options = {}) {
       });
       record.partIDs = [part.id];
 
-      await writeMessageWithParts(state, sessionID, record, [part]);
+      // User input is the order-critical anchor for the turn and cheap to write,
+      // so it is always awaited (never fire-and-forget) — through the queue for
+      // ordering against concurrent writers.
+      await commitWrite(state, sessionID, record, [part]);
       return record;
     },
 
@@ -79,8 +102,8 @@ function createSessionMessageStore(options = {}) {
       if (!message || typeof message !== "object") return null;
       const result = context.result && typeof context.result === "object" ? context.result : {};
       const runState = result.runState && typeof result.runState === "object" ? result.runState : {};
-      const sessionID = readString$2(context.sessionId) || readString$2(message.sessionId) || readString$2(runState.sessionId);
-      const runID = readString$2(message.runId) || readString$2(runState.runId);
+      const sessionID = readString(context.sessionId) || readString(message.sessionId) || readString(runState.sessionId);
+      const runID = readString(message.runId) || readString(runState.runId);
       if (!sessionID || !runID) return null;
 
       const runRecord = consumeRunRecord(state, runID, runState);
@@ -98,12 +121,24 @@ function createSessionMessageStore(options = {}) {
         role: "assistant",
         runId: runID,
         sessionID,
-        status: readString$2(message.status) || readRunStatus(runState)
+        status: readString(message.status) || readRunStatus(runState)
       });
       record.partIDs = parts.map((part) => part.id);
 
-      await writeMessageWithParts(state, sessionID, record, parts);
-      await maybeAppendWorkspaceDiff(state, sessionID, record, result);
+      // AGRUN-440 — the assistant transcript write is the only write that can
+      // safely leave the critical path: nothing downstream reads it back (it is
+      // derived from the in-memory result). Both the message write and its
+      // workspace diff are enqueued together so they stay ordered. In the default
+      // (await) mode we wait for durability before resolving; in asyncWrites mode
+      // we return immediately and the host awaits store.flush() at a checkpoint.
+      const written = commitWrite(state, sessionID, record, parts);
+      const diffWritten = state.writeQueue.enqueue(
+        () => maybeAppendWorkspaceDiff(state, sessionID, record, result),
+        "appendSessionDiff"
+      );
+      if (state.asyncWrites) return record;
+      await written;
+      await diffWritten;
       return record;
     },
 
@@ -114,12 +149,12 @@ function createSessionMessageStore(options = {}) {
       const compaction = context.compactionTurn && typeof context.compactionTurn === "object"
         ? context.compactionTurn
         : {};
-      const sessionID = readString$2(context.sessionId)
-        || readString$2(assistantMessage.sessionId)
-        || readString$2(userMessage.sessionId);
-      const runID = readString$2(compaction.runId)
-        || readString$2(assistantMessage.runId)
-        || readString$2(userMessage.runId);
+      const sessionID = readString(context.sessionId)
+        || readString(assistantMessage.sessionId)
+        || readString(userMessage.sessionId);
+      const runID = readString(compaction.runId)
+        || readString(assistantMessage.runId)
+        || readString(userMessage.runId);
       if (!sessionID || !runID) return null;
 
       const runRecord = consumeRunRecord(state, runID, {
@@ -128,8 +163,8 @@ function createSessionMessageStore(options = {}) {
         status: "completed"
       });
       const summary = createCompactionSummary(compaction, {
-        assistantMessageID: readString$2(assistantMessage.id),
-        userMessageID: readString$2(userMessage.id)
+        assistantMessageID: readString(assistantMessage.id),
+        userMessageID: readString(userMessage.id)
       });
       const userRecord = createMessageRecord({
         agent: "agrun.compaction",
@@ -169,13 +204,15 @@ function createSessionMessageStore(options = {}) {
         messageID: assistantRecord.id,
         runID,
         sessionID,
-        text: stringifySessionContent(assistantMessage.content) || readString$2(compaction.summaryText),
+        text: stringifySessionContent(assistantMessage.content) || readString(compaction.summaryText),
         type: "text"
       });
       assistantRecord.partIDs = [assistantPart.id];
 
-      await writeMessageWithParts(state, sessionID, userRecord, [userPart]);
-      await writeMessageWithParts(state, sessionID, assistantRecord, [assistantPart]);
+      // Compaction is order-critical (summary supersedes the compacted turns)
+      // and not perf-sensitive, so both writes are always awaited.
+      await commitWrite(state, sessionID, userRecord, [userPart]);
+      await commitWrite(state, sessionID, assistantRecord, [assistantPart]);
       return { assistant: assistantRecord, user: userRecord };
     },
 
@@ -183,8 +220,16 @@ function createSessionMessageStore(options = {}) {
       return {
         enabled: true,
         errors: cloneValue(state.errors),
-        pendingRunCount: state.runs.size
+        pendingRunCount: state.runs.size,
+        pendingWrites: state.writeQueue.size()
       };
+    },
+
+    // AGRUN-440 — await durability of every write enqueued so far. Hosts that
+    // enable asyncWrites call this at a checkpoint (beforeunload, session close)
+    // to guarantee the transcript is persisted.
+    async flush() {
+      return state.writeQueue.flush();
     },
 
     close() {
@@ -205,8 +250,9 @@ function createDisabledSessionMessageStore() {
     async recordAssistantMessage() { return null; },
     async recordCompactionTurn() { return null; },
     getState() {
-      return { enabled: false, errors: [], pendingRunCount: 0 };
+      return { enabled: false, errors: [], pendingRunCount: 0, pendingWrites: 0 };
     },
+    async flush() {},
     close() {}
   };
 }
@@ -225,8 +271,8 @@ function normalizeStorageAdapter(storage) {
 
 function recordRuntimeEvent(state, event) {
   if (!event || typeof event !== "object") return;
-  const sessionID = readString$2(event.sessionId);
-  const runID = readString$2(event.runId);
+  const sessionID = readString(event.sessionId);
+  const runID = readString(event.runId);
   if (!sessionID || !runID) return;
   const runRecord = ensureRunRecord(state, runID, sessionID);
   const clonedEvent = cloneValue(event);
@@ -271,7 +317,7 @@ function consumeRunRecord(state, runID, runState) {
     events: [],
     items: [],
     runID,
-    sessionID: readString$2(runState && runState.sessionId),
+    sessionID: readString(runState && runState.sessionId),
     textBuffer: "",
     toolItems: new Map()
   };
@@ -328,8 +374,8 @@ function createPartItemFromEvent(runRecord, event) {
 
 function createToolItem(runRecord, event) {
   const payload = event.payload && typeof event.payload === "object" ? event.payload : {};
-  const actionName = readString$2(payload.actionName) || readString$2(payload.name) || readString$2(event.type);
-  const callId = readString$2(payload.callId) || `${actionName || "action"}-${event.sequence || runRecord.items.length + 1}`;
+  const actionName = readString(payload.actionName) || readString(payload.name) || readString(event.type);
+  const callId = readString(payload.callId) || `${actionName || "action"}-${event.sequence || runRecord.items.length + 1}`;
   const key = `${actionName}:${callId}`;
   const existing = runRecord.toolItems.get(key);
   const item = existing || {
@@ -358,7 +404,7 @@ function createToolItem(runRecord, event) {
   } else if (event.type === "action-execute-error") {
     item.state.status = "error";
     item.state.time.end = readNumber$1(event.ts) || Date.now();
-    item.state.error = readString$2(payload.error) || "Action failed.";
+    item.state.error = readString(payload.error) || "Action failed.";
   }
 
   runRecord.toolItems.set(key, item);
@@ -366,8 +412,8 @@ function createToolItem(runRecord, event) {
 }
 
 function materializeAssistantParts({ message, runRecord, runState, sessionID }) {
-  const runID = readString$2(message.runId) || readString$2(runState && runState.runId) || runRecord.runID;
-  const messageID = readString$2(message.id);
+  const runID = readString(message.runId) || readString(runState && runState.runId) || runRecord.runID;
+  const messageID = readString(message.id);
   const parts = [];
 
   for (const item of runRecord.items) {
@@ -385,7 +431,7 @@ function materializeAssistantParts({ message, runRecord, runState, sessionID }) 
     parts.push(part);
   }
 
-  const streamedText = readString$2(runRecord.textBuffer);
+  const streamedText = readString(runRecord.textBuffer);
   const assistantText = stringifySessionContent(message.content);
   const text = streamedText || assistantText;
   if (text && !parts.some((part) => part.type === "text")) {
@@ -420,46 +466,46 @@ function createCompactionSummary(compaction, ids) {
   const source = compaction && typeof compaction === "object" ? compaction : {};
   return {
     compactedMessageIDs: Array.isArray(source.compactedMessageIds)
-      ? source.compactedMessageIds.map(readString$2).filter(Boolean)
+      ? source.compactedMessageIds.map(readString).filter(Boolean)
       : [],
     durationMs: readNumber$1(source.durationMs),
     kind: "compaction",
-    oldestPreservedTurnID: readString$2(source.oldestPreservedTurnId) || null,
-    reason: readString$2(source.reason) || "budget",
+    oldestPreservedTurnID: readString(source.oldestPreservedTurnId) || null,
+    reason: readString(source.reason) || "budget",
     savedTokensEstimate: readNumber$1(source.savedTokensEstimate),
     sourceMessageIDs: Array.isArray(source.sourceMessageIds)
-      ? source.sourceMessageIds.map(readString$2).filter(Boolean)
+      ? source.sourceMessageIds.map(readString).filter(Boolean)
       : [],
-    summaryID: readString$2(source.summaryId) || null,
-    summaryMessageID: readString$2(ids && ids.assistantMessageID) || null,
-    threadID: readString$2(source.threadId) || null,
-    turnID: readString$2(source.turnId) || readString$2(source.runId) || null,
-    uptoMessageID: readString$2(source.uptoMessageId) || null,
-    userMessageID: readString$2(ids && ids.userMessageID) || null
+    summaryID: readString(source.summaryId) || null,
+    summaryMessageID: readString(ids && ids.assistantMessageID) || null,
+    threadID: readString(source.threadId) || null,
+    turnID: readString(source.turnId) || readString(source.runId) || null,
+    uptoMessageID: readString(source.uptoMessageId) || null,
+    userMessageID: readString(ids && ids.userMessageID) || null
   };
 }
 
 function createMessageRecord(options) {
   const message = options.message && typeof options.message === "object" ? options.message : {};
-  const sessionID = readString$2(options.sessionID);
-  const runID = readString$2(options.runId) || readString$2(message.runId) || null;
+  const sessionID = readString(options.sessionID);
+  const runID = readString(options.runId) || readString(message.runId) || null;
   return stripUndefined({
     agent: options.agent === undefined ? null : options.agent,
     eventRange: options.eventRange ? cloneValue(options.eventRange) : undefined,
-    id: readString$2(message.id),
+    id: readString(message.id),
     model: options.model || null,
     partIDs: [],
     role: options.role,
     runID,
     schemaVersion: SESSION_MESSAGE_SCHEMA_VERSION,
     sessionID,
-    status: readString$2(options.status) || readString$2(message.status) || "completed",
+    status: readString(options.status) || readString(message.status) || "completed",
     summary: options.summary === undefined ? null : cloneValue(options.summary),
-    threadID: readString$2(message.threadId) || null,
+    threadID: readString(message.threadId) || null,
     time: {
       created: readNumber$1(message.createdAt) || Date.now()
     },
-    turnID: readString$2(message.turnId) || runID,
+    turnID: readString(message.turnId) || runID,
     variant: options.variant === undefined ? null : options.variant
   });
 }
@@ -470,27 +516,37 @@ function createPartRecord(options) {
   return stripUndefined({
     event: event
       ? {
-          id: readString$2(event.id) || null,
-          phase: readString$2(event.phase) || null,
+          id: readString(event.id) || null,
+          phase: readString(event.phase) || null,
           sequence: readNumber$1(event.sequence) || null,
-          type: readString$2(event.type) || null,
-          visibility: readString$2(event.visibility) || null
+          type: readString(event.type) || null,
+          visibility: readString(event.visibility) || null
         }
       : undefined,
     id,
     index: options.index,
-    messageID: readString$2(options.messageID),
-    runID: readString$2(options.runID) || null,
+    messageID: readString(options.messageID),
+    runID: readString(options.runID) || null,
     schemaVersion: SESSION_PART_SCHEMA_VERSION,
-    sessionID: readString$2(options.sessionID),
+    sessionID: readString(options.sessionID),
     state: options.state ? cloneValue(options.state) : undefined,
     text: typeof options.text === "string" ? options.text : undefined,
     time: {
       created: event && readNumber$1(event.ts) ? readNumber$1(event.ts) : Date.now()
     },
-    tool: readString$2(options.tool) || undefined,
+    tool: readString(options.tool) || undefined,
     type: options.type
   });
+}
+
+// Enqueue a message+parts write onto the ordered durable queue. Returns the
+// settled promise (resolves when this write — and every write before it — is
+// committed); callers await it for durability or drop it for fire-and-forget.
+function commitWrite(state, sessionID, message, parts) {
+  return state.writeQueue.enqueue(
+    () => writeMessageWithParts(state, sessionID, message, parts),
+    "writeMessage"
+  );
 }
 
 async function writeMessageWithParts(state, sessionID, message, parts) {
@@ -514,11 +570,11 @@ async function maybeAppendWorkspaceDiff(state, sessionID, message, result) {
     ? runState.virtualWorkspace
     : null;
   if (!workspace || !workspace.files || typeof workspace.files !== "object") return;
-  const finalCandidatePath = readString$2(workspace.quality && workspace.quality.finalCandidatePath) || "final_candidate.md";
+  const finalCandidatePath = readString(workspace.quality && workspace.quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
   const file = workspace.files[finalCandidatePath] && typeof workspace.files[finalCandidatePath] === "object"
     ? workspace.files[finalCandidatePath]
     : null;
-  const content = readString$2(file && file.content);
+  const content = readString(file && file.content);
   if (!content) return;
   const diff = {
     diff: renderAddedFileDiff(finalCandidatePath, content),
@@ -535,72 +591,76 @@ async function safeStorageCall(state, label, operation) {
   try {
     return await operation();
   } catch (error) {
-    const entry = {
-      label,
-      message: normalizeErrorMessage(error),
-      ts: Date.now()
-    };
-    state.errors.push(entry);
-    if (state.errors.length > state.maxErrors) {
-      state.errors.splice(0, state.errors.length - state.maxErrors);
-    }
-    if (state.onError) {
-      try {
-        state.onError(cloneValue(entry));
-      } catch (_error) {
-        // Storage error observers must not break runtime execution.
-      }
-    }
+    recordStorageError(state, label, error);
     return null;
   }
 }
 
+function recordStorageError(state, label, error) {
+  const entry = {
+    label,
+    message: normalizeErrorMessage(error),
+    ts: Date.now()
+  };
+  state.errors.push(entry);
+  if (state.errors.length > state.maxErrors) {
+    state.errors.splice(0, state.errors.length - state.maxErrors);
+  }
+  if (state.onError) {
+    try {
+      state.onError(cloneValue(entry));
+    } catch (_error) {
+      // Storage error observers must not break runtime execution.
+    }
+  }
+}
+
 function isCycleStart(event) {
-  return readString$2(event && event.type) === "cycle-started";
+  return readString(event && event.type) === "cycle-started";
 }
 
 function isCycleFinish(event) {
-  return readString$2(event && event.type) === "cycle-completed";
+  return readString(event && event.type) === "cycle-completed";
 }
 
 function isTextDeltaEvent(event) {
-  const type = readString$2(event && event.type);
+  const type = readString(event && event.type);
   return (event && event.mode === "stream") && (type === "provider_text_delta" || type === "provider-text-delta");
 }
 
 function isActionEvent(event) {
-  const type = readString$2(event && event.type);
+  const type = readString(event && event.type);
   return type === "action-executing" || type === "action-executed" || type === "action-execute-error";
 }
 
 function isReasoningEvent(event) {
-  const type = readString$2(event && event.type);
+  const type = readString(event && event.type);
   if (!type) return false;
-  if (readString$2(event.phase) === "decide") return true;
+  if (readString(event.phase) === "decide") return true;
   if (type.startsWith("planner-")) return true;
   if (type.startsWith("provider-")) return true;
   if (type.startsWith("observation-")) return true;
-  return readString$2(event.visibility) !== "debug";
+  return readString(event.visibility) !== "debug";
 }
 
 function formatReasoningEvent(event) {
   const payload = event && event.payload != null ? event.payload : null;
   return stableStringify({
-    event: readString$2(event && event.type),
+    event: readString(event && event.type),
     payload
   });
 }
 
 function readModel(result, runState) {
   const output = result && result.output && typeof result.output === "object" ? result.output : {};
-  const providerID = readString$2(output.provider) || readString$2(runState && runState.provider) || null;
-  const modelID = readString$2(output.model) || readString$2(runState && runState.model) || null;
+  const providerID = readString(output.provider) || readString(runState && runState.provider) || null;
+  const modelID = readString(output.model) || readString(runState && runState.model) || null;
   if (!providerID && !modelID) return null;
   return { providerID, modelID };
 }
 
 function readRunStatus(runState) {
-  return readString$2(runState && runState.status) || "completed";
+  return readString(runState && runState.status) || "completed";
 }
 
 function stripRuntimeEventPayload(payload) {
@@ -620,7 +680,7 @@ function renderAddedFileDiff(filePath, content) {
 }
 
 function createPartId(messageID, index) {
-  const base = readString$2(messageID).replace(/[^a-zA-Z0-9_-]/g, "_") || "msg";
+  const base = readString(messageID).replace(/[^a-zA-Z0-9_-]/g, "_") || "msg";
   return `prt-${base}-${String(index + 1).padStart(4, "0")}`;
 }
 
@@ -661,10 +721,6 @@ function readPositiveInteger$1(value) {
 
 function readNumber$1(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readString$2(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { SESSION_MESSAGE_SCHEMA_VERSION, SESSION_PART_SCHEMA_VERSION, createSessionMessageStore };

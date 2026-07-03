@@ -1,5 +1,6 @@
 import { summarizeToolCallsForDebug } from './planner-tools.js';
 import { createProviderRequestTrace, createProviderResponseTrace, summarizeTraceText } from './llm-trace.js';
+import { readString } from './semantic-json.js';
 
 const MAX_NAMES = 20;
 
@@ -11,18 +12,18 @@ function createPlannerRequestPacket(options = {}) {
     : {};
   const actions = Array.isArray(options.availableActions) ? options.availableActions : [];
   const tools = Array.isArray(options.tools) ? options.tools : [];
-  const prompt = readString$s(options.prompt);
-  const systemPrompt = readString$s(options.systemPrompt);
+  const prompt = readString(options.prompt);
+  const systemPrompt = readString(options.systemPrompt);
   return {
-    availableActions: actions.map((action) => readString$s(action && action.name)).filter(Boolean).slice(0, MAX_NAMES),
+    availableActions: actions.map((action) => readString(action && action.name)).filter(Boolean).slice(0, MAX_NAMES),
     availableActionCount: actions.length,
     activeSkill: readSkillName(options.activeAgentSkill || (runState.agentSkillContext && runState.agentSkillContext.activeSkill)),
     callKind: "planner_request",
     packetId: createPacketId(runState, options.mode || "planner"),
-    plannerMode: readString$s(options.mode) || readString$s(modeSelection.effectiveMode) || "n/a",
-    plannerModeReason: readString$s(modeSelection.reason) || "n/a",
-    provider: readString$s(request.provider) || "n/a",
-    model: readString$s(request.model) || "n/a",
+    plannerMode: readString(options.mode) || readString(modeSelection.effectiveMode) || "n/a",
+    plannerModeReason: readString(modeSelection.reason) || "n/a",
+    provider: readString(request.provider) || "n/a",
+    model: readString(request.model) || "n/a",
     prompt: summarizeTextPayload(prompt),
     requestPayload: createProviderRequestTrace({
       apiVariant: request.apiVariant,
@@ -41,7 +42,7 @@ function createPlannerRequestPacket(options = {}) {
     }),
     readSources: summarizeReadSources(runState.researchContext && runState.researchContext.readSources),
     systemPrompt: summarizeTextPayload(systemPrompt),
-    toolChoice: readString$s(options.toolChoice) || null,
+    toolChoice: readString(options.toolChoice) || null,
     tools: summarizeTools(tools),
     virtualWorkspace: summarizeVirtualWorkspace(runState.virtualWorkspace)
   };
@@ -54,21 +55,21 @@ function createPlannerResponsePacket(options = {}) {
   return {
     callKind: "planner_response",
     decision: summarizeDecision(decision),
-    finishReason: readString$s(response.finishReason) || null,
+    finishReason: readString(response.finishReason) || null,
     packetId: createPacketId(runState, options.mode || "planner"),
     parse: {
-      parseError: readString$s(options.parseError) || null,
+      parseError: readString(options.parseError) || null,
       rejection: compactRejection(options.rejection),
-      repairPath: readString$s(options.repairPath) || "none",
-      responseType: readString$s(options.responseType) || inferResponseType(response, decision)
+      repairPath: readString(options.repairPath) || "none",
+      responseType: readString(options.responseType) || inferResponseType(response, decision)
     },
-    provider: readString$s(options.provider) || readString$s(options.request && options.request.provider) || "n/a",
-    model: readString$s(options.model) || readString$s(options.request && options.request.model) || "n/a",
+    provider: readString(options.provider) || readString(options.request && options.request.provider) || "n/a",
+    model: readString(options.model) || readString(options.request && options.request.model) || "n/a",
     responsePayload: createProviderResponseTrace({
       durationMs: options.durationMs || response.durationMs,
       finishReason: response.finishReason,
-      model: readString$s(options.model) || readString$s(options.request && options.request.model) || "n/a",
-      provider: readString$s(options.provider) || readString$s(options.request && options.request.provider) || "n/a",
+      model: readString(options.model) || readString(options.request && options.request.model) || "n/a",
+      provider: readString(options.provider) || readString(options.request && options.request.provider) || "n/a",
       response: response.raw,
       status: response.status,
       text: response.text,
@@ -84,12 +85,12 @@ function compactRejection(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
   const compact = {
-    reason: readString$s(source.reason) || null,
-    type: readString$s(source.type) || null
+    reason: readString(source.reason) || null,
+    type: readString(source.type) || null
   };
-  const rejectedActionName = readString$s(source.rejectedActionName);
+  const rejectedActionName = readString(source.rejectedActionName);
   if (rejectedActionName) compact.rejectedActionName = rejectedActionName;
-  const message = readString$s(source.message);
+  const message = readString(source.message);
   if (message) compact.message = summarizeTraceText(message, 240);
   if (Number.isFinite(source.availableActionCount)) {
     compact.availableActionCount = source.availableActionCount;
@@ -101,9 +102,9 @@ function compactRejection(value) {
 }
 
 function createPacketId(runState, mode) {
-  const runId = readString$s(runState && runState.runId) || "run";
+  const runId = readString(runState && runState.runId) || "run";
   const cycle = Number.isInteger(runState && runState.cycleCount) ? runState.cycleCount : 0;
-  return `${runId}:${cycle}:${readString$s(mode) || "planner"}`;
+  return `${runId}:${cycle}:${readString(mode) || "planner"}`;
 }
 
 function summarizeTools(tools) {
@@ -111,12 +112,12 @@ function summarizeTools(tools) {
   for (const group of tools) {
     if (group && Array.isArray(group.functionDeclarations)) {
       for (const declaration of group.functionDeclarations) {
-        const name = readString$s(declaration && declaration.name);
+        const name = readString(declaration && declaration.name);
         if (name) names.push(name);
       }
       continue;
     }
-    const name = readString$s(group && group.name);
+    const name = readString(group && group.name);
     if (name) names.push(name);
   }
   return {
@@ -139,8 +140,8 @@ function summarizeReadSources(value) {
     latest: latest ? {
       ok: latest.ok !== false,
       status: typeof latest.status === "number" ? latest.status : null,
-      tier: readString$s(latest.tier) || null,
-      url: readString$s(latest.url) || null
+      tier: readString(latest.tier) || null,
+      url: readString(latest.url) || null
     } : null,
     successful: sources.filter((source) => source && typeof source === "object" && source.ok !== false).length
   };
@@ -171,8 +172,8 @@ function summarizeDecision(decision) {
   if (!decision) return null;
   const finalReadiness = decision.finalReadiness && typeof decision.finalReadiness === "object"
     ? {
-      decision: readString$s(decision.finalReadiness.decision) || null,
-      evidenceMode: readString$s(decision.finalReadiness.evidenceMode) || null,
+      decision: readString(decision.finalReadiness.decision) || null,
+      evidenceMode: readString(decision.finalReadiness.evidenceMode) || null,
       limitations: summarizeTextPayload(decision.finalReadiness.limitations),
       requirementsAssessment: summarizeRequirementsAssessment(
         decision.finalReadiness.requirementsAssessment || decision.finalReadiness.selfAudit
@@ -180,11 +181,11 @@ function summarizeDecision(decision) {
     }
     : null;
   return {
-    actionName: readString$s(decision.name || decision.actionName) || null,
+    actionName: readString(decision.name || decision.actionName) || null,
     finalReadiness,
     instruction: summarizeTextPayload(decision.instruction || decision.synthesize_instruction),
     reasoning: summarizeTextPayload(decision.reasoning),
-    type: readString$s(decision.type) || null
+    type: readString(decision.type) || null
   };
 }
 
@@ -196,18 +197,18 @@ function summarizeRequirementsAssessment(value) {
     evidenceSatisfied: typeof value.evidenceSatisfied === "boolean" ? value.evidenceSatisfied : null,
     lengthSatisfied: typeof value.lengthSatisfied === "boolean" ? value.lengthSatisfied : null,
     observedLength: readNumberOrNull(value.observedLength) ?? readNumberOrNull(value.actualLength),
-    observedLengthUnit: readString$s(value.observedLengthUnit || value.lengthUnit) || null,
+    observedLengthUnit: readString(value.observedLengthUnit || value.lengthUnit) || null,
     requestedLength: readNumberOrNull(value.requestedLength),
     requirementSatisfied: typeof value.requirementSatisfied === "boolean" ? value.requirementSatisfied : null,
-    summary: readString$s(value.summary) || null,
+    summary: readString(value.summary) || null,
     successfulReadUrlCount: readNumberOrNull(value.successfulReadUrlCount)
   };
 }
 
 function inferResponseType(response, decision) {
   if (Array.isArray(response.toolCalls) && response.toolCalls.length > 0) return "tool_call";
-  if (decision) return readString$s(decision.type) || "parsed";
-  if (readString$s(response.text)) return "text";
+  if (decision) return readString(decision.type) || "parsed";
+  if (readString(response.text)) return "text";
   return "empty";
 }
 
@@ -225,7 +226,7 @@ function normalizeTextStats(value) {
 
 function readSkillName(skill) {
   if (!skill || typeof skill !== "object") return null;
-  return readString$s(skill.name || skill.id || skill.skillId) || null;
+  return readString(skill.name || skill.id || skill.skillId) || null;
 }
 
 function readNumber$3(value) {
@@ -234,10 +235,6 @@ function readNumber$3(value) {
 
 function readNumberOrNull(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readString$s(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createPlannerRequestPacket, createPlannerResponsePacket };

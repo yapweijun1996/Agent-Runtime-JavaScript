@@ -2,7 +2,7 @@ import { copySchemaEnum } from './tool-schema.js';
 
 function toSkillCatalogCompact(skill) {
   if (!skill || typeof skill !== "object") return null;
-  const name = readString$1R(skill.name);
+  const name = readString$3(skill.name);
   if (!name) return null;
   const tools = Array.isArray(skill.tools) ? skill.tools : [];
   const toolArgHints = tools
@@ -10,28 +10,28 @@ function toSkillCatalogCompact(skill) {
     .filter(Boolean);
   return {
     name,
-    description: readString$1R(skill.description),
+    description: readString$3(skill.description),
     toolCount: tools.length,
     ...(toolArgHints.length > 0 ? { toolArgHints } : {}),
     toolNames: tools
-      .map((t) => readString$1R(t && t.name))
+      .map((t) => readString$3(t && t.name))
       .filter(Boolean)
   };
 }
 
 function toSkillCatalogSummary(skill) {
   if (!skill || typeof skill !== "object") return null;
-  const name = readString$1R(skill.name);
+  const name = readString$3(skill.name);
   if (!name) return null;
   return {
     name,
-    description: readString$1R(skill.description),
+    description: readString$3(skill.description),
     tools: Array.isArray(skill.tools)
       ? skill.tools
           .map((t) => {
-            const toolName = readString$1R(t && t.name);
+            const toolName = readString$3(t && t.name);
             if (!toolName) return null;
-            const entry = { name: toolName, description: readString$1R(t.description) };
+            const entry = { name: toolName, description: readString$3(t.description) };
             const argHint = toCompactArgHint(t && t.parameters);
             if (argHint) {
               entry.args = argHint.args;
@@ -51,14 +51,14 @@ function toSkillPromptValue(skill, options) {
     return null;
   }
 
-  const name = readString$1R(skill.name);
+  const name = readString$3(skill.name);
   if (!name) {
     return null;
   }
 
   const includeInstructions = Boolean(options && options.includeInstructions);
   const value = {
-    description: readString$1R(skill.description),
+    description: readString$3(skill.description),
     name,
     tools: Array.isArray(skill.tools)
       ? skill.tools.map(createToolPromptValue).filter(Boolean)
@@ -66,7 +66,7 @@ function toSkillPromptValue(skill, options) {
   };
 
   if (includeInstructions) {
-    const body = readString$1R(skill.instructions);
+    const body = readString$3(skill.instructions);
     if (body) {
       value.instructions = body;
     }
@@ -105,12 +105,12 @@ function serializePromptValue$2(value, maxChars) {
   return `${text.slice(0, maxChars - 3)}...`;
 }
 
-function readString$1R(value) {
+function readString$3(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function toEnumBearingToolArgHint(tool) {
-  const name = readString$1R(tool && tool.name);
+  const name = readString$3(tool && tool.name);
   if (!name || !hasSchemaEnum(tool && tool.parameters)) {
     return null;
   }
@@ -155,7 +155,7 @@ function toCompactArgHint(parameters) {
 }
 
 function describePromptProperty(prop) {
-  const type = readString$1R(prop && prop.type) || "string";
+  const type = readString$3(prop && prop.type) || "string";
   if (type === "object" && prop && prop.properties && typeof prop.properties === "object" && !Array.isArray(prop.properties)) {
     const nested = Object.entries(prop.properties)
       .map(([key, value]) => `${key}:${describePromptProperty(value)}`);
@@ -192,13 +192,13 @@ function createToolPromptValue(tool) {
     return null;
   }
 
-  const name = readString$1R(tool.name);
+  const name = readString$3(tool.name);
   if (!name) {
     return null;
   }
 
   return {
-    description: readString$1R(tool.description),
+    description: readString$3(tool.description),
     name,
     parameters: clonePromptParameters(tool.parameters)
   };
@@ -221,8 +221,8 @@ function clonePromptParameters(parameters) {
     properties: Object.fromEntries(
       Object.entries(properties).map(([key, value]) => {
         const prop = {
-          description: readString$1R(value && value.description),
-          type: readString$1R(value && value.type)
+          description: readString$3(value && value.description),
+          type: readString$3(value && value.type)
         };
         copySchemaEnum(prop, value);
         if (value && value.properties && typeof value.properties === "object" && !Array.isArray(value.properties)) {
@@ -230,8 +230,8 @@ function clonePromptParameters(parameters) {
             Object.entries(value.properties).map(([nk, nv]) => [
               nk,
               copySchemaEnum({
-                description: readString$1R(nv && nv.description),
-                type: readString$1R(nv && nv.type)
+                description: readString$3(nv && nv.description),
+                type: readString$3(nv && nv.type)
               }, nv)
             ])
           );
@@ -242,8 +242,8 @@ function clonePromptParameters(parameters) {
     required: Array.isArray(parameters.required)
       ? parameters.required.filter((value) => typeof value === "string" && value.trim())
       : [],
-    type: readString$1R(parameters.type) || "object"
+    type: readString$3(parameters.type) || "object"
   };
 }
 
-export { formatActiveSkillTools, readString$1R as readString, serializePromptValue$2 as serializePromptValue, toSkillCatalogCompact, toSkillCatalogSummary, toSkillPromptValue };
+export { formatActiveSkillTools, readString$3 as readString, serializePromptValue$2 as serializePromptValue, toSkillCatalogCompact, toSkillCatalogSummary, toSkillPromptValue };

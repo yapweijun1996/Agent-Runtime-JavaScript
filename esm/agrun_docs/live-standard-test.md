@@ -45,6 +45,7 @@ vs `cfg.runDeadlineMs`).
 ```bash
 npm run build                       # always test the latest bundle
 npm run test:live:standard          # full 6-cell matrix
+npm run test:live:multiturn-standard # 5-turn simple-chat monitor
 node test/live-standard.mjs --tier short      # one tier only
 node test/live-standard.mjs --only gemini     # one model only
 node test/live-standard.mjs --render-only      # re-score existing artifacts, no API calls
@@ -53,6 +54,27 @@ node test/live-standard.mjs --render-only      # re-score existing artifacts, no
 Requires real keys in `.env.local`: `OPENAI_API_KEY`, `GEMINI_API_KEY`,
 `DEEPSEEK_API_KEY` (cells with a missing key are skipped, not failed), plus the
 `READ_URL_ENDPOINT` / `WEB_SEARCH_ENDPOINT` services.
+
+## Companion: 5-turn multi-turn simple-chat monitor
+
+Use `npm run test:live:multiturn-standard` before the full matrix when the change
+affects normal chatbox/session UX. It is cheaper and faster than the matrix and
+checks a different surface:
+
+| Gate | Standard |
+|------|----------|
+| Conversation length | 5 turns in one `session.run` thread |
+| Model roster | OpenAI `gpt-5.4-mini` + `reasoningEffort: low`; Gemini `gemini-3.1-flash-lite` + `thinkingLevel: low` |
+| Runtime profile | browser simple-chat: `plannerMode: native_tools`, external actions plus `plan`/`finalize` disabled, virtual workspace disabled, memory extraction skipped by host policy |
+| Provider calls | exactly 1 LLM request per turn |
+| Tool behavior | no external model tool picks and no runtime actions; native `final_answer` terminal calls are allowed |
+| Context quality | turn 3 must recall the session anchor |
+| Time quality | turn 4 must use host-provided `timeContext` exactly |
+| Security | returned results must not contain the provider API key |
+| Evidence | redacted provider payload/response JSONL + summary report in `test/live-observe-out/` |
+
+This does not replace the full matrix. It is the standard quick monitor for
+general frontend chat performance and multi-turn continuity.
 
 ## Outputs (in `test/live-standard-out/`)
 

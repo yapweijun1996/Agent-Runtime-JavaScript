@@ -1,6 +1,6 @@
 import { startPhase, completePhase, createEvaluationRecord } from './oodae.js';
 import { summarizeLastObservationForPrompt } from './planner-prompt-projection.js';
-import { scrubSecretText } from './provider-error.js';
+import { scrubSecretText } from './secret-redaction.js';
 import { applyFailure, finalizeResult } from './result.js';
 import { cloneValue } from './utils.js';
 

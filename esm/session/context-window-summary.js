@@ -1,3 +1,5 @@
+import { readString } from '../runtime/semantic-json.js';
+
 const ORDERED_HEADINGS = Object.freeze([
   "Current goal",
   "Current topic",
@@ -24,14 +26,14 @@ function formatStructuredSummary(rawText, snapshot, messages) {
     ? snapshot.sessionMemory
     : {};
   const latestUserText = readLatestUserText(messages);
-  const fallbackText = readString$c(rawText);
+  const fallbackText = readString(rawText);
 
   return stringifyStructuredSummary({
-    "Confirmed facts": sections["Confirmed facts"] || readString$c(sessionMemory.facts) || "None",
+    "Confirmed facts": sections["Confirmed facts"] || readString(sessionMemory.facts) || "None",
     "Constraints": sections.Constraints || fallbackText || "None",
-    "Current goal": sections["Current goal"] || readString$c(inquiryContext.activeGoal) || "None",
-    "Current topic": sections["Current topic"] || readString$c(inquiryContext.activeTopic) || "None",
-    "Decisions": sections.Decisions || readString$c(sessionMemory.decisions) || "None",
+    "Current goal": sections["Current goal"] || readString(inquiryContext.activeGoal) || "None",
+    "Current topic": sections["Current topic"] || readString(inquiryContext.activeTopic) || "None",
+    "Decisions": sections.Decisions || readString(sessionMemory.decisions) || "None",
     "Next step": sections["Next step"] || (latestUserText ? `Continue from: ${latestUserText}` : "Continue from the most recent turn."),
     "Open questions": sections["Open questions"]
       || readPendingQuestion(inquiryContext.pendingClarification)
@@ -53,7 +55,7 @@ function createCompressedSummaryVariants(summaryText) {
 
   for (const step of steps) {
     const nextSections = { ...sections };
-    const current = readString$c(nextSections[step.heading]);
+    const current = readString(nextSections[step.heading]);
 
     nextSections[step.heading] = step.mode === "short"
       ? shortenSection(current)
@@ -67,11 +69,11 @@ function createCompressedSummaryVariants(summaryText) {
 }
 
 function estimateStructuredSummaryTokens(summaryText, charsPerToken) {
-  return Math.ceil(readString$c(summaryText).length / readPositiveInteger$7(charsPerToken, 4));
+  return Math.ceil(readString(summaryText).length / readPositiveInteger$6(charsPerToken, 4));
 }
 
 function parseStructuredSummary(summaryText) {
-  const text = readString$c(summaryText);
+  const text = readString(summaryText);
   const sections = Object.fromEntries(ORDERED_HEADINGS.map((heading) => [heading, ""]));
 
   if (!text) {
@@ -118,17 +120,17 @@ function flushBuffer(sections, heading, buffer) {
     return;
   }
 
-  sections[heading] = readString$c(buffer.join("\n")) || "None";
+  sections[heading] = readString(buffer.join("\n")) || "None";
   buffer.length = 0;
 }
 
 function normalizeSectionValue(value, required) {
-  const text = readString$c(value);
+  const text = readString(value);
   return text || (required ? "None" : "None");
 }
 
 function shortenSection(value) {
-  const text = readString$c(value);
+  const text = readString(value);
 
   if (!text || text === "None") {
     return "None";
@@ -151,7 +153,7 @@ function readLatestUserText(messages) {
     const message = list[index];
 
     if (message && message.role === "user") {
-      return readString$c(
+      return readString(
         message.content && typeof message.content === "object" && typeof message.content.text === "string"
           ? message.content.text
           : ""
@@ -166,7 +168,7 @@ function dedupeStrings(values) {
   const seen = new Set();
 
   return values.filter((value) => {
-    const key = readString$c(value);
+    const key = readString(value);
 
     if (!key || seen.has(key)) {
       return false;
@@ -181,12 +183,8 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function readPositiveInteger$7(value, fallback) {
+function readPositiveInteger$6(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-function readString$c(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createCompressedSummaryVariants, estimateStructuredSummaryTokens, formatStructuredSummary, parseStructuredSummary, stringifyStructuredSummary };

@@ -6,6 +6,7 @@ import { mergeAbortSignals } from '../../runtime/abort-signal.js';
 import { DEFAULT_LLM_TIMEOUT_MS } from './fetch-resilience.js';
 import { filterHeadersByAllowList } from './header-allow-list.js';
 import { createProviderRequestTrace } from '../../runtime/llm-trace.js';
+import { pumpProviderFullStream } from './provider-stream-pump.js';
 import { jsonSchema } from '../../node_modules/@ai-sdk/provider-utils/dist/index.js';
 
 // AGRUN-207 — Allow-list of headers that may travel through the
@@ -121,13 +122,14 @@ function isEmptyGeminiResult(result) {
   return !text && !toolCalls;
 }
 
-async function requestGeminiContentStreaming(request, _fetchImpl, onToken) {
+async function requestGeminiContentStreaming(request, _fetchImpl, onToken, onReasoning) {
   const google = createGeminiProvider(request, _fetchImpl, "stream");
   const model = google(request.model);
   const messages = buildAISDKMessages$1(request);
   const system = buildSystemPrompt$1(request);
   const tools = convertGeminiTools(request.tools);
   const safeOnToken = typeof onToken === "function" ? onToken : null;
+  const safeOnReasoning = typeof onReasoning === "function" ? onReasoning : null;
   const abortSignal = mergeAbortSignals([request.signal, createTimeoutSignal$1(request.timeoutMs || DEFAULT_LLM_TIMEOUT_MS)]);
   const providerOptions = buildGeminiProviderOptions(request);
   const requestBody = createProviderRequestTrace({
@@ -157,7 +159,8 @@ async function requestGeminiContentStreaming(request, _fetchImpl, onToken) {
       providerOptions,
       abortSignal,
       maxRetries: 1,
-      onToken: safeOnToken
+      onToken: safeOnToken,
+      onReasoning: safeOnReasoning
     });
     const toolCalls = extractToolCalls$1(result.toolCalls);
     const fullText = result.text || "";
@@ -217,17 +220,18 @@ async function streamGeminiTextOnce(options) {
     maxRetries: options.maxRetries
   });
 
-  if (typeof options.onToken === "function") {
-    for await (const delta of result.textStream) {
-      try { options.onToken(delta); } catch (_ignored) { /* consumer error */ }
-    }
-  }
+  await pumpProviderFullStream(result, { onToken: options.onToken, onReasoning: options.onReasoning });
 
   return {
     finishReason: (await result.finishReason) || null,
     response: await result.response,
     text: (await result.text) || "",
-    toolCalls: extractToolCalls$1(await result.toolCalls),
+    // RAW sdk tool calls — the caller (and isEmptyGeminiResult) run
+    // extractToolCalls exactly once. Mapping here too double-extracted:
+    // the second pass read toolName/input off already-mapped {name,
+    // arguments} items and blanked every tool call name, so gemini
+    // streaming turns looped planner-invalid to maxSteps (AGRUN-585).
+    toolCalls: (await result.toolCalls) || null,
     usage: (await result.usage) || null
   };
 }

@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-142 — Goal anchor harness.
 //
 // Three-layer anchor model (per ADR 0002):
@@ -15,6 +17,7 @@
 //
 // Lexicon-free: no domain vocabulary. The block is literally whichever
 // verbatim strings are present, fenced by block headers.
+
 
 const ORIGINAL_QUERY_HEADER = "[ORIGINAL USER QUERY — DO NOT REINTERPRET]";
 const GOAL_ANCHOR_HEADER = "[GOAL ANCHOR]";
@@ -34,10 +37,10 @@ const TRUNCATION_SUFFIX = "…";
  */
 function captureOriginalQuery(runState, options) {
   if (!runState || typeof runState !== "object") return "";
-  const existing = readString$B(runState.originalQuery);
+  const existing = readString(runState.originalQuery);
   if (existing) return existing;
   const source = options && typeof options === "object" ? options : {};
-  const captured = readString$B(source.inputText) || readString$B(source.requestPrompt);
+  const captured = readString(source.inputText) || readString(source.requestPrompt);
   if (!captured) return "";
   runState.originalQuery = captured;
   return captured;
@@ -60,7 +63,7 @@ function readGoalAnchorView(options) {
     ? source.config
     : { enabled: true, includeThreadAnchor: true };
   const enabled = config.enabled !== false;
-  const originalQuery = readString$B(source.runState && source.runState.originalQuery);
+  const originalQuery = readString(source.runState && source.runState.originalQuery);
   const threadGoalAnchor = config.includeThreadAnchor !== false
     ? readThreadAnchor(source.activeThread)
     : "";
@@ -91,8 +94,8 @@ function formatGoalAnchorBlock(view, config) {
     ? cfg.maxAnchorChars
     : 4000;
 
-  const originalQuery = truncate(readString$B(resolved.originalQuery), limit);
-  const threadGoalAnchor = truncate(readString$B(resolved.threadGoalAnchor), limit);
+  const originalQuery = truncate(readString(resolved.originalQuery), limit);
+  const threadGoalAnchor = truncate(readString(resolved.threadGoalAnchor), limit);
 
   const blocks = [];
   if (originalQuery) {
@@ -108,11 +111,7 @@ function readThreadAnchor(activeThread) {
   if (!activeThread || typeof activeThread !== "object") return "";
   const anchor = activeThread.goalAnchor;
   if (!anchor || typeof anchor !== "object") return "";
-  return readString$B(anchor.text);
-}
-
-function readString$B(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return readString(anchor.text);
 }
 
 function truncate(value, limit) {

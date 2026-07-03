@@ -1,5 +1,6 @@
 import { cloneValue } from './utils.js';
 import { classifyEvent } from './runtime-event-classifier.js';
+import { readString } from './semantic-json.js';
 
 // AGRUN-248-C Phase 1 — Typed runtime event ledger SSOT.
 //
@@ -7,6 +8,7 @@ import { classifyEvent } from './runtime-event-classifier.js';
 // appended here in normalized envelope form. Phase 1 is additive: steps[] and
 // host onStep/onStreamEvent callbacks are unchanged; the ledger is an extra
 // projection that future Inspector / replay / support-bundle consumers can read.
+
 
 
 const RUNTIME_EVENT_LEDGER_SCHEMA_VERSION = "v1";
@@ -30,7 +32,7 @@ function createRuntimeEventLedger(options = {}) {
 
   return {
     appendEvent({ type, detail, mode } = {}) {
-      const eventType = readString$1t(type);
+      const eventType = readString(type);
       if (!eventType) return null;
       const normalizedMode = normalizeMode(mode);
       const classification = classifyEvent({ type: eventType, mode: normalizedMode });
@@ -100,19 +102,19 @@ function createRuntimeEventBus({ maxEvents } = {}) {
     },
 
     appendEvent({ type, detail, mode, runId, sessionId, parentSessionId, cycle } = {}) {
-      const eventType = readString$1t(type);
+      const eventType = readString(type);
       if (!eventType) return null;
       const normalizedMode = normalizeMode(mode);
       const classification = classifyEvent({ type: eventType, mode: normalizedMode });
       const sequence = nextSequence(state);
-      const resolvedRunId = readString$1t(runId) || "anonymous";
+      const resolvedRunId = readString(runId) || "anonymous";
       const event = Object.freeze({
         schemaVersion: RUNTIME_EVENT_LEDGER_SCHEMA_VERSION,
         id: buildEventId(resolvedRunId, sequence),
         sequence,
         runId: resolvedRunId,
-        sessionId: readString$1t(sessionId) || null,
-        parentSessionId: readString$1t(parentSessionId) || null,
+        sessionId: readString(sessionId) || null,
+        parentSessionId: readString(parentSessionId) || null,
         cycle: Number.isInteger(cycle) ? cycle : null,
         ts: Date.now(),
         mode: normalizedMode,
@@ -225,10 +227,10 @@ function copyFilterField(target, source, key) {
 
 function normalizeFilterValue(value) {
   if (Array.isArray(value)) {
-    const items = value.map(readString$1t).filter(Boolean);
+    const items = value.map(readString).filter(Boolean);
     return items.length > 0 ? items : null;
   }
-  const text = readString$1t(value);
+  const text = readString(value);
   return text || null;
 }
 
@@ -251,8 +253,8 @@ function matchesTypeFilter(value, filter) {
 }
 
 function matchesTypePattern(value, pattern) {
-  const eventType = readString$1t(value);
-  const normalizedPattern = readString$1t(pattern);
+  const eventType = readString(value);
+  const normalizedPattern = readString(pattern);
   if (!normalizedPattern) return true;
   if (!normalizedPattern.includes("*")) return eventType === normalizedPattern;
   const expression = new RegExp(`^${escapeRegExp$2(normalizedPattern).replaceAll("\\*", ".*")}$`);
@@ -352,10 +354,6 @@ function readCycle$1(runState) {
 
 function buildEventId(runId, sequence) {
   return `evt_${runId}_${sequence}`;
-}
-
-function readString$1t(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { DEFAULT_MAX_EVENTS, RUNTIME_EVENT_LEDGER_SCHEMA_VERSION, createRuntimeEventBus, createRuntimeEventLedger };

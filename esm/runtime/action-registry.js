@@ -8,17 +8,23 @@ import { createUseAgentSkillAction } from './actions/use-agent-skill-action.js';
 import { workspaceListAction, workspaceReadAction, workspaceWriteAction, workspaceReplaceAction, workspaceProposePatchAction, workspaceApplyPatchAction, workspaceInsertAfterSectionAction, workspaceRemoveAction, workspaceMoveAction, workspaceMultiEditAction, workspaceFinalizeCandidateAction, workspaceReviewCandidateAction, workspacePublishCandidateAction } from './actions/virtual-workspace-actions.js';
 import { createRepoSearchAction, createRepoReadFileAction } from './actions/repo-file-actions.js';
 import { handoffToSkillAction } from './actions/handoff-to-skill-action.js';
+import { createOpenActionNamespaceAction } from './actions/open-action-namespace-action.js';
 import { spawnSubagentAction } from './actions/spawn-subagent-action.js';
 import { webSearchAction } from './actions/web-search-action.js';
 import { assertPlannerActionArgsContract } from './action-args-validation.js';
 import { assertActionOutputContract } from './action-output-contract.js';
+import { getActionNamespace } from './action-namespace-gate.js';
 import { normalizeActionTimeoutMs, normalizeActionTimeoutBehavior } from './tool-schema.js';
+import { readString } from './semantic-json.js';
 
 function createActionRegistry(options = {}) {
   const customActions = Array.isArray(options.customActions) ? options.customActions : [];
   const bundled = buildActions({
     agentSkillIndexProvider: options.agentSkillIndexProvider,
     agentSkills: options.agentSkills,
+    // ADR-0057 Phase 1 — non-empty deferredNamespaces registers the
+    // open_action_namespace escape hatch (config-gated like repo_*).
+    deferredNamespaces: options.deferredNamespaces,
     repoFileTools: options.repoFileTools,
     toolCallExamples: options.toolCallExamples,
     customActionNames: customActions.map((action) => action && action.name).filter(Boolean)
@@ -68,6 +74,10 @@ function buildActions(options) {
     readUrlAction,
     handoffToSkillAction,
     spawnSubagentAction,
+    // ADR-0057 Phase 1 — null (unregistered) unless the host deferred at
+    // least one namespace; it is namespace-less by design so the closed-
+    // namespace catalog filter can never hide the way out of a closed state.
+    createOpenActionNamespaceAction(options && options.deferredNamespaces),
     todoPlanAction,
     todoAdvanceAction,
     todoCancelAction,
@@ -154,6 +164,10 @@ const BUILT_IN_PERMISSION_METADATA = Object.freeze({
   repo_read_file: readOnlyPermission("host_repo", true),
   repo_rg: readOnlyPermission("host_repo", true),
   handoff_to_skill: virtualMutationPermission("agent_skill_selection"),
+  // ADR-0057 Phase 1 — same permission tier/shape as use_agent_skill (a
+  // virtual planner-surface mutation; no approval, checkpoint-required
+  // interrupt behavior).
+  open_action_namespace: virtualMutationPermission("action_namespace_state"),
   spawn_subagent: dynamicPermission("subagent_run"),
   todo_advance: virtualMutationPermission("todo_state"),
   todo_cancel: virtualMutationPermission("todo_state"),
@@ -177,10 +191,29 @@ const BUILT_IN_PERMISSION_METADATA = Object.freeze({
   workspace_write: virtualMutationPermission("virtual_workspace")
 });
 
+// AGRUN-448 — the authoritative complete list of built-in action names, derived
+// from the permission-metadata map (which carries an entry for every built-in
+// action, including the config-gated ones the default registry omits). The
+// action-names.js enum is pinned bidirectionally against this by
+// test/unit/action-names.test.js.
+Object.freeze(
+  Object.keys(BUILT_IN_PERMISSION_METADATA).slice().sort()
+);
+
 function withActionMetadata(action) {
   if (!action || typeof action !== "object") return action;
+  // ADR-0057 Phase 0/1 (AGRUN-565) — optional declarative `namespace`
+  // metadata, same tier as `permission`. Assigned from the SSOT map in
+  // action-namespace-gate.js; namespace-less actions gain no key. The
+  // toPublicAction/toPlannerAction projections deliberately do NOT carry it:
+  // Phase 1's dispatch/prompt consumers all key on the action NAME via
+  // getActionNamespace/resolveClosedNamespaceForAction (pure map lookups), so
+  // no public/planner surface change is needed and the projections stay
+  // byte-identical for every host.
+  const namespace = getActionNamespace(action.name);
   return Object.freeze({
     ...action,
+    ...(namespace ? { namespace } : {}),
     timeoutBehavior: normalizeActionTimeoutBehavior(action.timeoutBehavior),
     timeoutMs: normalizeActionTimeoutMs(action.timeoutMs),
     permission: normalizePermissionMetadata(action)
@@ -195,13 +228,13 @@ function normalizePermissionMetadata(action) {
   const merged = { ...override, ...source };
   const tierNeedsApproval = action.tier === 1 || action.tier === 2 || action.tier === 3;
   return {
-    effect: readString$G(merged.effect) || "runtime_action",
-    interruptBehavior: readString$G(merged.interruptBehavior) || "abort_safe",
+    effect: readString(merged.effect) || "runtime_action",
+    interruptBehavior: readString(merged.interruptBehavior) || "abort_safe",
     isConcurrencySafe: readBoolean$1(merged.isConcurrencySafe, false),
     isDestructive: readBoolean$1(merged.isDestructive, false),
     isReadOnly: readBoolean$1(merged.isReadOnly, false),
     needsApproval: readBoolean$1(merged.needsApproval, tierNeedsApproval),
-    source: readString$G(merged.source) || "built_in_metadata"
+    source: readString(merged.source) || "built_in_metadata"
   };
 }
 
@@ -247,10 +280,6 @@ function clonePermission(value) {
 
 function readBoolean$1(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
-}
-
-function readString$G(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function clonePlanContract(value) {

@@ -6,12 +6,14 @@ import { createSessionStore } from '../session/store.js';
 import { normalizeRuntimeConfig } from './config.js';
 import { createRuntimeConfigLifecycle } from './runtime-config-lifecycle.js';
 import { createActionRegistry } from './action-registry.js';
+import { readAbortSignal, wrapHookForAbort } from './abort-signal.js';
 import { runLoop } from './run-loop.js';
 import { createAgentSkillSummary } from './agent-skills.js';
 import { createApprovalSigner } from './approval-signing.js';
 import { mergeRunOptions } from './default-run-options.js';
 import { createRuntimeEventBus } from './runtime-event-ledger.js';
 import { createSessionMessageStore } from './session-message-store.js';
+import { createRunEventStream } from './run-event-stream.js';
 import { cloneValue } from './utils.js';
 
 function createRuntime(options) {
@@ -19,6 +21,10 @@ function createRuntime(options) {
   const runtimeState = { lastRun: null };
   const runtimeEventBus = createRuntimeEventBus();
   const sessionMessageStore = createSessionMessageStore({
+    // AGRUN-440 — opt-in fire-and-forget assistant transcript writes. Default
+    // off (every write awaited). When on, the host should call
+    // runtime.flushMessageStorage() at a checkpoint to guarantee durability.
+    asyncWrites: Boolean(options && options.asyncMessageWrites),
     onError: options && typeof options.onStorageError === "function" ? options.onStorageError : null,
     runtimeEventBus,
     storage: options && options.storage
@@ -30,34 +36,58 @@ function createRuntime(options) {
     return `run-${++runSequence}`;
   }
 
+  function runOnce(rawInput, runOptions) {
+    const resolvedConfig = readResolvedConfig();
+    const mergedRunOptions = mergeRunOptions(
+      resolvedConfig.runtimeConfig.defaultRunOptions,
+      runOptions
+    );
+    // AGRUN-465 — dispatch-parity: session.run always honored the
+    // `abortSignal` run option (readAbortSignal → callerAbortSignal +
+    // abort-wrapped hooks); this door silently ignored it, so
+    // runtime.run(input, { abortSignal }) could not be cancelled. Same
+    // wrapping set as session/handle.js; onCheckpoint deliberately
+    // UNwrapped on both doors (a checkpoint persisting crash-recovery
+    // state must still fire while an abort is unwinding).
+    const callerAbortSignal = readAbortSignal(mergedRunOptions);
+    return runLoop({
+      callerAbortSignal,
+      disabledActions: readDisabledActions(mergedRunOptions),
+      onStep: wrapHookForAbort(readOnStep(mergedRunOptions), callerAbortSignal),
+      onToken: wrapHookForAbort(readOnToken(mergedRunOptions), callerAbortSignal),
+      onReasoning: wrapHookForAbort(readFunctionOption(mergedRunOptions, "onReasoning"), callerAbortSignal),
+      onInvalidPlannerOutput: wrapHookForAbort(readFunctionOption(mergedRunOptions, "onInvalidPlannerOutput"), callerAbortSignal),
+      onPlannerDecision: wrapHookForAbort(readFunctionOption(mergedRunOptions, "onPlannerDecision"), callerAbortSignal),
+      onStreamEvent: wrapHookForAbort(readFunctionOption(mergedRunOptions, "onStreamEvent"), callerAbortSignal),
+      onToolResult: wrapHookForAbort(readFunctionOption(mergedRunOptions, "onToolResult"), callerAbortSignal),
+      onBeforeFinalize: wrapHookForAbort(readFunctionOption(mergedRunOptions, "onBeforeFinalize"), callerAbortSignal),
+      onCheckpoint: readFunctionOption(mergedRunOptions, "onCheckpoint"),
+      resumeState: readResumeState(mergedRunOptions),
+      plannerDirectives: readPlannerDirectives(mergedRunOptions),
+      plannerDirectivesMode: readPlannerDirectivesMode(mergedRunOptions),
+      rawInput,
+      runId: nextRunId(),
+      runtimeConfig: resolvedConfig.runtimeConfig,
+      runtimeEventBus,
+      runtimeState,
+      resolvedMemory: resolvedConfig.memory,
+      skills: resolvedConfig.skills
+    });
+  }
+
   return {
     async run(rawInput, runOptions) {
-      const resolvedConfig = readResolvedConfig();
-      const mergedRunOptions = mergeRunOptions(
-        resolvedConfig.runtimeConfig.defaultRunOptions,
-        runOptions
+      return runOnce(rawInput, runOptions);
+    },
+
+    // AGRUN-442 — streaming engine surface. Iterate typed AgentLoopEvents at your
+    // own pace; break / generator.return() aborts the run. Built on the same
+    // runOnce as run(), so every run mechanism (abort, hooks, budget) carries over.
+    runStream(rawInput, runOptions) {
+      return createRunEventStream(
+        (hookedOptions) => runOnce(rawInput, hookedOptions),
+        runOptions || {}
       );
-      return runLoop({
-        disabledActions: readDisabledActions(mergedRunOptions),
-        onStep: readOnStep(mergedRunOptions),
-        onToken: readOnToken(mergedRunOptions),
-        onInvalidPlannerOutput: readFunctionOption(mergedRunOptions, "onInvalidPlannerOutput"),
-        onPlannerDecision: readFunctionOption(mergedRunOptions, "onPlannerDecision"),
-        onStreamEvent: readFunctionOption(mergedRunOptions, "onStreamEvent"),
-        onToolResult: readFunctionOption(mergedRunOptions, "onToolResult"),
-        onBeforeFinalize: readFunctionOption(mergedRunOptions, "onBeforeFinalize"),
-        onCheckpoint: readFunctionOption(mergedRunOptions, "onCheckpoint"),
-        resumeState: readResumeState(mergedRunOptions),
-        plannerDirectives: readPlannerDirectives(mergedRunOptions),
-        plannerDirectivesMode: readPlannerDirectivesMode(mergedRunOptions),
-        rawInput,
-        runId: nextRunId(),
-        runtimeConfig: resolvedConfig.runtimeConfig,
-        runtimeEventBus,
-        runtimeState,
-        resolvedMemory: resolvedConfig.memory,
-        skills: resolvedConfig.skills
-      });
     },
 
     async createSession(sessionOptions) {
@@ -74,6 +104,13 @@ function createRuntime(options) {
       await resolvedSessionStore.saveSession(sessionRecord);
       await sessionMessageStore.createSession(sessionRecord, sessionOptions);
       return createSessionHandle({
+        // AGRUN-440/444 — opt-in: run session memory extraction off the turn's
+        // critical path (default off = awaited, result.memoryEntriesAdded set).
+        asyncMemoryExtraction: Boolean(options && options.asyncMemoryExtraction),
+        // AGRUN-517 — optional host policy gating the per-turn extraction LLM call.
+        memoryExtractionPolicy: options && typeof options.memoryExtractionPolicy === "function"
+          ? options.memoryExtractionPolicy
+          : null,
         runtimeConfig: resolvedConfig.runtimeConfig,
         runtimeEventBus,
         sessionMessageStore,
@@ -94,6 +131,13 @@ function createRuntime(options) {
       }
 
       return createSessionHandle({
+        // AGRUN-440/444 — opt-in: run session memory extraction off the turn's
+        // critical path (default off = awaited, result.memoryEntriesAdded set).
+        asyncMemoryExtraction: Boolean(options && options.asyncMemoryExtraction),
+        // AGRUN-517 — optional host policy gating the per-turn extraction LLM call.
+        memoryExtractionPolicy: options && typeof options.memoryExtractionPolicy === "function"
+          ? options.memoryExtractionPolicy
+          : null,
         runtimeConfig: resolvedConfig.runtimeConfig,
         runtimeEventBus,
         sessionMessageStore,
@@ -126,6 +170,13 @@ function createRuntime(options) {
       return sessionMessageStore.getState();
     },
 
+    // AGRUN-440 — await durability of all pending transcript writes. Relevant
+    // when the store runs with asyncWrites (fire-and-forget assistant writes);
+    // call at a host checkpoint (beforeunload, before close) to flush the queue.
+    async flushMessageStorage() {
+      return sessionMessageStore.flush();
+    },
+
     async reloadRuntimeConfig(nextOptionsOrLoader, reloadOptions) {
       return configLifecycle.reload(nextOptionsOrLoader, reloadOptions);
     },
@@ -145,6 +196,9 @@ function createRuntime(options) {
         agentSkills: resolvedConfig.agentSkills,
         agentSkillIndexProvider: resolvedConfig.agentSkillIndexProvider,
         customActions: resolvedConfig.runtimeConfig.customActions,
+        // ADR-0057 Phase 1 — keep host introspection consistent with the run
+        // path: open_action_namespace appears here exactly when it runs.
+        deferredNamespaces: resolvedConfig.runtimeConfig.deferredNamespaces,
         repoFileTools: resolvedConfig.runtimeConfig.repoFileTools,
         toolCallExamples: resolvedConfig.runtimeConfig.toolCallExamples
       });

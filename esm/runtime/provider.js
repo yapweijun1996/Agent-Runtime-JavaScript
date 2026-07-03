@@ -3,7 +3,9 @@ import { requestGeminiContentStreaming, requestGeminiContent } from '../skills/p
 import { requestOpenAIChatCompletionStreaming, requestOpenAIChatCompletion } from '../skills/providers/openai-browser.js';
 import { normalizeBrowserProviderRequest } from '../skills/providers/request.js';
 import { attachProviderError } from './provider-error.js';
-import { normalizeProviderRetry, isTransientProviderError, waitMs, providerRetryDelayMs } from './provider-retry.js';
+import { normalizeProviderRetry, isTransientProviderError, isTimeoutProviderError, waitMs, providerRetryDelayMs } from './provider-retry.js';
+import { PROVIDER_TIMEOUT_DEFAULTS } from './provider-timeout.js';
+import { DEFAULT_LLM_TIMEOUT_MS } from '../skills/providers/fetch-resilience.js';
 import { createProviderStreamEmitter } from './provider-stream-events.js';
 
 // ADR/provider-registry-design.md — built-in providers are registry entries,
@@ -56,7 +58,7 @@ function isToolLoopProviderRequest(rawInput, registry) {
     return false;
   }
 
-  if (readString$D(rawInput, "prompt").length === 0) {
+  if (readString(rawInput, "prompt").length === 0) {
     return false;
   }
 
@@ -64,11 +66,11 @@ function isToolLoopProviderRequest(rawInput, registry) {
     return true;
   }
 
-  return registryHas(registry, readString$D(rawInput, "provider", "providerId"));
+  return registryHas(registry, readString(rawInput, "provider", "providerId"));
 }
 
 function normalizeToolLoopProviderRequest(rawInput, registry) {
-  const provider = readString$D(rawInput, "provider", "providerId");
+  const provider = readString(rawInput, "provider", "providerId");
 
   if (isInjectedTransport(rawInput && rawInput.transport)) {
     return normalizeInjectedTransportRequest(rawInput, provider);
@@ -131,12 +133,28 @@ async function requestProviderCompletion(request, overrides) {
         throw error;
       }
       attempt += 1;
+      // AGRUN-568 — a timeout is evidence the call needs MORE than the
+      // current budget; retrying with the identical deadline is provably
+      // wasted work for a deterministically-slow call (captured live:
+      // deepseek planner cycle needing >120s failed 120s + 120s back to
+      // back, aborting the run). Double the budget for the retry, bounded
+      // by the shared adaptive cap. Other transient reasons (rate_limit /
+      // network / upstream) keep the same budget — for those, time was
+      // never the problem. Transports read options.timeoutMs per attempt,
+      // so mutating it here takes effect on the next loop iteration.
+      if (isTimeoutProviderError(error, providerKey)) {
+        const currentMs = readPositiveInteger$c(options.timeoutMs) || DEFAULT_LLM_TIMEOUT_MS;
+        options.timeoutMs = Math.min(
+          PROVIDER_TIMEOUT_DEFAULTS.ADAPTIVE_TIMEOUT_CAP_MS,
+          currentMs * 2
+        );
+      }
       await waitMs(providerRetryDelayMs(retryPolicy, attempt));
     }
   }
 }
 
-async function requestProviderCompletionStreaming(request, overrides, onToken, onStreamEvent, streamContext = {}) {
+async function requestProviderCompletionStreaming(request, overrides, onToken, onStreamEvent, streamContext = {}, onReasoning) {
   const options = createRequestOptions(request, overrides);
   const providerKey = options.provider;
   const streamEmitter = createProviderStreamEmitter(onStreamEvent, {
@@ -145,11 +163,16 @@ async function requestProviderCompletionStreaming(request, overrides, onToken, o
     provider: providerKey
   });
   const wrappedOnToken = streamEmitter.wrapToken(onToken);
+  // AGRUN-419-followup — always build the reasoning wrapper, even when the host
+  // registered no onReasoning callback: it emits provider-reasoning-delta events
+  // onto onStreamEvent / the ledger, which is how the browser surfaces the live
+  // "thinking" stream. A non-reasoning model simply never feeds it.
+  const wrappedOnReasoning = streamEmitter.wrapReasoning(onReasoning);
   streamEmitter.emit("provider-stream-start");
 
   if (isInjectedTransport(options.transport)) {
     try {
-      const result = await options.transport.stream(options, wrappedOnToken);
+      const result = await options.transport.stream(options, wrappedOnToken, wrappedOnReasoning);
       streamEmitter.emit("provider-stream-finish", { final: true });
       return result;
     } catch (error) {
@@ -168,7 +191,7 @@ async function requestProviderCompletionStreaming(request, overrides, onToken, o
     const entry = resolveProviderEntry(options);
     let result;
     if (typeof entry.stream === "function") {
-      result = await entry.stream(options, options.fetch, wrappedOnToken);
+      result = await entry.stream(options, options.fetch, wrappedOnToken, wrappedOnReasoning);
     } else {
       // Host provider without a stream() impl: complete() then emit the full
       // text as one delta so onToken/onStreamEvent consumers still fire.
@@ -204,22 +227,22 @@ function createRequestOptions(request, overrides) {
     cachedContentMode: readOptionalString(config, "cachedContentMode") || request.cachedContentMode || null,
     endpoint: readOptionalString(config, "endpoint") || request.endpoint || null,
     parts: Array.isArray(config.parts) ? config.parts : request.parts,
-    prompt: readString$D(config, "prompt") || request.prompt,
-    sessionContext: hasOwn(config, "sessionContext") ? config.sessionContext : request.sessionContext,
+    prompt: readString(config, "prompt") || request.prompt,
+    sessionContext: hasOwn$1(config, "sessionContext") ? config.sessionContext : request.sessionContext,
     streamEndpoint: readOptionalString(config, "streamEndpoint") || request.streamEndpoint || null,
     systemPrompt: readOptionalString(config, "systemPrompt") || request.systemPrompt || null,
     // AGRUN-212a amendment 2D — Per-call timeout override (autopilot
     // finalize bumps to 180s; planner cycles to 120s). Falls through
     // to `request.timeoutMs` (and ultimately DEFAULT_LLM_TIMEOUT_MS)
     // when no override is supplied. See provider-timeout.js.
-    timeoutMs: readPositiveInteger$e(config.timeoutMs) || request.timeoutMs || null,
-    tools: hasOwn(config, "tools") ? config.tools : null,
-    toolChoice: hasOwn(config, "toolChoice") ? config.toolChoice : null,
-    geminiThinkingConfig: hasOwn(config, "geminiThinkingConfig")
+    timeoutMs: readPositiveInteger$c(config.timeoutMs) || request.timeoutMs || null,
+    tools: hasOwn$1(config, "tools") ? config.tools : null,
+    toolChoice: hasOwn$1(config, "toolChoice") ? config.toolChoice : null,
+    geminiThinkingConfig: hasOwn$1(config, "geminiThinkingConfig")
       ? readStructuredValue(config.geminiThinkingConfig)
       : request.geminiThinkingConfig || null,
     reasoningEffort: readOptionalString(config, "reasoningEffort") || request.reasoningEffort || null,
-    reasoningSummary: hasOwn(config, "reasoningSummary")
+    reasoningSummary: hasOwn$1(config, "reasoningSummary")
       ? readNullableString(config.reasoningSummary)
       : request.reasoningSummary || null,
     transport: isInjectedTransport(request.transport) ? request.transport : null
@@ -241,7 +264,7 @@ function isInjectedTransport(value) {
 }
 
 function normalizeInjectedTransportRequest(rawInput, providerLabel) {
-  const prompt = readString$D(rawInput, "prompt");
+  const prompt = readString(rawInput, "prompt");
   if (prompt.length === 0) {
     throw new Error("Transport-injected provider request requires a non-empty prompt.");
   }
@@ -258,7 +281,7 @@ function normalizeInjectedTransportRequest(rawInput, providerLabel) {
     contextSnapshot: readStructuredValue(rawInput.contextSnapshot),
     endpoint: null,
     fetch: typeof rawInput.fetch === "function" ? rawInput.fetch : null,
-    model: readString$D(rawInput, "model", "modelId") || (typeof transport.model === "string" && transport.model) || "injected-transport",
+    model: readString(rawInput, "model", "modelId") || (typeof transport.model === "string" && transport.model) || "injected-transport",
     parts: Array.isArray(rawInput.parts) ? rawInput.parts : [],
     prompt,
     provider: label,
@@ -279,16 +302,16 @@ function normalizeInjectedTransportRequest(rawInput, providerLabel) {
   };
 }
 
-function readPositiveInteger$e(value) {
+function readPositiveInteger$c(value) {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
   return Math.floor(value);
 }
 
-function hasOwn(source, key) {
+function hasOwn$1(source, key) {
   return Boolean(source && typeof source === "object" && Object.prototype.hasOwnProperty.call(source, key));
 }
 
-function readString$D(source, ...keys) {
+function readString(source, ...keys) {
   if (!source || typeof source !== "object") {
     return "";
   }
@@ -303,7 +326,7 @@ function readString$D(source, ...keys) {
 }
 
 function readOptionalString(source, ...keys) {
-  const value = readString$D(source, ...keys);
+  const value = readString(source, ...keys);
   return value.length > 0 ? value : null;
 }
 

@@ -1,14 +1,17 @@
 import { buildActiveAgentSkillSystemPrompt } from './agent-skills.js';
 import { buildRoleSystemPromptBlock } from './agent-roles.js';
+import { recordProviderCallDuration } from './provider-latency.js';
 import { finalizeActionLoopFailure } from './action-loop-failure.js';
 import './tool-schema.js';
 import { createProviderErrorStepDetail } from './provider-error.js';
 import { createUsageDetail } from './runtime-events.js';
 import './action-pattern-convergence.js';
+import './action-names.js';
 import './runtime-event-classifier.js';
 import { normalizeFinalResponseStructure, noteFinalResponseQualityIssues } from './final-response-quality.js';
 import { projectSessionContextFromSnapshot } from '../session/context-snapshot-projection.js';
 import { readFinalSourcePrompt } from './final-source-prompt.js';
+import { createProviderResponseTrace } from './llm-trace.js';
 import { handleRuntimeFinalize } from './action-loop-terminal.js';
 import { ERROR_CODES } from './errors.js';
 import { buildFinalResponseSystemPrompt, buildFinalResponseParts, buildFinalResponsePrompt, ensureVisibleFinalReadinessDecisionLine } from './final-response-prompt.js';
@@ -16,7 +19,6 @@ import { scrubFinalResponseText, finalResponseHasLeakedActionBlock, createStream
 import { readGoalAnchorView, formatGoalAnchorBlock } from './goal-anchor.js';
 import { deriveProviderTimeoutMs } from './provider-timeout.js';
 import { requestProviderCompletionStreaming, requestProviderCompletion } from './provider.js';
-import { createProviderResponseTrace } from './llm-trace.js';
 import { projectSessionContextForFinalizer } from './session-context-projection.js';
 
 async function executeRuntimeFinalize(options) {
@@ -25,6 +27,7 @@ async function executeRuntimeFinalize(options) {
     decision,
     memoryEntriesAdded,
     normalizedInput,
+    onReasoning,
     onStreamEvent,
     onToken,
     pushStep,
@@ -104,6 +107,7 @@ async function executeRuntimeFinalize(options) {
     const response = await requestFinalizerProviderResponse({
       finalizeCallId,
       finalizeOverrides,
+      onReasoning,
       onStreamEvent,
       onToken,
       pushStep,
@@ -111,6 +115,9 @@ async function executeRuntimeFinalize(options) {
       runState,
       source: terminalSource
     });
+    // AGRUN-568 — successful finalize call feeds the same observed-latency
+    // floor as planner calls (both doors of deriveProviderTimeoutMs).
+    recordProviderCallDuration(runState, Date.now() - providerStartedAt);
     response.text = scrubFinalResponseText(response.text);
     response.text = ensureVisibleFinalReadinessDecisionLine(
       response.text,
@@ -242,6 +249,7 @@ async function requestFinalizerProviderResponse(options) {
   const {
     finalizeCallId,
     finalizeOverrides,
+    onReasoning,
     onStreamEvent,
     onToken,
     pushStep,
@@ -258,7 +266,7 @@ async function requestFinalizerProviderResponse(options) {
   };
 
   try {
-    const response = await requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent, streamContext);
+    const response = await requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent, streamContext, onReasoning);
     // The finalizer call exposes no tools (tools.count = 0) and asks for a
     // user-facing answer, but a weak model can still leak a planner-action /
     // tool-call envelope (e.g. a fenced {"action":"list_agent_skills"}) as its
@@ -278,7 +286,8 @@ async function requestFinalizerProviderResponse(options) {
         buildProseOnlyFinalizeRetryOverrides(finalizeOverrides, { leakedAction: true }),
         onToken,
         onStreamEvent,
-        streamContext
+        streamContext,
+        onReasoning
       );
     }
     return response;
@@ -296,7 +305,8 @@ async function requestFinalizerProviderResponse(options) {
       buildProseOnlyFinalizeRetryOverrides(finalizeOverrides, { }),
       onToken,
       onStreamEvent,
-      streamContext
+      streamContext,
+      onReasoning
     );
   }
 }
@@ -325,15 +335,16 @@ function readTerminalSource(value) {
     : "runtime_finalize";
 }
 
-async function requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent, streamContext) {
-  if (onToken || onStreamEvent) {
+async function requestFinalizerProviderOnce(request, finalizeOverrides, onToken, onStreamEvent, streamContext, onReasoning) {
+  if (onToken || onStreamEvent || onReasoning) {
     const fence = createStreamFence(onToken);
     const response = await requestProviderCompletionStreaming(
       request,
       finalizeOverrides,
       fence.wrappedOnToken,
       onStreamEvent,
-      streamContext
+      streamContext,
+      onReasoning
     );
     fence.flush();
     return response;

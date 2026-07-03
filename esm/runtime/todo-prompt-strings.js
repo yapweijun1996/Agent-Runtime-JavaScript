@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 /**
  * SSOT for every LLM-facing string the TodoState subsystem injects into
  * planner prompts or autopilot vetoes.
@@ -27,9 +29,6 @@
  *     additive, not positional.
  */
 
-function readString$11(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function readFunction(value) {
   return typeof value === "function" ? value : null;
@@ -167,7 +166,7 @@ function mergeSection(defaults, override) {
       const fn = readFunction(overrideValue);
       merged[key] = fn || defaultValue;
     } else {
-      const str = readString$11(overrideValue);
+      const str = readString(overrideValue);
       merged[key] = str || defaultValue;
     }
   }

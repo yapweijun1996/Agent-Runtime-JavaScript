@@ -296,6 +296,10 @@ async function requestPlanner(options) {
       plannerMode: options.plannerMode,
       plannerState,
       runState,
+      onReasoning: options.onReasoning,
+      // C3c (AGRUN-585) — forwarded for the native door's fenced TTFT streaming.
+      onToken: options.onToken,
+      onStreamEvent: options.onStreamEvent,
       onInvalidPlannerOutput: options.onInvalidPlannerOutput,
       readSources: runState.researchContext.readSources,
       researchContext: runState.researchContext,
@@ -317,6 +321,13 @@ async function requestPlanner(options) {
         ? plannerResult.response.providerRetries
         : 0,
       responseType: plannerResult.decision ? plannerResult.decision.type : "invalid",
+      // AGRUN-419-followup — surface the AI's OWN stated reasoning for this
+      // decision (the planner envelope's `reasoning` field) so the host can show
+      // the agent's actual thought, not just a generic phase label. Model-
+      // agnostic: every planner decision carries it, no provider CoT needed.
+      reasoning: plannerResult.decision && typeof plannerResult.decision.reasoning === "string"
+        ? plannerResult.decision.reasoning.trim().slice(0, 800)
+        : null,
       responseText: summarizePlannerResponseText(plannerResult.response),
       usage: createUsageDetail(plannerResult.response, {
         model: request.model,

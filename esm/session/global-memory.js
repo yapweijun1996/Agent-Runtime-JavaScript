@@ -1,4 +1,5 @@
 import { normalizeThrownError } from '../runtime/errors.js';
+import { readSessionMemorySlotKey } from './memory-slot.js';
 
 const GLOBAL_MEMORY_MAX_ENTRIES = 100;
 const GLOBAL_MEMORY_MIN_CONFIDENCE = 0.7;
@@ -129,10 +130,13 @@ function mergeGlobalIntoSessionMemory(sessionEntries, globalEntries) {
   const sessionSlots = new Set();
 
   for (const entry of sessionArray) {
-    const slot = readNestedString(entry, "metadata", "slot");
-    const kind = readNestedString(entry, "metadata", "kind");
-    if (slot) {
-      sessionSlots.add(`${kind}:${slot}`);
+    // AGRUN-494 (audit M17) — derive the session slot key via the shared SSOT
+    // so the read-merge dedup and the write-time appendMemory dedup can never
+    // disagree on what "same slot" means. Behavior-identical to the prior
+    // inline `${kind}:${slot}` (slot must be present; kind may be empty).
+    const slotKey = readSessionMemorySlotKey(entry);
+    if (slotKey) {
+      sessionSlots.add(slotKey);
     }
   }
 

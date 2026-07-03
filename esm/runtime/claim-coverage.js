@@ -1,11 +1,14 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-246-B (C2.6): LONG_RESEARCH_RE removed — evidenceConstrained and
 // claimCoverageRequired now rely on researchReportLoop runtime state instead
 // of English keyword scanning of the user prompt.
+
 const CLAIM_COVERAGE_HEADING_RE = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:claim\s+coverage|verified\s+facts|reported\s+but\s+not\s+independently\s+verified|what\s+is\s+directly\s+supported|not\s+verified|verification\s+limits)\b/i;
 const CLAIM_LINE_RE = /^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+)$/;
 
 function analyzeClaimCoverage(text, context = {}) {
-  const value = readString$1q(text);
+  const value = readString(text);
   const sourceNotes = readSourceNotes(context);
   const sourceQuality = readSourceQuality(context);
   const gaps = readGaps(context);
@@ -44,7 +47,7 @@ function analyzeClaimCoverage(text, context = {}) {
 }
 
 function ensureClaimCoverageSection(text, context = {}) {
-  const value = readString$1q(text);
+  const value = readString(text);
   if (!value) return "";
   const analysis = analyzeClaimCoverage(value, context);
   if (!analysis.claimCoverageRequired || analysis.hasClaimCoverageSection) return value;
@@ -52,7 +55,7 @@ function ensureClaimCoverageSection(text, context = {}) {
 }
 
 function normalizeConstrainedEvidenceClaims(text, context = {}) {
-  const value = readString$1q(text);
+  const value = readString(text);
   if (!value) return "";
   if (looksLikeCompiledEvidenceReport(value)) return value;
   const analysis = analyzeClaimCoverage(value, context);
@@ -194,17 +197,17 @@ function isResearchReportLoopActive$1(context) {
   const loop = context && context.researchReportLoop && typeof context.researchReportLoop === "object"
     ? context.researchReportLoop
     : null;
-  const status = loop ? readString$1q(loop.status) : "";
+  const status = loop ? readString(loop.status) : "";
   return Boolean(
     loop &&
-    (loop.enabled === true || readString$1q(loop.finalMode) || (status && status !== "idle"))
+    (loop.enabled === true || readString(loop.finalMode) || (status && status !== "idle"))
   );
 }
 
 
 
 function extractClaimCandidates(text) {
-  const lines = readString$1q(text).split(/\r?\n/);
+  const lines = readString(text).split(/\r?\n/);
   const claims = [];
   for (const line of lines) {
     const trimmed = line.trim();
@@ -224,7 +227,7 @@ function extractClaimCandidates(text) {
 }
 
 function cleanupClaim(value) {
-  return readString$1q(value)
+  return readString(value)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/[*_`]/g, "")
     .replace(/\s+/g, " ")
@@ -261,13 +264,13 @@ function readGaps(context) {
     []
       .concat(Array.isArray(state.gaps) ? state.gaps : [])
       .concat(Array.isArray(readiness.remainingGaps) ? readiness.remainingGaps : [])
-      .map(readString$1q)
+      .map(readString)
       .filter(Boolean)
   ));
 }
 
 function insertBeforeSources$1(text, section) {
-  const value = readString$1q(text);
+  const value = readString(text);
   const marker = /\n(?:#{1,6}\s*)?Sources\s*:?\s*\n/i.exec(value);
   if (!marker) return [value, section].filter(Boolean).join("\n\n");
   const sourceStart = marker.index + 1;
@@ -276,16 +279,12 @@ function insertBeforeSources$1(text, section) {
   return [before, section, sources].filter(Boolean).join("\n\n");
 }
 
-function readString$1q(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readNumber$a(value) {
   return Number.isFinite(value) ? value : 0;
 }
 
 function normalizeBlankLines$1(text) {
-  return readString$1q(text)
+  return readString(text)
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n");
 }

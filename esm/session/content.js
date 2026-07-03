@@ -79,7 +79,7 @@ function stringifySessionContent(content) {
   }
 
   if (content.type === "json") {
-    return stableStringify$1(content.value);
+    return stableStringify(content.value);
   }
 
   if (content.type === "parts") {
@@ -105,7 +105,7 @@ function readSessionParts(content) {
   return [];
 }
 
-function stableStringify$1(value) {
+function stableStringify(value) {
   return JSON.stringify(normalizeStableValue(value));
 }
 
@@ -156,4 +156,4 @@ function stringifyParts(parts) {
     .join("\n");
 }
 
-export { createAssistantSessionContent, createUserSessionContent, readSessionParts, stableStringify$1 as stableStringify, stringifySessionContent };
+export { createAssistantSessionContent, createUserSessionContent, readSessionParts, stableStringify, stringifySessionContent };

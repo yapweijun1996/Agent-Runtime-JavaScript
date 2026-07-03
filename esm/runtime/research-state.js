@@ -1,5 +1,6 @@
 import { classifyReadSourceTier, explainReadSourceQuality } from './read-source-quality.js';
 import { isEvidenceConvergenceRun } from './convergence-activation.js';
+import { readString } from './semantic-json.js';
 
 // AGRUN-313 P2c — the hardcoded LONG_RESEARCH_SKILL_IDS name list is removed.
 // The kernel activates the evidence-convergence gate from the generic
@@ -31,8 +32,8 @@ function refreshResearchState(runState, options = {}) {
     ? detectEvidenceGaps({ readSources, searchResults, sourceQuality })
     : [];
   const finalAllowed = !required || gaps.length === 0;
-  const previousPhase = readString$1y(previous.phase);
-  const phase = readString$1y(options.phase)
+  const previousPhase = readString(previous.phase);
+  const phase = readString(options.phase)
     || (finalAllowed ? "ready_to_finalize" : inferResearchPhase({ readSources, searchResults, previousPhase }));
   const finalReason = finalAllowed
     ? (required ? "evidence_quality_gate_passed" : "evidence_convergence_inactive")
@@ -84,24 +85,24 @@ function createResearchWorkspace(runState, options = {}) {
   const context = runState && runState.researchContext && typeof runState.researchContext === "object"
     ? runState.researchContext
     : {};
-  const recoveryMode = readString$1y(options && options.recoveryMode)
-    || readString$1y(state.recoveryMode);
+  const recoveryMode = readString(options && options.recoveryMode)
+    || readString(state.recoveryMode);
   const prompt = recoveryMode === "continued_research_thread"
-    ? readString$1y(runState && runState.threadGoalAnchorText)
-      || readString$1y(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)
-      || readString$1y(runState && runState.originalQuery)
-      || readString$1y(options && options.prompt)
-      || readString$1y(runState && runState.observationSummary && runState.observationSummary.prompt)
-    : readString$1y(options && options.prompt)
-      || readString$1y(runState && runState.originalQuery)
-      || readString$1y(runState && runState.observationSummary && runState.observationSummary.prompt);
-  const topic = readString$1y(state.topic) || extractResearchTopic(runState, options);
+    ? readString(runState && runState.threadGoalAnchorText)
+      || readString(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)
+      || readString(runState && runState.originalQuery)
+      || readString(options && options.prompt)
+      || readString(runState && runState.observationSummary && runState.observationSummary.prompt)
+    : readString(options && options.prompt)
+      || readString(runState && runState.originalQuery)
+      || readString(runState && runState.observationSummary && runState.observationSummary.prompt);
+  const topic = readString(state.topic) || extractResearchTopic(runState, options);
   const queries = Array.isArray(state.queries) && state.queries.length > 0
     ? state.queries
     : collectQueries(runState);
   const searchLog = collectSearchLog(context);
   const sourceNotes = collectSourceNotes(context);
-  const gaps = Array.isArray(state.gaps) ? state.gaps.map(readString$1y).filter(Boolean) : [];
+  const gaps = Array.isArray(state.gaps) ? state.gaps.map(readString).filter(Boolean) : [];
   const reportLoop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
     ? runState.researchReportLoop
     : {};
@@ -127,7 +128,7 @@ function createResearchWorkspace(runState, options = {}) {
     claimEvidence: Array.isArray(reportLoop.claimEvidence) ? reportLoop.claimEvidence.slice(0, 12) : [],
     finalReadiness: {
       allowed: state.finalAllowed === true,
-      reason: readString$1y(state.finalReason) || "n/a",
+      reason: readString(state.finalReason) || "n/a",
       remainingGaps: gaps
     },
     gaps,
@@ -136,14 +137,14 @@ function createResearchWorkspace(runState, options = {}) {
       searchStrategy: "start broad, read promising sources, then retry for official or primary sources when evidence is weak"
     },
     progress: {
-      phase: readString$1y(state.phase) || "idle",
+      phase: readString(state.phase) || "idle",
       qualityGateRequired: state.qualityGateRequired === true,
       vetoCount: Number.isInteger(state.vetoCount) && state.vetoCount >= 0 ? state.vetoCount : 0
     },
-    reportLoop: reportLoop && readString$1y(reportLoop.status) ? {
-      finalMode: readString$1y(reportLoop.finalMode) || null,
+    reportLoop: reportLoop && readString(reportLoop.status) ? {
+      finalMode: readString(reportLoop.finalMode) || null,
       sourceMinimum: reportLoop.sourceMinimum && typeof reportLoop.sourceMinimum === "object" ? reportLoop.sourceMinimum : null,
-      status: readString$1y(reportLoop.status),
+      status: readString(reportLoop.status),
       vetoCount: Number.isInteger(reportLoop.vetoCount) && reportLoop.vetoCount >= 0 ? reportLoop.vetoCount : 0
     } : null,
     queries,
@@ -253,16 +254,16 @@ function readStableResearchTopic(runState, options = {}) {
     // the recovery prompt.
     runState && runState.researchThreadSlice && runState.researchThreadSlice.topic,
     runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeTopic,
-    extractTopicFromPrompt(readString$1y(runState && runState.threadGoalAnchorText)),
-    extractTopicFromPrompt(readString$1y(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)),
+    extractTopicFromPrompt(readString(runState && runState.threadGoalAnchorText)),
+    extractTopicFromPrompt(readString(runState && runState.contextSnapshot && runState.contextSnapshot.inquiryContext && runState.contextSnapshot.inquiryContext.activeGoal)),
     runState && runState.turnState && runState.turnState.topicAnchorText,
     runState && runState.inputResolution && runState.inputResolution.intentState && runState.inputResolution.intentState.topic,
-    extractTopicFromPrompt(readString$1y(runState && runState.originalQuery)),
-    extractTopicFromPrompt(readString$1y(runState && runState.observationSummary && runState.observationSummary.prompt)),
+    extractTopicFromPrompt(readString(runState && runState.originalQuery)),
+    extractTopicFromPrompt(readString(runState && runState.observationSummary && runState.observationSummary.prompt)),
     runState && runState.researchReportLoop && runState.researchReportLoop.lastTopic
   ];
   for (const candidate of candidates) {
-    const topic = readString$1y(candidate);
+    const topic = readString(candidate);
     if (isUsableStableTopic(topic, options)) return topic;
   }
   return "";
@@ -322,9 +323,9 @@ function collectSearchLog(context) {
           : [];
     return {
       id: `search-${index + 1}`,
-      query: readString$1y(pass && (pass.query || pass.lastExecutedQuery)) || "n/a",
+      query: readString(pass && (pass.query || pass.lastExecutedQuery)) || "n/a",
       resultCount: items.length,
-      strategy: readString$1y(pass && pass.strategy) || readString$1y(pass && pass.kind) || "search"
+      strategy: readString(pass && pass.strategy) || readString(pass && pass.kind) || "search"
     };
   });
 }
@@ -340,14 +341,14 @@ function collectSourceNotes(context) {
       quality: tier === "usable" ? "medium" : tier,
       qualityDetail,
       status: source && typeof source.status === "number" ? source.status : null,
-      title: readString$1y(source && source.title) || readString$1y(source && source.url) || `Read source ${index + 1}`,
-      url: readString$1y(source && source.url)
+      title: readString(source && source.title) || readString(source && source.url) || `Read source ${index + 1}`,
+      url: readString(source && source.url)
     };
   });
 }
 
 function createDraftOutline(topic) {
-  const label = readString$1y(topic) || "the research topic";
+  const label = readString(topic) || "the research topic";
   return [
     `What is publicly verifiable about ${label}`,
     "Key supporting evidence",
@@ -357,7 +358,7 @@ function createDraftOutline(topic) {
 }
 
 function createResearchQuestions(topic) {
-  const label = readString$1y(topic) || "the topic";
+  const label = readString(topic) || "the topic";
   return [
     `What direct public sources mention ${label}?`,
     `Which sources are primary, official, or otherwise strong for ${label}?`,
@@ -376,8 +377,8 @@ function createSynthesisNotes({ gaps, sourceNotes, state }) {
   if (gaps.length > 0) {
     notes.push(`Evidence gaps remain: ${gaps.join(", ")}.`);
   }
-  if (readString$1y(state.finalReason)) {
-    notes.push(`Final readiness reason: ${readString$1y(state.finalReason)}.`);
+  if (readString(state.finalReason)) {
+    notes.push(`Final readiness reason: ${readString(state.finalReason)}.`);
   }
   return notes;
 }
@@ -407,8 +408,8 @@ function createWorkspaceTimeline({ searchLog, sourceNotes, state }) {
   }
   if (state.qualityGateRequired === true) {
     timeline.push({
-      label: readString$1y(state.finalReason) || "Evidence checked",
-      phase: readString$1y(state.phase) || "gap_check",
+      label: readString(state.finalReason) || "Evidence checked",
+      phase: readString(state.phase) || "gap_check",
       status: state.finalAllowed === true ? "done" : "blocked"
     });
   }
@@ -420,9 +421,9 @@ function extractResearchTopic(runState, options) {
     const stableTopic = readStableResearchTopic(runState, options);
     if (stableTopic) return stableTopic;
   }
-  const prompt = readString$1y(options && options.prompt)
-    || readString$1y(runState && runState.originalQuery)
-    || readString$1y(runState && runState.observationSummary && runState.observationSummary.prompt);
+  const prompt = readString(options && options.prompt)
+    || readString(runState && runState.originalQuery)
+    || readString(runState && runState.observationSummary && runState.observationSummary.prompt);
   return extractTopicFromPrompt(prompt);
 }
 
@@ -463,7 +464,7 @@ function hasExistingResearchArtifacts(runState) {
     ? runState.virtualWorkspace
     : {};
   const files = workspace.files && typeof workspace.files === "object" ? workspace.files : {};
-  if (Object.values(files).some((file) => file && typeof file === "object" && readString$1y(file.content))) return true;
+  if (Object.values(files).some((file) => file && typeof file === "object" && readString(file.content))) return true;
   const graph = runState.researchEvidenceGraph && typeof runState.researchEvidenceGraph === "object"
     ? runState.researchEvidenceGraph
     : {};
@@ -472,18 +473,18 @@ function hasExistingResearchArtifacts(runState) {
   const researchWorkspace = runState.researchWorkspace && typeof runState.researchWorkspace === "object"
     ? runState.researchWorkspace
     : {};
-  if (readString$1y(researchWorkspace.brief && researchWorkspace.brief.topic)) return true;
+  if (readString(researchWorkspace.brief && researchWorkspace.brief.topic)) return true;
   const loop = runState.researchReportLoop && typeof runState.researchReportLoop === "object"
     ? runState.researchReportLoop
     : {};
-  if (loop.enabled === true || Boolean(readString$1y(loop.status) && readString$1y(loop.status) !== "idle")) return true;
+  if (loop.enabled === true || Boolean(readString(loop.status) && readString(loop.status) !== "idle")) return true;
   // AGRUN-214m — a hydrated thread research slice (topic + evidence
   // from a previous turn) counts as existing artefacts even when the
   // current run has not yet touched researchContext.
   const slice = runState.researchThreadSlice && typeof runState.researchThreadSlice === "object"
     ? runState.researchThreadSlice
     : null;
-  return Boolean(slice && readString$1y(slice.topic));
+  return Boolean(slice && readString(slice.topic));
 }
 
 function isFollowUpTurn(runState, options) {
@@ -492,7 +493,7 @@ function isFollowUpTurn(runState, options) {
     runState && runState.turnState && runState.turnState.turnIntentKind,
     runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind,
     runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind
-  ].map(readString$1y);
+  ].map(readString);
   return kinds.includes("follow_up") || kinds.includes("continuation");
 }
 
@@ -502,16 +503,16 @@ function isFollowUpTurn(runState, options) {
 // the turn-intent layer's call (turn-intent-planner.js), not a runtime
 // lexical guess.
 function isNewResearchTopicTurn(runState, options) {
-  const kind = readString$1y(options && options.turnIntent && options.turnIntent.kind)
-    || readString$1y(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind)
-    || readString$1y(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind)
-    || readString$1y(runState && runState.turnState && runState.turnState.turnIntentKind);
+  const kind = readString(options && options.turnIntent && options.turnIntent.kind)
+    || readString(runState && runState.inputResolution && runState.inputResolution.turnIntent && runState.inputResolution.turnIntent.kind)
+    || readString(runState && runState.contextSnapshot && runState.contextSnapshot.turnIntent && runState.contextSnapshot.turnIntent.kind)
+    || readString(runState && runState.turnState && runState.turnState.turnIntentKind);
   return kind === "new_task";
 }
 
 function isUsableStableTopic(topic, options) {
   if (!topic) return false;
-  if (options && options.skipPromptTopic && topic === extractTopicFromPrompt(readString$1y(options.prompt))) return false;
+  if (options && options.skipPromptTopic && topic === extractTopicFromPrompt(readString(options.prompt))) return false;
   if (/^(?:research topic|n\/a)$/i.test(topic)) return false;
   return true;
 }
@@ -533,7 +534,7 @@ function collectQueries(runState) {
     : {};
   const queries = [];
   const push = (value) => {
-    const normalized = readString$1y(value);
+    const normalized = readString(value);
     if (normalized && !queries.includes(normalized)) queries.push(normalized);
   };
   push(context.lastQuery);
@@ -554,10 +555,6 @@ function inferResearchPhase({ readSources, searchResults, previousPhase }) {
 
 function readPositiveInteger$i(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
-}
-
-function readString$1y(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createEmptyResearchWorkspace, createResearchState, createResearchWorkspace, detectContinuedResearchThread, readStableResearchTopic, refreshResearchState };

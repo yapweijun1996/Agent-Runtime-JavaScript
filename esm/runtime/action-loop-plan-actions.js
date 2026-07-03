@@ -1,4 +1,5 @@
 import { appendWebSearchOutput, appendResearchReadSource } from './search-research-context.js';
+import { EXECUTE_SKILL_TOOL_ACTION, WEB_SEARCH_ACTION, READ_URL_ACTION, ASK_CLARIFICATION_ACTION, LIST_AGENT_SKILLS_ACTION, READ_AGENT_SKILL_ACTION, USE_AGENT_SKILL_ACTION, HANDOFF_TO_SKILL_ACTION, TODO_RUN_NEXT_ACTION } from './action-names.js';
 import { pushReadUrlRequestedStep, pushReadUrlCompletedStep, readResearchQuery, syncSearchInquiryContext, createResearchReadSource, syncReadInquiryContext, syncPendingClarification, shouldRefreshLongRunRequirementRecovery } from './action-loop-action-context.js';
 import { createActionContext } from './action-loop-plan-validation.js';
 import { recordToolContextResult, resolveToolHistoryCap, shouldRecordStructuredToolEvidence, recordStructuredToolEvidence } from './action-evidence.js';
@@ -16,14 +17,16 @@ import { refreshActionPatternConvergence, shouldEmitActionPatternConvergenceRefr
 import { refreshRequirementRecoveryEvaluator } from './requirement-recovery-evaluator.js';
 import { refreshReadUrlRecoverySignal } from './read-url-recovery-signal.js';
 import { refreshResearchState } from './research-state.js';
-import { refreshTerminalRepairState, buildTerminalRepairRefreshedStepDetail, shouldEmitAdvisoryPersistenceSignalStep } from './terminal-repair-state.js';
+import { readString } from './semantic-json.js';
+import { refreshTerminalRepairState, buildTerminalRepairRefreshedStepDetail, shouldEmitAdvisoryPersistenceSignalStep } from './terminal-repair/core.js';
 import { stampThreadProvenance } from './thread-provenance.js';
 import { resetAgentHandoffChainForSkill, applyAgentHandoffToSession } from './handoff-input-filter.js';
 import { maybeCreateTodoActionProgressDecision } from './todo-action-progress.js';
 import { applyTodoRunNextToRunState } from './actions/todo-actions.js';
+import { runWithConcurrency } from './run-with-concurrency.js';
 
 async function runPlanActions(session, planActions, maxParallel, partialOk) {
-  const settled = await runWithConcurrency$1(planActions, maxParallel, (item) => (
+  const settled = await runWithConcurrency(planActions, maxParallel, (item) => (
     executePlanAction(session, item)
   ));
   const failures = settled.filter((entry) => entry.status === "rejected");
@@ -208,7 +211,7 @@ async function applySettledPlanResults(session, actions, settled, partialOk) {
 
 async function applyActionSuccess(session, item, actionResult) {
   let output = actionResult.output || null;
-  if (item.name === "execute_skill_tool" && typeof session.onToolResult === "function") {
+  if (item.name === EXECUTE_SKILL_TOOL_ACTION && typeof session.onToolResult === "function") {
     output = await applyToolResultHook(session, item, output);
     actionResult.output = output;
   }
@@ -247,7 +250,7 @@ function applyTodoActionProgress(session, actionName) {
     session.runtimeConfig && session.runtimeConfig.todoAutopilot,
     { actionName }
   );
-  if (!decision || decision.name !== "todo_run_next") return;
+  if (!decision || decision.name !== TODO_RUN_NEXT_ACTION) return;
 
   const result = applyTodoRunNextToRunState(session.runState, decision.args, createActionContext(session));
   session.pushStep("todo-autopilot-action-progress", {
@@ -263,7 +266,7 @@ function applyTodoActionProgress(session, actionName) {
 }
 
 function applyActionFailure(session, item, output) {
-  if (item.name === "execute_skill_tool") {
+  if (item.name === EXECUTE_SKILL_TOOL_ACTION) {
     // Audit H5 (AGRUN-483) — route through the shared capped recorder so a
     // failing skill tool cannot grow toolContext.history unbounded either.
     recordToolContextResult(session.runState, output, resolveToolHistoryCap(session.runtimeConfig));
@@ -384,7 +387,7 @@ function refreshPlanReadUrlRecoverySignal(session, actionName, output) {
 async function applyActionSideEffects(session, item, output) {
   const actionName = item && item.name;
   const runState = session.runState;
-  if (actionName === "web_search") {
+  if (actionName === WEB_SEARCH_ACTION) {
     runState.researchContext = appendWebSearchOutput(runState.researchContext, output, session.runtimeConfig);
     refreshResearchState(runState, {
       phase: "searching",
@@ -395,7 +398,7 @@ async function applyActionSideEffects(session, item, output) {
     refreshPlanLongRunRequirementRecovery(session, actionName, "after_web_search", output);
   }
 
-  if (actionName === "read_url") {
+  if (actionName === READ_URL_ACTION) {
     const readSource = stampThreadProvenance(
       cloneValue(createResearchReadSource(
         output,
@@ -413,15 +416,15 @@ async function applyActionSideEffects(session, item, output) {
     refreshPlanLongRunRequirementRecovery(session, actionName, "after_read_url", output);
   }
 
-  if (actionName === "ask_clarification") {
+  if (actionName === ASK_CLARIFICATION_ACTION) {
     syncPendingClarification(runState, output);
   }
 
-  if (actionName === "list_agent_skills") {
+  if (actionName === LIST_AGENT_SKILLS_ACTION) {
     runState.agentSkillContext.catalogListed = true;
   }
 
-  if (actionName === "read_agent_skill") {
+  if (actionName === READ_AGENT_SKILL_ACTION) {
     const skillRecord = cloneValue(output && output.skill || null);
     runState.agentSkillContext.lastReadSkill = skillRecord;
     // AGRUN-479 (audit M3) — dispatch-path parity with the single path
@@ -441,7 +444,7 @@ async function applyActionSideEffects(session, item, output) {
     });
   }
 
-  if (actionName === "use_agent_skill") {
+  if (actionName === USE_AGENT_SKILL_ACTION) {
     const selectedSkill = cloneValue(output && output.skill || null);
     runState.agentSkillContext.activeSkill = selectedSkill;
     resetAgentHandoffChainForSkill(runState.agentSkillContext, selectedSkill);
@@ -452,7 +455,7 @@ async function applyActionSideEffects(session, item, output) {
     });
   }
 
-  if (actionName === "handoff_to_skill") {
+  if (actionName === HANDOFF_TO_SKILL_ACTION) {
     await applyAgentHandoffToSession(session, output);
     // AGRUN-479 (audit M2) — research-phase parity with the single path.
     refreshResearchState(runState, {
@@ -469,7 +472,7 @@ async function applyActionSideEffects(session, item, output) {
     recordStructuredToolEvidence(runState, output, session.runtimeConfig);
   }
 
-  if (actionName !== "web_search" && actionName !== "read_url") {
+  if (actionName !== WEB_SEARCH_ACTION && actionName !== READ_URL_ACTION) {
     refreshPlanLongRunRequirementRecovery(session, actionName, `after_${actionName}`, output);
   }
 }
@@ -497,32 +500,6 @@ async function applyToolResultHook(session, item, output) {
   return output;
 }
 
-async function runWithConcurrency$1(items, limit, worker) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(Math.max(1, limit || 1), items.length);
-
-  await Promise.all(Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      try {
-        results[index] = {
-          status: "fulfilled",
-          value: await worker(items[index])
-        };
-      } catch (error) {
-        results[index] = {
-          reason: error,
-          status: "rejected"
-        };
-      }
-    }
-  }));
-
-  return results;
-}
-
 function createPlanActionErrorOutput(item, error) {
   return {
     actionName: item.name,
@@ -534,21 +511,17 @@ function createPlanActionErrorOutput(item, error) {
 }
 
 function readToolSkillName(actionName, output, decision) {
-  if (actionName !== "execute_skill_tool") return undefined;
-  return readString$m(output && output.skill) ||
-    readString$m(decision && decision.args && decision.args.skillName) ||
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) return undefined;
+  return readString(output && output.skill) ||
+    readString(decision && decision.args && decision.args.skillName) ||
     undefined;
 }
 
 function readToolName(actionName, output, decision) {
-  if (actionName !== "execute_skill_tool") return undefined;
-  return readString$m(output && output.tool) ||
-    readString$m(decision && decision.args && decision.args.toolName) ||
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) return undefined;
+  return readString(output && output.tool) ||
+    readString(decision && decision.args && decision.args.toolName) ||
     undefined;
-}
-
-function readString$m(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { runPlanActions };

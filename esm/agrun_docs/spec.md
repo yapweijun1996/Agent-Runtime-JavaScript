@@ -304,9 +304,9 @@ Client calls Runtime
 ↓
 Runtime normalizes input
 ↓
-Runtime checks for direct skill match
+Runtime rejects non-tool-loop input with INVALID_RUN_INPUT; a tool-loop provider request drives the planner
 ↓
-If no direct skill matches, planner selects a runtime action
+Planner selects a runtime action
 ↓
 Runtime executes action such as web_search or read_url
 ↓

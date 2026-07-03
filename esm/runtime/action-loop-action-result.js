@@ -1,4 +1,5 @@
 import { recordObservation, startEvaluatePhase, completeEvaluatePhase, finishRun } from './finalizer.js';
+import { ASK_CLARIFICATION_ACTION } from './action-names.js';
 import { completePhase } from './oodae.js';
 import { createEvaluationState } from './task-state.js';
 import { syncPromptInquiryContext } from './inquiry-context-resolution.js';
@@ -71,7 +72,7 @@ function handleActionResult(options) {
   }
 
   syncPromptInquiryContext(runState, request, {
-    preservePendingClarification: actionName === "ask_clarification"
+    preservePendingClarification: actionName === ASK_CLARIFICATION_ACTION
   });
   runState.status = "completed";
   runState.finalAnswerSource = actionName;

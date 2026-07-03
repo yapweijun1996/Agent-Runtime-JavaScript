@@ -1,9 +1,10 @@
 import { stringifySessionContent } from './content.js';
+import { readString } from '../runtime/semantic-json.js';
 
 function buildAnchoredRecentTurns(messages, inquiryContext, options) {
   const turns = buildTurns(messages);
-  const maxTurns = readPositiveInteger$6(options && options.maxTurns, 0);
-  const minTurns = readPositiveInteger$6(options && options.minTurns, 1);
+  const maxTurns = readPositiveInteger$5(options && options.maxTurns, 0);
+  const minTurns = readPositiveInteger$5(options && options.minTurns, 1);
 
   if (turns.length === 0) {
     return [];
@@ -101,14 +102,14 @@ function collectAnchorTexts(inquiryContext, anchorSignals) {
   }
 
   return values
-    .map(readString$b)
+    .map(readString)
     .filter(Boolean)
     .map((value) => value.toLowerCase());
 }
 
 function matchesAnchor(turn, anchorTexts) {
   const haystack = [turn.user, ...(Array.isArray(turn.assistant) ? turn.assistant : [])]
-    .map(readString$b)
+    .map(readString)
     .filter(Boolean)
     .join("\n")
     .toLowerCase();
@@ -128,12 +129,8 @@ function readResolutionText(value) {
   return typeof value.kind === "string" ? value.kind.trim() : "";
 }
 
-function readPositiveInteger$6(value, fallback) {
+function readPositiveInteger$5(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-function readString$b(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { buildAnchoredRecentTurns, renderTurns };

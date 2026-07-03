@@ -28,13 +28,13 @@ function assertActionOutputContract(actions) {
         `Action "${actionName(action)}" outputSchema must be an object or null; got ${typeof schema}.`
       );
     }
-    const kinds = readStringArray$3(schema.kinds);
+    const kinds = readStringArray$1(schema.kinds);
     if (kinds.length === 0) {
       throw new Error(
         `Action "${actionName(action)}" outputSchema.kinds must be a non-empty string array.`
       );
     }
-    const controls = readStringArray$3(schema.controls);
+    const controls = readStringArray$1(schema.controls);
     if (controls.length === 0) {
       throw new Error(
         `Action "${actionName(action)}" outputSchema.controls must be a non-empty string array.`
@@ -64,7 +64,7 @@ function assertActionOutputContract(actions) {
   }
 }
 
-function readStringArray$3(value) {
+function readStringArray$1(value) {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => (typeof entry === "string" ? entry.trim() : "")).filter(Boolean);
 }

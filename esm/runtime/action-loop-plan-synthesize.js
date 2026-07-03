@@ -3,6 +3,8 @@ import { requestProviderCompletion } from './provider.js';
 import { scrubFinalResponseText } from './final-response-scrubber.js';
 import { stripSectionUiExtensionBlocks } from './markdown-ui-blocks.js';
 import { normalizeThrownError } from './errors.js';
+import { readString } from './semantic-json.js';
+import { runWithConcurrency } from './run-with-concurrency.js';
 
 const SECTION_SYSTEM_PROMPT = [
   "You synthesize exactly one markdown report section for agrun.js.",
@@ -173,7 +175,7 @@ function stitchMarkdown(actions, taskResults, stitch) {
   }
 
   for (const section of sections) {
-    const title = readString$k(section.title) || `## Section ${Number(section.index) + 1}`;
+    const title = readString(section.title) || `## Section ${Number(section.index) + 1}`;
     parts.push([title, section.markdown].filter(Boolean).join("\n\n"));
   }
 
@@ -212,7 +214,7 @@ function buildTaskPrompt(originalPrompt, task) {
     ? 12000
     : (typeof task.stitchBudget === "number" && task.stitchBudget > 0 ? task.stitchBudget : 8000);
   return [
-    `User request: ${readString$k(originalPrompt)}`,
+    `User request: ${readString(originalPrompt)}`,
     "",
     "Section prompt:",
     task.prompt,
@@ -223,7 +225,7 @@ function buildTaskPrompt(originalPrompt, task) {
 }
 
 function buildSectionSystemPrompt(systemPrompt) {
-  const dynamic = readString$k(systemPrompt);
+  const dynamic = readString(systemPrompt);
   return dynamic ? `${dynamic}\n\n${SECTION_SYSTEM_PROMPT}` : SECTION_SYSTEM_PROMPT;
 }
 
@@ -236,37 +238,11 @@ function buildCompactPlanSummary(outputs) {
   }));
 }
 
-async function runWithConcurrency(items, limit, worker) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(Math.max(1, limit || 1), items.length);
-
-  await Promise.all(Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      try {
-        results[index] = {
-          status: "fulfilled",
-          value: await worker(items[index])
-        };
-      } catch (error) {
-        results[index] = {
-          reason: error,
-          status: "rejected"
-        };
-      }
-    }
-  }));
-
-  return results;
-}
-
 function normalizeSection(section, index) {
   const source = section && typeof section === "object" ? section : {};
   return {
-    prompt: readString$k(source.prompt),
-    title: readString$k(source.title) || `## Section ${index + 1}`
+    prompt: readString(source.prompt),
+    title: readString(source.title) || `## Section ${index + 1}`
   };
 }
 
@@ -279,9 +255,9 @@ function normalizeStitch(stitch) {
     followups: Array.isArray(source.followups)
       ? source.followups.filter((item) => typeof item === "string")
       : [],
-    intro_prompt: readString$k(source.intro_prompt),
-    outro_prompt: readString$k(source.outro_prompt),
-    provenance: readString$k(source.provenance),
+    intro_prompt: readString(source.intro_prompt),
+    outro_prompt: readString(source.outro_prompt),
+    provenance: readString(source.provenance),
     result_budget: normalizeResultBudget(source.result_budget)
   };
 }
@@ -325,10 +301,6 @@ function isDrillHint(value) {
     typeof value.match_header === "string" &&
     typeof value.label === "string" &&
     typeof value.prompt === "string";
-}
-
-function readString$k(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { synthesizePlanPerAction };

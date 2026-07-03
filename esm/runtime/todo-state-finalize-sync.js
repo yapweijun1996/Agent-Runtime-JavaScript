@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 // AI-first terminal Todo handling.
 //
 // History:
@@ -27,6 +29,7 @@
 //          `buildTodoStateBlockForCycle` skip rendering when
 //          `terminatedAt` is set, defensively at every render site.
 
+
 function observeTodoStateOnTerminal(runState, options = {}) {
   if (!runState || typeof runState !== "object") return false;
   const todoState = runState.todoState;
@@ -42,18 +45,18 @@ function observeTodoStateOnTerminal(runState, options = {}) {
   const activeItem = findActiveItem(todoState, items);
   const unfinishedCount = counts.active + counts.pending + counts.blocked;
   const observation = {
-    activeItemId: readString$18(activeItem && activeItem.id) || null,
-    activeItemLabel: readString$18(activeItem && activeItem.label) || null,
+    activeItemId: readString(activeItem && activeItem.id) || null,
+    activeItemLabel: readString(activeItem && activeItem.label) || null,
     counts,
     items: items.map((item) => ({
-      id: readString$18(item && item.id) || null,
-      label: readString$18(item && item.label) || null,
-      status: readString$18(item && item.status) || "pending"
+      id: readString(item && item.id) || null,
+      label: readString(item && item.label) || null,
+      status: readString(item && item.status) || "pending"
     })),
     observedAt,
     source,
     status: unfinishedCount > 0 ? "unfinished_at_terminal" : "already_terminal_or_complete",
-    todoStateStatus: readString$18(todoState.status) || null,
+    todoStateStatus: readString(todoState.status) || null,
     unfinishedCount
   };
   runState.todoTerminalObservation = observation;
@@ -96,16 +99,12 @@ function countStatuses(items) {
 }
 
 function findActiveItem(todoState, items) {
-  const activeItemId = readString$18(todoState && todoState.activeItemId);
+  const activeItemId = readString(todoState && todoState.activeItemId);
   if (activeItemId) {
     const byId = items.find((item) => item && item.id === activeItemId && item.status === "active");
     if (byId) return byId;
   }
   return items.find((item) => item && item.status === "active") || null;
-}
-
-function readString$18(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { observeTodoStateOnTerminal };

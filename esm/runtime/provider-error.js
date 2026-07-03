@@ -1,10 +1,4 @@
-const SECRET_PATTERNS = [
-  /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
-  /(?:sk|gm)-[A-Za-z0-9._~+/-]{3,}/g,
-  /gw_[A-Za-z0-9._~+/-]{6,}/g,
-  /\b(?:sk|gm|gw_|AIza)[A-Za-z0-9._~+/=-]{6,}\b/g
-];
-const SECRET_FIELD_PATTERN = /("(?:apiKey|authorization|Authorization|x-goog-api-key)"\s*:\s*")[^"]+(")/g;
+import { scrubSecretText } from './secret-redaction.js';
 
 function attachProviderError(error, providerHint) {
   const normalized = normalizeProviderError(error, providerHint);
@@ -39,7 +33,7 @@ function normalizeProviderError(value, providerHint) {
   if (!reason) return null;
 
   return {
-    cause: truncate$3(rawMessage || reason || "Provider request failed.", 300),
+    cause: truncate$2(rawMessage || reason || "Provider request failed.", 300),
     code: code || null,
     message: buildProviderErrorMessage(provider, reason),
     provider: provider || null,
@@ -192,16 +186,7 @@ function readMessage(value) {
   return String(value);
 }
 
-function scrubSecretText(value) {
-  let text = typeof value === "string" ? value : "";
-  for (const pattern of SECRET_PATTERNS) {
-    text = text.replace(pattern, "[redacted]");
-  }
-  text = text.replace(SECRET_FIELD_PATTERN, "$1[redacted]$2");
-  return text;
-}
-
-function truncate$3(value, maxChars) {
+function truncate$2(value, maxChars) {
   const text = typeof value === "string" ? value.trim() : "";
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(0, maxChars - 3))}...`;

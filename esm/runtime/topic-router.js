@@ -1,6 +1,7 @@
 import { tokenizeTopicText, DEFAULT_THREAD_ID } from '../session/thread.js';
 import { looksLikeTopicPrompt } from './topic-like-task.js';
 import { scoreThreads, anyThreadHasDistinctiveTokens } from './topic-scoring.js';
+import { readString } from './semantic-json.js';
 
 /**
  * Minimum Jaccard overlap required to treat a user message as a match
@@ -46,7 +47,7 @@ const PIVOT_MARKERS_FALLBACK = [
  * @param {object} [options.turnIntent] — optional intent hint from upstream
  *
  * @returns {{
- *   action: "continue_thread"|"new_thread"|"pivot_back"|"ambiguous",
+ *   action: "continue_thread"|"new_thread"|"pivot_back"|"cross_thread_recall"|"ambiguous",
  *   threadId: string|null,
  *   candidates: Array<{threadId:string, score:number}>,
  *   topic: string,
@@ -55,9 +56,9 @@ const PIVOT_MARKERS_FALLBACK = [
  */
 function routeTopic(options) {
   const source = options && typeof options === "object" ? options : {};
-  const text = readString$e(source.userMessage);
+  const text = readString(source.userMessage);
   const threads = Array.isArray(source.threads) ? source.threads.filter(Boolean) : [];
-  const activeThreadId = readString$e(source.activeThreadId) || null;
+  const activeThreadId = readString(source.activeThreadId) || null;
   const turnIntent = source.turnIntent && typeof source.turnIntent === "object" ? source.turnIntent : null;
 
   // Empty / missing input → stay on active (or default) thread.
@@ -101,6 +102,24 @@ function routeTopic(options) {
     // fall through to structural routing. Validator upstream already
     // dropped hallucinations, so reaching here means a race (thread
     // evicted). Conservative default covers us.
+  }
+
+  // AGRUN-593 — upstream recall intent: the turn references earlier
+  // conversation content (the user's name, a previous result) whose thread
+  // is unknown or spans topics, so no single-thread route can serve it. Stay
+  // on the active thread but tell the session layer to give THIS turn the
+  // whole-session view (threadScope null — the same pre-AGRUN-145 view the
+  // compaction layer already supports for cross-thread-recall sessions).
+  // Checked AFTER targetThreadId: a planner confident enough to name the
+  // fact-bearing thread gives better topic continuity than a broad recall.
+  if (turnIntent && turnIntent.recallIntent === true) {
+    return buildVerdict({
+      action: "cross_thread_recall",
+      threadId: activeThreadId || DEFAULT_THREAD_ID,
+      candidates: [],
+      topic: "",
+      reasoning: "upstream_recall_intent"
+    });
   }
 
   const tokens = new Set(tokenizeTopicText(text));
@@ -266,10 +285,6 @@ function buildVerdict(result) {
     topic: typeof result.topic === "string" ? result.topic : "",
     reasoning: typeof result.reasoning === "string" ? result.reasoning : ""
   };
-}
-
-function readString$e(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { routeTopic };

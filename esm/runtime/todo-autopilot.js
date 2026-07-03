@@ -1,3 +1,4 @@
+import { TODO_INSPECT_ACTION, TODO_PLAN_ACTION, ASK_CLARIFICATION_ACTION } from './action-names.js';
 import { normalizeActionProgressRules, normalizeFinalizationPattern, DEFAULT_ACTION_PROGRESS_RULES, DEFAULT_FINALIZATION_PATTERN } from './todo-autopilot-rules.js';
 import { isTodoShapedRun, readString } from './todo-detection.js';
 import { normalizeTodoPromptStrings, DEFAULT_TODO_PROMPT_STRINGS } from './todo-prompt-strings.js';
@@ -92,7 +93,7 @@ function maybeCreateTodoInspectLoopGuard(runState, config, context) {
   const normalized = normalizeTodoAutopilotConfig(config);
   if (!normalized.enabled) return null;
   const actionName = readString(context && context.actionName);
-  if (actionName !== "todo_inspect") return null;
+  if (actionName !== TODO_INSPECT_ACTION) return null;
 
   const history = Array.isArray(context && context.actionHistory) ? context.actionHistory : [];
   const consecutive = countTrailingInspects(history);
@@ -119,7 +120,7 @@ function countTrailingInspects(history) {
     // Only count actual inspects. Errors / hints / non-action entries
     // also break the streak — once anything else lands in history,
     // the planner is making forward progress.
-    if (entry.actionName === "todo_inspect" && entry.kind === "action") {
+    if (entry.actionName === TODO_INSPECT_ACTION && entry.kind === "action") {
       count += 1;
     } else {
       break;
@@ -165,9 +166,9 @@ function maybeCreateTodoPlanRequiredGuard(runState, config, context) {
 }
 
 function isTodoPlanningAction(actionName) {
-  return actionName === "todo_plan" ||
-    actionName === "todo_inspect" ||
-    actionName === "ask_clarification";
+  return actionName === TODO_PLAN_ACTION ||
+    actionName === TODO_INSPECT_ACTION ||
+    actionName === ASK_CLARIFICATION_ACTION;
 }
 
 export { maybeCreateTodoInspectLoopGuard, maybeCreateTodoPlanRequiredGuard, normalizeTodoAutopilotConfig, resetTodoAutopilotVetoOnProgress };

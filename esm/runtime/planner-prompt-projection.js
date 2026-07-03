@@ -21,8 +21,8 @@ function summarizeSearchResults(value, researchContext, options = {}) {
   const aggregated = Array.isArray(context.aggregatedSearchResults) ? context.aggregatedSearchResults : [];
   const source = results.length > 0 ? results : aggregated;
   const opts = options && typeof options === "object" ? options : {};
-  const maxResults = readPositiveInteger$o(opts.maxResults) || 5;
-  const snippetChars = readPositiveInteger$o(opts.snippetChars) || 360;
+  const maxResults = readPositiveInteger$m(opts.maxResults) || 5;
+  const snippetChars = readPositiveInteger$m(opts.snippetChars) || 360;
   return {
     count: source.length,
     lastQuery: readString(context.lastQuery) || null,
@@ -37,7 +37,7 @@ function summarizeObservationOutputForPrompt(output, options = {}) {
   const kind = readString(output.kind);
   if (kind === "web_search_result") {
     return {
-      count: readNumber$l(output.count),
+      count: readNumber$h(output.count),
       items: summarizeSearchResults(output.items, { lastQuery: output.lastExecutedQuery || output.query }, opts.searchResults).results,
       kind,
       lastExecutedQuery: readString(output.lastExecutedQuery) || null,
@@ -50,7 +50,7 @@ function summarizeObservationOutputForPrompt(output, options = {}) {
     };
   }
   if (kind === "read_url_result" || readString(output.url)) {
-    const readUrlPreviewChars = readPositiveInteger$o(opts.readUrlPreviewChars) || 1200;
+    const readUrlPreviewChars = readPositiveInteger$m(opts.readUrlPreviewChars) || 1200;
     return {
       error: readString(output.error) || null,
       kind: kind || "read_url_result",
@@ -66,7 +66,7 @@ function summarizeObservationOutputForPrompt(output, options = {}) {
     };
   }
   if (kind === "virtual_workspace_read") {
-    const wsReadPreviewChars = readPositiveInteger$o(opts.workspaceReadPreviewChars) || 2000;
+    const wsReadPreviewChars = readPositiveInteger$m(opts.workspaceReadPreviewChars) || 2000;
     const file = output.file && typeof output.file === "object" ? output.file : {};
     const content = typeof file.content === "string" ? file.content : "";
     return {
@@ -110,7 +110,7 @@ function summarizeSearchResult(item, index, snippetChars) {
   return {
     domain: readString(item.domain) || null,
     rank: typeof item.rank === "number" ? item.rank : index + 1,
-    score: readNumber$l(item.sourceScore) || readNumber$l(item.score) || null,
+    score: readNumber$h(item.sourceScore) || readNumber$h(item.score) || null,
     snippet: truncateForPrompt(snippet, snippetChars),
     title: truncateForPrompt(title, 160),
     url: url || null
@@ -122,7 +122,7 @@ function summarizeSearchPasses(value) {
   return passes.slice(-4).map((pass) => {
     if (!pass || typeof pass !== "object" || Array.isArray(pass)) return null;
     return {
-      count: readNumber$l(pass.count),
+      count: readNumber$h(pass.count),
       error: readString(pass.error) || null,
       kind: readString(pass.kind) || null,
       provider: readString(pass.provider) || null,
@@ -186,7 +186,7 @@ function summarizeWorkspaceMutationForPrompt(output, kind) {
 }
 
 function summarizeGenericOutputForPrompt(output, options = {}) {
-  const genericChars = readPositiveInteger$o(options.genericOutputChars) || 2000;
+  const genericChars = readPositiveInteger$m(options.genericOutputChars) || 2000;
   try {
     const text = JSON.stringify(output, null, 2);
     if (text.length <= genericChars) {
@@ -205,11 +205,11 @@ function truncateForPrompt(value, maxChars) {
   return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
 }
 
-function readNumber$l(value) {
+function readNumber$h(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function readPositiveInteger$o(value) {
+function readPositiveInteger$m(value) {
   return Number.isInteger(value) && value > 0 ? value : 0;
 }
 

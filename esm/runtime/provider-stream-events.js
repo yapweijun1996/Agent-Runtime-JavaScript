@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 function createProviderStreamEmitter(callback, context = {}) {
   return createRuntimeStreamEmitter(callback, context);
 }
@@ -71,24 +73,24 @@ function normalizeProviderStreamEvent(value) {
     : {};
   const type = normalizeType$1(source.type);
   const event = {
-    actionName: readString$13(source.actionName) || readString$13(context.actionName) || undefined,
-    callId: readString$13(source.callId) || readString$13(context.callId) || undefined,
-    control: readString$13(source.control) || undefined,
+    actionName: readString(source.actionName) || readString(context.actionName) || undefined,
+    callId: readString(source.callId) || readString(context.callId) || undefined,
+    control: readString(source.control) || undefined,
     delta: typeof source.delta === "string" ? source.delta : undefined,
     durationMs: Number.isFinite(source.durationMs) ? source.durationMs : undefined,
     error: typeof source.error === "string" ? source.error : undefined,
     final: source.final === true,
-    kind: readString$13(source.kind) || undefined,
-    model: readString$13(source.model) || readString$13(context.model) || null,
+    kind: readString(source.kind) || undefined,
+    model: readString(source.model) || readString(context.model) || null,
     preliminary: source.preliminary === true,
-    provider: readString$13(source.provider) || readString$13(context.provider) || null,
+    provider: readString(source.provider) || readString(context.provider) || null,
     resultCount: Number.isFinite(source.resultCount) ? source.resultCount : undefined,
     sequence: Number.isInteger(source.sequence) && source.sequence > 0 ? source.sequence : null,
-    skillName: readString$13(source.skillName) || undefined,
-    source: readString$13(source.source) || readString$13(context.source) || undefined,
-    status: readString$13(source.status) || undefined,
+    skillName: readString(source.skillName) || undefined,
+    source: readString(source.source) || readString(context.source) || undefined,
+    status: readString(source.status) || undefined,
     timestamp: Number.isFinite(source.timestamp) ? source.timestamp : Date.now(),
-    toolName: readString$13(source.toolName) || undefined,
+    toolName: readString(source.toolName) || undefined,
     type
   };
   return stripUndefined$1(event);
@@ -98,7 +100,7 @@ function normalizeProviderStreamEvent(value) {
 // (ADR-0055). The event `mode` field ("stream" vs "step"), not the spelling,
 // is what distinguishes the two surfaces.
 function normalizeType$1(value) {
-  const type = readString$13(value);
+  const type = readString(value);
   if (type === "provider-stream-start") return type;
   if (type === "provider-text-delta") return type;
   if (type === "provider-reasoning-delta") return type;
@@ -118,10 +120,6 @@ function stripUndefined$1(value) {
     if (entry !== undefined) output[key] = entry;
   }
   return output;
-}
-
-function readString$13(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createProviderStreamEmitter, createRuntimeStreamEmitter, normalizeProviderStreamEvent };

@@ -1,6 +1,10 @@
-import { isPublishProtocolRequiredActionForRepair, isWorkspaceRepairInspectionActionForRepair } from './terminal-repair-state.js';
+import { DEFAULT_FINAL_CANDIDATE_PATH } from './workspace-candidate-lifecycle.js';
+import { PUBLISH_DIRECT_ACTION } from './action-names.js';
+import { readStringArray, readString } from './semantic-json.js';
+import { isPublishProtocolRequiredActionForRepair, isWorkspaceRepairInspectionActionForRepair } from './terminal-repair/publish-contract.js';
 import { isEvidenceConvergenceRun } from './convergence-activation.js';
-import { PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
+import { evaluateActionPolicy } from './policy.js';
+import { resolveClosedNamespaceForAction } from './action-namespace-gate.js';
 
 const SKILL_SETUP_ACTION_NAMES = new Set([
   "list_agent_skills",
@@ -40,34 +44,60 @@ const SKILL_ACTION_NAMES = new Set([...SKILL_SETUP_ACTION_NAMES, DIRECT_TOOL_ACT
 // (executeWorkspacePublishCandidateAction) is unchanged and remains usable
 // when explicitly authorized.
 const WORKSPACE_PUBLISH_CANDIDATE = PUBLISH_DIRECT_ACTION;
+const WORKSPACE_REVIEW_CANDIDATE = "workspace_review_candidate";
 
 function selectPlannerActions(actions, options = {}) {
   const source = Array.isArray(actions) ? actions : [];
   const terminalRepair = resolveTerminalRepairState(options);
   const actionPatternConvergence = resolveActionPatternConvergence(options);
   const allowedRepairActions = terminalRepair && terminalRepair.active === true
-    ? new Set(readStringArray$2(terminalRepair.allowedActions))
+    ? new Set(readStringArray(terminalRepair.allowedActions))
     : null;
   const repeatedActionName = resolveRepeatedNoProgressActionName(actionPatternConvergence);
   const readOnlyPlanningForbiddenActions = resolveReadOnlyPlanningForbiddenActions(actionPatternConvergence);
   const structureRepairForbiddenActions = resolveStructureRepairForbiddenActions(actionPatternConvergence);
   const workspaceMutationGrowthForbiddenActions = resolveWorkspaceMutationGrowthForbiddenActions(actionPatternConvergence);
   const hideWorkspacePublishCandidate = shouldHideWorkspacePublishCandidateForMode(options);
+  const hideFreshWorkspaceReviewCandidate = shouldHideFreshWorkspaceReviewCandidate(options);
   const readyWorkspacePublishOnly = shouldConstrainToReadyWorkspacePublish(options);
 
   if (readyWorkspacePublishOnly) {
-    return source.filter((action) => readString$y(action && action.name) === WORKSPACE_PUBLISH_CANDIDATE);
+    return source.filter((action) => readString(action && action.name) === WORKSPACE_PUBLISH_CANDIDATE);
   }
 
   return source.filter((action) => {
-    const name = readString$y(action && action.name);
+    const name = readString(action && action.name);
     if (!name) {
       return false;
     }
 
-    // Hard-veto convergence signals override everything, including the repair allowlist.
-    // These only return non-null when escalation === "hard_veto", so advisory signals still
-    // defer to the repair allowlist below.
+    // AGRUN-588 — statically denied actions never reach the model surface.
+    // evaluateActionPolicy is args-independent (name + tier) and the
+    // permission judge can only escalate "allow", never rescue a "deny" — so
+    // a "deny" here is final for every possible call. Offering the tool
+    // anyway invited guaranteed-rejection cycles: deepseek batched
+    // [web_search, web_search] under policy deny and burned 3 cycles on
+    // action_policy_denied_in_plan in the 2026-07-03 live probe. Placed above
+    // the repair allowlist on purpose: no repair contract can authorize an
+    // action no approval can grant. Execution-side policy checks stay — a
+    // model can still hallucinate a tool name it was never offered.
+    if (evaluateActionPolicy(options.runtimeConfig && options.runtimeConfig.actionPolicy, action).action === "deny") {
+      return false;
+    }
+
+    // AGRUN-415 — the two resolvers ABOVE the terminal-repair allowlist
+    // early-return (readOnlyPlanning, workspaceMutationGrowth) override
+    // everything, INCLUDING that allowlist. To avoid clobbering the repair
+    // allowlist at advisory level, they each gate on escalation === "hard_veto"
+    // (so advisory signals fall through to the allowlist below). structureRepair
+    // is DIFFERENT BY DESIGN: it is evaluated AFTER the allowlist early-return,
+    // so it can never override the allowlist — and it intentionally forbids at
+    // its no-progress ACTIVATION threshold (advisory), not only at hard_veto,
+    // because forbidding the unproductive section-edit moves early is the whole
+    // point of activating. See resolveStructureRepairForbiddenActions and
+    // structure-repair-escalation-asymmetry.test.js. (Aligning structureRepair
+    // to a hard_veto gate would regress that loop-break — verified: it breaks
+    // planner-action-surface's "hides no-progress structure repair actions".)
     if (
       readOnlyPlanningForbiddenActions &&
       readOnlyPlanningForbiddenActions.has(name) &&
@@ -84,6 +114,21 @@ function selectPlannerActions(actions, options = {}) {
       return allowedRepairActions.has(name);
     }
 
+    // ADR-0057 Phase 1 — deferred-namespace subtraction: members of a closed
+    // namespace leave the per-cycle planner catalog, so the "Available
+    // actions" list, the args-examples envelope block, and every hasAction()
+    // gate in workspace/research/todo/skill-directives shrink for free —
+    // and re-appear the cycle after open_action_namespace runs. Placed BELOW
+    // the terminal-repair allowlist early-return above so an active repair
+    // contract keeps owning the surface (ADR-0057 §5; the gate predicate
+    // itself also auto-opens for repair contracts + evidence-convergence
+    // runs, keeping this filter and both dispatch doors consistent).
+    // Composes with disabledActions, which subtracted unconditionally
+    // upstream (action-loop-session.js) before this per-cycle filter runs.
+    if (resolveClosedNamespaceForAction(options.runState, options.runtimeConfig, name)) {
+      return false;
+    }
+
     if (repeatedActionName && name === repeatedActionName) {
       return false;
     }
@@ -93,6 +138,10 @@ function selectPlannerActions(actions, options = {}) {
     }
 
     if (hideWorkspacePublishCandidate && name === WORKSPACE_PUBLISH_CANDIDATE) {
+      return false;
+    }
+
+    if (hideFreshWorkspaceReviewCandidate && name === WORKSPACE_REVIEW_CANDIDATE) {
       return false;
     }
 
@@ -177,7 +226,7 @@ function shouldConstrainToReadyWorkspacePublish(options) {
     ? workspace.quality
     : null;
   if (!quality || quality.finalCandidateReady !== true) return false;
-  const path = readString$y(quality.finalCandidatePath) || "final_candidate.md";
+  const path = readString(quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
   const protocol = readPublishProtocol(workspace, path);
   if (!protocol || protocol.finalizedAfterLatestWrite !== true || protocol.readAfterLatestContentChange !== true) {
     return false;
@@ -186,11 +235,11 @@ function shouldConstrainToReadyWorkspacePublish(options) {
     return false;
   }
   const lastRead = quality.lastRead && typeof quality.lastRead === "object" ? quality.lastRead : null;
-  if (!lastRead || readString$y(lastRead.path) !== path) return false;
+  if (!lastRead || readString(lastRead.path) !== path) return false;
   const review = quality.candidateReview && typeof quality.candidateReview === "object"
     ? quality.candidateReview
     : null;
-  if (!review || readString$y(review.path) !== path || review.readyToPublish !== true) return false;
+  if (!review || readString(review.path) !== path || review.readyToPublish !== true) return false;
   if (readNumber$5(review.issueCount) > 0) return false;
   const signal = quality.candidateQualitySignal && typeof quality.candidateQualitySignal === "object"
     ? quality.candidateQualitySignal
@@ -199,11 +248,44 @@ function shouldConstrainToReadyWorkspacePublish(options) {
       : null;
   if (signal) {
     if (signal.hasBlockingIssues === true) return false;
-    if (readStringArray$2(signal.blockingIssueCodes).length > 0) return false;
-    const status = readString$y(signal.status);
+    if (readStringArray(signal.blockingIssueCodes).length > 0) return false;
+    const status = readString(signal.status);
     if (signal.ok !== true && status !== "pass") return false;
   }
   return true;
+}
+
+function shouldHideFreshWorkspaceReviewCandidate(options) {
+  const runState = options && options.runState && typeof options.runState === "object"
+    ? options.runState
+    : null;
+  if (!runState) return false;
+  const terminalRepair = resolveTerminalRepairState(options);
+  if (terminalRepair && terminalRepair.active === true) return false;
+  const workspace = runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
+    ? runState.virtualWorkspace
+    : null;
+  const quality = workspace && workspace.quality && typeof workspace.quality === "object"
+    ? workspace.quality
+    : null;
+  if (!workspace || !quality) return false;
+  const path = readString(quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
+  const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
+    ? workspace.files
+    : {};
+  const file = files[path] && typeof files[path] === "object" ? files[path] : null;
+  const review = quality.candidateReview && typeof quality.candidateReview === "object"
+    ? quality.candidateReview
+    : null;
+  if (!file || !review || readString(review.path) !== path) return false;
+  const fileVersion = readNumber$5(file.version);
+  if (fileVersion <= 0 || readNumber$5(review.fileVersion) !== fileVersion) return false;
+  const protocol = readPublishProtocol(workspace, path);
+  return Boolean(
+    protocol &&
+    protocol.reviewAfterLatestContentChange === true &&
+    protocol.reviewAfterRead === true
+  );
 }
 
 function readPublishProtocol(workspace, path) {
@@ -214,8 +296,8 @@ function readPublishProtocol(workspace, path) {
   let latestReviewIndex = -1;
   operations.forEach((operation, index) => {
     if (!operation || typeof operation !== "object") return;
-    if (readString$y(operation.path) !== path) return;
-    const action = readString$y(operation.action);
+    if (readString(operation.path) !== path) return;
+    const action = readString(operation.action);
     if (
       action === "write" ||
       action === "append" ||
@@ -268,14 +350,14 @@ function hasUnfinishedTodoState(runState) {
   }
   const items = Array.isArray(todo.items) ? todo.items : [];
   return items.some((item) => {
-    const status = readString$y(item && item.status);
+    const status = readString(item && item.status);
     return status && status !== "done" && status !== "completed" && status !== "abandoned" && status !== "cancelled";
   });
 }
 
 function shouldShowSkillSurface(actions) {
   return (Array.isArray(actions) ? actions : []).some((action) => {
-    const name = readString$y(action && action.name);
+    const name = readString(action && action.name);
     return SKILL_ACTION_NAMES.has(name);
   });
 }
@@ -315,9 +397,9 @@ function resolveRepeatedNoProgressActionName(value) {
     ? value.convergenceSignal
     : null;
   if (!signal) return "";
-  if (readString$y(signal.patternKind) !== "exact_action") return "";
-  if (readString$y(signal.forbiddenMove) !== "repeat_same_action_args") return "";
-  return readString$y(signal.actionName);
+  if (readString(signal.patternKind) !== "exact_action") return "";
+  if (readString(signal.forbiddenMove) !== "repeat_same_action_args") return "";
+  return readString(signal.actionName);
 }
 
 function resolveReadOnlyPlanningForbiddenActions(value) {
@@ -325,17 +407,30 @@ function resolveReadOnlyPlanningForbiddenActions(value) {
     ? value.readOnlyPlanningState
     : null;
   if (!state || state.active !== true) return null;
-  if (readString$y(state.escalation) !== "hard_veto") return null;
-  const forbiddenActions = readStringArray$2(state.forbiddenActions);
+  if (readString(state.escalation) !== "hard_veto") return null;
+  const forbiddenActions = readStringArray(state.forbiddenActions);
   return forbiddenActions.length > 0 ? new Set(forbiddenActions) : null;
 }
 
+// AGRUN-415 — DELIBERATELY no `escalation === "hard_veto"` gate, unlike the two
+// sibling resolvers. Those two sit ABOVE the terminal-repair allowlist
+// early-return in selectPlannerActions and would clobber it at advisory level,
+// so they gate on hard_veto. This resolver is consumed BELOW that early-return,
+// so it can never override the allowlist regardless of escalation — and the
+// structure-repair convergence intentionally populates forbiddenActions at its
+// no-progress ACTIVATION threshold (advisory, default 2), escalating the
+// `escalation` label to hard_veto only at the higher threshold (default 3).
+// Forbidding the unproductive section-edit moves starting at activation is the
+// purpose of activating; gating here on hard_veto would make the activation
+// threshold a no-op for the action surface. Pinned by
+// structure-repair-escalation-asymmetry.test.js + the long-standing
+// planner-action-surface "hides no-progress structure repair actions" case.
 function resolveStructureRepairForbiddenActions(value) {
   const state = value && value.structureRepairConvergence && typeof value.structureRepairConvergence === "object"
     ? value.structureRepairConvergence
     : null;
   if (!state || state.active !== true) return null;
-  const forbiddenActions = readStringArray$2(state.forbiddenActions);
+  const forbiddenActions = readStringArray(state.forbiddenActions);
   return forbiddenActions.length > 0 ? new Set(forbiddenActions) : null;
 }
 
@@ -344,22 +439,14 @@ function resolveWorkspaceMutationGrowthForbiddenActions(value) {
     ? value.workspaceMutationGrowthConvergence
     : null;
   if (!state || state.active !== true) return null;
-  if (readString$y(state.escalation) !== "hard_veto") return null;
-  const forbiddenActions = readStringArray$2(state.forbiddenActions);
+  if (readString(state.escalation) !== "hard_veto") return null;
+  const forbiddenActions = readStringArray(state.forbiddenActions);
   return forbiddenActions.length > 0 ? new Set(forbiddenActions) : null;
-}
-
-function readString$y(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function readNumber$5(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
-}
-
-function readStringArray$2(value) {
-  return Array.isArray(value) ? value.map(readString$y).filter(Boolean) : [];
 }
 
 export { isWorkspacePublishCandidateGatedForMode, selectPlannerActions, shouldShowSkillSurface };

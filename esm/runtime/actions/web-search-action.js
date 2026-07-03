@@ -4,6 +4,7 @@ import { normalizeSearchPassItems, aggregateRankedSearchResults, hasUsableSearch
 import { isConcreteArticleSource } from '../final-response-sources.js';
 import { createSearchVerification } from '../web-search-verification.js';
 import { withDeadline, DEFAULT_SEARCH_DEADLINE_MS } from '../../skills/providers/fetch-resilience.js';
+import { readString } from '../semantic-json.js';
 
 const webSearchAction = Object.freeze({
   description: "Search the web for current or factual information.",
@@ -16,18 +17,21 @@ const webSearchAction = Object.freeze({
       query: "...",
       strategy: "auto"
     },
+    // AGRUN-595 — provider/searchProvider removed from the MODEL-facing
+    // schema: the search backend is host configuration. Exposing a bare
+    // `provider: string` invited engine-name guesses ('bing', 'google',
+    // 'serpapi') that failed every call. Host-side request.searchProvider
+    // wiring is unaffected; the executor still honors known values.
     argsSchema: {
       deadlineMs: { type: "number" },
       limit: { type: "number" },
       maxPasses: { type: "number" },
-      provider: { type: "string" },
       query: { type: "string" },
-      searchProvider: { type: "string" },
       siteHints: { type: "array" },
       strategy: { type: "string" }
     },
     decisionType: "action",
-    guidance: "Use web_search for current, factual, or lookup requests that need outside information."
+    guidance: "Use web_search for current, factual, or lookup requests that need outside information. The search backend is preconfigured by the host — never pass a provider or engine name."
   },
   tier: 1,
   execute: executeWebSearchAction,
@@ -39,7 +43,7 @@ const webSearchAction = Object.freeze({
 });
 
 async function executeWebSearchAction(context, args) {
-  const originalQuery = readString$H(args && args.query) || readString$H(context.request && context.request.prompt);
+  const originalQuery = readString(args && args.query) || readString(context.request && context.request.prompt);
   const limit = readPositiveInteger$f(args && args.limit) || 5;
   const provider = readSearchProvider(context, args);
   const searchAuthMode = readSearchAuthMode(context, provider);
@@ -49,8 +53,8 @@ async function executeWebSearchAction(context, args) {
   const searchPlan = planWebSearch({
     maxPasses: readPositiveInteger$f(args && args.maxPasses) || readPositiveInteger$f(context.request && context.request.maxPasses),
     query: originalQuery,
-    siteHints: readStringArray$4(args && args.siteHints) || readStringArray$4(context.request && context.request.siteHints),
-    strategy: readString$H(args && args.strategy) || readString$H(context.request && context.request.strategy)
+    siteHints: readStringArray$2(args && args.siteHints) || readStringArray$2(context.request && context.request.siteHints),
+    strategy: readString(args && args.strategy) || readString(context.request && context.request.strategy)
   });
   const readSources = Array.isArray(context && context.runState && context.runState.researchContext && context.runState.researchContext.readSources)
     ? context.runState.researchContext.readSources
@@ -182,7 +186,7 @@ async function executeWebSearchAction(context, args) {
       } catch (error) {
         searchPasses.push({
           count: 0,
-          error: readString$H(error && error.message) || "Gemini grounding fallback failed.",
+          error: readString(error && error.message) || "Gemini grounding fallback failed.",
           items: [],
           kind: "grounding_fallback",
           provider: "gemini_grounding",
@@ -231,7 +235,7 @@ function shouldExecutePass(pass, searchPasses, verification) {
     return true;
   }
 
-  return searchPasses.length >= 2 && readString$H(verification && verification.state) === "none";
+  return searchPasses.length >= 2 && readString(verification && verification.state) === "none";
 }
 
 function shouldStopSearch(searchPlan, searchPasses, rankedItems, verification) {
@@ -248,7 +252,7 @@ function shouldStopSearch(searchPlan, searchPasses, rankedItems, verification) {
     searchPasses.length === 1 &&
     searchPlan.passes.some((pass) => pass && pass.kind === "exact_phrase")
   ) {
-    return readString$H(verification && verification.state) === "official_plus_secondary"
+    return readString(verification && verification.state) === "official_plus_secondary"
       || hasUsableSearchEvidence(rankedItems);
   }
 
@@ -260,7 +264,7 @@ function shouldStopSearch(searchPlan, searchPasses, rankedItems, verification) {
     return false;
   }
 
-  if (readString$H(verification && verification.state) === "official_plus_secondary") {
+  if (readString(verification && verification.state) === "official_plus_secondary") {
     return true;
   }
 
@@ -284,35 +288,46 @@ function hasConcreteArticleEvidence(items) {
 }
 
 function createGroundingFallbackQuery(query) {
-  const text = readString$H(query);
+  const text = readString(query);
   return text
     ? `${text} direct article sources`
     : "latest news direct article sources";
 }
 
 function readSearchProvider(context, args) {
-  const requestProvider = readString$H(context && context.request && context.request.searchProvider)
+  const requestProvider = readString(context && context.request && context.request.searchProvider)
     || (
       context &&
       context.request &&
       context.request.type === "web_search"
-        ? readString$H(context.request.provider)
+        ? readString(context.request.provider)
         : ""
     );
-  const requestedProvider = readString$H(args && (args.searchProvider || args.provider)) || requestProvider;
+  // AGRUN-595 — the search provider is HOST configuration, not a model
+  // decision. Models (live: gpt-5-mini) guess engine names ('bing',
+  // 'google', 'serpapi') into the args field; trusting them verbatim made
+  // searchWeb throw "Unsupported web search provider" before any fetch, and
+  // the model concluded the tool itself was broken (clarification loops /
+  // "search tool is failing" — the AGRUN-596 'variance' was this bug's
+  // probability of the model filling the field). Only KNOWN provider values
+  // are honored from args; anything else falls through to host config.
+  const KNOWN_SEARCH_PROVIDERS = new Set(["searxng", "gemini_grounding"]);
+  const argsProvider = readString(args && (args.searchProvider || args.provider));
+  const requestedProvider = (argsProvider && KNOWN_SEARCH_PROVIDERS.has(argsProvider) ? argsProvider : "")
+    || requestProvider;
 
   if (requestedProvider && requestedProvider !== "web_search") {
     return requestedProvider;
   }
 
-  const hasSearxngEndpoint = !!readString$H(context && context.webSearchEndpoint);
+  const hasSearxngEndpoint = !!readString(context && context.webSearchEndpoint);
   if (hasSearxngEndpoint) {
     return "searxng";
   }
 
   const hasGeminiApiKey = !!(
-    readString$H(context && context.request && context.request.webSearchApiKey)
-    || readString$H(context && context.request && context.request.apiKey)
+    readString(context && context.request && context.request.webSearchApiKey)
+    || readString(context && context.request && context.request.apiKey)
   );
   if (hasGeminiApiKey) {
     return "gemini_grounding";
@@ -331,14 +346,14 @@ function readSearchApiKey(context, provider) {
   }
 
   const request = context && context.request;
-  const explicitSearchKey = readString$H(request && request.webSearchApiKey);
+  const explicitSearchKey = readString(request && request.webSearchApiKey);
   if (explicitSearchKey) {
     return explicitSearchKey;
   }
 
-  const requestedSearchProvider = readString$H(request && (request.searchProvider || request.provider));
-  if (requestedSearchProvider === "gemini_grounding" || readString$H(request && request.type) === "web_search") {
-    return readString$H(request && request.apiKey);
+  const requestedSearchProvider = readString(request && (request.searchProvider || request.provider));
+  if (requestedSearchProvider === "gemini_grounding" || readString(request && request.type) === "web_search") {
+    return readString(request && request.apiKey);
   }
 
   return "";
@@ -346,17 +361,17 @@ function readSearchApiKey(context, provider) {
 
 function readSearchEndpoint(context, provider, authMode) {
   if (provider === "searxng") {
-    return readString$H(context && context.webSearchEndpoint);
+    return readString(context && context.webSearchEndpoint);
   }
 
   const request = context && context.request;
   if (authMode === "server") {
-    return readString$H(request && request.webSearchEndpoint)
-      || (request && request.type === "web_search" ? readString$H(request.endpoint) : "");
+    return readString(request && request.webSearchEndpoint)
+      || (request && request.type === "web_search" ? readString(request.endpoint) : "");
   }
 
-  return readString$H(request && request.webSearchEndpoint)
-    || readString$H(request && request.endpoint);
+  return readString(request && request.webSearchEndpoint)
+    || readString(request && request.endpoint);
 }
 
 function readSearchModel(context, provider) {
@@ -365,14 +380,14 @@ function readSearchModel(context, provider) {
   }
 
   const request = context && context.request;
-  const explicitSearchModel = readString$H(request && request.webSearchModel);
+  const explicitSearchModel = readString(request && request.webSearchModel);
   if (explicitSearchModel) {
     return explicitSearchModel;
   }
 
-  const requestedSearchProvider = readString$H(request && (request.searchProvider || request.provider));
-  if (requestedSearchProvider === "gemini_grounding" || readString$H(request && request.type) === "web_search") {
-    return readString$H(request && request.model);
+  const requestedSearchProvider = readString(request && (request.searchProvider || request.provider));
+  if (requestedSearchProvider === "gemini_grounding" || readString(request && request.type) === "web_search") {
+    return readString(request && request.model);
   }
 
   return "";
@@ -384,13 +399,9 @@ function readSearchAuthMode(context, provider) {
   }
 
   const request = context && context.request;
-  const value = readString$H(request && request.webSearchAuthMode)
-    || readString$H(request && request.authMode);
+  const value = readString(request && request.webSearchAuthMode)
+    || readString(request && request.authMode);
   return value === "server" ? "server" : "client";
-}
-
-function readString$H(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function readPositiveInteger$f(value) {
@@ -399,9 +410,9 @@ function readPositiveInteger$f(value) {
     : null;
 }
 
-function readStringArray$4(value) {
+function readStringArray$2(value) {
   return Array.isArray(value)
-    ? value.map((item) => readString$H(item)).filter(Boolean)
+    ? value.map((item) => readString(item)).filter(Boolean)
     : null;
 }
 

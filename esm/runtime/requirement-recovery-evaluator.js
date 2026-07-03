@@ -1,21 +1,22 @@
 import { readStatsKeyForUnit, readTerminalContractText, extractRequestedLengthContract } from './terminal-final-contract.js';
+import { WORKSPACE_INSERT_AFTER_SECTION_ACTION, WORKSPACE_MULTI_EDIT_ACTION, WORKSPACE_PROPOSE_PATCH_ACTION, WORKSPACE_WRITE_ACTION, WEB_SEARCH_ACTION, READ_URL_ACTION, WORKSPACE_REPLACE_ACTION, WORKSPACE_READ_ACTION, FINALIZE_CANDIDATE_ACTION, PUBLISH_DIRECT_ACTION } from './action-names.js';
 import { cloneValue } from './utils.js';
-import { FINALIZE_CANDIDATE_ACTION, PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
 import { readWorkspaceFinalCandidate } from './virtual-workspace.js';
+import { readString } from './semantic-json.js';
+import { lowCycleRemainingThreshold } from './cycle-budget.js';
 
 const WORKSPACE_RECOVERY_ACTIONS = new Set(["append", "insert_after_section", "replace"]);
 const WORKSPACE_ACTION_NAMES = new Set([
-  "workspace_insert_after_section",
-  "workspace_replace",
-  "workspace_write",
-  "workspace_read",
+  WORKSPACE_INSERT_AFTER_SECTION_ACTION,
+  WORKSPACE_REPLACE_ACTION,
+  WORKSPACE_WRITE_ACTION,
+  WORKSPACE_READ_ACTION,
   FINALIZE_CANDIDATE_ACTION
 ]);
-const SOURCE_ACTION_NAMES = new Set(["web_search", "read_url"]);
+const SOURCE_ACTION_NAMES = new Set([WEB_SEARCH_ACTION, READ_URL_ACTION]);
 const TERMINAL_ACTION_NAMES = new Set([PUBLISH_DIRECT_ACTION, "finalize"]);
 const SOURCE_RECOVERY_STATUSES = new Set(["retryable_failure", "needs_alternate_source", "source_blocked"]);
 const REPEATED_INVALID_TERMINAL_THRESHOLD = 2;
-const LOW_CYCLE_REMAINING_THRESHOLD = 10;
 const WORKSPACE_LOW_BUDGET_RATIO = 0.8;
 
 function createRequirementRecoveryEvaluatorState() {
@@ -51,7 +52,7 @@ function evaluateRequirementRecovery(runState, context = {}) {
   const previous = normalizeRequirementRecoveryEvaluatorState(context.previous || runState && runState.requirementRecoveryEvaluator);
   const candidate = readCandidateSnapshot(runState);
   const requestedLength = readRequestedLengthSnapshot(runState, context);
-  const sourceMinimum = readSourceMinimum$1(runState);
+  const sourceMinimum = readSourceMinimum(runState);
   const readUrlRecoverySignal = readReadUrlRecoverySignalSnapshot(runState);
   const workspaceSignals = readWorkspaceRecoverySignals(runState, candidate);
   const sourceSignals = readSourceRecoverySignals(runState, readUrlRecoverySignal);
@@ -72,8 +73,8 @@ function evaluateRequirementRecovery(runState, context = {}) {
   ) {
     recoverableDeficits.push({
       allowedNextMoves: workspaceSignals.expansionAttempted
-        ? ["workspace_insert_after_section", "workspace_multi_edit", "workspace_propose_patch"]
-        : ["workspace_write", "workspace_insert_after_section"],
+        ? [WORKSPACE_INSERT_AFTER_SECTION_ACTION, WORKSPACE_MULTI_EDIT_ACTION, WORKSPACE_PROPOSE_PATCH_ACTION]
+        : [WORKSPACE_WRITE_ACTION, WORKSPACE_INSERT_AFTER_SECTION_ACTION],
       deficit: deficits.lengthDeficit,
       dimension: "length",
       observed: deficits.lengthObserved,
@@ -176,7 +177,7 @@ function evaluateRequirementRecovery(runState, context = {}) {
     lastObservableDeficits: deficits,
     convergence,
     nextMoveContract,
-    updatedAtCycle: readNullableNumber$4(runState.cycleCount),
+    updatedAtCycle: readNullableNumber$3(runState.cycleCount),
     version: 1
   };
 }
@@ -186,52 +187,52 @@ function summarizeRequirementRecoveryEvaluator(value) {
   const deficits = Array.isArray(value.recoverableDeficits)
     ? value.recoverableDeficits.map((entry) => ({
         allowedNextMoves: Array.isArray(entry.allowedNextMoves)
-          ? entry.allowedNextMoves.map(readString$1B).filter(Boolean).slice(0, 6)
+          ? entry.allowedNextMoves.map(readString).filter(Boolean).slice(0, 6)
           : [],
-        deficit: readNullableNumber$4(entry.deficit),
-        dimension: readString$1B(entry.dimension) || "requirement",
+        deficit: readNullableNumber$3(entry.deficit),
+        dimension: readString(entry.dimension) || "requirement",
         observed: cloneValue(entry.observed),
         recoverable: entry.recoverable === true,
-        requiredAttempt: readString$1B(entry.requiredAttempt) || null,
+        requiredAttempt: readString(entry.requiredAttempt) || null,
         target: cloneValue(entry.target),
-        unit: readString$1B(entry.unit) || null,
-        whyRecoverable: readString$1B(entry.whyRecoverable) || null
+        unit: readString(entry.unit) || null,
+        whyRecoverable: readString(entry.whyRecoverable) || null
       })).slice(0, 6)
     : [];
   return {
     kind: "requirement_recovery_evaluator",
-    status: readString$1B(value.status) || "tracking",
+    status: readString(value.status) || "tracking",
     recoverableDeficits: deficits,
     validLimitedAllowed: value.validLimitedAllowed !== false,
     requiredAttemptBeforeLimited: Array.isArray(value.requiredAttemptBeforeLimited)
-      ? value.requiredAttemptBeforeLimited.map(readString$1B).filter(Boolean).slice(0, 6)
+      ? value.requiredAttemptBeforeLimited.map(readString).filter(Boolean).slice(0, 6)
       : [],
     forbiddenMoves: Array.isArray(value.forbiddenMoves)
-      ? value.forbiddenMoves.map(readString$1B).filter(Boolean).slice(0, 6)
+      ? value.forbiddenMoves.map(readString).filter(Boolean).slice(0, 6)
       : [],
     recoverySignals: value.recoverySignals && typeof value.recoverySignals === "object"
       ? {
           source: Array.isArray(value.recoverySignals.source)
-            ? value.recoverySignals.source.map(readString$1B).filter(Boolean).slice(0, 8)
+            ? value.recoverySignals.source.map(readString).filter(Boolean).slice(0, 8)
             : [],
           workspace: Array.isArray(value.recoverySignals.workspace)
-            ? value.recoverySignals.workspace.map(readString$1B).filter(Boolean).slice(0, 8)
+            ? value.recoverySignals.workspace.map(readString).filter(Boolean).slice(0, 8)
             : []
         }
       : { source: [], workspace: [] },
     lastCandidateStats: value.lastCandidateStats && typeof value.lastCandidateStats === "object"
       ? {
-          chars: readNullableNumber$4(value.lastCandidateStats.chars),
-          cjkChars: readNullableNumber$4(value.lastCandidateStats.cjkChars),
-          path: readString$1B(value.lastCandidateStats.path) || null,
-          words: readNullableNumber$4(value.lastCandidateStats.words)
+          chars: readNullableNumber$3(value.lastCandidateStats.chars),
+          cjkChars: readNullableNumber$3(value.lastCandidateStats.cjkChars),
+          path: readString(value.lastCandidateStats.path) || null,
+          words: readNullableNumber$3(value.lastCandidateStats.words)
         }
       : null,
     lastObservableDeficits: value.lastObservableDeficits && typeof value.lastObservableDeficits === "object"
       ? cloneValue(value.lastObservableDeficits)
       : null,
     convergence: summarizeRequirementRecoveryConvergence(value.convergence),
-    nextMoveContract: readString$1B(value.nextMoveContract) || null
+    nextMoveContract: readString(value.nextMoveContract) || null
   };
 }
 
@@ -239,7 +240,7 @@ function inspectLimitedRecoveryReadiness(runState, context = {}) {
   const finalReadiness = context.finalReadiness && typeof context.finalReadiness === "object"
     ? context.finalReadiness
     : null;
-  if (!finalReadiness || readString$1B(finalReadiness.decision) !== "limited") {
+  if (!finalReadiness || readString(finalReadiness.decision) !== "limited") {
     return { ok: true, evaluator: evaluateRequirementRecovery(runState, context) };
   }
   const evaluator = evaluateRequirementRecovery(runState, context);
@@ -268,14 +269,15 @@ function shouldAllowTerminalRepairLimited({ convergence, recoverableDeficits, ru
     : null;
   if (!repair || repair.active !== true) return false;
   if (!Array.isArray(recoverableDeficits) || recoverableDeficits.length === 0) return false;
-  const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString$1B(entry && entry.dimension)).filter(Boolean)));
+  const dimensions = Array.from(new Set(recoverableDeficits.map((entry) => readString(entry && entry.dimension)).filter(Boolean)));
   if (dimensions.includes("source")) return false;
   if (dimensions.some((dimension) => dimension !== "length")) return false;
   if (!workspaceSignals || workspaceSignals.expansionAttempted !== true) return false;
   const normalized = normalizeRequirementRecoveryConvergenceState(convergence);
   const lengthState = normalized.dimensionStates.length;
   return normalized.budgetState === "exhausted" ||
-    readNumber$f(lengthState.repeatedNoProgressCount) >= 2;
+    readNumber$d(lengthState.repeatedRegressionCount) >= 1 ||
+    readNumber$d(lengthState.repeatedNoProgressCount) >= 2;
 }
 
 function buildNextMoveContract({ convergence, recoverableDeficits, requiredAttemptBeforeLimited, validLimitedAllowed }) {
@@ -297,13 +299,20 @@ function buildNextMoveContract({ convergence, recoverableDeficits, requiredAttem
     recoverableDeficits.flatMap((entry) => Array.isArray(entry.allowedNextMoves) ? entry.allowedNextMoves : [])
   ));
   const terminalWarning = convergence &&
-    readNumber$f(convergence.repeatedInvalidTerminalCount) >= REPEATED_INVALID_TERMINAL_THRESHOLD
+    readNumber$d(convergence.repeatedInvalidTerminalCount) >= REPEATED_INVALID_TERMINAL_THRESHOLD
     ? "Repeated workspace_publish_candidate/finalize attempts produced no observable requirement progress. Do not publish again until source or length facts improve, or validLimitedAllowed becomes true."
+    : "";
+  const lengthState = convergence && convergence.dimensionStates && convergence.dimensionStates.length
+    ? convergence.dimensionStates.length
+    : null;
+  const regressionWarning = readNumber$d(lengthState && lengthState.repeatedRegressionCount) > 0
+    ? "Candidate length regressed during recovery. Do not use broad rewrites that shrink the selected candidate; use additive repair or publish valid limited when recovery is exhausted."
     : "";
   return [
     `Recoverable deficits remain: ${deficitText}.`,
     `Before limited, perform: ${requiredAttemptBeforeLimited.join(", ") || "recovery work"}.`,
     `Allowed next moves: ${moves.join(", ") || "continue recovery work"}.`,
+    regressionWarning,
     terminalWarning,
     "Do not clean ready or limited_without_recovery_attempt while these deficits are recoverable."
   ].join(" ");
@@ -329,8 +338,11 @@ function createDimensionState(dimension) {
     dimension,
     exhausted: false,
     lastEffectiveAction: null,
+    lastRegressionAction: null,
     lastObserved: null,
     progressCount: 0,
+    regressionCount: 0,
+    repeatedRegressionCount: 0,
     repeatedNoProgressCount: 0
   };
 }
@@ -350,7 +362,7 @@ function buildRequirementRecoveryConvergence({
   workspaceSignals
 }) {
   const previousConvergence = normalizeRequirementRecoveryConvergenceState(previous && previous.convergence);
-  const actionName = readString$1B(context && context.actionName);
+  const actionName = readString(context && context.actionName);
   const finalReadiness = readFinalReadiness(context);
   const sourceRecoverable = recoverableDeficits.some((entry) => entry.dimension === "source");
   const lengthRecoverable = recoverableDeficits.some((entry) => entry.dimension === "length");
@@ -359,6 +371,7 @@ function buildRequirementRecoveryConvergence({
   const validLimited = isValidLimitedWithConcreteGaps(finalReadiness, deficits);
   const sourceProgress = hasSourceProgress(previousConvergence.dimensionStates.source, sourceObserved, validLimited);
   const lengthProgress = hasLengthProgress(previousConvergence.dimensionStates.length, lengthObserved, validLimited);
+  const lengthRegression = hasLengthRegression(previousConvergence.dimensionStates.length, lengthObserved);
   const sourceState = updateDimensionState({
     actionName,
     dimension: "source",
@@ -366,6 +379,7 @@ function buildRequirementRecoveryConvergence({
     observed: sourceObserved,
     previous: previousConvergence.dimensionStates.source,
     progress: sourceProgress,
+    regression: false,
     recoverable: sourceRecoverable,
     exhausted: sourceHasDeficit(deficits) && !sourceRecoverable && !isSourceDeficitRecoverable(readUrlRecoverySignal, sourceSignals)
   });
@@ -376,6 +390,7 @@ function buildRequirementRecoveryConvergence({
     observed: lengthObserved,
     previous: previousConvergence.dimensionStates.length,
     progress: lengthProgress,
+    regression: lengthRegression,
     recoverable: lengthRecoverable,
     exhausted: deficits.lengthDeficit > 0 && !lengthRecoverable && !isWorkspaceDeficitRecoverable(runState, candidate, workspaceSignals, context)
   });
@@ -387,7 +402,7 @@ function buildRequirementRecoveryConvergence({
     : hasAnyProgress
       ? 0
       : previousConvergence.repeatedInvalidTerminalCount;
-  const budgetState = readBudgetState$1(runState, candidate, context);
+  const budgetState = readBudgetState(runState, candidate, context);
   const recommendedContract = readRecommendedContract({
     budgetState,
     repeatedInvalidTerminalCount,
@@ -410,15 +425,21 @@ function buildRequirementRecoveryConvergence({
             : "Terminal action was attempted while recoverable deficits remained."
         }
       : null,
-    updatedAtCycle: readNullableNumber$4(runState && runState.cycleCount)
+    updatedAtCycle: readNullableNumber$3(runState && runState.cycleCount)
   };
 }
 
-function updateDimensionState({ actionName, dimension, exhausted, isAttemptAction, observed, previous, progress, recoverable }) {
+function updateDimensionState({ actionName, dimension, exhausted, isAttemptAction, observed, previous, progress, regression, recoverable }) {
   const state = normalizeDimensionState(previous, dimension);
   const hasActiveDeficit = recoverable || exhausted;
   const attempts = isAttemptAction && hasActiveDeficit ? state.attempts + 1 : state.attempts;
   const progressCount = progress ? state.progressCount + 1 : state.progressCount;
+  const regressionCount = regression ? state.regressionCount + 1 : state.regressionCount;
+  const repeatedRegressionCount = regression
+    ? state.repeatedRegressionCount + 1
+    : progress
+      ? 0
+      : state.repeatedRegressionCount;
   const repeatedNoProgressCount = progress
     ? 0
     : isAttemptAction && hasActiveDeficit
@@ -429,8 +450,11 @@ function updateDimensionState({ actionName, dimension, exhausted, isAttemptActio
     dimension,
     exhausted: exhausted === true,
     lastEffectiveAction: progress ? actionName || state.lastEffectiveAction : state.lastEffectiveAction,
+    lastRegressionAction: regression ? actionName || state.lastRegressionAction : state.lastRegressionAction,
     lastObserved: cloneValue(observed),
     progressCount,
+    regressionCount,
+    repeatedRegressionCount,
     repeatedNoProgressCount
   };
 }
@@ -439,21 +463,21 @@ function readSourceObservedSnapshot(runState, sourceMinimum, deficits) {
   return {
     passed: sourceMinimum ? sourceMinimum.passed === true : null,
     readSourceDeficit: deficits.readSourceDeficit,
-    readSources: sourceMinimum ? readNumber$f(sourceMinimum.readSources) : null,
+    readSources: sourceMinimum ? readNumber$d(sourceMinimum.readSources) : null,
     relevantSourceDeficit: deficits.relevantSourceDeficit,
-    relevantSources: sourceMinimum ? readNumber$f(sourceMinimum.relevantSources) : null,
-    successfulReadUrlCount: readSuccessfulReadUrlCount$1(runState)
+    relevantSources: sourceMinimum ? readNumber$d(sourceMinimum.relevantSources) : null,
+    successfulReadUrlCount: readSuccessfulReadUrlCount(runState)
   };
 }
 
 function readLengthObservedSnapshot(candidate, requestedLength, deficits) {
   return {
-    chars: candidate ? readNumber$f(candidate.chars) : null,
-    cjkChars: candidate ? readNumber$f(candidate.cjkChars) : null,
+    chars: candidate ? readNumber$d(candidate.chars) : null,
+    cjkChars: candidate ? readNumber$d(candidate.cjkChars) : null,
     deficit: deficits.lengthDeficit,
     requested: requestedLength && Number.isFinite(requestedLength.value) ? requestedLength.value : null,
-    unit: requestedLength ? readString$1B(requestedLength.unit) || null : null,
-    words: candidate ? readNumber$f(candidate.words) : null
+    unit: requestedLength ? readString(requestedLength.unit) || null : null,
+    words: candidate ? readNumber$d(candidate.words) : null
   };
 }
 
@@ -464,9 +488,9 @@ function hasSourceProgress(previousState, observed, validLimited) {
   if (!previous) return false;
   if (validLimited && sourceObservedHasDeficit(observed)) return true;
   if (observed.passed === true && previous.passed !== true) return true;
-  if (readNumber$f(observed.successfulReadUrlCount) > readNumber$f(previous.successfulReadUrlCount)) return true;
-  if (readNumber$f(observed.readSources) > readNumber$f(previous.readSources)) return true;
-  if (readNumber$f(observed.relevantSources) > readNumber$f(previous.relevantSources)) return true;
+  if (readNumber$d(observed.successfulReadUrlCount) > readNumber$d(previous.successfulReadUrlCount)) return true;
+  if (readNumber$d(observed.readSources) > readNumber$d(previous.readSources)) return true;
+  if (readNumber$d(observed.relevantSources) > readNumber$d(previous.relevantSources)) return true;
   return false;
 }
 
@@ -475,26 +499,55 @@ function hasLengthProgress(previousState, observed, validLimited) {
     ? previousState.lastObserved
     : null;
   if (!previous) return false;
-  if (validLimited && readNumber$f(observed.deficit) > 0) return true;
-  if (readNumber$f(observed.deficit) === 0 && readNumber$f(previous.deficit) > 0) return true;
-  if (readNumber$f(observed.words) > readNumber$f(previous.words)) return true;
-  if (readNumber$f(observed.chars) > readNumber$f(previous.chars)) return true;
-  if (readNumber$f(observed.cjkChars) > readNumber$f(previous.cjkChars)) return true;
+  if (validLimited && readNumber$d(observed.deficit) > 0) return true;
+  if (readNumber$d(observed.deficit) === 0 && readNumber$d(previous.deficit) > 0) return true;
+  if (readNumber$d(observed.words) > readNumber$d(previous.words)) return true;
+  if (readNumber$d(observed.chars) > readNumber$d(previous.chars)) return true;
+  if (readNumber$d(observed.cjkChars) > readNumber$d(previous.cjkChars)) return true;
   return false;
 }
 
+function hasLengthRegression(previousState, observed) {
+  const previous = previousState && previousState.lastObserved && typeof previousState.lastObserved === "object"
+    ? previousState.lastObserved
+    : null;
+  if (!previous) return false;
+  const requested = readNumber$d(observed && observed.requested) || readNumber$d(previous.requested);
+  const previousObserved = readNumber$d(previous.words) || readNumber$d(previous.chars) || readNumber$d(previous.cjkChars);
+  const currentObserved = readNumber$d(observed && observed.words) || readNumber$d(observed && observed.chars) || readNumber$d(observed && observed.cjkChars);
+  const activeDeficit = requested > 0 && currentObserved > 0 && currentObserved < requested;
+  const nearOrAboveTargetBefore = requested > 0 && previousObserved >= Math.floor(requested * 0.95);
+  if (isMaterialRegression(previous.words, observed && observed.words, 100)) {
+    return activeDeficit || nearOrAboveTargetBefore || readNumber$d(previous.words) >= 1000;
+  }
+  if (isMaterialRegression(previous.chars, observed && observed.chars, 600)) {
+    return activeDeficit || nearOrAboveTargetBefore || readNumber$d(previous.chars) >= 6000;
+  }
+  if (isMaterialRegression(previous.cjkChars, observed && observed.cjkChars, 250)) {
+    return activeDeficit || nearOrAboveTargetBefore || readNumber$d(previous.cjkChars) >= 2500;
+  }
+  return false;
+}
+
+function isMaterialRegression(previous, current, floor) {
+  const before = readNumber$d(previous);
+  const after = readNumber$d(current);
+  if (!before || after >= before) return false;
+  return before - after >= floor && after <= Math.floor(before * 0.9);
+}
+
 function sourceObservedHasDeficit(observed) {
-  return readNumber$f(observed && observed.readSourceDeficit) > 0 ||
-    readNumber$f(observed && observed.relevantSourceDeficit) > 0;
+  return readNumber$d(observed && observed.readSourceDeficit) > 0 ||
+    readNumber$d(observed && observed.relevantSourceDeficit) > 0;
 }
 
 function sourceHasDeficit(deficits) {
-  return readNumber$f(deficits && deficits.readSourceDeficit) > 0 ||
-    readNumber$f(deficits && deficits.relevantSourceDeficit) > 0;
+  return readNumber$d(deficits && deficits.readSourceDeficit) > 0 ||
+    readNumber$d(deficits && deficits.relevantSourceDeficit) > 0;
 }
 
-function readSuccessfulReadUrlCount$1(runState) {
-  const packet = readAcceptancePacket$1(runState);
+function readSuccessfulReadUrlCount(runState) {
+  const packet = readAcceptancePacket(runState);
   const packetCount = packet && packet.evidence && Number.isFinite(Number(packet.evidence.successfulReadUrlCount))
     ? Number(packet.evidence.successfulReadUrlCount)
     : null;
@@ -502,7 +555,7 @@ function readSuccessfulReadUrlCount$1(runState) {
   const readSources = runState && runState.researchContext && Array.isArray(runState.researchContext.readSources)
     ? runState.researchContext.readSources
     : [];
-  return readSources.filter((source) => source && (source.ok === true || readNumber$f(source.status) >= 200 && readNumber$f(source.status) < 300)).length;
+  return readSources.filter((source) => source && (source.ok === true || readNumber$d(source.status) >= 200 && readNumber$d(source.status) < 300)).length;
 }
 
 function readFinalReadiness(context) {
@@ -514,45 +567,47 @@ function readFinalReadiness(context) {
 }
 
 function isValidLimitedWithConcreteGaps(finalReadiness, deficits) {
-  if (!finalReadiness || readString$1B(finalReadiness.decision) !== "limited") return false;
+  if (!finalReadiness || readString(finalReadiness.decision) !== "limited") return false;
   const assessment = finalReadiness.requirementsAssessment &&
     typeof finalReadiness.requirementsAssessment === "object"
     ? finalReadiness.requirementsAssessment
     : finalReadiness;
   const gaps = Array.isArray(assessment.remainingGaps)
-    ? assessment.remainingGaps.map(readString$1B).filter(Boolean)
+    ? assessment.remainingGaps.map(readString).filter(Boolean)
     : Array.isArray(finalReadiness.remainingGaps)
-      ? finalReadiness.remainingGaps.map(readString$1B).filter(Boolean)
+      ? finalReadiness.remainingGaps.map(readString).filter(Boolean)
       : [];
   if (gaps.length === 0) return false;
   if (sourceHasDeficit(deficits) && assessment.evidenceSatisfied !== false) return false;
-  if (readNumber$f(deficits.lengthDeficit) > 0 && assessment.lengthSatisfied !== false) return false;
-  if ((sourceHasDeficit(deficits) || readNumber$f(deficits.lengthDeficit) > 0) && assessment.requirementSatisfied !== false) return false;
+  if (readNumber$d(deficits.lengthDeficit) > 0 && assessment.lengthSatisfied !== false) return false;
+  if ((sourceHasDeficit(deficits) || readNumber$d(deficits.lengthDeficit) > 0) && assessment.requirementSatisfied !== false) return false;
   return true;
 }
 
 function isBlockedTerminalOutput(output) {
   if (!output || typeof output !== "object") return false;
-  const kind = readString$1B(output.kind);
-  const status = readString$1B(output.status);
-  const control = readString$1B(output.control);
+  const kind = readString(output.kind);
+  const status = readString(output.status);
+  const control = readString(output.control);
   if (kind.includes("blocked") || kind.includes("continuation")) return true;
   if (status === "blocked" || status === "error" || status === "continue") return true;
   return control === "continue";
 }
 
-function readBudgetState$1(runState, candidate, context) {
+function readBudgetState(runState, candidate, context) {
   const cyclesRemaining = readCyclesRemaining(runState);
+  const maxSteps = readNullableNumber$3(runState && runState.maxSteps);
   const limits = readWorkspaceRecoveryLimits(context);
   const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
     ? runState.virtualWorkspace
     : null;
   const operationCount = workspace && Array.isArray(workspace.operations) ? workspace.operations.length : 0;
-  const chars = candidate ? readNumber$f(candidate.chars) : 0;
+  const chars = candidate ? readNumber$d(candidate.chars) : 0;
   if (cyclesRemaining != null && cyclesRemaining <= 0) return "exhausted";
   if (operationCount >= limits.maxOperations) return "exhausted";
   if (chars >= limits.maxFileChars) return "exhausted";
-  if (cyclesRemaining != null && cyclesRemaining <= LOW_CYCLE_REMAINING_THRESHOLD) return "low";
+  // AGRUN-413 — proportional to maxSteps, consistent with WORKSPACE_LOW_BUDGET_RATIO below.
+  if (cyclesRemaining != null && cyclesRemaining <= lowCycleRemainingThreshold(maxSteps)) return "low";
   if (operationCount >= Math.floor(limits.maxOperations * WORKSPACE_LOW_BUDGET_RATIO)) return "low";
   if (chars >= Math.floor(limits.maxFileChars * WORKSPACE_LOW_BUDGET_RATIO)) return "low";
   return "enough";
@@ -560,8 +615,8 @@ function readBudgetState$1(runState, candidate, context) {
 
 function readCyclesRemaining(runState) {
   if (!runState || typeof runState !== "object") return null;
-  const maxSteps = readNullableNumber$4(runState.maxSteps);
-  const cycleCount = readNullableNumber$4(runState.cycleCount);
+  const maxSteps = readNullableNumber$3(runState.maxSteps);
+  const cycleCount = readNullableNumber$3(runState.cycleCount);
   if (maxSteps == null || cycleCount == null) return null;
   return Math.max(0, maxSteps - cycleCount);
 }
@@ -593,13 +648,13 @@ function normalizeRequirementRecoveryConvergenceState(value) {
       source: normalizeDimensionState(value.dimensionStates && value.dimensionStates.source, "source"),
       length: normalizeDimensionState(value.dimensionStates && value.dimensionStates.length, "length")
     },
-    repeatedInvalidTerminalCount: readNumber$f(value.repeatedInvalidTerminalCount),
+    repeatedInvalidTerminalCount: readNumber$d(value.repeatedInvalidTerminalCount),
     budgetState: readBudgetStateValue(value.budgetState) || base.budgetState,
     recommendedContract: readRecommendedContractValue(value.recommendedContract) || base.recommendedContract,
     terminalPattern: value.terminalPattern && typeof value.terminalPattern === "object"
       ? cloneValue(value.terminalPattern)
       : null,
-    updatedAtCycle: readNullableNumber$4(value.updatedAtCycle)
+    updatedAtCycle: readNullableNumber$3(value.updatedAtCycle)
   };
 }
 
@@ -607,13 +662,16 @@ function normalizeDimensionState(value, dimension) {
   const base = createDimensionState(dimension);
   if (!value || typeof value !== "object" || Array.isArray(value)) return base;
   return {
-    attempts: readNumber$f(value.attempts),
+    attempts: readNumber$d(value.attempts),
     dimension,
     exhausted: value.exhausted === true,
-    lastEffectiveAction: readString$1B(value.lastEffectiveAction) || null,
+    lastEffectiveAction: readString(value.lastEffectiveAction) || null,
+    lastRegressionAction: readString(value.lastRegressionAction) || null,
     lastObserved: value.lastObserved && typeof value.lastObserved === "object" ? cloneValue(value.lastObserved) : null,
-    progressCount: readNumber$f(value.progressCount),
-    repeatedNoProgressCount: readNumber$f(value.repeatedNoProgressCount)
+    progressCount: readNumber$d(value.progressCount),
+    regressionCount: readNumber$d(value.regressionCount),
+    repeatedRegressionCount: readNumber$d(value.repeatedRegressionCount),
+    repeatedNoProgressCount: readNumber$d(value.repeatedNoProgressCount)
   };
 }
 
@@ -630,33 +688,36 @@ function summarizeRequirementRecoveryConvergence(value) {
     recommendedContract: normalized.recommendedContract,
     terminalPattern: normalized.terminalPattern
       ? {
-          kind: readString$1B(normalized.terminalPattern.kind) || null,
-          message: readString$1B(normalized.terminalPattern.message) || null,
-          threshold: readNullableNumber$4(normalized.terminalPattern.threshold)
+          kind: readString(normalized.terminalPattern.kind) || null,
+          message: readString(normalized.terminalPattern.message) || null,
+          threshold: readNullableNumber$3(normalized.terminalPattern.threshold)
         }
       : null
   };
 }
 
 function summarizeDimensionState(value) {
-  const normalized = normalizeDimensionState(value, readString$1B(value && value.dimension) || "requirement");
+  const normalized = normalizeDimensionState(value, readString(value && value.dimension) || "requirement");
   return {
     attempts: normalized.attempts,
     exhausted: normalized.exhausted,
     lastEffectiveAction: normalized.lastEffectiveAction,
+    lastRegressionAction: normalized.lastRegressionAction,
     lastObserved: normalized.lastObserved,
     progressCount: normalized.progressCount,
+    regressionCount: normalized.regressionCount,
+    repeatedRegressionCount: normalized.repeatedRegressionCount,
     repeatedNoProgressCount: normalized.repeatedNoProgressCount
   };
 }
 
 function readBudgetStateValue(value) {
-  const text = readString$1B(value);
+  const text = readString(value);
   return ["enough", "low", "exhausted"].includes(text) ? text : "";
 }
 
 function readRecommendedContractValue(value) {
-  const text = readString$1B(value);
+  const text = readString(value);
   return ["continue_recovery", "valid_limited_allowed", "fail_fast_debug"].includes(text) ? text : "";
 }
 
@@ -669,7 +730,7 @@ function isWorkspaceDeficitRecoverable(runState, candidate, workspaceSignals, co
   const operationCount = Array.isArray(workspace.operations) ? workspace.operations.length : 0;
   const limits = readWorkspaceRecoveryLimits(context);
   if (operationCount >= limits.maxOperations) return false;
-  if (readNumber$f(candidate.chars) >= limits.maxFileChars) return false;
+  if (readNumber$d(candidate.chars) >= limits.maxFileChars) return false;
   return true;
 }
 
@@ -689,9 +750,9 @@ function readWorkspaceRecoveryLimits(context) {
 function isSourceDeficitRecoverable(readUrlRecoverySignal, sourceSignals) {
   if (!sourceSignals.hasAnyEvidenceWork) return true;
   if (!readUrlRecoverySignal) return false;
-  if (!SOURCE_RECOVERY_STATUSES.has(readString$1B(readUrlRecoverySignal.status))) return false;
+  if (!SOURCE_RECOVERY_STATUSES.has(readString(readUrlRecoverySignal.status))) return false;
   if (sourceSignals.alternateCandidateCount > 0 && !sourceSignals.alternateAttempted) return true;
-  if (readString$1B(readUrlRecoverySignal.status) === "retryable_failure" && readNumber$f(readUrlRecoverySignal.sameUrlAttemptCount) <= 1) return true;
+  if (readString(readUrlRecoverySignal.status) === "retryable_failure" && readNumber$d(readUrlRecoverySignal.sameUrlAttemptCount) <= 1) return true;
   return false;
 }
 
@@ -699,7 +760,7 @@ function isSourceDeficitInScope(runState, readUrlRecoverySignal, sourceMinimum) 
   const researchState = runState && runState.researchState && typeof runState.researchState === "object"
     ? runState.researchState
     : null;
-  const finalReason = readString$1B(researchState && researchState.finalReason);
+  const finalReason = readString(researchState && researchState.finalReason);
   if (researchState && (
     researchState.qualityGateRequired === true ||
     researchState.finalAllowed === false ||
@@ -707,7 +768,7 @@ function isSourceDeficitInScope(runState, readUrlRecoverySignal, sourceMinimum) 
   )) {
     return true;
   }
-  if (readUrlRecoverySignal && readString$1B(readUrlRecoverySignal.status) !== "none") return true;
+  if (readUrlRecoverySignal && readString(readUrlRecoverySignal.status) !== "none") return true;
   const readSources = runState && runState.researchContext && Array.isArray(runState.researchContext.readSources)
     ? runState.researchContext.readSources
     : [];
@@ -716,7 +777,7 @@ function isSourceDeficitInScope(runState, readUrlRecoverySignal, sourceMinimum) 
 }
 
 function readWorkspaceRecoverySignals(runState, candidate) {
-  const path = readString$1B(candidate && candidate.path);
+  const path = readString(candidate && candidate.path);
   const operations = runState && runState.virtualWorkspace && Array.isArray(runState.virtualWorkspace.operations)
     ? runState.virtualWorkspace.operations
     : [];
@@ -725,10 +786,10 @@ function readWorkspaceRecoverySignals(runState, candidate) {
     (!path || operation.path === path)
   ));
   const expansionAttempted = relevant.some((operation) => (
-    WORKSPACE_RECOVERY_ACTIONS.has(readString$1B(operation.action)) &&
-    readString$1B(operation.status) === "ok"
+    WORKSPACE_RECOVERY_ACTIONS.has(readString(operation.action)) &&
+    readString(operation.status) === "ok"
   ));
-  const readAttempted = relevant.some((operation) => readString$1B(operation.action) === "read");
+  const readAttempted = relevant.some((operation) => readString(operation.action) === "read");
   const signals = [];
   if (readAttempted) signals.push("workspace_read_attempted");
   if (expansionAttempted) signals.push("workspace_expansion_attempted");
@@ -741,12 +802,12 @@ function readSourceRecoverySignals(runState, readUrlRecoverySignal) {
     : {};
   const readSources = Array.isArray(researchContext.readSources) ? researchContext.readSources : [];
   const searchPasses = Array.isArray(researchContext.searchPasses) ? researchContext.searchPasses : [];
-  const failedUrl = normalizeUrl$1(readUrlRecoverySignal && readUrlRecoverySignal.failedUrl);
+  const failedUrl = normalizeUrl(readUrlRecoverySignal && readUrlRecoverySignal.failedUrl);
   const alternateCandidateCount = Array.isArray(readUrlRecoverySignal && readUrlRecoverySignal.alternateSourceCandidates)
     ? readUrlRecoverySignal.alternateSourceCandidates.length
     : 0;
   const alternateAttempted = Boolean(failedUrl) && readSources.some((source) => {
-    const url = normalizeUrl$1(source && source.url);
+    const url = normalizeUrl(source && source.url);
     return url && url !== failedUrl;
   });
   const hasAnyEvidenceWork = readSources.length > 0 || searchPasses.length > 0 || alternateCandidateCount > 0;
@@ -764,7 +825,7 @@ function readSourceRecoverySignals(runState, readUrlRecoverySignal) {
 }
 
 function readObservableDeficits({ candidate, requestedLength, sourceMinimum }) {
-  const statsKey = requestedLength ? readString$1B(requestedLength.statsKey) || readStatsKeyForUnit(requestedLength.unit) : "";
+  const statsKey = requestedLength ? readString(requestedLength.statsKey) || readStatsKeyForUnit(requestedLength.unit) : "";
   const observedLength = candidate && statsKey && Number.isFinite(candidate[statsKey])
     ? candidate[statsKey]
     : null;
@@ -775,18 +836,18 @@ function readObservableDeficits({ candidate, requestedLength, sourceMinimum }) {
       : 0,
     lengthObserved: observedLength,
     lengthRequested: requestedValue,
-    lengthUnit: requestedLength ? readString$1B(requestedLength.unit) || null : null,
+    lengthUnit: requestedLength ? readString(requestedLength.unit) || null : null,
     readSourceDeficit: sourceMinimum
-      ? Math.max(0, readNumber$f(sourceMinimum.minReadSources) - readNumber$f(sourceMinimum.readSources))
+      ? Math.max(0, readNumber$d(sourceMinimum.minReadSources) - readNumber$d(sourceMinimum.readSources))
       : 0,
     relevantSourceDeficit: sourceMinimum
-      ? Math.max(0, readNumber$f(sourceMinimum.minRelevantSources) - readNumber$f(sourceMinimum.relevantSources))
+      ? Math.max(0, readNumber$d(sourceMinimum.minRelevantSources) - readNumber$d(sourceMinimum.relevantSources))
       : 0
   };
 }
 
 function readCandidateSnapshot(runState) {
-  const packet = readAcceptancePacket$1(runState);
+  const packet = readAcceptancePacket(runState);
   const packetCandidate = packet && packet.candidate && typeof packet.candidate === "object"
     ? packet.candidate
     : null;
@@ -794,7 +855,7 @@ function readCandidateSnapshot(runState) {
     ? runState.virtualWorkspace
     : null;
   const file = workspace ? readWorkspaceFinalCandidate(workspace, packetCandidate && packetCandidate.path) : null;
-  const stats = normalizeTextStats$2(
+  const stats = normalizeTextStats$1(
     (packetCandidate && packetCandidate.textStats)
     || (file && file.textStats)
     || (workspace && workspace.quality && workspace.quality.finalCandidateStats)
@@ -804,20 +865,20 @@ function readCandidateSnapshot(runState) {
     chars: stats.chars,
     cjkChars: stats.cjkChars,
     nonWhitespaceChars: stats.nonWhitespaceChars,
-    path: readString$1B(packetCandidate && packetCandidate.path) || readString$1B(file && file.path) || null,
+    path: readString(packetCandidate && packetCandidate.path) || readString(file && file.path) || null,
     words: stats.words
   };
 }
 
 function readRequestedLengthSnapshot(runState, context) {
-  const packet = readAcceptancePacket$1(runState);
+  const packet = readAcceptancePacket(runState);
   const packetLength = packet && packet.requestedLength && typeof packet.requestedLength === "object"
     ? packet.requestedLength
     : null;
   if (packetLength && Number.isFinite(packetLength.value)) {
-    const unit = readString$1B(packetLength.unit) || null;
+    const unit = readString(packetLength.unit) || null;
     return {
-      statsKey: readString$1B(packetLength.statsKey) || readStatsKeyForUnit(unit),
+      statsKey: readString(packetLength.statsKey) || readStatsKeyForUnit(unit),
       unit,
       value: packetLength.value
     };
@@ -828,7 +889,7 @@ function readRequestedLengthSnapshot(runState, context) {
     ? context.finalReadiness.requirementsAssessment
     : null;
   if (assessment && Number.isFinite(assessment.requestedLength)) {
-    const unit = readString$1B(assessment.observedLengthUnit) || null;
+    const unit = readString(assessment.observedLengthUnit) || null;
     return {
       statsKey: readStatsKeyForUnit(unit),
       unit,
@@ -841,14 +902,14 @@ function readRequestedLengthSnapshot(runState, context) {
   });
   const extracted = extractRequestedLengthContract(text);
   return extracted ? {
-    statsKey: readString$1B(extracted.statsKey) || readStatsKeyForUnit(extracted.unit),
-    unit: readString$1B(extracted.unit) || null,
+    statsKey: readString(extracted.statsKey) || readStatsKeyForUnit(extracted.unit),
+    unit: readString(extracted.unit) || null,
     value: extracted.value
   } : null;
 }
 
-function readSourceMinimum$1(runState) {
-  const packet = readAcceptancePacket$1(runState);
+function readSourceMinimum(runState) {
+  const packet = readAcceptancePacket(runState);
   const source = packet && packet.evidence && packet.evidence.sourceMinimum && typeof packet.evidence.sourceMinimum === "object"
     ? packet.evidence.sourceMinimum
     : runState && runState.researchReportLoop && runState.researchReportLoop.sourceMinimum && typeof runState.researchReportLoop.sourceMinimum === "object"
@@ -856,11 +917,11 @@ function readSourceMinimum$1(runState) {
       : null;
   if (!source) return null;
   return {
-    minReadSources: readNumber$f(source.minReadSources),
-    minRelevantSources: readNumber$f(source.minRelevantSources),
+    minReadSources: readNumber$d(source.minReadSources),
+    minRelevantSources: readNumber$d(source.minRelevantSources),
     passed: source.passed === true,
-    readSources: readNumber$f(source.readSources),
-    relevantSources: readNumber$f(source.relevantSources)
+    readSources: readNumber$d(source.readSources),
+    relevantSources: readNumber$d(source.relevantSources)
   };
 }
 
@@ -871,10 +932,14 @@ function readReadUrlRecoverySignalSnapshot(runState) {
   return value ? cloneValue(value) : null;
 }
 
-function readAcceptancePacket$1(runState) {
+function readAcceptancePacket(runState) {
   const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
     ? runState.researchReportLoop
     : null;
+  const directPacket = loop && loop.acceptancePacket && typeof loop.acceptancePacket === "object"
+    ? loop.acceptancePacket
+    : null;
+  if (directPacket) return directPacket;
   const gateSignal = loop && loop.gateSignal && typeof loop.gateSignal === "object"
     ? loop.gateSignal
     : null;
@@ -883,26 +948,22 @@ function readAcceptancePacket$1(runState) {
     : null;
 }
 
-function normalizeTextStats$2(value) {
+function normalizeTextStats$1(value) {
   if (!value || typeof value !== "object") return null;
   return {
-    chars: readNumber$f(value.chars),
-    cjkChars: readNumber$f(value.cjkChars),
-    nonWhitespaceChars: readNumber$f(value.nonWhitespaceChars),
-    words: readNumber$f(value.words)
+    chars: readNumber$d(value.chars),
+    cjkChars: readNumber$d(value.cjkChars),
+    nonWhitespaceChars: readNumber$d(value.nonWhitespaceChars),
+    words: readNumber$d(value.words)
   };
 }
 
-function normalizeUrl$1(value) {
-  const text = readString$1B(value);
+function normalizeUrl(value) {
+  const text = readString(value);
   return text ? text.replace(/\/+$/, "") : "";
 }
 
-function readString$1B(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readNumber$f(value) {
+function readNumber$d(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
 }
@@ -912,7 +973,7 @@ function readPositiveNumber$1(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
-function readNullableNumber$4(value) {
+function readNullableNumber$3(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }

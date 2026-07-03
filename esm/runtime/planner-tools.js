@@ -1,7 +1,9 @@
 import { getPlannerProviderCapabilities } from './provider-capabilities.js';
-import { formatStandalonePlanActionNames } from './action-plan-contract.js';
+import { ASK_CLARIFICATION_ACTION, EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
+import { readPlanActionContract, formatStandalonePlanActionNames } from './action-plan-contract.js';
 import { normalizeFinalReadiness } from './final-readiness.js';
 import { readPlanActionFallbackArgs, mergeMissingArgs } from './plan-args-fallback.js';
+import { readString } from './semantic-json.js';
 
 /**
  * Converts action registry definitions to native provider tool definitions.
@@ -10,18 +12,20 @@ import { readPlanActionFallbackArgs, mergeMissingArgs } from './plan-args-fallba
  */
 
 
+
 function buildOpenAITools(plannerActions, options) {
   const actions = Array.isArray(plannerActions) ? plannerActions : [];
   const capabilities = readCapabilities(options);
   const suppressFinalAnswerTool = options && options.suppressFinalAnswerTool === true;
   const suppressFinalizeTool = options && options.suppressFinalizeTool === true;
+  const suppressPlanTool = options && options.suppressPlanTool === true;
   const tools = [];
 
   for (const action of actions) {
     if (action.decisionType === "clarify") {
       tools.push({
         type: "function",
-        name: "ask_clarification",
+        name: ASK_CLARIFICATION_ACTION,
         description: action.description || "Ask the user a short clarifying question and stop.",
         parameters: {
           type: "object",
@@ -49,7 +53,9 @@ function buildOpenAITools(plannerActions, options) {
     });
   }
 
-  tools.push(buildPlanTool(actions, capabilities));
+  if (!suppressPlanTool) {
+    tools.push(buildPlanTool(actions, capabilities));
+  }
 
   if (!suppressFinalizeTool) {
     tools.push({
@@ -124,9 +130,23 @@ function buildGeminiTools(plannerActions, options) {
   }];
 }
 
-function parseToolCallDecision(toolCalls) {
+function parseToolCallDecision(toolCalls, options = {}) {
   if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
     return null;
+  }
+
+  // C3b (AGRUN-575) — consume the WHOLE toolCalls array. When the model
+  // emits multiple plain action calls in one response (provider-native
+  // parallel tool calling), batch them into a standard plan decision so the
+  // existing plan door runs them concurrently with its own validation,
+  // timeout, and input-order side effects. Previously only toolCalls[0] was
+  // consumed and the rest silently dropped — the model re-emitted the same
+  // calls every cycle and looped to maxSteps exhaustion (AGRUN-573 spike).
+  // Mixed batches (any terminal / clarify / plan / unnamed call) keep the
+  // first-call-decides behavior: terminals are not parallelizable.
+  const parallelBatch = readParallelActionBatch(toolCalls, options);
+  if (parallelBatch) {
+    return parallelBatch;
   }
 
   const call = toolCalls[0];
@@ -134,15 +154,15 @@ function parseToolCallDecision(toolCalls) {
     return null;
   }
 
-  const name = readString$u(call.name);
+  const name = readString(call.name);
   const args = parseArgs(call.arguments);
 
   if (name === "final_answer") {
     return {
-      answer: readString$u(args.answer),
+      answer: readString(args.answer),
       citations: Array.isArray(args.citations) ? args.citations : [],
       finalReadiness: normalizeFinalReadiness(args.finalReadiness),
-      reasoning: readString$u(args.reasoning),
+      reasoning: readString(args.reasoning),
       type: "final"
     };
   }
@@ -150,16 +170,16 @@ function parseToolCallDecision(toolCalls) {
   if (name === "finalize") {
     return {
       finalReadiness: normalizeFinalReadiness(args.finalReadiness),
-      instruction: readString$u(args.instruction),
-      reasoning: readString$u(args.reasoning),
+      instruction: readString(args.instruction),
+      reasoning: readString(args.reasoning),
       type: "finalize"
     };
   }
 
-  if (name === "ask_clarification") {
+  if (name === ASK_CLARIFICATION_ACTION) {
     return {
-      question: readString$u(args.question),
-      reasoning: readString$u(args.reasoning),
+      question: readString(args.question),
+      reasoning: readString(args.reasoning),
       type: "clarify"
     };
   }
@@ -175,15 +195,78 @@ function parseToolCallDecision(toolCalls) {
   return {
     args,
     name,
-    reasoning: readString$u(args.reasoning),
+    reasoning: readString(args.reasoning),
     type: "action"
+  };
+}
+
+// C3b — a batch qualifies only when there are 2+ calls and EVERY call is a
+// plain named runtime action (no terminals, no clarify, no nested plan tool,
+// no unnamed calls). Eligibility beyond naming (standalone-only, approval
+// policy, unknown actions) is deliberately left to the plan validation door,
+// whose rejections are planner-recoverable observations with explicit
+// guidance — the same contract envelope-authored plans get.
+const NON_BATCHABLE_TOOL_NAMES = new Set(["final_answer", "finalize", ASK_CLARIFICATION_ACTION, "plan"]);
+
+// AGRUN-588 — actions whose plan contract says allowedInPlan:false (todo_*,
+// workspace mutators, skill selection) must NOT be batched into a plan
+// decision: plan validation rejects the whole batch (skill_mutator_in_plan)
+// and the model burns a cycle per rejection. deepseek reliably emits parallel
+// todo_advance pairs, which cost 4 consecutive rejected cycles in the live
+// probe. Derive the exclusion from the SAME contract SSOT plan validation
+// uses, so the batch reader can never disagree with the validator.
+function readStandalonePlanActionNames(actions) {
+  const names = new Set();
+  for (const action of Array.isArray(actions) ? actions : []) {
+    if (readPlanActionContract(action).allowedInPlan === false) {
+      const name = readString(action && action.name).toLowerCase();
+      if (name) names.add(name);
+    }
+  }
+  return names;
+}
+
+function readParallelActionBatch(toolCalls, options = {}) {
+  if (toolCalls.length < 2) return null;
+  const standaloneNames = options.standalonePlanActionNames instanceof Set
+    ? options.standalonePlanActionNames
+    : null;
+  const actions = [];
+  for (const call of toolCalls) {
+    if (!call || typeof call !== "object") return null;
+    const name = readString(call.name);
+    if (!name || NON_BATCHABLE_TOOL_NAMES.has(name)) return null;
+    if (standaloneNames && standaloneNames.has(name.toLowerCase())) return null;
+    const args = parseArgs(call.arguments);
+    actions.push({
+      args,
+      name: name.toLowerCase(),
+      reasoning: readString(args.reasoning),
+      section: null,
+      type: "action"
+    });
+  }
+  return {
+    actions,
+    // Native parallel tool-calling semantics: each call settles on its own;
+    // one failure becomes that call's error observation instead of voiding
+    // the siblings' completed results.
+    partial_ok: true,
+    finalReadiness: null,
+    nativeParallelBatch: true,
+    reasoning: "",
+    result_budget: null,
+    stitch: null,
+    synthesize_instruction: "",
+    synthesize_per_action: false,
+    type: "plan"
   };
 }
 
 function buildPlanTool(actions, capabilities) {
   const nativePlan = capabilities && capabilities.nativePlan ? capabilities.nativePlan : {};
   const toolArgsJsonRequired = nativePlan.toolArgsJsonRequired === true;
-  const preferredShape = readString$u(nativePlan.executeSkillToolArgsShape) || "object";
+  const preferredShape = readString(nativePlan.executeSkillToolArgsShape) || "object";
   const standaloneActionNames = formatStandalonePlanActionNames(actions);
   const toolArgsJsonDescription = toolArgsJsonRequired
     ? "Compatibility field for execute_skill_tool. REQUIRED for this provider's plan actions that need tool arguments because nested objects can be emitted as empty objects. JSON string containing tool arguments, for example '{\"label\":\"alpha\"}'. Prefer this over nested toolArgs."
@@ -318,6 +401,10 @@ function buildPlanTool(actions, capabilities) {
   };
 }
 
+// C5b (AGRUN-582) — this schema is embedded in finalize, final_answer, AND
+// plan (3x per request, wire-measured at ~2-3KB each). Descriptions are kept
+// terse on purpose: field semantics stay identical (normalizeFinalReadiness
+// reads the same shape) while the tool surface sheds dead prose.
 function buildFinalReadinessSchema(description) {
   return {
     type: "object",
@@ -326,70 +413,70 @@ function buildFinalReadinessSchema(description) {
       decision: {
         type: "string",
         enum: ["ready", "limited"],
-        description: "AI's finalization decision."
+        description: "Your finalization decision."
       },
       evidenceMode: {
         type: "string",
         enum: ["read_sources", "search_summary_only", "model_knowledge", "mixed"],
-        description: "What evidence mode the final answer will honestly use."
+        description: "Evidence mode the answer honestly uses."
       },
       limitations: {
         type: "string",
-        description: "Limitations the final answer must disclose when evidence is thin or only search snippets are available."
+        description: "Limitations to disclose when evidence is thin."
       },
       requirementsAssessment: {
         type: "object",
-        description: "AI-authored assessment of whether the final answer satisfies the end user's requirements. Runtime records this declaration but does not judge or verify sufficiency; use workspace textStats/readSources already visible in the planner prompt and do not invent counts.",
+        description: "Your assessment of whether the answer satisfies the user's requirements. Use visible textStats/readSources facts; do not invent counts.",
         properties: {
           userRequirementSummary: {
             type: "string",
-            description: "Short summary of the relevant end-user requirement you checked, such as requested scope, evidence, language, or length."
+            description: "The requirement you checked (scope, evidence, language, length)."
           },
           requirementSatisfied: {
             type: "boolean",
-            description: "Whether YOU judge the final answer satisfies the end-user requirement."
+            description: "Whether the answer satisfies it."
           },
           requestedLength: {
             type: "number",
-            description: "Requested answer length, if the user asked for a length."
+            description: "Requested length, if any."
           },
           observedLength: {
             type: "number",
-            description: "Observed draft/final candidate length in observedLengthUnit, based on workspace textStats when available."
+            description: "Observed candidate length in observedLengthUnit."
           },
           observedLengthUnit: {
             type: "string",
             enum: ["chars", "cjk_chars", "words", "tokens"],
-            description: "Unit used for requestedLength and observedLength."
+            description: "Unit for both length fields."
           },
           lengthSatisfied: {
             type: "boolean",
-            description: "Whether YOU judge the observed answer satisfies the requested length, if any."
+            description: "Whether observed length satisfies the request."
           },
           successfulReadUrlCount: {
             type: "number",
-            description: "Count of successful read_url sources visible in readSources."
+            description: "Successful read_url sources in readSources."
           },
           evidenceSatisfied: {
             type: "boolean",
-            description: "Whether the evidence is enough for the chosen decision."
+            description: "Whether evidence suffices for the decision."
           },
           checkedWorkspaceStats: {
             type: "boolean",
-            description: "True only if you inspected workspace_read/workspace_list textStats or equivalent visible stats."
+            description: "True only if you inspected workspace textStats."
           },
           checkedReadUrlEvidence: {
             type: "boolean",
-            description: "True only if you inspected readSources/read_url evidence status."
+            description: "True only if you inspected readSources status."
           },
           remainingGaps: {
             type: "array",
             items: { type: "string" },
-            description: "Known unresolved gaps to disclose or accept when decision is limited."
+            description: "Unresolved gaps to disclose when limited."
           },
           summary: {
             type: "string",
-            description: "Short explanation of your readiness judgment."
+            description: "Short readiness rationale."
           }
         }
       }
@@ -409,10 +496,10 @@ function normalizePlanToolDecision(args) {
     actions: normalizePlanToolActions(args.actions),
     partial_ok: args.partial_ok === true,
     finalReadiness: normalizeFinalReadiness(args.finalReadiness),
-    reasoning: readString$u(args.reasoning),
+    reasoning: readString(args.reasoning),
     result_budget: readObject(args.result_budget),
     stitch: normalizePlanStitch(args.stitch),
-    synthesize_instruction: readString$u(args.synthesize_instruction) || readString$u(args.instruction),
+    synthesize_instruction: readString(args.synthesize_instruction) || readString(args.instruction),
     synthesize_per_action: args.synthesize_per_action === true,
     type: "plan"
   };
@@ -424,12 +511,12 @@ function normalizePlanToolActions(actions) {
   for (const item of actions) {
     const record = readObject(item);
     if (!record) continue;
-    const name = readString$u(record.name || record.action || record.tool || record.toolName).toLowerCase();
+    const name = readString(record.name || record.action || record.tool || record.toolName).toLowerCase();
     if (!name) continue;
     normalized.push({
       args: normalizePlanActionArgs(name, record),
       name,
-      reasoning: readString$u(record.reasoning),
+      reasoning: readString(record.reasoning),
       section: normalizePlanSection(record.section),
       type: "action"
     });
@@ -441,12 +528,12 @@ function normalizePlanActionArgs(name, record) {
   const args = readObject(record.args) || readObject(record.arguments) || {};
   const genericArgs = readPlanActionFallbackArgs(record, { includeFlatArgs: true });
 
-  if (name !== "execute_skill_tool") {
+  if (name !== EXECUTE_SKILL_TOOL_ACTION) {
     return mergeMissingArgs(args, genericArgs);
   }
 
-  const flatSkillName = readString$u(record.skillName || record.skill_name);
-  const flatToolName = readString$u(record.toolName || record.tool_name);
+  const flatSkillName = readString(record.skillName || record.skill_name);
+  const flatToolName = readString(record.toolName || record.tool_name);
   const flatToolArgs = genericArgs;
   const hasFlatFields = Boolean(flatSkillName || flatToolName || flatToolArgs);
 
@@ -455,8 +542,8 @@ function normalizePlanActionArgs(name, record) {
   }
 
   const normalized = { ...args };
-  if (flatSkillName && !readString$u(normalized.skillName)) normalized.skillName = flatSkillName;
-  if (flatToolName && !readString$u(normalized.toolName)) normalized.toolName = flatToolName;
+  if (flatSkillName && !readString(normalized.skillName)) normalized.skillName = flatSkillName;
+  if (flatToolName && !readString(normalized.toolName)) normalized.toolName = flatToolName;
   if (flatToolArgs && !readObject(normalized.args)) normalized.args = flatToolArgs;
   return normalized;
 }
@@ -465,8 +552,8 @@ function normalizePlanSection(section) {
   const record = readObject(section);
   if (!record) return null;
   return {
-    prompt: readString$u(record.prompt),
-    title: readString$u(record.title)
+    prompt: readString(record.prompt),
+    title: readString(record.title)
   };
 }
 
@@ -478,9 +565,9 @@ function normalizePlanStitch(stitch) {
     followups: Array.isArray(record.followups)
       ? record.followups.filter((item) => typeof item === "string")
       : [],
-    intro_prompt: readString$u(record.intro_prompt),
-    outro_prompt: readString$u(record.outro_prompt),
-    provenance: readString$u(record.provenance),
+    intro_prompt: readString(record.intro_prompt),
+    outro_prompt: readString(record.outro_prompt),
+    provenance: readString(record.provenance),
     result_budget: readObject(record.result_budget)
   };
 }
@@ -494,7 +581,7 @@ function summarizeToolCallsForDebug(toolCalls) {
     .filter((call) => call && typeof call === "object")
     .map((call) => ({
       argsShape: summarizeDebugValue(parseArgs(call.arguments), 0),
-      name: readString$u(call.name) || null
+      name: readString(call.name) || null
     }));
 }
 
@@ -808,12 +895,8 @@ function parseArgs(value) {
   return {};
 }
 
-function readString$u(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 
-export { buildGeminiTools, buildOpenAITools, parseToolCallDecision, summarizeToolCallsForDebug };
+export { buildGeminiTools, buildOpenAITools, parseToolCallDecision, readStandalonePlanActionNames, summarizeToolCallsForDebug };

@@ -1,3 +1,6 @@
+import { readMaxObservedProviderLatencyMs } from './provider-latency.js';
+import { DEFAULT_LLM_TIMEOUT_MS } from '../skills/providers/fetch-resilience.js';
+
 /**
  * AGRUN-212a amendment 2D — Semantic provider-timeout derivation.
  *
@@ -33,6 +36,12 @@
 const PLANNER_AUTOPILOT_TIMEOUT_MS = 120_000;
 const FINALIZE_AUTOPILOT_TIMEOUT_MS = 180_000;
 const LONG_RESEARCH_MIN_LENGTH = 1000;
+// AGRUN-568 — adaptive-deadline tunables. FACTOR scales the run's max
+// observed successful call duration into the next call's budget; CAP bounds
+// both this floor and the retry escalation in provider.js so a genuinely
+// hung provider still dies in bounded time.
+const ADAPTIVE_TIMEOUT_FACTOR = 2;
+const ADAPTIVE_TIMEOUT_CAP_MS = 600_000;
 
 /**
  * @param {object} options
@@ -44,12 +53,34 @@ const LONG_RESEARCH_MIN_LENGTH = 1000;
  */
 function deriveProviderTimeoutMs(options) {
   const opts = options && typeof options === "object" ? options : {};
-  const explicit = readPositiveInteger$b(opts.baseTimeoutMs);
+  const explicit = readPositiveInteger$d(opts.baseTimeoutMs);
   if (explicit) return explicit;
-  if (!isLongRunningTurnInPlay(opts.runState)) return null;
-  return opts.kind === "finalize"
-    ? FINALIZE_AUTOPILOT_TIMEOUT_MS
-    : PLANNER_AUTOPILOT_TIMEOUT_MS;
+  const structural = isLongRunningTurnInPlay(opts.runState)
+    ? (opts.kind === "finalize"
+      ? FINALIZE_AUTOPILOT_TIMEOUT_MS
+      : PLANNER_AUTOPILOT_TIMEOUT_MS)
+    : null;
+  // AGRUN-568 — adaptive floor from THIS run's observed successful call
+  // durations (provider-latency.js). A slow provider (deepseek at ~59 tok/s
+  // with hidden reasoning tokens) can legitimately spend 89s on one
+  // successful planner cycle; the next cycle's budget must sit comfortably
+  // above that, or the run dies on a fixed deadline the provider was never
+  // going to meet (captured live failure: 89.3s success, then 120+0.5+120 =
+  // 240.5s double-timeout run abort). The floor only ever RAISES the
+  // deadline: fast providers' observed calls stay far below the 60s default
+  // and the structural 120s/180s budgets, so nothing changes for them.
+  // Multiplier 2x: one observed max plus equal headroom — enough to absorb
+  // per-call variance without turning a genuinely hung call into a
+  // many-minute wait (the cap bounds the worst case).
+  const observedMaxMs = readMaxObservedProviderLatencyMs(opts.runState);
+  const adaptive = observedMaxMs
+    ? Math.min(ADAPTIVE_TIMEOUT_CAP_MS, observedMaxMs * ADAPTIVE_TIMEOUT_FACTOR)
+    : null;
+  const baseline = structural || DEFAULT_LLM_TIMEOUT_MS;
+  if (adaptive && adaptive > baseline) {
+    return adaptive;
+  }
+  return structural;
 }
 
 function isLongRunningTurnInPlay(runState) {
@@ -118,14 +149,22 @@ function isLongResearchInPlay(runState) {
   const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
     ? packet.requestedLength
     : null;
-  const requestedValue = readPositiveInteger$b(requested && requested.value);
+  const requestedValue = readPositiveInteger$d(requested && requested.value);
   return Boolean(requestedValue && requestedValue >= LONG_RESEARCH_MIN_LENGTH);
 }
 
-function readPositiveInteger$b(value) {
+function readPositiveInteger$d(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   if (value <= 0) return null;
   return Math.floor(value);
 }
 
-export { deriveProviderTimeoutMs };
+const PROVIDER_TIMEOUT_DEFAULTS = Object.freeze({
+  PLANNER_AUTOPILOT_TIMEOUT_MS,
+  FINALIZE_AUTOPILOT_TIMEOUT_MS,
+  LONG_RESEARCH_MIN_LENGTH,
+  ADAPTIVE_TIMEOUT_FACTOR,
+  ADAPTIVE_TIMEOUT_CAP_MS
+});
+
+export { PROVIDER_TIMEOUT_DEFAULTS, deriveProviderTimeoutMs };

@@ -24,6 +24,7 @@ The host-facing runtime standard is centered on these APIs:
 ```js
 createRuntime(options)
 runtime.run(input)
+runtime.runStream(input, options?)   // AGRUN-442 — async-generator event stream
 runtime.createSession(options?)
 runtime.openSession(sessionId)
 runtime.getState()
@@ -44,6 +45,50 @@ provider adapters such as `openaiBrowserSkill`, `geminiBrowserSkill`, and
 `deepseekBrowserSkill`. Deleted Set A skill-loop exports (`echoSkill`,
 `fallbackSkill`, `memorySkill`, `newsBriefSkill`, `timeSkill`,
 `webSearchSkill`) are not part of the v1.0.0 public surface.
+
+## Streaming the agent loop (`runStream`)
+
+`runtime.runStream(input, options?)` (and `session.runStream(input, options?)`)
+return an **async generator** of typed `AgentLoopEvent`s — the AGRUN-442 streaming
+engine. A host iterates at its own pace and yields control between events:
+
+```js
+for await (const event of runtime.runStream(input)) {
+  if (event.type === "tool_start") showSpinner(event.detail);
+  if (event.type === "completed") render(event.detail.result);
+}
+```
+
+The event `type` is one of the closed set `AGENT_LOOP_EVENT_TYPES`: `phase`,
+`tool_start`, `tool_result`, `budget_warning`, `repair_attempt`,
+`circuit_breaker_tripped`, `completed`. The stream always ends with exactly one
+`completed` event whose `detail` carries `{ terminalKind: "done" | "error" |
+"abort", result, error }`; the generator's return value is the run result (or
+`null` on failure). Breaking the `for await` (or calling `generator.return()`)
+aborts the underlying run. The host's own `onStep` / `onStreamEvent` still fire —
+`runStream` composes with them rather than replacing them — and `options` accepts
+the same run options as `run`, including `abortSignal`. `createRunEventStream` is
+exported as the underlying bridge for custom drivers.
+
+**Reference consumer:** `examples/browser` drives every chat turn through
+`session.runStream` (`examples/browser/src/runtime/agent.ts` `runAgentTurn`): it
+reads the run result from the generator's return, forwards `onStep`/`onToken` so
+the existing activity/inspector UI is unchanged, and passes the turn's
+`abortSignal` — so the Stop button now genuinely cancels the in-flight run
+instead of discarding the result after it finishes. The consumption contract
+(typed-event order, generator-return-is-the-result, `generator.return()` aborts)
+is pinned by `examples/browser/test/runstream-consumer.smoke.ts`.
+
+`createStreamingActionExecutor({ concurrency?, signal? })` (AGRUN-443) is the
+companion scheduling primitive: `add({ id, concurrencySafe, readonly, run })`
+starts concurrency-safe actions immediately and runs a non-concurrency-safe
+action as a barrier (waits for prior, blocks later); `getCompletedResults()` is
+an async generator yielding `{ id, ok, value?, error?, aborted? }` in completion
+order; a mutating (`readonly: false`) failure aborts in-flight siblings and
+drains the queued-after actions. It is pure mechanism — the caller stamps
+`concurrencySafe` / `readonly` from action permission metadata (no action-name
+lists), preserving the AI-first contract. (Slice 1: exported primitive; wiring
+into the action-loop plan path is a later slice.)
 
 ## Runtime Creation
 
@@ -68,6 +113,9 @@ const runtime = createRuntime({
 | `sessionStore` | no | stable | Async session persistence adapter for session history, summaries, and session-scoped memory. |
 | `storage` | no | stable advanced | Optional per-message JSON storage adapter. When present, session turns are written as message records plus per-part records using the typed runtime event stream. Omit it to preserve current in-memory/browser Inspector behavior. |
 | `onStorageError` | no | stable advanced | Optional callback for per-message storage write failures. Storage errors are recorded on `runtime.getMessageStorageState()` and do not crash the runtime. |
+| `asyncMessageWrites` | no | stable advanced | When `true`, the assistant transcript write is fire-and-forget: `session.run()` resolves before the write commits, off the critical path. Writes still go through a durable ordered queue (in-order, error-captured). Default `false` (every write awaited). When enabled, call `runtime.flushMessageStorage()` at a host checkpoint (e.g. `beforeunload`) to guarantee durability. |
+| `asyncMemoryExtraction` | no | stable advanced | When `true`, session memory extraction (an LLM call) + write + global-memory promotion run off the turn's critical path through a durable ordered queue, so `session.run()` resolves before extraction completes. Consistency is preserved automatically: the next turn (and `session.getMemory()` / `session.flushMemory()`) drain the queue first, so the next turn always sees the prior turn's memory. Only the CURRENT turn's `result.memoryEntriesAdded` becomes eventual (the entry surfaces on the next read, not on the returning result). Default `false` (extraction awaited; `result.memoryEntriesAdded` populated). |
+| `memoryExtractionPolicy` | no | stable advanced | Optional host gate, called once per *eligible* turn (a completed tool-loop turn with global memory enabled), that decides whether to spend the memory-extraction LLM call. `(context) => boolean \| { extract: boolean, reason? }`, may be async; `context` is `{ sessionId, runId, userText, assistantText }`. Return `false` / `{ extract: false, reason }` to SKIP the call — eliminating the extra provider round-trip a simple-chat turn would otherwise pay just to extract nothing. The skip is recorded as a first-class outcome (`session.getMemoryState().lastExtraction.status === "skipped"` with the reason). agrun ships **no** prompt heuristic of its own: with no policy the answer is always "extract" (historical default, memory quality preserved). A throwing policy **fails open** (the turn still extracts) and the error surfaces in `getMemoryState().errors` under label `memory-policy`. Memory extraction is a session-handle-only mechanism — `runtime.run()` never extracts — so this is a single-door capability (no `runtime.run` parity to wire). |
 | `sessionPolicy` | no | stable | Session prompt-window and compaction policy such as `contextWindowTokens`, `compactAtTokens`, and `recentMessages`. |
 | `compactionPolicy` | no | stable advanced | Host hook for in-flight provider history trimming: `{ maxTurns?, onCompact? }`. It does not rewrite persisted session messages. |
 | ~~`fallbackSkill`~~ | no | removed in v1.0.0 | Legacy Set A skill-loop fallback. The option is ignored; register host behavior through `customActions` / `agentSkills` instead. |
@@ -92,7 +140,7 @@ const runtime = createRuntime({
 | `virtualWorkspace` | no | stable advanced | Browser-safe virtual draft workspace for complex final responses. `false` disables it; `{ enabled: true }` forces it; default `{ enabled: "auto" }` enables workspace state for complex/long-run prompts without exposing chain-of-thought or touching real files. |
 | `longResearchQualityGate` | no | stable advanced | Compatibility alias for long-run research quality observation settings. Supports report-loop values such as `minReadSources`, `minRelevantSources`, `maxResearchLoopVetoes`, and `allowFinalWithLimitationsOnBudgetExhausted`; these surface diagnostic signals and do not install kernel-seam hooks or force report quality. |
 | `repoFileTools` | no | stable advanced | Optional host-provided read-only repo/file adapter. Disabled by default; when `{ enabled: true, readFile, search }` is provided the planner can use tier-1 `repo_read_file` and `repo_rg`, which still pass through `actionPolicy`. |
-| `plannerMode` | no | stable advanced | Planner decision encoding: `"auto"` (default), `"envelope"`, or `"native_tools"`. Since ADR-0031 (2026-05-16), `"auto"` and any omitted/unknown value resolve to `effectiveMode: "envelope"` with `reason: "default_envelope"`. `"envelope"` is the canonical PASS path; `"native_tools"` is an explicit advanced/debug opt-in only and was demoted from default after sustained Gemini-side native instability during long-running real-API live tests. |
+| `plannerMode` | no | stable advanced | Planner decision encoding: `"auto"` (default), `"envelope"`, or `"native_tools"`. Since ADR-0058 (2026-07-02, supersedes ADR-0031), `"auto"` and any omitted/unknown value resolve to `effectiveMode: "native_tools"` with `reason: "default_native_tools"` — measured equal-or-faster with equal-or-better correctness across openai/gemini/deepseek (short-task and long-report live A/Bs). `nativeToolsFailurePolicy` (default `"fallback_to_envelope"`) keeps envelope as the per-call safety net; `"envelope"` remains the explicit opt-out for weak models and for hosts using the ADR-0035 envelope prompt-override section keys. |
 | `nativeToolsFailurePolicy` | no | stable advanced | Native planner failure behavior when the effective planner mode is `"native_tools"`. Default `"fallback_to_envelope"` emits `planner-native-tools-fallback` and retries the same cycle through envelope mode. `"hard_fail"` emits `planner-native-tools-failed` and returns the provider/planner failure without envelope fallback. |
 | `selfCorrection` | no | stable advanced | LLM self-correction on action errors. `true` (default), `false`, or `{ enabled, maxRetries }`. |
 | `circuitBreaker` | no | stable advanced | Per-provider circuit breaker. `true` (defaults: 5 failures, 60s cooldown), `false` (default, disabled), or `{ threshold, cooldownMs }`. Fast-fails provider calls when a provider is consistently down. |
@@ -162,12 +210,12 @@ Rules:
 
 Three ways to set the agent role:
 
-1. **Role by string name** — resolves against the `agentRoles` array supplied by the host or an opt-in package such as `@agrun/skills-research` / `@agrun/skills-coder`. Core no longer defaults to a bundled role catalog.
+1. **Role by string name** — resolves against the `agentRoles` array supplied by the host. Core no longer defaults to a bundled role catalog. (The `@agrun/skills-*` packages were removed in AGRUN-522; a host supplies its own roles.)
 
 ```js
-import { bundledAgentRoles } from '@agrun/skills-research';
+const agentRoles = [ /* host-supplied role objects (parseRoleMarkdown for SKILL.md-style roles) */ ];
 
-createRuntime({ agentRoles: bundledAgentRoles, role: 'researcher', skills: [...] });
+createRuntime({ agentRoles, role: 'researcher', skills: [...] });
 ```
 
 2. **Inline object** — define role directly without any file dependency.
@@ -220,13 +268,14 @@ Four ways to provide agent skills:
 1. **Core default: no domain skills** — when `agentSkills` is omitted, core normalizes it to `[]`. The planner still receives built-in actions; it just sees no domain skill instruction packages. This is the current generic runtime default.
 
    ```js
-   import { createRuntime } from 'agrun';
-   import { bundledAgentSkills as researchSkills } from '@agrun/skills-research';
-   import { bundledAgentSkills as coderSkills } from '@agrun/skills-coder';
+   import { createRuntime, parseSkillMarkdown } from 'agrun';
+   // AGRUN-522 — the @agrun/skills-* packages were removed. A host supplies its own
+   // SKILL.md agent skills (e.g. parse them with parseSkillMarkdown or load them via
+   // an agentSkillIndexProvider). Research/coder are portable host-supplied skills now.
+   const domainSkills = [ /* host-parsed SKILL.md agent skills */ ];
 
-   createRuntime({ agentSkills: [] }); // no domain skills
-   createRuntime({ agentSkills: researchSkills });
-   createRuntime({ agentSkills: [...researchSkills, ...coderSkills] });
+   createRuntime({ agentSkills: [] }); // no domain skills (core default)
+   createRuntime({ agentSkills: domainSkills });
    ```
 
 2. **parseSkillMarkdown(text)** — parse a SKILL.md-formatted string into a skill object. Same frontmatter convention as ROLE.md (`name`, `description` in YAML frontmatter, markdown body as instructions).
@@ -952,11 +1001,12 @@ Both bundled adapters accept `redactor(record, { kind })` so hosts can remove se
 {
   enabled: true,
   pendingRunCount: 0,
+  pendingWrites: 0,
   errors: []
 }
 ```
 
-Storage errors are isolated from runtime execution and reported through `errors` plus optional `onStorageError`.
+`pendingWrites` is the number of writes still in the durable ordered queue (non-zero only with `asyncMessageWrites`). `await runtime.flushMessageStorage()` drains it. Storage errors are isolated from runtime execution and reported through `errors` plus optional `onStorageError`.
 
 All object-shaped step details include:
 
@@ -1099,6 +1149,7 @@ Recommended shape:
   "apiVariant": "chat",
   "prompt": "review this javascript code for bugs",
   "systemPrompt": "optional system prompt — applies to both planner and finalizer",
+  "timeContext": { "currentTime": "2026-06-15T19:25:10+08:00", "timezone": "Asia/Kuala_Lumpur" },
   "webSearchEndpoint": "https://search.example.test"
 }
 ```
@@ -1116,6 +1167,7 @@ Host notes:
 - `temperature`, `max_output_tokens`, `maxOutputTokens`, and `maxTokens` are not supported.
 - Provider-style input is still submitted through `runtime.run(input)`, not through a separate runtime API.
 - `systemPrompt` applies globally to both the planner and finalizer. This means per-run instructions such as response language or persona overrides take effect on all response paths, including `type: "final"` direct answers. When omitted, no dynamic system prompt is injected.
+- `timeContext` (optional, AGRUN-518): opt-in host-provided current time so the model answers date/time-sensitive prompts from trusted host truth instead of guessing or inferring from the prompt. Shape: `{ currentTime, timezone? }` where `currentTime` is an ISO/RFC-3339 string (a `Date` or epoch-ms number is also accepted and ISO-normalized) and `timezone` is an optional IANA name. When present it is surfaced to the planner as a trusted read-only `loopState.hostTime` signal plus a one-line instruction; the model uses it directly with **no** `web_search`/`read_url` round-trip. **Host responsibility & privacy boundary:** this is strictly opt-in — when omitted, nothing is injected and the model never sees a clock. The runtime never reads the host wall clock on its own; the host decides what time/timezone to expose and owns its accuracy. A spawned subagent inherits the parent's `timeContext` (it runs at the same wall-clock).
 - `modelTier` (optional, `"lite"|"capable"`): overrides the planner's name-string heuristic for lite-tier classification (ADR-0033 Tier A). When set to `"lite"`, the planner runs in compact-prompt mode even for a capable-looking model name; when set to `"capable"`, name-matching is bypassed and the full prompt is used. Default: heuristic on `model` matches `flash-lite | flash | mini | haiku | nano` as lite. Use this override when the host knows the model better than the heuristic — e.g. a future `*-mini` SKU that is actually capable, or a custom-named deployment that should still get the compact prompt. The explicit opt-out `compactPlannerSystemPrompt: false` still wins over both heuristic and `modelTier: "lite"`.
 
 #### 2. Approval resolution
@@ -1174,8 +1226,26 @@ session.id
 await session.run(input)
 await session.getHistory()
 await session.getMemory()
+await session.flushMemory() // drains in-flight async memory extraction (no-op unless asyncMemoryExtraction)
+session.getMemoryState() // host-visible async memory diagnostics (AGRUN-514)
 session.getState()
 ```
+
+`session.getMemoryState()` returns the async memory extraction surface so a host/inspector can see deferred failures without timing tricks (parallel to the message store's `getState()` error surface):
+
+```js
+session.getMemoryState()
+// {
+//   enabled,        // boolean — true only when asyncMemoryExtraction is on
+//   pendingWrites,  // number  — in-flight queued extractions (0 after flushMemory)
+//   lastExtraction, // { status: "completed" | "failed" | "skipped", entryCount? , message? , reason? } | null
+//   errors          // [{ label, message }] — captured append/promotion/policy failures (capped)
+// }
+```
+
+When `asyncMemoryExtraction` is on, the returned `result` object is **stable**: the deferred extraction never mutates `result.runState.semanticState` after `session.run()` has resolved. The outcome (and any storage failure) surfaces via `getMemoryState()` instead. On the sync (default) path the extraction stamp still rides `result.runState.semanticState.memoryExtraction` as before.
+
+When a `memoryExtractionPolicy` (above) vetoes an eligible turn, `lastExtraction` carries `{ status: "skipped", reason }` — so a host/inspector can tell "nothing durable was said" (`completed` with `entryCount: 0`) apart from "we chose not to look" (`skipped`).
 
 Current `session.getState()` shape is centered on session metadata:
 
@@ -1357,7 +1427,7 @@ Skills declare each tool's arg contract in `tools[].parameters` — a JSON-schem
 
 `aliases` is an optional per-property array that absorbs LLM planner hallucination where the model emits a near-miss key (e.g. camelCase for a snake_case param). If the planner sends an alias, the validator rewrites it to the canonical name *before* required/type checks and *before* the tool body is called, so hosts never have to defend against key drift inside their tool bodies. Works end-to-end: both bundled-tool calls (via `execute_skill_tool`) and action-level args.
 
-For effective `plannerMode: "native_tools"` (which is now an explicit advanced/debug opt-in only — see ADR-0031), provider tool declarations are projected from the same `argsSchema`. Gemini declarations also include recursive `propertyOrdering` to keep required/control fields before nested payload fields. Native `plan` normalizes Gemini compatibility shapes (`toolArgsJson`, `arg_*`, direct flat fields) back to canonical action args before validation. For Gemini, `toolArgsJson` is the required native-plan payload shape for bundled-tool args because nested `toolArgs` can be emitted as `{}`; this provider capability is centralized in `src/runtime/provider-capabilities.js`. `plannerMode: "auto"` now resolves to `effectiveMode: "envelope"` with `reason: "default_envelope"` regardless of provider/model, so the resolver no longer inspects provider capabilities for the auto path; native opt-in is `plannerMode: "native_tools"` explicit. Debug snapshots still expose configured/effective mode plus the resolver reason. Native `todo_plan` still preflights empty item lists in native mode so a bad provider output emits `action-args-invalid` before TodoState mutation. If `debug` is enabled, native planner calls log a scrubbed raw args shape only; raw values, headers, API keys, bearer tokens, cookies, passwords, and secrets are omitted.
+For effective `plannerMode: "native_tools"` (the default since ADR-0058; see ADR-0031 for the prior envelope default), provider tool declarations are projected from the same `argsSchema`. Gemini declarations also include recursive `propertyOrdering` to keep required/control fields before nested payload fields. Native `plan` normalizes Gemini compatibility shapes (`toolArgsJson`, `arg_*`, direct flat fields) back to canonical action args before validation. For Gemini, `toolArgsJson` is the required native-plan payload shape for bundled-tool args because nested `toolArgs` can be emitted as `{}`; this provider capability is centralized in `src/runtime/provider-capabilities.js`. `plannerMode: "auto"` now resolves to `effectiveMode: "native_tools"` with `reason: "default_native_tools"` regardless of provider/model (ADR-0058), so the resolver no longer inspects provider capabilities for the auto path; the envelope opt-out is `plannerMode: "envelope"` explicit, and `nativeToolsFailurePolicy: "fallback_to_envelope"` (default) falls back per call on native failures. Debug snapshots still expose configured/effective mode plus the resolver reason. Native `todo_plan` still preflights empty item lists in native mode so a bad provider output emits `action-args-invalid` before TodoState mutation. If `debug` is enabled, native planner calls log a scrubbed raw args shape only; raw values, headers, API keys, bearer tokens, cookies, passwords, and secrets are omitted.
 
 ```js
 // Skill tool (bundled-tool path via execute_skill_tool)

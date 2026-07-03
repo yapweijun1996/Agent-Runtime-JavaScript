@@ -4,6 +4,7 @@ import { resolvePromptInquiryContext } from './inquiry-context-resolution.js';
 import { classifyPromptSignal } from './task-state.js';
 import { cloneValue } from './utils.js';
 import { readContextSnapshot, normalizeInquiryContext } from '../session/context-snapshot-normalize.js';
+import { readString } from './semantic-json.js';
 
 async function createSemanticInputResolution(options) {
   const request = options && options.request;
@@ -36,10 +37,10 @@ async function createSemanticInputResolution(options) {
 }
 
 function createFallbackResolution(inquiryContext, evidenceState, options) {
-  const prompt = readString$i(options && options.prompt);
+  const prompt = readString(options && options.prompt);
   const snapshot = options && options.snapshot ? options.snapshot : null;
-  const goal = readString$i(inquiryContext && inquiryContext.activeGoal);
-  const topic = readString$i(inquiryContext && inquiryContext.activeTopic);
+  const goal = readString(inquiryContext && inquiryContext.activeGoal);
+  const topic = readString(inquiryContext && inquiryContext.activeTopic);
   const promptSignal = classifyPromptSignal(prompt).signal;
   const upstreamTurnIntent = normalizeUpstreamTurnIntent(options && options.turnIntent);
   const resolvedContext = resolvePromptInquiryContext(inquiryContext, prompt, {
@@ -124,7 +125,7 @@ function normalizeUpstreamTurnIntent(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
-  const kind = readString$i(value.kind);
+  const kind = readString(value.kind);
   return {
     ...value,
     kind
@@ -132,14 +133,14 @@ function normalizeUpstreamTurnIntent(value) {
 }
 
 function resolveTurnIntentKind(options) {
-  if (readString$i(options && options.requestType) === "approval_resolution") {
+  if (readString(options && options.requestType) === "approval_resolution") {
     return "approval_resolution";
   }
-  const upstreamKind = readString$i(options && options.upstreamTurnIntent && options.upstreamTurnIntent.kind);
+  const upstreamKind = readString(options && options.upstreamTurnIntent && options.upstreamTurnIntent.kind);
   if (upstreamKind) return upstreamKind;
-  const explicitTurnKind = readString$i(options && options.turnKind);
+  const explicitTurnKind = readString(options && options.turnKind);
   if (explicitTurnKind) return explicitTurnKind;
-  return readString$i(options && options.resolvedContext && options.resolvedContext.turnKind) || "unknown";
+  return readString(options && options.resolvedContext && options.resolvedContext.turnKind) || "unknown";
 }
 
 function pendingClarificationLike(value) {
@@ -147,7 +148,7 @@ function pendingClarificationLike(value) {
 }
 
 function shouldUseSemanticRecall(prompt, inquiryContext, snapshot) {
-  const normalizedPrompt = readString$i(prompt).toLowerCase();
+  const normalizedPrompt = readString(prompt).toLowerCase();
 
   if (!normalizedPrompt || !hasConfirmedSessionMemory(inquiryContext, snapshot)) {
     return false;
@@ -171,16 +172,16 @@ function hasConfirmedSessionMemory(inquiryContext, snapshot) {
   return Boolean(
     inquiryContext &&
     (
-      readString$i(inquiryContext.activeGoal) ||
-      readString$i(inquiryContext.activeTopic) ||
+      readString(inquiryContext.activeGoal) ||
+      readString(inquiryContext.activeTopic) ||
       inquiryContext.lastClarificationResolution ||
       (sessionMemory && (
-        readString$i(sessionMemory.decisions) ||
-        readString$i(sessionMemory.facts) ||
-        readString$i(sessionMemory.history) ||
-        readString$i(sessionMemory.preferences) ||
-        readString$i(sessionMemory.recentTurns) ||
-        readString$i(sessionMemory.summary) ||
+        readString(sessionMemory.decisions) ||
+        readString(sessionMemory.facts) ||
+        readString(sessionMemory.history) ||
+        readString(sessionMemory.preferences) ||
+        readString(sessionMemory.recentTurns) ||
+        readString(sessionMemory.summary) ||
         (Array.isArray(sessionMemory.items) && sessionMemory.items.length > 0)
       ))
     )
@@ -203,10 +204,6 @@ function readPrompt$1(request, normalizedInput) {
   }
 
   return "";
-}
-
-function readString$i(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createFallbackResolution, createSemanticInputResolution };

@@ -8,6 +8,7 @@ import { isToolLoopProviderRequest, normalizeToolLoopProviderRequest } from './p
 import { attachProviderError, createProviderErrorStepDetail } from './provider-error.js';
 import { finalizeResult } from './result.js';
 import { runActionLoop } from './action-loop.js';
+import { deriveParentRunId } from './run-identity.js';
 import { createRunState, readSessionLineage } from './state.js';
 
 // ADR-0037 — Self-reference key. action-loop-session.js reads
@@ -89,7 +90,8 @@ function createProviderInputFailureResult(options, normalizedInput, cause) {
   pushStep("run-started", {
     inputType: normalizedInput.type,
     maxSteps: options.runtimeConfig.maxSteps,
-    mode: "tool_loop"
+    mode: "tool_loop",
+    parentRunId: deriveParentRunId(options.runId)
   });
   pushStep("provider-input-invalid", {
     code: error.code,
@@ -151,7 +153,8 @@ function createInvalidRunInputResult(options, normalizedInput) {
   pushStep("run-started", {
     inputType: normalizedInput.type,
     maxSteps: options.runtimeConfig.maxSteps,
-    mode: "tool_loop"
+    mode: "tool_loop",
+    parentRunId: deriveParentRunId(options.runId)
   });
   pushStep("invalid-run-input", {
     code: error.code,

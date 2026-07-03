@@ -818,8 +818,9 @@ Compatibility:
 
 - Existing `agentSkills: []` arrays are adapted through an in-memory provider.
 - Omitting both `agentSkills` and `agentSkillIndexProvider` uses no domain
-  skills. Core defaults to the generic runtime; import `@agrun/skills-research`
-  or `@agrun/skills-coder` and pass `bundledAgentSkills` to opt in.
+  skills. Core defaults to the generic runtime; provide your own SKILL.md agent
+  skills via `agentSkills` to opt in. (The `@agrun/skills-*` packages were
+  removed in AGRUN-522 — research/coder are portable host-supplied skills now.)
 - `runtime.getAgentSkills()` still returns summaries only and never exposes tool `func`.
 - `loadAgentSkills(manifestUrl)` still returns full skill objects; it is not changed to return a provider.
 - `loadSkillIndexProvider(manifestUrl)` is the scalable manifest-first path.

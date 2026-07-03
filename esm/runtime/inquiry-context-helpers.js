@@ -1,13 +1,15 @@
+import { readString } from './semantic-json.js';
+
 function normalizeAnchorText(value) {
-  return readString$1a(value).replace(/[.?!]+$/g, "").trim();
+  return readString(value).replace(/[.?!]+$/g, "").trim();
 }
 
 function looksLikeAffirmativePrompt(value) {
-  return /^(yes|yeah|yep|ok|okay|sure|go ahead|do it|just do it)\b/i.test(readString$1a(value));
+  return /^(yes|yeah|yep|ok|okay|sure|go ahead|do it|just do it)\b/i.test(readString(value));
 }
 
 function inferClarifiedTopic(question) {
-  const text = readString$1a(question);
+  const text = readString(question);
   const directMatch = text.match(/^do you mean\s+(.+?)(?:\s+specifically)?[?]?$/i);
 
   if (directMatch && directMatch[1]) {
@@ -37,9 +39,9 @@ function readResolvedInputContext(runState) {
   }
 
   return {
-    activeGoal: readString$1a(intentState.goal),
-    activeQuery: readString$1a(inputResolution && inputResolution.activeQuery),
-    activeTopic: readString$1a(intentState.topic),
+    activeGoal: readString(intentState.goal),
+    activeQuery: readString(inputResolution && inputResolution.activeQuery),
+    activeTopic: readString(intentState.topic),
     continuityKind: "input_resolution",
     hasUserClarification: intentState.hasUserClarification === true,
     lastClarificationResolution: cloneResolution(intentState.lastResolution),
@@ -49,12 +51,12 @@ function readResolvedInputContext(runState) {
 }
 
 function matchClarificationOption(prompt, options) {
-  const normalizedPrompt = readString$1a(prompt).toLowerCase();
+  const normalizedPrompt = readString(prompt).toLowerCase();
   const normalizedOptions = Array.isArray(options) ? options : [];
 
   for (const option of normalizedOptions) {
-    const key = readString$1a(option && option.key);
-    const text = readString$1a(option && option.text);
+    const key = readString(option && option.key);
+    const text = readString(option && option.text);
 
     if (!key || !text) {
       continue;
@@ -134,15 +136,11 @@ function hasStandaloneTopicAnchor(prompt) {
 }
 
 function tokenize$1(value) {
-  return readString$1a(value)
+  return readString(value)
     .toLowerCase()
     .split(/[^a-z0-9]+/i)
     .map((token) => token.trim())
     .filter((token) => token.length > 1);
-}
-
-function readString$1a(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { clonePendingClarification$1 as clonePendingClarification, cloneResolution, countTokenOverlap, hasStandaloneTopicAnchor, inferClarifiedTopic, looksLikeAffirmativePrompt, matchClarificationOption, matchesClarificationAnswer, normalizeAnchorText, overlapsCurrentDirection, readResolvedInputContext };

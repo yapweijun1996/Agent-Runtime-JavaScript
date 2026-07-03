@@ -1,4 +1,5 @@
 import { extractResearchCoverageTargets } from '../../runtime/research-coverage-guard.js';
+import { readString } from '../../runtime/semantic-json.js';
 
 const DEFAULT_WEB_SEARCH_MAX_PASSES = 3;
 const DEFAULT_WEB_SEARCH_STRATEGY = "auto";
@@ -50,7 +51,7 @@ const GENERIC_EXACT_PHRASE_TOKENS = new Set([
 ]);
 
 function normalizeWebSearchStrategy(value) {
-  const normalized = readString$I(value).toLowerCase();
+  const normalized = readString(value).toLowerCase();
   return SUPPORTED_STRATEGIES.has(normalized)
     ? normalized
     : DEFAULT_WEB_SEARCH_STRATEGY;
@@ -65,14 +66,14 @@ function normalizeWebSearchMaxPasses(value, fallback = DEFAULT_WEB_SEARCH_MAX_PA
 function normalizeSiteHints(value) {
   return Array.isArray(value)
     ? value
-      .map((item) => readString$I(item).toLowerCase())
+      .map((item) => readString(item).toLowerCase())
       .filter(Boolean)
       .slice(0, 5)
     : [];
 }
 
 function planWebSearch(options = {}) {
-  const originalQuery = collapseWhitespace(readString$I(options.query)).toLowerCase();
+  const originalQuery = collapseWhitespace(readString(options.query)).toLowerCase();
   const strategy = resolveSearchStrategy(originalQuery, options.strategy);
   const maxPasses = normalizeWebSearchMaxPasses(options.maxPasses);
   const siteHints = normalizeSiteHints(options.siteHints);
@@ -366,22 +367,18 @@ function compressQuery(query) {
 }
 
 function tokenize(value) {
-  return collapseWhitespace(readString$I(value))
+  return collapseWhitespace(readString(value))
     .toLowerCase()
     .split(/[^a-z0-9\u4e00-\u9fff.&-]+/i)
     .filter(Boolean);
 }
 
 function collapseWhitespace(value) {
-  return readString$I(value).replace(/\s+/g, " ").trim();
+  return readString(value).replace(/\s+/g, " ").trim();
 }
 
 function escapeRegExp$1(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function readString$I(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { DEFAULT_WEB_SEARCH_MAX_PASSES, DEFAULT_WEB_SEARCH_STRATEGY, normalizeSiteHints, normalizeWebSearchMaxPasses, normalizeWebSearchStrategy, planWebSearch };

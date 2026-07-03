@@ -1,6 +1,8 @@
 import { inspectWorkspacePublishProtocol, inspectWorkspaceCandidateStructure } from './virtual-workspace.js';
+import { DEFAULT_FINAL_CANDIDATE_PATH } from './workspace-candidate-lifecycle.js';
 import { extractRequestedLengthContract, readTerminalContractText } from './terminal-final-contract.js';
 import { isReadableEvidenceSource, explainReadSourceQuality } from './read-source-quality.js';
+import { readString, readFiniteNumber } from './semantic-json.js';
 
 const ISSUE_BLOCKING = "blocking";
 const ISSUE_ADVISORY = "advisory";
@@ -90,7 +92,7 @@ function buildCandidateQualitySignal(options = {}) {
       ? runState.virtualWorkspace
       : {};
   const file = options.file && typeof options.file === "object" ? options.file : {};
-  const path = readString$1x(file.path || options.path) || "final_candidate.md";
+  const path = readString(file.path || options.path) || DEFAULT_FINAL_CANDIDATE_PATH;
   const content = typeof file.content === "string" ? file.content : "";
   const finalReadiness = options.finalReadiness && typeof options.finalReadiness === "object"
     ? options.finalReadiness
@@ -103,7 +105,7 @@ function buildCandidateQualitySignal(options = {}) {
   const textStats = readTextStats(file.textStats, content);
   const requestedLength = readRequestedLength({ context, finalReadiness, options });
   const requestedCitations = readRequestedCitationContract({ options });
-  const publishDecision = readString$1x(finalReadiness && finalReadiness.decision).toLowerCase();
+  const publishDecision = readString(finalReadiness && finalReadiness.decision).toLowerCase();
   const structureSeverity = resolveStructureIssueSeverity(options.runtimeConfig);
   const sourceSeverity = resolveSourceIssueSeverity(options.runtimeConfig);
 
@@ -111,7 +113,7 @@ function buildCandidateQualitySignal(options = {}) {
     const reviewFresh = Boolean(
       review &&
       review.path === path &&
-      review.fileVersion === readNumber$d(file.version) &&
+      review.fileVersion === readNumber$i(file.version) &&
       publishProtocol.reviewAfterLatestContentChange === true
     );
     if (!reviewFresh) {
@@ -176,6 +178,24 @@ function buildCandidateQualitySignal(options = {}) {
       finalSectionTitle,
       followingHeadings: contentAfterFinalSection.followingHeadings
     }));
+  } else if (!finalSectionTitle) {
+    // Quality-arc 2026-07-03 — when the model never declared a final section
+    // (e.g. it skipped review), a Sources/References-style heading is the
+    // natural terminal-section candidate: body headings AFTER it read as a
+    // structural defect to humans ("body-after-sources" in the scorecard's
+    // text analysis) but previously produced NO runtime fact the model could
+    // repair from. Advisory, not blocking — the title is inferred.
+    const sourcesAfter = inspectContentAfterSourcesHeading(content);
+    if (sourcesAfter && sourcesAfter.hasContentAfterFinalSection) {
+      issues.push(createIssue({
+        code: "body_after_sources",
+        message: `Candidate has major section headings after its "${sourcesAfter.sourcesHeading}" section; sources normally end the report.`,
+        severity: ISSUE_ADVISORY,
+        path,
+        finalSectionTitle: sourcesAfter.sourcesHeading,
+        followingHeadings: sourcesAfter.followingHeadings
+      }));
+    }
   }
 
   const citationAudit = inspectCitedUrlEvidence(content, runState);
@@ -267,20 +287,20 @@ function normalizeCandidateQualitySignal(value) {
     blockingIssueCodes: blockingIssues.map((issue) => issue.code),
     blockingIssues,
     citationAudit: source.citationAudit && typeof source.citationAudit === "object" ? source.citationAudit : null,
-    finalSectionTitle: readString$1x(source.finalSectionTitle) || null,
+    finalSectionTitle: readString(source.finalSectionTitle) || null,
     hasBlockingIssues: blockingIssues.length > 0,
     issueCodes: issues.map((issue) => issue.code),
     issues,
     kind: "candidate_quality_signal",
     ok: source.ok === true && blockingIssues.length === 0,
-    path: readString$1x(source.path) || null,
+    path: readString(source.path) || null,
     publishProtocol: source.publishProtocol && typeof source.publishProtocol === "object" ? source.publishProtocol : null,
     requestedCitations: source.requestedCitations && typeof source.requestedCitations === "object" ? source.requestedCitations : null,
     requestedLength: source.requestedLength && typeof source.requestedLength === "object" ? source.requestedLength : null,
     requirementsChecklist: normalizeRequirementsChecklist(source.requirementsChecklist),
     review: source.review && typeof source.review === "object" ? source.review : null,
     reviewRequired: source.reviewRequired === true,
-    status: readString$1x(source.status) || (blockingIssues.length > 0 ? "blocked" : advisoryIssues.length > 0 ? "warn" : "pass"),
+    status: readString(source.status) || (blockingIssues.length > 0 ? "blocked" : advisoryIssues.length > 0 ? "warn" : "pass"),
     structure: source.structure && typeof source.structure === "object" ? source.structure : null,
     textStats: source.textStats && typeof source.textStats === "object" ? source.textStats : null,
     version: 1,
@@ -295,7 +315,7 @@ function readCandidateReview(workspace, path) {
   const review = quality.candidateReview && typeof quality.candidateReview === "object"
     ? quality.candidateReview
     : null;
-  if (!review || readString$1x(review.path) !== path) return null;
+  if (!review || readString(review.path) !== path) return null;
   return review;
 }
 
@@ -303,7 +323,7 @@ function readRequestedLength({ context, finalReadiness, options }) {
   const assessment = finalReadiness && finalReadiness.requirementsAssessment && typeof finalReadiness.requirementsAssessment === "object"
     ? finalReadiness.requirementsAssessment
     : {};
-  const requestedFromReadiness = readFiniteNumber$4(assessment.requestedLength);
+  const requestedFromReadiness = readFiniteNumber(assessment.requestedLength);
   const unitFromReadiness = normalizeLengthUnit(assessment.observedLengthUnit);
   if (requestedFromReadiness != null && requestedFromReadiness > 0) {
     return {
@@ -315,12 +335,12 @@ function readRequestedLength({ context, finalReadiness, options }) {
   const explicit = options.requestedLength && typeof options.requestedLength === "object"
     ? options.requestedLength
     : null;
-  if (explicit && readFiniteNumber$4(explicit.value) > 0) {
+  if (explicit && readFiniteNumber(explicit.value) > 0) {
     const unit = normalizeLengthUnit(explicit.unit);
     return {
-      statsKey: readString$1x(explicit.statsKey) || unitToStatsKey(unit),
+      statsKey: readString(explicit.statsKey) || unitToStatsKey(unit),
       unit,
-      value: readFiniteNumber$4(explicit.value)
+      value: readFiniteNumber(explicit.value)
     };
   }
   return extractRequestedLengthContract(readTerminalContractText(context)) || null;
@@ -347,7 +367,7 @@ function readRequestedCitationContract({ options }) {
   ];
   for (const [explicit, source] of candidates) {
     if (!explicit || typeof explicit !== "object") continue;
-    const explicitMin = readFiniteNumber$4(explicit.minUrlCount || explicit.minUrls || explicit.minSources);
+    const explicitMin = readFiniteNumber(explicit.minUrlCount || explicit.minUrls || explicit.minSources);
     if (explicitMin && explicitMin > 0) {
       return { minUrlCount: Math.floor(explicitMin), source };
     }
@@ -357,10 +377,10 @@ function readRequestedCitationContract({ options }) {
 
 function inspectWordCountAgreement(content, textStats, requestedLength) {
   if (!requestedLength || requestedLength.unit !== "words") return null;
-  const requestedWords = readFiniteNumber$4(requestedLength.value);
+  const requestedWords = readFiniteNumber(requestedLength.value);
   if (!requestedWords || requestedWords <= 0) return null;
   const externalWords = countWhitespaceWords(content);
-  const runtimeWords = readNumber$d(textStats && textStats.words);
+  const runtimeWords = readNumber$i(textStats && textStats.words);
   return {
     belowRequested: externalWords < requestedWords,
     externalWords,
@@ -379,7 +399,7 @@ function inspectWordCountAgreement(content, textStats, requestedLength) {
 function buildCitationCoverageAudit(content, runState) {
   const text = typeof content === "string" ? content : "";
   const evidence = collectReadSourceEvidence(runState);
-  const cited = new Set(extractUrls(text).map((url) => normalizeUrl(url)));
+  const cited = new Set(extractUrls(text).map((url) => normalizeUrl$1(url)));
   const uncitedReadUrls = [];
   let citedReadableCount = 0;
   for (const [normalized, source] of evidence.byUrl) {
@@ -389,8 +409,8 @@ function buildCitationCoverageAudit(content, runState) {
       continue;
     }
     uncitedReadUrls.push({
-      title: readString$1x(source.title) || null,
-      url: readString$1x(source.url)
+      title: readString(source.title) || null,
+      url: readString(source.url)
     });
   }
   const audit = {
@@ -408,25 +428,39 @@ function buildCitationCoverageAudit(content, runState) {
   return audit;
 }
 
+// AGRUN-414 — the three URL counts are deliberately distinct; the names now
+// make the difference unambiguous:
+//   citedUrlCount          — URLs the candidate cites (raw, regardless of read/quality)
+//   citedReadableUrlCount  — of those cited URLs, how many are READABLE evidence
+//                            the run actually read (cited ∩ readable)
+//   readableEvidenceUrlCount — readable sources the run read, run-wide (cited or not)
+// The cited∩readable intersection is the metric the source-quality acceptance
+// gate cares about (cite >= N readable sources); it used to have no runtime
+// field and had to be recomputed by consumers (see test/helpers/live-quality.mjs).
 function inspectCitedUrlEvidence(content, runState) {
   const urls = extractUrls(content);
   const evidence = collectReadSourceEvidence(runState);
+  let citedReadableUrlCount = 0;
+  const citedUrls = urls.map((url) => {
+    const source = evidence.byUrl.get(normalizeUrl$1(url));
+    if (!source) {
+      return { status: "unread", url };
+    }
+    const readable = isReadableEvidenceSource(source);
+    if (readable) citedReadableUrlCount += 1;
+    const detail = explainReadSourceQuality(source);
+    return {
+      ok: readable,
+      qualityReason: detail.reason,
+      qualityTier: detail.tier,
+      status: readable ? "readable" : "blocked",
+      url
+    };
+  });
   return {
-    citedUrls: urls.map((url) => {
-      const source = evidence.byUrl.get(normalizeUrl(url));
-      if (!source) {
-        return { status: "unread", url };
-      }
-      const detail = explainReadSourceQuality(source);
-      return {
-        ok: isReadableEvidenceSource(source),
-        qualityReason: detail.reason,
-        qualityTier: detail.tier,
-        status: isReadableEvidenceSource(source) ? "readable" : "blocked",
-        url
-      };
-    }).slice(0, 24),
+    citedUrls: citedUrls.slice(0, 24),
     citedUrlCount: urls.length,
+    citedReadableUrlCount,
     readableEvidenceUrlCount: evidence.readableCount,
     readSourceUrlCount: evidence.totalCount
   };
@@ -439,15 +473,15 @@ function collectReadSourceEvidence(runState) {
   const byUrl = new Map();
   let readableCount = 0;
   for (const source of readSources) {
-    const url = readString$1x(source && source.url);
+    const url = readString(source && source.url);
     if (!url) continue;
-    byUrl.set(normalizeUrl(url), source);
+    byUrl.set(normalizeUrl$1(url), source);
     if (isReadableEvidenceSource(source)) readableCount += 1;
   }
   return {
     byUrl,
     readableCount,
-    totalCount: readSources.filter((source) => readString$1x(source && source.url)).length
+    totalCount: readSources.filter((source) => readString(source && source.url)).length
   };
 }
 
@@ -478,10 +512,40 @@ function inspectContentAfterFinalSection(content, finalSectionTitle) {
   };
 }
 
+// Quality-arc 2026-07-03 — fallback terminal-section inference for the
+// body_after_sources advisory: the LAST sources/references-style heading is
+// treated as the terminal candidate when no finalSectionTitle was declared.
+// Exact-title match (optional numbering prefix, optional trailing colon) so
+// mid-document headings like "Sources of Error" never false-positive.
+const SOURCES_HEADING_PATTERN = /^(?:\d+[\.)]?\s*)?(sources?|references?|bibliography|citations?|参考文献|参考资料|来源)\s*[:：]?\s*$/iu;
+
+function inspectContentAfterSourcesHeading(content) {
+  const headings = collectHeadingLines(content);
+  // FIRST exact sources-style heading: body headings after it — including a
+  // duplicated Sources section — are the defect being surfaced.
+  const sourcesIndex = headings.findIndex((heading) => SOURCES_HEADING_PATTERN.test(readString(heading.text)));
+  if (sourcesIndex < 0) return null;
+  const sourcesHeading = headings[sourcesIndex];
+  const followingHeadings = headings
+    .slice(sourcesIndex + 1)
+    .filter((heading) => heading.level <= sourcesHeading.level)
+    .map((heading) => ({
+      level: heading.level,
+      lineNumber: heading.lineNumber,
+      text: heading.text
+    }))
+    .slice(0, 8);
+  return {
+    sourcesHeading: sourcesHeading.text,
+    followingHeadings,
+    hasContentAfterFinalSection: followingHeadings.length > 0
+  };
+}
+
 function readFinalSectionTitle({ review, options }) {
-  const reviewTitle = readString$1x(review && review.finalSectionTitle);
+  const reviewTitle = readString(review && review.finalSectionTitle);
   if (reviewTitle) return reviewTitle;
-  const optionTitle = readString$1x(options && options.finalSectionTitle);
+  const optionTitle = readString(options && options.finalSectionTitle);
   if (optionTitle) return optionTitle;
   return "";
 }
@@ -492,13 +556,13 @@ function collectHeadingLines(content) {
   const lines = value.split(/\r?\n/);
   const headings = [];
   for (let index = 0; index < lines.length; index += 1) {
-    const line = readString$1x(lines[index]);
+    const line = readString(lines[index]);
     const match = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
     if (!match) continue;
     headings.push({
       level: match[1].length,
       lineNumber: index + 1,
-      text: readString$1x(match[2])
+      text: readString(match[2])
     });
   }
   return headings;
@@ -512,7 +576,7 @@ function extractUrls(content) {
   let match;
   while ((match = re.exec(sourceContent)) !== null) {
     const url = cleanupUrl(match[0]);
-    const key = normalizeUrl(url);
+    const key = normalizeUrl$1(url);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     urls.push(url);
@@ -521,10 +585,10 @@ function extractUrls(content) {
 }
 
 function cleanupUrl(value) {
-  return readString$1x(value).replace(/[.,;:!?]+$/g, "");
+  return readString(value).replace(/[.,;:!?]+$/g, "");
 }
 
-function normalizeUrl(value) {
+function normalizeUrl$1(value) {
   try {
     const url = new URL(cleanupUrl(value));
     url.hash = "";
@@ -548,13 +612,13 @@ function readStructureSamples(structure, code) {
 function summarizeStructure(structure) {
   const source = structure && typeof structure === "object" ? structure : {};
   return {
-    duplicateHeadingCount: readNumber$d(source.duplicateHeadingCount),
-    duplicateNumberCount: readNumber$d(source.duplicateNumberCount),
-    headingCount: readNumber$d(source.headingCount),
-    issueCodes: Array.isArray(source.issueCodes) ? source.issueCodes.map(readString$1x).filter(Boolean).slice(0, 12) : [],
+    duplicateHeadingCount: readNumber$i(source.duplicateHeadingCount),
+    duplicateNumberCount: readNumber$i(source.duplicateNumberCount),
+    headingCount: readNumber$i(source.headingCount),
+    issueCodes: Array.isArray(source.issueCodes) ? source.issueCodes.map(readString).filter(Boolean).slice(0, 12) : [],
     ok: source.ok === true,
-    reason: readString$1x(source.reason) || null,
-    status: readString$1x(source.status) || "unknown"
+    reason: readString(source.reason) || null,
+    status: readString(source.status) || "unknown"
   };
 }
 
@@ -565,28 +629,28 @@ function createIssue(value) {
 function normalizeIssue(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const code = readString$1x(source.code);
+  const code = readString(source.code);
   if (!code) return null;
   return {
     code,
-    expectedAction: readString$1x(source.expectedAction) || null,
-    field: readString$1x(source.field) || null,
-    finalSectionTitle: readString$1x(source.finalSectionTitle) || null,
+    expectedAction: readString(source.expectedAction) || null,
+    field: readString(source.field) || null,
+    finalSectionTitle: readString(source.finalSectionTitle) || null,
     followingHeadings: Array.isArray(source.followingHeadings) ? source.followingHeadings.slice(0, 8) : [],
-    message: readString$1x(source.message) || code,
-    path: readString$1x(source.path) || null,
-    qualityReason: readString$1x(source.qualityReason) || null,
-    qualityTier: readString$1x(source.qualityTier) || null,
-    requirementId: readString$1x(source.requirementId) || null,
+    message: readString(source.message) || code,
+    path: readString(source.path) || null,
+    qualityReason: readString(source.qualityReason) || null,
+    qualityTier: readString(source.qualityTier) || null,
+    requirementId: readString(source.requirementId) || null,
     samples: Array.isArray(source.samples) ? source.samples.slice(0, 8) : [],
-    severity: readString$1x(source.severity) === ISSUE_ADVISORY ? ISSUE_ADVISORY : ISSUE_BLOCKING,
-    status: readString$1x(source.status) || null,
-    url: readString$1x(source.url) || null,
-    citedUrlCount: readFiniteNumber$4(source.citedUrlCount),
-    externalWords: readFiniteNumber$4(source.externalWords),
-    minUrlCount: readFiniteNumber$4(source.minUrlCount),
-    requestedWords: readFiniteNumber$4(source.requestedWords),
-    runtimeWords: readFiniteNumber$4(source.runtimeWords)
+    severity: readString(source.severity) === ISSUE_ADVISORY ? ISSUE_ADVISORY : ISSUE_BLOCKING,
+    status: readString(source.status) || null,
+    url: readString(source.url) || null,
+    citedUrlCount: readFiniteNumber(source.citedUrlCount),
+    externalWords: readFiniteNumber(source.externalWords),
+    minUrlCount: readFiniteNumber(source.minUrlCount),
+    requestedWords: readFiniteNumber(source.requestedWords),
+    runtimeWords: readFiniteNumber(source.runtimeWords)
   };
 }
 
@@ -601,29 +665,29 @@ function normalizeRequirementsChecklist(value) {
 function normalizeRequirement(value, index) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   if (!source) return null;
-  const requirement = readString$1x(source.requirement || source.summary || source.text);
+  const requirement = readString(source.requirement || source.summary || source.text);
   if (!requirement) return null;
-  const id = readString$1x(source.id) || `requirement_${index + 1}`;
+  const id = readString(source.id) || `requirement_${index + 1}`;
   return {
-    evidence: readString$1x(source.evidence).slice(0, 360) || null,
+    evidence: readString(source.evidence).slice(0, 360) || null,
     id: id.slice(0, 80),
     kind: normalizeRequirementKind(source.kind || source.type),
-    remainingGap: readString$1x(source.remainingGap || source.gap).slice(0, 360) || null,
-    repairAction: readString$1x(source.repairAction || source.repairPlan).slice(0, 360) || null,
+    remainingGap: readString(source.remainingGap || source.gap).slice(0, 360) || null,
+    repairAction: readString(source.repairAction || source.repairPlan).slice(0, 360) || null,
     requirement: requirement.slice(0, 360),
     status: normalizeRequirementStatus(source.status || source.result)
   };
 }
 
 function normalizeRequirementKind(value) {
-  const text = readString$1x(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (text === "objective" || text === "fact" || text === "measurable") return "objective";
   if (text === "subjective" || text === "editorial" || text === "quality") return "subjective";
   return "unknown";
 }
 
 function normalizeRequirementStatus(value) {
-  const text = readString$1x(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (text === "met" || text === "pass" || text === "passed" || text === "done") return "met";
   if (text === "partial" || text === "partially_met" || text === "partly_met") return "partial";
   if (text === "unmet" || text === "fail" || text === "failed" || text === "missing") return "unmet";
@@ -632,25 +696,25 @@ function normalizeRequirementStatus(value) {
 
 function readTextStats(stats, content) {
   const source = stats && typeof stats === "object" ? stats : {};
-  const text = readString$1x(content);
+  const text = readString(content);
   const words = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g) || [];
   const cjkChars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
   return {
-    chars: readNumber$d(source.chars) || text.length,
-    cjkChars: readNumber$d(source.cjkChars) || cjkChars.length,
-    nonWhitespaceChars: readNumber$d(source.nonWhitespaceChars) || text.replace(/\s/g, "").length,
-    words: readNumber$d(source.words) || words.length
+    chars: readNumber$i(source.chars) || text.length,
+    cjkChars: readNumber$i(source.cjkChars) || cjkChars.length,
+    nonWhitespaceChars: readNumber$i(source.nonWhitespaceChars) || text.replace(/\s/g, "").length,
+    words: readNumber$i(source.words) || words.length
   };
 }
 
 function countWhitespaceWords(value) {
-  const text = readString$1x(value);
+  const text = readString(value);
   if (!text) return 0;
   return text.split(/\s+/).filter(Boolean).length;
 }
 
 function normalizeHeadingLabel(value) {
-  return readString$1x(value)
+  return readString(value)
     .replace(/^#{1,6}\s+/, "")
     .replace(/\s+#+\s*$/, "")
     .replace(/^\d{1,3}(?:\.\d{1,3})*\.?\s+/, "")
@@ -662,7 +726,7 @@ function normalizeHeadingLabel(value) {
 }
 
 function normalizeLengthUnit(value) {
-  const text = readString$1x(value).toLowerCase();
+  const text = readString(value).toLowerCase();
   if (text === "words" || text === "word") return "words";
   if (text === "cjk_chars" || text === "cjkchars" || text === "\u5b57" || text === "\u5b57\u6570") return "cjk_chars";
   if (text === "chars" || text === "char" || text === "characters") return "chars";
@@ -675,16 +739,8 @@ function unitToStatsKey(unit) {
   return "chars";
 }
 
-function readFiniteNumber$4(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readNumber$d(value) {
+function readNumber$i(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function readString$1x(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { buildCandidateQualitySignal, buildCitationCoverageAudit, normalizeCandidateQualitySignal };

@@ -1,5 +1,5 @@
 import { normalizeConvergenceConfig } from '../action-pattern-convergence.js';
-import { PUBLISH_DIRECT_ACTION } from '../kernel-terminal-actions.js';
+import { PUBLISH_DIRECT_ACTION } from '../action-names.js';
 
 // ADR-0035 (AGRUN-262) — native tool-calling mode planner directives.
 // Extracted verbatim from planner-native-system-prompt.js buildNativeToolsSystemPrompt
@@ -18,13 +18,15 @@ function buildLines({ availableActions, standaloneActionNames, nativePlanGuidanc
   const hasAction = (name) => actionDefinitions.some((action) => action && action.name === name);
   return [
     "[agrun:planner-contract]",
-    "Internal contract: pick the next step for an action loop. Choose exactly one tool call as your next step.",
+    "Internal contract: pick the next step for an action loop. Choose exactly one tool call as your next step, or, when no tool is needed and the task is complete, reply directly with the final user-facing answer as plain text (no JSON, no tool syntax).",
+    "You may request multiple INDEPENDENT non-mutating tool calls in a single response; they run in parallel and every result comes back together. Emit dependent, mutating, approval-gated, or standalone-only actions one at a time.",
     "User-visible text inside the final answer or finalize instruction must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
     "Check the current topic, current goal, open ambiguity, confirmed memory, and recent turns before asking for clarification.",
     "Treat clarification as a last resort.",
     "If YOU judge the current session evidence is sufficient to answer, use finalize. Use final_answer only when that tool is available for a simple no-tool answer.",
     "When current or factual evidence is needed and evidence is missing, gather evidence before asking for clarification or finalizing.",
-    "For source-grounded research, treat web_search results as candidate leads until a successful read_url adds the page to readSources. Cite URLs in final sources only when they are in successful readSources; if you use search snippets without reading pages, label the answer as search-summary-only.",
+    "For source-grounded research, treat web_search results as candidate leads until a successful read_url adds the page to readSources. Cite URLs in final sources only when they are in successful readSources; if you use search snippets without reading pages, label the answer as search-summary-only. EXCEPTION — proportionality: for quick current-events or headline-style asks (e.g. 'today's top news', 'latest X headlines'), the search results themselves are the deliverable: answer directly from result titles and URLs, note the answer is based on search results, and do NOT spend steps reading pages unless the user asks about page content.",
+    "Citation-count self-check: when the user requires N cited sources, the FINAL deliverable must cite at least N distinct successfully-read URLs inline — reading N pages is not enough if the text cites fewer. Count your inline citations against the requirement before finalizing/publishing; if short, cite additional pages you already read or read one more.",
     "read_url supports optional textStart and textLength. If a readSource textRange shows hasAfter=true and the missing answer may be later in that same page, call read_url again with the same url and textStart=nextTextStart instead of assuming the unseen text is irrelevant.",
     "If loopState.readUrlRecoverySignal says the latest URL is needs_alternate_source or source_blocked, do not retry that same non-retryable URL; use an alternate candidate, run refined web_search, or finalize/publish limited with evidenceSatisfied=false and concrete remainingGaps if evidence is exhausted.",
     "If loopState.requirementRecoveryEvaluator.validLimitedAllowed=false, observable deficits still appear recoverable; do not clean ready or publish limited until you perform the listed recovery attempt, or can name a concrete unrecoverable blocker with remainingGaps.",
@@ -45,6 +47,7 @@ function buildLines({ availableActions, standaloneActionNames, nativePlanGuidanc
     ...(hasAction("workspace_write")
       ? [
         "Virtual workspace tools provide browser-safe draft artifacts: workspace_write writes, workspace_read/workspace_list reviews existing artifacts, workspace_replace revises, workspace_finalize_candidate marks the user-facing candidate, and workspace_publish_candidate publishes that selected candidate directly when it is the answer. Follow standalone-only action metadata when choosing plan versus direct tool calls.",
+        "Workspace authoring (workspace_write, workspace_replace, workspace_insert_after_section, workspace_apply_patch, workspace_multi_edit) is for deliverables that genuinely need multi-turn work — integrating evidence you still have to gather, revising an existing draft across steps, or self-review before publishing. If you can produce the complete deliverable in ONE response — even a long, multi-section one, like a ~1500-word article from knowledge you already have — answer directly; workspace drafting only adds steps without improving that result. For a simple or direct answer (a single fact, a brief explanation, a quick lookup or search result), likewise finalize directly. Choose workspace authoring only when YOU judge the deliverable cannot be completed well in a single response.",
         "Before relying on a virtual workspace draft, inspect the relevant file with workspace_read or workspace_list and use textStats (chars, nonWhitespaceChars, cjkChars, words) as inputs for YOUR readiness judgment. Runtime will not decide whether requested requirements are satisfied.",
         "If a loaded skill gives a workspace workflow, follow the skill's SKILL.md rather than native planner defaults.",
         "If a TodoState plan exists, keep it synchronized yourself: after completing a phase choose todo_run_next or todo_advance before moving to the next phase, and before any terminal publish/finalize mark completed phases done or honestly blocked/abandoned. Runtime will only observe stale TodoState; it will not mark items done for you.",
@@ -60,6 +63,7 @@ function buildLines({ availableActions, standaloneActionNames, nativePlanGuidanc
     "When a loaded skill or action contract requires finalReadiness, include it on finalize/publish using observable tool, readSources, and workspace facts. It is YOUR self-assessment; runtime records consistency and required-field checks only.",
     "If the user explicitly asks the visible answer to include finalReadiness.decision, include one plain-text line with that exact field in your finalize instruction, and keep it consistent with finalReadiness.decision. Do not include readiness JSON.",
     "Use final_answer only for simple no-tool answers when the runtime exposes that tool. If a loaded skill workflow, read_url evidence, virtual workspace drafting, or readiness contract is active, use finalize with the required contract or continue tool work.",
+    "When the gathered tool evidence already answers the user and no readiness contract, loaded skill workflow, or workspace draft is active, reply directly with the final plain-text answer instead of another tool call — do not re-call a tool whose result is already in toolContext or the observations.",
     "Do not create or revise TodoState for a simple one-step lookup, search, or read request; choose the relevant research action directly. Use todo_plan only for genuinely multi-step tasks that need progress tracking.",
     ...(nativePlanGuidance ? [nativePlanGuidance] : []),
     "When you choose finalize, the instruction must end the turn and must not ask the user a follow-up question.",

@@ -1,5 +1,7 @@
+import { readString } from './semantic-json.js';
+
 function isExecutableTopicLikeTurn(prompt, turnIntent) {
-  const text = readString$1e(prompt);
+  const text = readString(prompt);
 
   if (!text) {
     return false;
@@ -8,7 +10,7 @@ function isExecutableTopicLikeTurn(prompt, turnIntent) {
   if (
     !turnIntent ||
     typeof turnIntent !== "object" ||
-    readString$1e(turnIntent.kind) !== "new_task"
+    readString(turnIntent.kind) !== "new_task"
   ) {
     return false;
   }
@@ -47,7 +49,7 @@ function looksLikeTopicPrompt(value) {
 // prose loop-risk scan in clarification-state.js (assistant text, not a user
 // prompt). "?" is language-neutral punctuation, not an intent lexicon.
 function isQuestionLikeText(value) {
-  return readString$1e(value).endsWith("?");
+  return readString(value).endsWith("?");
 }
 
 // AGRUN-246-K: isActionLikeText (the last English action-verb lexicon, B1/B2)
@@ -70,7 +72,7 @@ function countWords(value) {
 // signals specificity ("Q3 2024", "...2026"); this is a structural primitive,
 // not an intent lexicon.
 function hasDigit(value) {
-  const text = readString$1e(value);
+  const text = readString(value);
   for (let i = 0; i < text.length; i += 1) {
     const ch = text[i];
     if (ch >= "0" && ch <= "9") {
@@ -81,11 +83,7 @@ function hasDigit(value) {
 }
 
 function trimTrailingPunctuation$2(value) {
-  return readString$1e(value).replace(/[.?!]+$/g, "").trim();
-}
-
-function readString$1e(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return readString(value).replace(/[.?!]+$/g, "").trim();
 }
 
 export { isExecutableTopicLikeTurn, isQuestionLikeText, looksLikeTopicPrompt };

@@ -1,10 +1,12 @@
+import { readString } from './semantic-json.js';
+
 const UI_EXTENSION_BLOCKS = Object.freeze([
   "g3-followups",
   "g3-drill-hints"
 ]);
 
 function stripSectionUiExtensionBlocks(value) {
-  let text = readString$l(value);
+  let text = readString(value);
   if (!text) return "";
 
   for (const language of UI_EXTENSION_BLOCKS) {
@@ -25,10 +27,6 @@ function createFencePattern(language) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function readString$l(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { stripSectionUiExtensionBlocks };

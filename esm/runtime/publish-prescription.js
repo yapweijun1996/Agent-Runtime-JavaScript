@@ -53,8 +53,8 @@ function buildValidLimitedPublishArgsExample(runState) {
       ? candidate.textStats
       : {};
   const statsKey = readString(requested.statsKey) || "words";
-  const observed = readFiniteNumber$3(stats[statsKey]);
-  const requestedLength = readFiniteNumber$3(requested.value);
+  const observed = readFiniteNumber$4(stats[statsKey]);
+  const requestedLength = readFiniteNumber$4(requested.value);
   const lengthSatisfied = requestedLength > 0 ? observed >= requestedLength : false;
   const evidence = packet.evidence && typeof packet.evidence === "object" ? packet.evidence : {};
   return {
@@ -72,7 +72,7 @@ function buildValidLimitedPublishArgsExample(runState) {
         remainingGaps: ["Source minimum / read_url evidence is still insufficient."],
         requestedLength: requestedLength || null,
         requirementSatisfied: false,
-        successfulReadUrlCount: readFiniteNumber$3(evidence.successfulReadUrlCount),
+        successfulReadUrlCount: readFiniteNumber$4(evidence.successfulReadUrlCount),
         summary: "Publish limited only if evidence recovery is exhausted or cannot improve within budget."
       }
     }
@@ -109,7 +109,7 @@ function buildPublishPrescription(options) {
   };
 }
 
-function readFiniteNumber$3(value) {
+function readFiniteNumber$4(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 

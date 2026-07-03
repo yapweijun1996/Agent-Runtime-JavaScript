@@ -1,12 +1,13 @@
 import { isTurnIdBefore } from '../runtime/turn-ordering.js';
 import { cloneValue } from '../runtime/utils.js';
+import { readString } from '../runtime/semantic-json.js';
 
 function normalizeCompactionPolicy(value) {
   const source = value && typeof value === "object" && !Array.isArray(value)
     ? value
     : {};
   return {
-    maxTurns: readPositiveInteger$8(source.maxTurns),
+    maxTurns: readPositiveInteger$7(source.maxTurns),
     onCompact: typeof source.onCompact === "function" ? source.onCompact : null
   };
 }
@@ -34,10 +35,10 @@ async function applyCompactionPolicyToHistory(history, options = {}) {
     try {
       const hostResult = await policy.onCompact(cloneValue(sourceHistory), {
         maxTurns: policy.maxTurns,
-        sessionId: readString$d(opts.sessionId) || null,
+        sessionId: readString(opts.sessionId) || null,
         sourceCount,
         sourceTurnCount,
-        threadId: readString$d(opts.threadId) || null
+        threadId: readString(opts.threadId) || null
       });
       const normalized = normalizeHistory(hostResult);
       if (normalized) {
@@ -53,7 +54,7 @@ async function applyCompactionPolicyToHistory(history, options = {}) {
     } catch (error) {
       return createCompactionPolicyResult(defaultTrim(sourceHistory, policy.maxTurns), {
         applied: shouldTrimByMaxTurns,
-        error: readString$d(error && error.message) || "onCompact_failed",
+        error: readString(error && error.message) || "onCompact_failed",
         hook: "onCompact",
         maxTurns: policy.maxTurns,
         reason: shouldTrimByMaxTurns ? "host_onCompact_failed_default_trim" : "host_onCompact_failed_noop",
@@ -90,10 +91,10 @@ function createCompactionPolicyResult(history, detail) {
   return {
     detail: {
       applied: detail.applied === true,
-      error: readString$d(detail.error) || null,
-      hook: readString$d(detail.hook) || null,
+      error: readString(detail.error) || null,
+      hook: readString(detail.hook) || null,
       maxTurns: Number.isInteger(detail.maxTurns) ? detail.maxTurns : null,
-      reason: readString$d(detail.reason) || null,
+      reason: readString(detail.reason) || null,
       resultCount: messages.length,
       sourceCount: Number.isInteger(detail.sourceCount) ? detail.sourceCount : messages.length,
       sourceTurnCount: Number.isInteger(detail.sourceTurnCount) ? detail.sourceTurnCount : null
@@ -120,20 +121,20 @@ function defaultTrim(history, maxTurns) {
   }
   const keptTurnIds = new Set(turnIds.slice(-maxTurns));
   return history.filter((message) => {
-    const turnId = readString$d(message && message.turnId);
+    const turnId = readString(message && message.turnId);
     return !turnId || keptTurnIds.has(turnId);
   });
 }
 
 function createWindowFromHistory(history) {
-  const first = history.find((message) => readString$d(message && message.turnId));
-  const oldestPreservedTurnId = readString$d(first && first.turnId);
+  const first = history.find((message) => readString(message && message.turnId));
+  const oldestPreservedTurnId = readString(first && first.turnId);
   return oldestPreservedTurnId ? { oldestPreservedTurnId } : null;
 }
 
 function sameMessageIds(left, right) {
   if (left.length !== right.length) return false;
-  return left.every((entry, index) => readString$d(entry && entry.id) === readString$d(right[index] && right[index].id));
+  return left.every((entry, index) => readString(entry && entry.id) === readString(right[index] && right[index].id));
 }
 
 function countHistoryTurns(history) {
@@ -144,7 +145,7 @@ function readOrderedTurnIds(history) {
   const turnIds = [];
   const seen = new Set();
   for (const message of history) {
-    const turnId = readString$d(message && message.turnId);
+    const turnId = readString(message && message.turnId);
     if (!turnId || seen.has(turnId)) continue;
     seen.add(turnId);
     turnIds.push(turnId);
@@ -154,16 +155,12 @@ function readOrderedTurnIds(history) {
 
 function readWindowTurnId(value) {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? readString$d(value.oldestPreservedTurnId)
+    ? readString(value.oldestPreservedTurnId)
     : "";
 }
 
-function readPositiveInteger$8(value) {
+function readPositiveInteger$7(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
-}
-
-function readString$d(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { applyCompactionPolicyToHistory, mergeCompactionWindows, normalizeCompactionPolicy };

@@ -8,13 +8,16 @@ import { normalizeInput } from './input.js';
 import { normalizeToolLoopProviderRequest } from './provider.js';
 import { createRunState, readSessionLineage, ensureLiveEventLedger } from './state.js';
 import { createSpawnSubagentCapability } from './spawn-subagent-capability.js';
+import { deriveParentRunId } from './run-identity.js';
 import { attachPricingResolver } from './cost-ledger.js';
 import { captureOriginalQuery } from './goal-anchor.js';
 import { createDebugLogger } from './debug.js';
 import { ensureVirtualWorkspace } from './virtual-workspace.js';
 import { cloneValue } from './utils.js';
 import { filterAvailableActions } from './action-availability.js';
+import { ensureActionNamespaceContext } from './action-namespace-gate.js';
 import { readContextSnapshot, createContextSnapshot } from '../session/context-snapshot-normalize.js';
+import './action-names.js';
 import './action-history-compaction.js';
 import './tool-schema.js';
 import './plan-args-fallback.js';
@@ -22,8 +25,8 @@ import './action-pattern-convergence.js';
 import './action-result-envelope.js';
 import './planner-prompt.js';
 import './planner-action-surface.js';
-import './loop-transition.js';
 import './final-response-scrubber.js';
+import './loop-transition.js';
 import { hydrateRunStateWithThread } from './run-state-thread.js';
 
 function createActionLoopSession(options) {
@@ -79,6 +82,9 @@ function createActionLoopSession(options) {
     agentSkills: options.runtimeConfig.agentSkills,
     agentSkillIndexProvider: options.runtimeConfig.agentSkillIndexProvider,
     customActions: options.runtimeConfig.customActions,
+    // ADR-0057 Phase 1 — registers open_action_namespace only when the host
+    // deferred at least one namespace (default [] registers nothing new).
+    deferredNamespaces: options.runtimeConfig.deferredNamespaces,
     repoFileTools: options.runtimeConfig.repoFileTools,
     toolCallExamples: options.runtimeConfig.toolCallExamples
   });
@@ -111,6 +117,7 @@ function createActionLoopSession(options) {
   const historyCompaction = options.historyCompaction || { compactedThrough: 0, observations: "" };
   const pushStep = options.pushStep || createPushStep(steps, runState, options.onStep);
   const onToken = typeof options.onToken === "function" ? options.onToken : null;
+  const onReasoning = typeof options.onReasoning === "function" ? options.onReasoning : null;
   const onStreamEvent = typeof options.onStreamEvent === "function" ? options.onStreamEvent : null;
   const onInvalidPlannerOutput = typeof options.onInvalidPlannerOutput === "function" ? options.onInvalidPlannerOutput : null;
   const onPlannerDecision = typeof options.onPlannerDecision === "function" ? options.onPlannerDecision : null;
@@ -138,6 +145,11 @@ function createActionLoopSession(options) {
     config: options.runtimeConfig.virtualWorkspace,
     prompt: request && request.prompt
   });
+  // ADR-0057 Phase 1 — seed the per-run namespace open-state beside the
+  // virtual-workspace seeding above. Also repairs the slot on resumed
+  // runStates from pre-Phase-1 checkpoints; an existing `opened` map from a
+  // crash-recovery import is preserved (ensure is idempotent).
+  ensureActionNamespaceContext(runState, options.runtimeConfig);
 
   // AGRUN-142 — seed runState.originalQuery once per run from the verbatim
   // rawInput. Immutable afterwards (captureOriginalQuery refuses to rewrite).
@@ -155,7 +167,8 @@ function createActionLoopSession(options) {
     pushStep("run-started", {
       inputType: normalizedInput.type,
       maxSteps: options.runtimeConfig.maxSteps,
-      mode: runState.mode
+      mode: runState.mode,
+      parentRunId: deriveParentRunId(options.runId)
     });
   }
 
@@ -171,6 +184,7 @@ function createActionLoopSession(options) {
     memoryFacade,
     normalizedInput,
     onInvalidPlannerOutput,
+    onReasoning,
     onStreamEvent,
     onToken,
     onPlannerDecision,

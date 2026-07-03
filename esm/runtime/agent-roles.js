@@ -1,7 +1,11 @@
+import { readString } from './semantic-json.js';
+
 // AGRUN-313 (post-3.0) — this is the role MECHANISM only. The concrete bundled role
-// DATA (bundledAgentRoles / getBundledAgentRole) moved to default-agent-roles.js and ships
-// from @agrun/skills-research, so core's createRuntime graph carries zero domain roles.
+// DATA (bundledAgentRoles / getBundledAgentRole) ships in-tree as loadable DATA
+// (default-research-roles.js / default-coder-roles.js — the @agrun/skills-* ESM
+// packages were removed in AGRUN-522), so core's createRuntime graph carries zero domain roles.
 // resolveActiveRole resolves names ONLY against the catalog the host passes in.
+
 
 function normalizeAgentRoles(roles) {
   if (!Array.isArray(roles)) {
@@ -18,24 +22,24 @@ function normalizeAgentRole(role) {
     return null;
   }
 
-  const name = readString$x(role.name);
-  const instructions = readString$x(role.instructions);
+  const name = readString(role.name);
+  const instructions = readString(role.instructions);
 
   if (!name || !instructions) {
     return null;
   }
 
   return {
-    description: readString$x(role.description),
+    description: readString(role.description),
     instructions,
     name,
-    priority: readString$x(role.priority) || "actions",
-    sourcePath: readString$x(role.sourcePath)
+    priority: readString(role.priority) || "actions",
+    sourcePath: readString(role.sourcePath)
   };
 }
 
 function findAgentRole(roles, name) {
-  const target = readString$x(name).toLowerCase();
+  const target = readString(name).toLowerCase();
 
   if (!target) {
     return null;
@@ -125,10 +129,6 @@ function stripQuotes$1(value) {
   }
 
   return value;
-}
-
-function readString$x(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { buildRoleSystemPromptBlock$1 as buildRoleSystemPromptBlock, findAgentRole, normalizeAgentRole, normalizeAgentRoles, parseRoleMarkdown, resolveActiveRole };

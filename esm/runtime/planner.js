@@ -1,24 +1,69 @@
-import { requestProviderCompletion } from './provider.js';
+import { requestProviderCompletion, requestProviderCompletionStreaming } from './provider.js';
+import { recordProviderCallDuration } from './provider-latency.js';
 import { callHostHookWithTimeout } from './host-hook-timeout.js';
 import { normalizeThrownError } from './errors.js';
+import { scrubSecretText } from './secret-redaction.js';
 import { buildPlannerPrompt, buildPlannerSystemPrompt } from './planner-prompt.js';
 import { repairPlannerEnvelope, diagnosePlannerEnvelopeRejection, requestPlannerEnvelopeRepair, parsePlannerEnvelope } from './planner-repair.js';
 import { isRecoveryBudgetExhausted } from './planner-recovery.js';
 import { projectSessionContextFromPlannerState } from './session-context-projection.js';
 import { readContextSnapshot } from '../session/context-snapshot-normalize.js';
+import { readString } from './semantic-json.js';
 import { projectSessionContextFromSnapshot } from '../session/context-snapshot-projection.js';
-import { buildGeminiTools, buildOpenAITools, summarizeToolCallsForDebug, parseToolCallDecision } from './planner-tools.js';
+import { buildGeminiTools, buildOpenAITools, summarizeToolCallsForDebug, parseToolCallDecision, readStandalonePlanActionNames } from './planner-tools.js';
 import { resolvePlannerMode, getPlannerProviderCapabilities, isLiteTierModel } from './provider-capabilities.js';
 import { buildNativeToolsSystemPrompt } from './planner-native-system-prompt.js';
+import { createStreamFence } from './final-response-scrubber.js';
 import { createPlannerRequestPacket, createPlannerResponsePacket } from './agent-workflow-packets.js';
 import { isResearchQualityGateRequired } from './convergence-activation.js';
 
+// AGRUN-419-followup — run the planner provider call, streaming the model's
+// reasoning when the host wired onReasoning / onStreamEvent. The planner output
+// is a structured envelope / native tool-call (not clean prose), so text deltas
+// are intentionally NOT routed to a host onToken — only reasoning deltas and
+// stream events flow, which is what fills the "Thinking" panel while a direct
+// planner_final answer is being produced (no separate finalize call streams it).
+// Falls back to the non-streaming call when no reasoning consumer is registered,
+// keeping the default path untouched. SSOT for both planner doors (native_tools
+// and envelope).
+async function requestPlannerProviderResponse(options, overrides, streamOnToken) {
+  const onReasoning = typeof options.onReasoning === "function" ? options.onReasoning : null;
+  const onStreamEvent = typeof options.onStreamEvent === "function" ? options.onStreamEvent : null;
+  // C3c (AGRUN-585) — the NATIVE door passes a fenced onToken so a direct
+  // text answer streams at TTFT; the envelope door never does (JSON output).
+  const onToken = typeof streamOnToken === "function" ? streamOnToken : null;
+  // AGRUN-568 — record each SUCCESSFUL planner call's duration so
+  // deriveProviderTimeoutMs can floor the next call's deadline at 2x the
+  // run's observed max (slow providers like deepseek legitimately spend
+  // 30-90s per cycle; a fixed 120s deadline killed runs one cycle after an
+  // 89s success). Failures are deliberately not recorded — the retry
+  // escalation in provider.js owns failure-driven growth.
+  const startedAt = Date.now();
+  const recordSuccess = (response) => {
+    recordProviderCallDuration(options.runState, Date.now() - startedAt);
+    return response;
+  };
+  if (!onReasoning && !onStreamEvent && !onToken) {
+    return requestProviderCompletion(options.request, overrides).then(recordSuccess);
+  }
+  const streamContext = {
+    ledger: options.runState && options.runState.eventLedger,
+    runId: options.runState && options.runState.runId,
+    source: "planner"
+  };
+  return requestProviderCompletionStreaming(
+    options.request,
+    overrides,
+    onToken,
+    onStreamEvent,
+    streamContext,
+    onReasoning
+  ).then(recordSuccess);
+}
+
 async function planNextAction(options) {
   const plannerModeSelection = resolvePlannerMode({
-    actions: options && options.availableActions,
-    configuredMode: readPlannerMode(options),
-    model: options && options.request && options.request.model,
-    provider: options && options.request && options.request.provider
+    configuredMode: readPlannerMode(options)
   });
   if (options && options.runState && typeof options.runState === "object") {
     options.runState.plannerModeSelection = plannerModeSelection;
@@ -41,9 +86,14 @@ async function planNextAction(options) {
       }
       const nativeToolsError = error;
       const failurePolicy = readNativeToolsFailurePolicy(options);
+      // ADR-0058 — the native failure message can embed provider request
+      // details (an assertion/provider error may quote the Authorization
+      // header verbatim); steps and the event ledger are host-visible, so
+      // scrub before emitting (AGRUN-556 SSOT).
+      const nativeToolsErrorMessage = scrubSecretText(normalizeThrownError(nativeToolsError).message);
       if (failurePolicy === "hard_fail") {
         emitStep(options, "planner-native-tools-failed", {
-          error: normalizeThrownError(nativeToolsError).message,
+          error: nativeToolsErrorMessage,
           policy: failurePolicy,
           provider: options.request && options.request.provider,
           reason: "native_tools_failed"
@@ -51,7 +101,7 @@ async function planNextAction(options) {
         throw nativeToolsError;
       }
       emitStep(options, "planner-native-tools-fallback", {
-        error: normalizeThrownError(nativeToolsError).message,
+        error: nativeToolsErrorMessage,
         policy: failurePolicy,
         provider: options.request && options.request.provider,
         reason: "native_tools_failed"
@@ -98,9 +148,10 @@ async function planNextActionWithNativeTools(options) {
   const capabilities = getPlannerProviderCapabilities(provider);
   const suppressFinalAnswerTool = shouldSuppressNativeFinalAnswerTool(options);
   const suppressFinalizeTool = shouldSuppressNativeFinalizeTool(options);
+  const suppressPlanTool = shouldSuppressNativePlanTool(options);
   const tools = provider === "gemini"
-    ? buildGeminiTools(options.availableActions, { suppressFinalAnswerTool, suppressFinalizeTool })
-    : buildOpenAITools(options.availableActions, { suppressFinalAnswerTool, suppressFinalizeTool });
+    ? buildGeminiTools(options.availableActions, { suppressFinalAnswerTool, suppressFinalizeTool, suppressPlanTool })
+    : buildOpenAITools(options.availableActions, { suppressFinalAnswerTool, suppressFinalizeTool, suppressPlanTool });
   const systemPrompt = buildNativeToolsSystemPrompt(
     options.agentRole,
     options.request && options.request.systemPrompt,
@@ -119,19 +170,68 @@ async function planNextActionWithNativeTools(options) {
     runState: options.runState,
     sessionContext,
     systemPrompt,
-    toolChoice: "required",
+    // C3a (AGRUN-574, ROADMAP Phase C) — "auto", not "required". Forcing a
+    // tool call every cycle removed the model's only way to terminate by
+    // answering, which looped tool calls to maxSteps exhaustion (AGRUN-573
+    // spike: lookup_order 8x, status failed). With auto, a no-tool text
+    // response IS the final answer (decide-and-answer in one call — the loop
+    // shape every surveyed framework uses; audits/why-other-agents-feel-fast).
+    toolChoice: "auto",
     tools
   }));
 
+  // C3c (AGRUN-585) — stream a fenced direct answer through onToken at TTFT.
+  // The fence (SSOT: final-response-scrubber.js) buffers JSON/fenced-block
+  // prefixes so an envelope-shaped emission or tool-call payload never leaks
+  // to the host; plain prose forwards as it arrives. streamedChars lets the
+  // direct-answer branch mark the decision so the planner_final terminal
+  // skips its one-shot onToken (no duplicate text).
+  let streamedChars = 0;
+  const hostOnToken = typeof options.onToken === "function" ? options.onToken : null;
+  const fence = createStreamFence(hostOnToken
+    ? (token) => {
+      streamedChars += String(token).length;
+      hostOnToken(token);
+    }
+    : null);
+  // First-character latch in front of the fence: the fence swallows ACTION
+  // envelope blocks but forwards other JSON (e.g. a {"type":"final",...}
+  // emission) as text — which must never leak raw to onToken. Buffer until
+  // the first non-whitespace character: '{' or '`' latches the stream CLOSED
+  // (the terminal one-shot will deliver the parsed answer instead); anything
+  // else opens the stream and prose flows at TTFT.
+  const latch = { state: "buffering", buffer: "" };
+  const latchedOnToken = fence.wrappedOnToken
+    ? (token) => {
+      if (latch.state === "closed") return;
+      if (latch.state === "open") {
+        fence.wrappedOnToken(token);
+        return;
+      }
+      latch.buffer += String(token);
+      const firstChar = latch.buffer.trimStart().charAt(0);
+      if (!firstChar) return;
+      if (firstChar === "{" || firstChar === "`") {
+        latch.state = "closed";
+        latch.buffer = "";
+        return;
+      }
+      latch.state = "open";
+      const buffered = latch.buffer;
+      latch.buffer = "";
+      fence.wrappedOnToken(buffered);
+    }
+    : null;
+
   const providerStartedAt = Date.now();
-  const response = await requestProviderCompletion(options.request, {
+  const response = await requestPlannerProviderResponse(options, {
     prompt,
     sessionContext,
     systemPrompt,
     timeoutMs: options.timeoutMs || null,
     tools,
-    toolChoice: "required"
-  });
+    toolChoice: "auto"
+  }, latchedOnToken);
   const providerDurationMs = Date.now() - providerStartedAt;
 
   let decision = null;
@@ -143,15 +243,70 @@ async function planNextActionWithNativeTools(options) {
         toolCalls: summarizeToolCallsForDebug(response.toolCalls)
       });
     }
-    decision = parseToolCallDecision(response.toolCalls);
+    // AGRUN-588 — tell the batch reader which actions are standalone-only so
+    // a parallel batch that plan validation would reject (e.g. deepseek's
+    // [todo_advance, todo_advance]) falls back to first-call-decides instead
+    // of burning a cycle on a guaranteed skill_mutator_in_plan rejection.
+    decision = parseToolCallDecision(response.toolCalls, {
+      standalonePlanActionNames: readStandalonePlanActionNames(options.availableActions)
+    });
     emitStep(options, "planner-native-tool-call", {
       provider: options.request.provider,
       responseType: readDecisionType(decision),
       toolCallCount: response.toolCalls.length
     });
+    // C3b (AGRUN-575) — surface when multiple parallel tool calls were
+    // batched into one plan decision (previously all but the first were
+    // silently dropped).
+    if (decision && decision.nativeParallelBatch === true) {
+      emitStep(options, "planner-native-parallel-batch", {
+        actionCount: decision.actions.length,
+        actionNames: decision.actions.map((action) => action.name),
+        provider: options.request.provider
+      });
+    }
   }
 
   let rawRejectedNameNative = readRejectedNativeToolName(response.toolCalls);
+  // C3a (AGRUN-574) — with toolChoice "auto", a no-tool plain-text response
+  // is the model terminating by answering (stop_reason branch). Structural
+  // check only: text that looks like a JSON/fenced envelope attempt still
+  // goes through the existing envelope repair path below.
+  if (!decision && response.text && !looksLikeEnvelopeText(response.text)) {
+    const answer = response.text.trim();
+    // C3c — emit any buffered fence tail, then mark the decision so the
+    // terminal knows the answer already streamed (skip the one-shot).
+    fence.flush();
+    decision = { type: "final", answer };
+    if (streamedChars > 0) {
+      decision.answerStreamed = true;
+    }
+    emitStep(options, "planner-native-direct-answer", {
+      answerLength: answer.length,
+      provider: options.request && options.request.provider,
+      reason: "no_tool_calls_text_is_answer",
+      streamedChars
+    });
+    emitStep(options, "agent-workflow-packet", createPlannerResponsePacket({
+      decision,
+      durationMs: providerDurationMs,
+      mode: "native_tools",
+      repairPath: "native_direct_answer",
+      request: options.request,
+      response,
+      responseType: "final",
+      runState: options.runState
+    }));
+    return {
+      decision,
+      prompt,
+      repairResponse: null,
+      response,
+      strictRetryResponse: null,
+      rejectedActionName: null,
+      repairAttempted: false
+    };
+  }
   if (!decision && response.text) {
     const parsed = parsePlannerEnvelopeSafely(response.text);
     if (!rawRejectedNameNative) rawRejectedNameNative = readRejectedActionName(parsed.value);
@@ -197,6 +352,14 @@ async function planNextActionWithNativeTools(options) {
   };
 }
 
+// C3a — structural (non-semantic) check: does the no-tool text look like an
+// attempted JSON envelope / fenced code block rather than a prose answer?
+// String prefix inspection only — no regex over prose, no content heuristics.
+function looksLikeEnvelopeText(text) {
+  const trimmed = typeof text === "string" ? text.trim() : "";
+  return trimmed.startsWith("{") || trimmed.startsWith("```");
+}
+
 function readRejectedNativeToolName(toolCalls) {
   if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null;
   const first = toolCalls[0];
@@ -223,11 +386,11 @@ function shouldSuppressNativeFinalAnswerTool(options) {
   if (runState.agentSkillContext && typeof runState.agentSkillContext === "object") {
     const activeSkill = runState.agentSkillContext.activeSkill;
     const lastReadSkill = runState.agentSkillContext.lastReadSkill;
-    if (readString$r(activeSkill && activeSkill.name) || readString$r(lastReadSkill && lastReadSkill.name)) {
+    if (readString(activeSkill && activeSkill.name) || readString(lastReadSkill && lastReadSkill.name)) {
       return true;
     }
   }
-  if (readString$r(options && options.activeAgentSkill && options.activeAgentSkill.name)) {
+  if (readString(options && options.activeAgentSkill && options.activeAgentSkill.name)) {
     return true;
   }
   const readSources = runState.researchContext && Array.isArray(runState.researchContext.readSources)
@@ -240,7 +403,54 @@ function shouldSuppressNativeFinalizeTool(options) {
   const runState = options && options.runState && typeof options.runState === "object"
     ? options.runState
     : {};
+  if (isNativeTerminalToolDisabledForRun(options, "finalize")) {
+    return true;
+  }
   return isTerminalRepairActive(runState);
+}
+
+function shouldSuppressNativePlanTool(options) {
+  if (isNativeTerminalToolDisabledForRun(options, "plan")) return true;
+  // C5a (AGRUN-582, wire-measured) — the plan tool is 7.1KB, 25% of the
+  // native tool surface, and since C3b the model gets the same parallel
+  // capability by emitting multiple tool_calls in one response (consumed as
+  // a plan-door batch). The tool's unique remainder is synthesize_per_action
+  // stitching plus execute_skill_tool fan-out, which only skill/research
+  // flows can use — so keep it exactly when such a flow is possible: bundled
+  // skills or a skill index provider are configured (the ACTION surface is
+  // not a usable signal — execute_skill_tool stays listed even with zero
+  // skills, and ADR-0023 pull-mode keeps the manifest catalog empty until
+  // list_agent_skills), a skill is active, or a research loop is engaged.
+  // State/config-gated, not model/provider-gated: nothing is hidden from
+  // plain tool runs (parallelism stays available via the provider protocol).
+  if (options && options.activeAgentSkill) return false;
+  const runtimeConfig = options && options.runtimeConfig ? options.runtimeConfig : {};
+  // Initial bundled-skill manifests (config) or the discovered catalog
+  // (runState, populated by list_agent_skills for custom index providers).
+  // NOTE: runtimeConfig.agentSkillIndexProvider is NOT a usable signal — the
+  // default config always wraps agentSkills in an in-memory provider.
+  if (Array.isArray(runtimeConfig.agentSkills) && runtimeConfig.agentSkills.length > 0) return false;
+  const catalogManifests = options && options.runState && options.runState.skillCatalogManifests;
+  if (Array.isArray(catalogManifests) && catalogManifests.length > 0) return false;
+  const researchLoop = options && options.runState && options.runState.researchReportLoop;
+  const researchActive = Boolean(
+    researchLoop
+    && typeof researchLoop === "object"
+    && typeof researchLoop.status === "string"
+    && researchLoop.status !== "idle"
+  );
+  return !researchActive;
+}
+
+function isNativeTerminalToolDisabledForRun(options, toolName) {
+  const runtimeDisabled = options && options.runtimeConfig && Array.isArray(options.runtimeConfig.disabledActions)
+    ? options.runtimeConfig.disabledActions
+    : [];
+  const localDisabled = options && Array.isArray(options.disabledActions)
+    ? options.disabledActions
+    : [];
+  return [...runtimeDisabled, ...localDisabled]
+    .some((name) => typeof name === "string" && name.trim().toLowerCase() === toolName);
 }
 
 function isTerminalRepairActive(runState) {
@@ -283,10 +493,6 @@ function readNativeToolsFailurePolicy(options) {
   return "fallback_to_envelope";
 }
 
-function readString$r(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function parsePlannerEnvelopeSafely(text) {
   try {
     return {
@@ -315,7 +521,7 @@ async function requestInvalidPlannerOutputOverride(options, rawText, parseError)
   // planner's error-recovery path.
   const hook = await callHostHookWithTimeout(
     () => options.onInvalidPlannerOutput(
-      readString$r(rawText),
+      readString(rawText),
       parseError || null,
       options.runState || null
     ),
@@ -387,7 +593,7 @@ async function planNextActionWithEnvelope(options) {
     tools: []
   }));
   const providerStartedAt = Date.now();
-  const response = await requestProviderCompletion(options.request, {
+  const response = await requestPlannerProviderResponse(options, {
     prompt,
     sessionContext,
     systemPrompt: plannerSystemPrompt,
@@ -499,7 +705,7 @@ async function planNextActionWithEnvelope(options) {
     response: repairResponse || response,
     strictRetryResponse: null,
     rejectedActionName: decision ? null : rawRejectedName,
-    invalidKind: decision ? null : readString$r((repairRejection || originalRejection) && (repairRejection || originalRejection).reason),
+    invalidKind: decision ? null : readString((repairRejection || originalRejection) && (repairRejection || originalRejection).reason),
     invalidReason: decision ? null : (repairRejection || originalRejection),
     repairAttempted: repairPath === "repair" || repairPath === "repair_failed"
   };

@@ -1,7 +1,9 @@
-import { refreshTerminalRepairState, buildBudgetRemainingForExpansionSignal, shouldEmitAdvisoryPersistenceSignalStep, summarizeTerminalRepairState } from '../terminal-repair-state.js';
-import { DEFAULT_TERMINAL_REPAIR_STRINGS } from '../terminal-repair-strings.js';
 import { cloneValue } from '../utils.js';
 import { readString } from '../semantic-json.js';
+import '../action-names.js';
+import { refreshTerminalRepairState, buildBudgetRemainingForExpansionSignal, shouldEmitAdvisoryPersistenceSignalStep, summarizeTerminalRepairState } from '../terminal-repair/core.js';
+import { resolveGrantedTerminalEscape } from '../terminal-repair/escape-rules.js';
+import { DEFAULT_TERMINAL_REPAIR_STRINGS } from '../terminal-repair-strings.js';
 
 // AGRUN-421: terminal repair as preRequest + onResponse hooks (depends on
 // AGRUN-418/422). Logic moved VERBATIM from the two loop-body sites:
@@ -84,10 +86,39 @@ function createTerminalRepairOnResponseHook() {
     });
     if (!repair || repair.active !== true) return;
 
+    // AGRUN-550 — honor the finalize-opening terminal escapes (graceful
+    // degradation). When terminal repair has opened final/finalize, do NOT
+    // block: let the honest finalize through so the run terminates with a real
+    // answer instead of thrashing to the deadline with EMPTY output. This door
+    // previously gated purely on repair.active and silently ignored the escapes,
+    // so they only ever worked on the action-preflight door — a Dispatch-Path
+    // Parity gap (final/finalize decisions arrive ONLY here).
+    //
+    // AGRUN-559 — resolved through the shared escape-rule descriptors instead
+    // of enumerating flag names (the AGRUN-550 bug was exactly this door not
+    // knowing a flag existed). Any escape whose descriptor says opensFinalize
+    // passes; the publishLoop escape does NOT (it opens PUBLISH, not finalize),
+    // so a finalize under it is still redirected to the publish protocol.
+    const grantedEscape = resolveGrantedTerminalEscape(repair);
+    if (grantedEscape && grantedEscape.opensFinalize) {
+      if (typeof session.pushStep === "function") {
+        session.pushStep("terminal-repair-finalize-escape-granted", {
+          actionName,
+          escalation: repair.escalation || "advisory",
+          reason: grantedEscape.escapeReason
+        });
+      }
+      return;
+    }
+
     const isHardVeto = readString(repair.escalation) === "hard_veto";
     const ignoredCount = repair.ignoredCount || 0;
     const budgetExpansionSignal = isHardVeto
-      ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount)
+      // AGRUN-509 — forward runtimeConfig so the expansion-signal advisory gate
+      // honors host-overridden terminalRepair thresholds (same forwarding as
+      // the refresh call above; keeps this door in parity with the
+      // single-action door in action-loop-action.js).
+      ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount, session && session.runtimeConfig)
       : null;
     const message = isHardVeto
       ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({

@@ -1,8 +1,10 @@
-import { fingerprintAction, stableStringify, djb2Hash } from './action-fingerprint.js';
-import { createProgressSnapshot, resolveProductiveProgressDimensions, diffProgress, summarizeProgressSnapshot, normalizeProgressSnapshot, readCandidateSnapshot, readSourceMinimum, hasUnfinishedTodoState, hasWorkspaceArtifacts, readRequestedLengthStatus, readAcceptancePacket } from './action-pattern-progress.js';
+import { djb2Hash, stableStringify, fingerprintAction } from './action-fingerprint.js';
+import { DEFAULT_FINAL_CANDIDATE_PATH } from './workspace-candidate-lifecycle.js';
+import { summarizeProgressSnapshot, normalizeProgressSnapshot, createProgressSnapshot, resolveProductiveProgressDimensions, diffProgress, readCandidateSnapshot, readSourceMinimum, hasUnfinishedTodoState, hasWorkspaceArtifacts, readRequestedLengthStatus, readAcceptancePacket } from './action-pattern-progress.js';
 import { isEvidenceConvergenceRun } from './convergence-activation.js';
-import { PUBLISH_DIRECT_ACTION, FINALIZE_CANDIDATE_ACTION } from './kernel-terminal-actions.js';
+import { WORKSPACE_WRITE_ACTION, WORKSPACE_REPLACE_ACTION, WORKSPACE_MULTI_EDIT_ACTION, WORKSPACE_LIST_ACTION, WORKSPACE_READ_ACTION, WORKSPACE_INSERT_AFTER_SECTION_ACTION, WORKSPACE_PROPOSE_PATCH_ACTION, WORKSPACE_APPLY_PATCH_ACTION, WEB_SEARCH_ACTION, TODO_PLAN_ACTION, TODO_INSPECT_ACTION, LIST_AGENT_SKILLS_ACTION, READ_AGENT_SKILL_ACTION, USE_AGENT_SKILL_ACTION, EXECUTE_SKILL_TOOL_ACTION, PUBLISH_DIRECT_ACTION, FINALIZE_CANDIDATE_ACTION } from './action-names.js';
 import { cloneValue } from './utils.js';
+import { readStringArray, readString } from './semantic-json.js';
 
 const DEFAULT_REPEAT_THRESHOLD = 2;
 const TRANSITIONAL_ONLY_THRESHOLD = 3;
@@ -26,20 +28,20 @@ const MAX_RECENT_PATTERNS = 12;
 const TOOL_RESULT_DEDUP_WINDOW = 5;
 const DEFAULT_FORBIDDEN_TERMINAL_ACTIONS = [PUBLISH_DIRECT_ACTION, "finalize"];
 const DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS = [
-  "web_search",
-  "todo_plan",
-  "todo_inspect",
-  "workspace_list",
-  "workspace_read",
-  "list_agent_skills",
-  "read_agent_skill",
-  "use_agent_skill",
-  "execute_skill_tool"
+  WEB_SEARCH_ACTION,
+  TODO_PLAN_ACTION,
+  TODO_INSPECT_ACTION,
+  WORKSPACE_LIST_ACTION,
+  WORKSPACE_READ_ACTION,
+  LIST_AGENT_SKILLS_ACTION,
+  READ_AGENT_SKILL_ACTION,
+  USE_AGENT_SKILL_ACTION,
+  EXECUTE_SKILL_TOOL_ACTION
 ];
 const LENGTH_DEFICIT_CHURN_ACTIONS = [
-  "workspace_read",
-  "workspace_write",
-  "workspace_replace"
+  WORKSPACE_READ_ACTION,
+  WORKSPACE_WRITE_ACTION,
+  WORKSPACE_REPLACE_ACTION
 ];
 const DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES = [
   "read_url",
@@ -51,13 +53,13 @@ const DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES = [
   "workspace_publish_candidate_limited_with_remainingGaps"
 ];
 const DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS = [
-  "workspace_list",
-  "workspace_read",
-  "workspace_insert_after_section",
-  "workspace_multi_edit",
-  "workspace_propose_patch",
-  "workspace_apply_patch",
-  "workspace_replace"
+  WORKSPACE_LIST_ACTION,
+  WORKSPACE_READ_ACTION,
+  WORKSPACE_INSERT_AFTER_SECTION_ACTION,
+  WORKSPACE_MULTI_EDIT_ACTION,
+  WORKSPACE_PROPOSE_PATCH_ACTION,
+  WORKSPACE_APPLY_PATCH_ACTION,
+  WORKSPACE_REPLACE_ACTION
 ];
 const DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES = [
   "workspace_write",
@@ -67,12 +69,15 @@ const DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES = [
   "todo_run_next",
   "workspace_publish_candidate_limited_with_structure_remainingGaps"
 ];
-const DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS = ["workspace_write", "workspace_replace"];
+const DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS = [
+  WORKSPACE_WRITE_ACTION,
+  WORKSPACE_REPLACE_ACTION,
+  WORKSPACE_MULTI_EDIT_ACTION
+];
 const DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES = [
   "workspace_propose_patch",
   "workspace_apply_patch",
   "workspace_insert_after_section",
-  "workspace_multi_edit",
   "workspace_review_candidate",
   FINALIZE_CANDIDATE_ACTION,
   "workspace_publish_candidate_limited_with_remainingGaps"
@@ -118,17 +123,17 @@ function normalizeConvergenceConfig(runtimeConfig) {
     ? runtimeConfig.convergence
     : {};
   return {
-    repeatThreshold: readPositiveInteger$k(source.repeatThreshold, DEFAULT_REPEAT_THRESHOLD),
-    transitionalOnlyThreshold: readPositiveInteger$k(source.transitionalOnlyThreshold, TRANSITIONAL_ONLY_THRESHOLD),
-    readOnlyPlanningHardVetoThreshold: readPositiveInteger$k(source.readOnlyPlanningHardVetoThreshold, READ_ONLY_PLANNING_HARD_VETO_THRESHOLD),
-    readOnlyPlanningClearThreshold: readPositiveInteger$k(source.readOnlyPlanningClearThreshold, READ_ONLY_PLANNING_CLEAR_THRESHOLD),
-    structureRepairNoProgressThreshold: readPositiveInteger$k(source.structureRepairNoProgressThreshold, STRUCTURE_REPAIR_NO_PROGRESS_THRESHOLD),
-    structureRepairHardVetoThreshold: readPositiveInteger$k(source.structureRepairHardVetoThreshold, STRUCTURE_REPAIR_HARD_VETO_THRESHOLD),
-    workspaceMutationGrowthAdvisoryThreshold: readPositiveInteger$k(source.workspaceMutationGrowthAdvisoryThreshold, WORKSPACE_MUTATION_GROWTH_ADVISORY_THRESHOLD),
-    workspaceMutationGrowthHardVetoThreshold: readPositiveInteger$k(source.workspaceMutationGrowthHardVetoThreshold, WORKSPACE_MUTATION_GROWTH_HARD_VETO_THRESHOLD),
-    workspaceMutationGrowthStallFloor: readPositiveInteger$k(source.workspaceMutationGrowthStallFloor, WORKSPACE_MUTATION_GROWTH_STALL_FLOOR),
-    toolResultDedupWindow: readPositiveInteger$k(source.toolResultDedupWindow, TOOL_RESULT_DEDUP_WINDOW),
-    maxRecentPatterns: readPositiveInteger$k(source.maxRecentPatterns, MAX_RECENT_PATTERNS),
+    repeatThreshold: readPositiveInteger$j(source.repeatThreshold, DEFAULT_REPEAT_THRESHOLD),
+    transitionalOnlyThreshold: readPositiveInteger$j(source.transitionalOnlyThreshold, TRANSITIONAL_ONLY_THRESHOLD),
+    readOnlyPlanningHardVetoThreshold: readPositiveInteger$j(source.readOnlyPlanningHardVetoThreshold, READ_ONLY_PLANNING_HARD_VETO_THRESHOLD),
+    readOnlyPlanningClearThreshold: readPositiveInteger$j(source.readOnlyPlanningClearThreshold, READ_ONLY_PLANNING_CLEAR_THRESHOLD),
+    structureRepairNoProgressThreshold: readPositiveInteger$j(source.structureRepairNoProgressThreshold, STRUCTURE_REPAIR_NO_PROGRESS_THRESHOLD),
+    structureRepairHardVetoThreshold: readPositiveInteger$j(source.structureRepairHardVetoThreshold, STRUCTURE_REPAIR_HARD_VETO_THRESHOLD),
+    workspaceMutationGrowthAdvisoryThreshold: readPositiveInteger$j(source.workspaceMutationGrowthAdvisoryThreshold, WORKSPACE_MUTATION_GROWTH_ADVISORY_THRESHOLD),
+    workspaceMutationGrowthHardVetoThreshold: readPositiveInteger$j(source.workspaceMutationGrowthHardVetoThreshold, WORKSPACE_MUTATION_GROWTH_HARD_VETO_THRESHOLD),
+    workspaceMutationGrowthStallFloor: readPositiveInteger$j(source.workspaceMutationGrowthStallFloor, WORKSPACE_MUTATION_GROWTH_STALL_FLOOR),
+    toolResultDedupWindow: readPositiveInteger$j(source.toolResultDedupWindow, TOOL_RESULT_DEDUP_WINDOW),
+    maxRecentPatterns: readPositiveInteger$j(source.maxRecentPatterns, MAX_RECENT_PATTERNS),
     readOnlyPlanningForbiddenActions: readForbiddenActionList(source.readOnlyPlanningForbiddenActions, DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS),
     structureRepairForbiddenActions: readForbiddenActionList(source.structureRepairForbiddenActions, DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS),
     workspaceMutationGrowthForbiddenActions: readForbiddenActionList(source.workspaceMutationGrowthForbiddenActions, DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS)
@@ -164,7 +169,7 @@ function createActionPatternConvergenceState() {
 }
 
 function isActionErrorRefresh(context) {
-  const status = readString$1G(context && context.status);
+  const status = readString(context && context.status);
   return status === "action_error_self_correct"
     || status === "validation_error_self_correct"
     || status === "preflight_error_self_correct";
@@ -191,10 +196,10 @@ function shouldEmitActionPatternConvergenceRefreshed(evaluator) {
 function evaluateActionPatternConvergence(runState, context = {}) {
   const config = normalizeConvergenceConfig(context.runtimeConfig);
   const previous = normalizeActionPatternConvergenceState(context.previous || runState && runState.actionPatternConvergence, config);
-  const actionName = readString$1G(context.actionName) || readActionName$3(context.decision);
-  const fingerprint = readString$1G(context.fingerprint) || fingerprintAction(context.decision) || null;
-  const outcomeHash = readString$1G(context.outcomeHash) || createOutcomeHash(runState, context, actionName);
-  const semanticFingerprint = readString$1G(context.semanticFingerprint) ||
+  const actionName = readString(context.actionName) || readActionName$3(context.decision);
+  const fingerprint = readString(context.fingerprint) || fingerprintAction(context.decision) || null;
+  const outcomeHash = readString(context.outcomeHash) || createOutcomeHash(runState, context, actionName);
+  const semanticFingerprint = readString(context.semanticFingerprint) ||
     createSemanticTerminalFingerprint(runState, context, actionName);
   const snapshot = createProgressSnapshot(runState, context.runtimeConfig);
   // AGRUN-263 — `tool_result` dimension: when configured productive
@@ -204,7 +209,7 @@ function evaluateActionPatternConvergence(runState, context = {}) {
   // re-issuing identical tool calls.
   const productiveWhitelist = resolveProductiveProgressDimensions(context.runtimeConfig);
   const toolFingerprint = buildToolCallFingerprint(actionName, context.decision);
-  const toolHistoryGrew = readNumber$i(snapshot.toolHistoryCount) > readNumber$i(previous.progressSnapshot && previous.progressSnapshot.toolHistoryCount);
+  const toolHistoryGrew = readNumber$f(snapshot.toolHistoryCount) > readNumber$f(previous.progressSnapshot && previous.progressSnapshot.toolHistoryCount);
   const isDuplicateToolCall = Boolean(
     toolFingerprint && Array.isArray(previous.recentToolFingerprints) &&
     previous.recentToolFingerprints.includes(toolFingerprint)
@@ -254,7 +259,7 @@ function evaluateActionPatternConvergence(runState, context = {}) {
   // resets it, so a single recovered action clears the signal.
   const errorRepeatCount = isActionErrorRefresh(context)
     ? (fingerprint && fingerprint === previous.lastFingerprint
-        ? readNumber$i(previous.errorRepeatCount) + 1
+        ? readNumber$f(previous.errorRepeatCount) + 1
         : 1)
     : 0;
   const signal = buildConvergenceSignal({
@@ -316,6 +321,7 @@ function evaluateActionPatternConvergence(runState, context = {}) {
     actionName,
     config,
     context,
+    progress,
     previous: previous.workspaceMutationGrowthConvergence,
     runState
   });
@@ -336,7 +342,7 @@ function evaluateActionPatternConvergence(runState, context = {}) {
       : "tracking";
   const recentPatterns = appendRecentPattern(previous.recentPatterns, {
     actionName: actionName || null,
-    cycle: readNullableNumber$6(runState && runState.cycleCount),
+    cycle: readNullableNumber$5(runState && runState.cycleCount),
     fingerprint,
     outcomeHash,
     patternKind,
@@ -345,7 +351,7 @@ function evaluateActionPatternConvergence(runState, context = {}) {
     semanticFingerprint,
     semanticRepeatCount: repeatedSemanticFingerprintCount,
     status,
-    stage: readString$1G(context.status) || readString$1G(context.stage) || null
+    stage: readString(context.status) || readString(context.stage) || null
   }, config);
 
   return {
@@ -372,7 +378,7 @@ function evaluateActionPatternConvergence(runState, context = {}) {
       : 0,
     latestCorrectionSignal,
     terminalRetryCooldown,
-    updatedAtCycle: readNullableNumber$6(runState && runState.cycleCount),
+    updatedAtCycle: readNullableNumber$5(runState && runState.cycleCount),
     version: 1
   };
 }
@@ -387,9 +393,9 @@ function summarizeActionPatternConvergence(value) {
     !normalized.terminalRetryCooldown.active &&
     !normalized.structureRepairConvergence.active &&
     !normalized.workspaceMutationGrowthConvergence.active &&
-    readNumber$i(normalized.terminalRetryCooldown.blockedTerminalRetryCount) === 0 &&
+    readNumber$f(normalized.terminalRetryCooldown.blockedTerminalRetryCount) === 0 &&
     normalized.repeatedFingerprintCount === 0 &&
-    readNumber$i(normalized.errorRepeatCount) === 0 &&
+    readNumber$f(normalized.errorRepeatCount) === 0 &&
     normalized.stepsWithoutObservableProgress === 0
   ) {
     return null;
@@ -403,21 +409,21 @@ function summarizeActionPatternConvergence(value) {
     lastSemanticFingerprint: normalized.lastSemanticFingerprint,
     repeatedFingerprintCount: normalized.repeatedFingerprintCount,
     repeatedSemanticFingerprintCount: normalized.repeatedSemanticFingerprintCount,
-    errorRepeatCount: readNumber$i(normalized.errorRepeatCount),
+    errorRepeatCount: readNumber$f(normalized.errorRepeatCount),
     stepsWithoutObservableProgress: normalized.stepsWithoutObservableProgress,
     progressSnapshot: summarizeProgressSnapshot(normalized.progressSnapshot),
     recentPatterns: normalized.recentPatterns.slice(-6).map((entry) => ({
-      actionName: readString$1G(entry.actionName) || null,
-      cycle: readNullableNumber$6(entry.cycle),
-      fingerprint: readString$1G(entry.fingerprint) || null,
-      outcomeHash: readString$1G(entry.outcomeHash) || null,
+      actionName: readString(entry.actionName) || null,
+      cycle: readNullableNumber$5(entry.cycle),
+      fingerprint: readString(entry.fingerprint) || null,
+      outcomeHash: readString(entry.outcomeHash) || null,
       patternKind: readPatternKind(entry.patternKind),
-      progress: Array.isArray(entry.progress) ? entry.progress.map(readString$1G).filter(Boolean).slice(0, 6) : [],
-      repeatCount: readNumber$i(entry.repeatCount),
-      semanticFingerprint: readString$1G(entry.semanticFingerprint) || null,
-      semanticRepeatCount: readNumber$i(entry.semanticRepeatCount),
-      status: readString$1G(entry.status) || "tracking",
-      stage: readString$1G(entry.stage) || null
+      progress: Array.isArray(entry.progress) ? entry.progress.map(readString).filter(Boolean).slice(0, 6) : [],
+      repeatCount: readNumber$f(entry.repeatCount),
+      semanticFingerprint: readString(entry.semanticFingerprint) || null,
+      semanticRepeatCount: readNumber$f(entry.semanticRepeatCount),
+      status: readString(entry.status) || "tracking",
+      stage: readString(entry.stage) || null
     })),
     convergenceSignal: signal ? cloneValue(signal) : null,
     terminalCorrectionState: cloneValue(normalized.terminalCorrectionState),
@@ -436,35 +442,35 @@ function summarizeActionPatternConvergence(value) {
 function createReadOnlyPlanningState(value = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const active = source.active === true;
-  const forbiddenActions = readStringArray$8(source.forbiddenActions);
-  const allowedNextMoves = readStringArray$8(source.allowedNextMoves);
-  const ignoredCount = readNumber$i(source.ignoredCount);
-  const explicitEscalation = readString$1G(source.escalation);
+  const forbiddenActions = readStringArray(source.forbiddenActions);
+  const allowedNextMoves = readStringArray(source.allowedNextMoves);
+  const ignoredCount = readNumber$f(source.ignoredCount);
+  const explicitEscalation = readString(source.escalation);
   const escalation = explicitEscalation === "hard_veto" || explicitEscalation === "advisory"
     ? explicitEscalation
     : (active && ignoredCount >= READ_ONLY_PLANNING_HARD_VETO_THRESHOLD ? "hard_veto" : "advisory");
   return {
     active,
-    status: readString$1G(source.status) || (active ? "active" : "none"),
-    reason: readString$1G(source.reason) || null,
-    forbiddenMove: readString$1G(source.forbiddenMove) || (active ? "repeat_read_only_planning_without_productive_progress" : null),
+    status: readString(source.status) || (active ? "active" : "none"),
+    reason: readString(source.reason) || null,
+    forbiddenMove: readString(source.forbiddenMove) || (active ? "repeat_read_only_planning_without_productive_progress" : null),
     forbiddenActions: (forbiddenActions.length > 0
       ? forbiddenActions
       : DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS).slice(0, 12),
     allowedNextMoves: (allowedNextMoves.length > 0
       ? allowedNextMoves
       : DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES).slice(0, 12),
-    requiredCorrection: readString$1G(source.requiredCorrection) || null,
-    stepsWithoutProductiveProgress: readNumber$i(source.stepsWithoutProductiveProgress),
-    consecutiveProductiveSteps: readNumber$i(source.consecutiveProductiveSteps),
+    requiredCorrection: readString(source.requiredCorrection) || null,
+    stepsWithoutProductiveProgress: readNumber$f(source.stepsWithoutProductiveProgress),
+    consecutiveProductiveSteps: readNumber$f(source.consecutiveProductiveSteps),
     ignoredCount,
     escalation,
-    activatedAtCycle: readNullableNumber$6(source.activatedAtCycle),
-    lastUpdatedAtCycle: readNullableNumber$6(source.lastUpdatedAtCycle),
-    lastIgnoredAtCycle: readNullableNumber$6(source.lastIgnoredAtCycle),
-    transitionalDimensions: readStringArray$8(source.transitionalDimensions).slice(0, 8),
-    lastActionName: readString$1G(source.lastActionName) || null,
-    clearedReason: active ? null : (readString$1G(source.clearedReason) || null)
+    activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
+    lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
+    lastIgnoredAtCycle: readNullableNumber$5(source.lastIgnoredAtCycle),
+    transitionalDimensions: readStringArray(source.transitionalDimensions).slice(0, 8),
+    lastActionName: readString(source.lastActionName) || null,
+    clearedReason: active ? null : (readString(source.clearedReason) || null)
   };
 }
 
@@ -507,28 +513,28 @@ function createStructureRepairConvergenceState(value = {}) {
   const active = source.active === true;
   return {
     active,
-    status: readString$1G(source.status) || (active ? "active" : "none"),
-    reason: readString$1G(source.reason) || null,
-    forbiddenMove: readString$1G(source.forbiddenMove) || (active ? "repeat_structure_repair_without_audit_delta" : null),
-    forbiddenActions: (readStringArray$8(source.forbiddenActions).length > 0
-      ? readStringArray$8(source.forbiddenActions)
+    status: readString(source.status) || (active ? "active" : "none"),
+    reason: readString(source.reason) || null,
+    forbiddenMove: readString(source.forbiddenMove) || (active ? "repeat_structure_repair_without_audit_delta" : null),
+    forbiddenActions: (readStringArray(source.forbiddenActions).length > 0
+      ? readStringArray(source.forbiddenActions)
       : DEFAULT_STRUCTURE_REPAIR_FORBIDDEN_ACTIONS).slice(0, 12),
-    allowedNextMoves: (readStringArray$8(source.allowedNextMoves).length > 0
-      ? readStringArray$8(source.allowedNextMoves)
+    allowedNextMoves: (readStringArray(source.allowedNextMoves).length > 0
+      ? readStringArray(source.allowedNextMoves)
       : DEFAULT_STRUCTURE_REPAIR_ALLOWED_NEXT_MOVES).slice(0, 12),
-    requiredCorrection: readString$1G(source.requiredCorrection) || null,
-    repeatedStructureNoProgressCount: readNumber$i(source.repeatedStructureNoProgressCount),
-    structureProgressCount: readNumber$i(source.structureProgressCount),
-    lastActionName: readString$1G(source.lastActionName) || null,
+    requiredCorrection: readString(source.requiredCorrection) || null,
+    repeatedStructureNoProgressCount: readNumber$f(source.repeatedStructureNoProgressCount),
+    structureProgressCount: readNumber$f(source.structureProgressCount),
+    lastActionName: readString(source.lastActionName) || null,
     lastStructureSnapshot: normalizeStructureSnapshot(source.lastStructureSnapshot),
-    activeIssueCodes: readStringArray$8(source.activeIssueCodes).slice(0, 8),
-    repeatedHeadingSamples: normalizeStructureSamples$1(source.repeatedHeadingSamples, "heading"),
-    repeatedNumberSamples: normalizeStructureSamples$1(source.repeatedNumberSamples, "number"),
-    escalation: readString$1G(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
-    activatedAtCycle: readNullableNumber$6(source.activatedAtCycle),
-    lastUpdatedAtCycle: readNullableNumber$6(source.lastUpdatedAtCycle),
-    lastNoProgressAtCycle: readNullableNumber$6(source.lastNoProgressAtCycle),
-    clearedReason: active ? null : (readString$1G(source.clearedReason) || null),
+    activeIssueCodes: readStringArray(source.activeIssueCodes).slice(0, 8),
+    repeatedHeadingSamples: normalizeStructureSamples(source.repeatedHeadingSamples, "heading"),
+    repeatedNumberSamples: normalizeStructureSamples(source.repeatedNumberSamples, "number"),
+    escalation: readString(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+    activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
+    lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
+    lastNoProgressAtCycle: readNullableNumber$5(source.lastNoProgressAtCycle),
+    clearedReason: active ? null : (readString(source.clearedReason) || null),
     // AGRUN-303 — the host output guardrail can block one section (e.g.
     // section_rehash) while the heading/number structure reads clean. The live
     // block only appears on the publish-attempt cycle, so the blocked section +
@@ -542,11 +548,11 @@ function createStructureRepairConvergenceState(value = {}) {
 }
 
 function normalizeOpenGuardrailBlock(value) {
-  const source = readRecord$1(value);
+  const source = readRecord(value);
   if (!source) return null;
-  const section = readString$1G(source.section) || null;
-  const sectionHash = readString$1G(source.sectionHash) || null;
-  const issueCodes = readStringArray$8(source.issueCodes).slice(0, 8);
+  const section = readString(source.section) || null;
+  const sectionHash = readString(source.sectionHash) || null;
+  const issueCodes = readStringArray(source.issueCodes).slice(0, 8);
   if (!section && issueCodes.length === 0) return null;
   return { section, sectionHash, issueCodes };
 }
@@ -594,21 +600,21 @@ function createWorkspaceMutationGrowthConvergenceState(value = {}) {
   const active = source.active === true;
   return {
     active,
-    status: readString$1G(source.status) || (active ? "active" : "none"),
-    reason: readString$1G(source.reason) || null,
-    forbiddenMove: readString$1G(source.forbiddenMove) || (active ? "repeat_workspace_write_without_growth" : null),
-    forbiddenActions: (readStringArray$8(source.forbiddenActions).length > 0
-      ? readStringArray$8(source.forbiddenActions)
+    status: readString(source.status) || (active ? "active" : "none"),
+    reason: readString(source.reason) || null,
+    forbiddenMove: readString(source.forbiddenMove) || (active ? "repeat_workspace_write_without_growth" : null),
+    forbiddenActions: (readStringArray(source.forbiddenActions).length > 0
+      ? readStringArray(source.forbiddenActions)
       : DEFAULT_WORKSPACE_MUTATION_GROWTH_FORBIDDEN_ACTIONS).slice(0, 6),
-    allowedNextMoves: (readStringArray$8(source.allowedNextMoves).length > 0
-      ? readStringArray$8(source.allowedNextMoves)
+    allowedNextMoves: (readStringArray(source.allowedNextMoves).length > 0
+      ? readStringArray(source.allowedNextMoves)
       : DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES).slice(0, 8),
-    requiredCorrection: readString$1G(source.requiredCorrection) || null,
-    stallCount: readNumber$i(source.stallCount),
-    escalation: readString$1G(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
-    activatedAtCycle: readNullableNumber$6(source.activatedAtCycle),
-    lastUpdatedAtCycle: readNullableNumber$6(source.lastUpdatedAtCycle),
-    clearedReason: active ? null : (readString$1G(source.clearedReason) || null)
+    requiredCorrection: readString(source.requiredCorrection) || null,
+    stallCount: readNumber$f(source.stallCount),
+    escalation: readString(source.escalation) === "hard_veto" ? "hard_veto" : "advisory",
+    activatedAtCycle: readNullableNumber$5(source.activatedAtCycle),
+    lastUpdatedAtCycle: readNullableNumber$5(source.lastUpdatedAtCycle),
+    clearedReason: active ? null : (readString(source.clearedReason) || null)
   };
 }
 
@@ -637,43 +643,43 @@ function createTerminalCorrectionState(value = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const active = source.active === true;
   return {
-    status: readString$1G(source.status) || (active ? "active" : "none"),
+    status: readString(source.status) || (active ? "active" : "none"),
     active,
-    reason: readString$1G(source.reason) || null,
-    actionName: readString$1G(source.actionName) || null,
-    forbiddenMove: readString$1G(source.forbiddenMove) || null,
-    allowedNextMoves: readStringArray$8(source.allowedNextMoves).slice(0, 8),
-    requiredCorrection: readString$1G(source.requiredCorrection) || null,
-    firstTriggeredAtCycle: readNullableNumber$6(source.firstTriggeredAtCycle),
-    lastTriggeredAtCycle: readNullableNumber$6(source.lastTriggeredAtCycle),
-    ignoredTerminalCorrectionCount: readNumber$i(source.ignoredTerminalCorrectionCount),
-    lastIgnoredAtCycle: readNullableNumber$6(source.lastIgnoredAtCycle),
-    lastSemanticFingerprint: readString$1G(source.lastSemanticFingerprint) || null,
-    lastOutcomeHash: readString$1G(source.lastOutcomeHash) || null,
-    clearedReason: active ? null : (readString$1G(source.clearedReason) || null)
+    reason: readString(source.reason) || null,
+    actionName: readString(source.actionName) || null,
+    forbiddenMove: readString(source.forbiddenMove) || null,
+    allowedNextMoves: readStringArray(source.allowedNextMoves).slice(0, 8),
+    requiredCorrection: readString(source.requiredCorrection) || null,
+    firstTriggeredAtCycle: readNullableNumber$5(source.firstTriggeredAtCycle),
+    lastTriggeredAtCycle: readNullableNumber$5(source.lastTriggeredAtCycle),
+    ignoredTerminalCorrectionCount: readNumber$f(source.ignoredTerminalCorrectionCount),
+    lastIgnoredAtCycle: readNullableNumber$5(source.lastIgnoredAtCycle),
+    lastSemanticFingerprint: readString(source.lastSemanticFingerprint) || null,
+    lastOutcomeHash: readString(source.lastOutcomeHash) || null,
+    clearedReason: active ? null : (readString(source.clearedReason) || null)
   };
 }
 
 function createTerminalRetryCooldownState(value = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const active = source.active === true;
-  const forbiddenTerminalActions = readStringArray$8(source.forbiddenTerminalActions);
+  const forbiddenTerminalActions = readStringArray(source.forbiddenTerminalActions);
   return {
     active,
-    status: readString$1G(source.status) || (active ? "active" : "none"),
-    reason: readString$1G(source.reason) || null,
+    status: readString(source.status) || (active ? "active" : "none"),
+    reason: readString(source.reason) || null,
     forbiddenTerminalActions: (forbiddenTerminalActions.length > 0
       ? forbiddenTerminalActions
       : DEFAULT_FORBIDDEN_TERMINAL_ACTIONS).slice(0, 8),
-    allowedNextMoves: readStringArray$8(source.allowedNextMoves).slice(0, 8),
-    validTerminalException: readString$1G(source.validTerminalException) || DEFAULT_VALID_TERMINAL_EXCEPTION,
-    blockedTerminalRetryCount: readNumber$i(source.blockedTerminalRetryCount),
-    executedPublishCount: readNumber$i(source.executedPublishCount),
-    consecutiveExecutedPublishCount: readNumber$i(source.consecutiveExecutedPublishCount),
-    firstActivatedAtCycle: readNullableNumber$6(source.firstActivatedAtCycle),
-    lastActivatedAtCycle: readNullableNumber$6(source.lastActivatedAtCycle),
-    lastBlockedAtCycle: readNullableNumber$6(source.lastBlockedAtCycle),
-    clearedReason: active ? null : (readString$1G(source.clearedReason) || null)
+    allowedNextMoves: readStringArray(source.allowedNextMoves).slice(0, 8),
+    validTerminalException: readString(source.validTerminalException) || DEFAULT_VALID_TERMINAL_EXCEPTION,
+    blockedTerminalRetryCount: readNumber$f(source.blockedTerminalRetryCount),
+    executedPublishCount: readNumber$f(source.executedPublishCount),
+    consecutiveExecutedPublishCount: readNumber$f(source.consecutiveExecutedPublishCount),
+    firstActivatedAtCycle: readNullableNumber$5(source.firstActivatedAtCycle),
+    lastActivatedAtCycle: readNullableNumber$5(source.lastActivatedAtCycle),
+    lastBlockedAtCycle: readNullableNumber$5(source.lastBlockedAtCycle),
+    clearedReason: active ? null : (readString(source.clearedReason) || null)
   };
 }
 
@@ -688,16 +694,16 @@ function updateTerminalRetryCooldown({
   terminalCorrectionState
 }) {
   const prior = createTerminalRetryCooldownState(previous);
-  const cycle = readNullableNumber$6(runState && runState.cycleCount);
+  const cycle = readNullableNumber$5(runState && runState.cycleCount);
   const preflightBlocked = isTerminalCorrectionPreflightBlock(context);
-  const terminalCompleted = isTerminalCompleted$1(actionName, context);
+  const terminalCompleted = isTerminalCompleted(actionName, context);
   const executedPublish = isExecutedWorkspacePublish(actionName, context);
   const base = {
     ...prior,
     blockedTerminalRetryCount: prior.blockedTerminalRetryCount + (preflightBlocked ? 1 : 0),
     executedPublishCount: prior.executedPublishCount + (executedPublish ? 1 : 0),
     consecutiveExecutedPublishCount: executedPublish
-      ? (readString$1G(previousLastActionName) === PUBLISH_DIRECT_ACTION
+      ? (readString(previousLastActionName) === PUBLISH_DIRECT_ACTION
         ? prior.consecutiveExecutedPublishCount + 1
         : 1)
       : 0,
@@ -719,13 +725,13 @@ function updateTerminalRetryCooldown({
   }
   const signalMoves = signal && Array.isArray(signal.allowedNextMoves) ? signal.allowedNextMoves : [];
   const correctionMoves = correction.allowedNextMoves || [];
-  const allowedNextMoves = readStringArray$8(correctionMoves.length > 0 ? correctionMoves : signalMoves).slice(0, 8);
+  const allowedNextMoves = readStringArray(correctionMoves.length > 0 ? correctionMoves : signalMoves).slice(0, 8);
   return {
     ...base,
     active: true,
     status: "active",
     reason: correction.reason ||
-      readString$1G(signal && signal.reason) ||
+      readString(signal && signal.reason) ||
       "terminal_retry_cooldown_active",
     forbiddenTerminalActions: DEFAULT_FORBIDDEN_TERMINAL_ACTIONS.slice(),
     allowedNextMoves,
@@ -758,8 +764,8 @@ function updateReadOnlyPlanningState({
   stepsWithoutObservableProgress
 }) {
   const prior = createReadOnlyPlanningState(previous);
-  const cycle = readNullableNumber$6(runState && runState.cycleCount);
-  const terminalCompleted = isTerminalCompleted$1(actionName, context);
+  const cycle = readNullableNumber$5(runState && runState.cycleCount);
+  const terminalCompleted = isTerminalCompleted(actionName, context);
   if (terminalCompleted) {
     return clearReadOnlyPlanningState(prior, "terminal_completed", cycle);
   }
@@ -783,7 +789,7 @@ function updateReadOnlyPlanningState({
     if (hasSourceProgress || !prior.active) {
       return clearReadOnlyPlanningState(prior, "productive_progress", cycle);
     }
-    const consecutive = readNumber$i(prior.consecutiveProductiveSteps) + 1;
+    const consecutive = readNumber$f(prior.consecutiveProductiveSteps) + 1;
     if (consecutive >= config.readOnlyPlanningClearThreshold) {
       return clearReadOnlyPlanningState(prior, "productive_progress", cycle);
     }
@@ -792,7 +798,7 @@ function updateReadOnlyPlanningState({
       consecutiveProductiveSteps: consecutive,
       stepsWithoutProductiveProgress: 0,
       lastUpdatedAtCycle: cycle,
-      lastActionName: readString$1G(actionName) || prior.lastActionName
+      lastActionName: readString(actionName) || prior.lastActionName
     };
   }
   const transitionalSignal = signal &&
@@ -803,7 +809,7 @@ function updateReadOnlyPlanningState({
     signal.status === "repeated_no_progress" &&
     isReadOnlyPlanningAction(signal.actionName, config);
   const readOnlyNoProgressThreshold = isReadOnlyPlanningAction(actionName, config) &&
-    readNumber$i(stepsWithoutObservableProgress) >= config.transitionalOnlyThreshold &&
+    readNumber$f(stepsWithoutObservableProgress) >= config.transitionalOnlyThreshold &&
     (!progress || progress.hasProductiveProgress !== true);
   const shouldActivate = prior.active || transitionalSignal || readOnlyExactSignal || readOnlyNoProgressThreshold;
   if (!shouldActivate) {
@@ -827,14 +833,14 @@ function updateReadOnlyPlanningState({
   // AI cannot escape via 1 productive insert sandwiched in a read loop.
   const nextConsecutiveProductive = planningAction
     ? 0
-    : readNumber$i(prior.consecutiveProductiveSteps);
+    : readNumber$f(prior.consecutiveProductiveSteps);
   const computedEscalation = ignoredCount >= config.readOnlyPlanningHardVetoThreshold
     ? "hard_veto"
     : "advisory";
   return {
     active: true,
     status: ignoredCount >= config.repeatThreshold ? "escalated" : "active",
-    reason: readString$1G(signal && signal.reason) ||
+    reason: readString(signal && signal.reason) ||
       prior.reason ||
       (readOnlyNoProgressThreshold
         ? "read_only_planning_sequence_without_productive_progress"
@@ -842,12 +848,12 @@ function updateReadOnlyPlanningState({
     forbiddenMove: "repeat_read_only_planning_without_productive_progress",
     forbiddenActions,
     allowedNextMoves,
-    requiredCorrection: readString$1G(signal && signal.requiredCorrection) ||
+    requiredCorrection: readString(signal && signal.requiredCorrection) ||
       "Stop repeating search, planning, skill-tool, or read-only review without productive progress. Use read_url to turn search leads into sources, mutate the workspace meaningfully, sync TodoState with todo_advance/todo_run_next, or publish only a valid limited result with concrete remainingGaps.",
     stepsWithoutProductiveProgress: Math.max(
       prior.stepsWithoutProductiveProgress + (isTrackableAction(actionName, context) ? 1 : 0),
-      readNumber$i(signal && signal.stepsWithoutObservableProgress),
-      readNumber$i(stepsWithoutObservableProgress)
+      readNumber$f(signal && signal.stepsWithoutObservableProgress),
+      readNumber$f(stepsWithoutObservableProgress)
     ),
     consecutiveProductiveSteps: nextConsecutiveProductive,
     ignoredCount,
@@ -858,7 +864,7 @@ function updateReadOnlyPlanningState({
     transitionalDimensions: Array.isArray(progress && progress.transitionalDimensions)
       ? progress.transitionalDimensions.slice(0, 8)
       : prior.transitionalDimensions,
-    lastActionName: readString$1G(actionName) || prior.lastActionName,
+    lastActionName: readString(actionName) || prior.lastActionName,
     clearedReason: null
   };
 }
@@ -895,10 +901,10 @@ function updateStructureRepairConvergence({
   runState
 }) {
   const prior = createStructureRepairConvergenceState(previous);
-  const cycle = readNullableNumber$6(runState && runState.cycleCount);
+  const cycle = readNullableNumber$5(runState && runState.cycleCount);
   const snapshot = readStructureSnapshot(runState);
   const repairAction = isStructureRepairAction(actionName);
-  const terminalCompleted = isTerminalCompleted$1(actionName, context);
+  const terminalCompleted = isTerminalCompleted(actionName, context);
 
   if (terminalCompleted) {
     return clearStructureRepairConvergence(prior, "terminal_completed", cycle, snapshot);
@@ -911,7 +917,7 @@ function updateStructureRepairConvergence({
   // clean (snapshot.ok===true), so the section-content hash — not the
   // heading/number axis — decides whether the repair loop is making progress.
   const liveGuardrailBlock = readLiveStructureGuardrailBlock(context);
-  const candidateContent = readFinalCandidateContent$1(runState);
+  const candidateContent = readFinalCandidateContent(runState);
   const openGuardrailBlock = liveGuardrailBlock
     ? {
         section: liveGuardrailBlock.section,
@@ -970,7 +976,7 @@ function updateStructureRepairConvergence({
   const progressCount = prior.structureProgressCount + (netImproved || changed ? 1 : 0);
   const shouldActivate = prior.active ||
     repeatedNoProgress >= config.structureRepairNoProgressThreshold ||
-    readString$1G(context && context.status) === "structure_repair_preflight_block";
+    readString(context && context.status) === "structure_repair_preflight_block";
 
   if (!shouldActivate) {
     return {
@@ -978,7 +984,7 @@ function updateStructureRepairConvergence({
       repeatedStructureNoProgressCount: repeatedNoProgress,
       structureProgressCount: progressCount,
       bestStructureDefectScore,
-      lastActionName: readString$1G(actionName) || prior.lastActionName,
+      lastActionName: readString(actionName) || prior.lastActionName,
       lastStructureSnapshot: snapshot,
       activeIssueCodes: snapshot.issueCodes,
       repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
@@ -1003,7 +1009,7 @@ function updateStructureRepairConvergence({
     repeatedStructureNoProgressCount: repeatedNoProgress,
     structureProgressCount: progressCount,
     bestStructureDefectScore,
-    lastActionName: readString$1G(actionName) || prior.lastActionName,
+    lastActionName: readString(actionName) || prior.lastActionName,
     lastStructureSnapshot: snapshot,
     activeIssueCodes: snapshot.issueCodes,
     repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
@@ -1047,7 +1053,7 @@ function clearStructureRepairConvergence(value, reason, cycle, snapshot) {
 // guardrail can block on. Length/source/citation blocks are intentionally
 // excluded so a non-structural guardrail block never forces a structure axis.
 function isStructureGuardrailIssueCode(code) {
-  const value = readString$1G(code);
+  const value = readString(code);
   if (!value) return false;
   return value.includes("section_rehash") ||
     value.includes("duplicate_heading") ||
@@ -1061,20 +1067,20 @@ function isStructureGuardrailIssueCode(code) {
 // when there is no structural guardrail block. Mirrors the read pattern in
 // terminal-repair-state.js readOutputGuardrailBlock.
 function readLiveStructureGuardrailBlock(context) {
-  const output = readRecord$1(context && context.output);
+  const output = readRecord(context && context.output);
   if (!output) return null;
-  if (readString$1G(output.status) !== "output_guardrail_blocked") return null;
-  const block = readRecord$1(output.outputGuardrailBlock);
-  const info = readRecord$1(block && block.info);
+  if (readString(output.status) !== "output_guardrail_blocked") return null;
+  const block = readRecord(output.outputGuardrailBlock);
+  const info = readRecord(block && block.info);
   const issues = Array.isArray(info && info.issues) ? info.issues : [];
   const structureIssues = issues.filter((issue) => isStructureGuardrailIssueCode(issue && issue.code));
   if (structureIssues.length === 0) return null;
   const section = structureIssues
-    .map((issue) => readString$1G(issue && issue.section))
+    .map((issue) => readString(issue && issue.section))
     .find(Boolean) || null;
   if (!section) return null;
   const issueCodes = structureIssues
-    .map((issue) => readString$1G(issue && issue.code))
+    .map((issue) => readString(issue && issue.code))
     .filter(Boolean)
     .slice(0, 8);
   return { section, issueCodes };
@@ -1083,27 +1089,27 @@ function readLiveStructureGuardrailBlock(context) {
 // The final candidate markdown is the single source of truth for the blocked
 // section's content. finalCandidateStructure is computed from this same content,
 // so the snapshot and the hash stay in sync within a cycle.
-function readFinalCandidateContent$1(runState) {
+function readFinalCandidateContent(runState) {
   const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
     ? runState.virtualWorkspace
     : null;
   if (!workspace) return "";
-  const quality = readRecord$1(workspace.quality) || {};
-  const path = readString$1G(quality.finalCandidatePath) || "final_candidate.md";
-  const files = readRecord$1(workspace.files) || {};
-  const file = readRecord$1(files[path]);
-  return readString$1G(file && file.content);
+  const quality = readRecord(workspace.quality) || {};
+  const path = readString(quality.finalCandidatePath) || DEFAULT_FINAL_CANDIDATE_PATH;
+  const files = readRecord(workspace.files) || {};
+  const file = readRecord(files[path]);
+  return readString(file && file.content);
 }
 
-function normalizeHeadingText$1(value) {
-  return readString$1G(value).replace(/^#+\s*/, "").replace(/\s+/g, " ").trim().toLowerCase();
+function normalizeHeadingText(value) {
+  return readString(value).replace(/^#+\s*/, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 // Extract one Markdown section's text by heading: from the matching heading line
 // down to the next same-or-higher-level heading. Read-only; authors nothing.
 function extractMarkdownSectionText(content, heading) {
-  const text = readString$1G(content);
-  const target = normalizeHeadingText$1(heading);
+  const text = readString(content);
+  const target = normalizeHeadingText(heading);
   if (!text || !target) return "";
   const lines = text.split(/\r?\n/);
   const headingPattern = /^(#{1,6})\s+(.*\S)\s*$/;
@@ -1112,7 +1118,7 @@ function extractMarkdownSectionText(content, heading) {
   for (let index = 0; index < lines.length; index += 1) {
     const match = headingPattern.exec(lines[index]);
     if (!match) continue;
-    if (normalizeHeadingText$1(match[2]) === target) {
+    if (normalizeHeadingText(match[2]) === target) {
       startIndex = index;
       startLevel = match[1].length;
       break;
@@ -1133,12 +1139,12 @@ function extractMarkdownSectionText(content, heading) {
 function hashStructureSection(content, heading) {
   const sectionText = extractMarkdownSectionText(content, heading);
   if (!sectionText) return null;
-  return hashCompactFacts({ heading: normalizeHeadingText$1(heading), text: sectionText });
+  return hashCompactFacts({ heading: normalizeHeadingText(heading), text: sectionText });
 }
 
 function buildGuardrailSectionRequiredCorrection(openGuardrailBlock) {
-  const section = readString$1G(openGuardrailBlock && openGuardrailBlock.section);
-  const issueCodes = readStringArray$8(openGuardrailBlock && openGuardrailBlock.issueCodes);
+  const section = readString(openGuardrailBlock && openGuardrailBlock.section);
+  const issueCodes = readStringArray(openGuardrailBlock && openGuardrailBlock.issueCodes);
   const parts = [
     section
       ? `Your last edits did not change the blocked section "${section}"; the host output guardrail still fails on it.`
@@ -1186,8 +1192,8 @@ function updateGuardrailSectionRepair({
       allowedNextMoves: [],
       requiredCorrection: null,
       repeatedStructureNoProgressCount: 0,
-      structureProgressCount: readNumber$i(prior.structureProgressCount),
-      lastActionName: readString$1G(actionName) || prior.lastActionName,
+      structureProgressCount: readNumber$f(prior.structureProgressCount),
+      lastActionName: readString(actionName) || prior.lastActionName,
       lastStructureSnapshot: snapshot,
       activeIssueCodes: [],
       repeatedHeadingSamples: prior.repeatedHeadingSamples,
@@ -1203,11 +1209,11 @@ function updateGuardrailSectionRepair({
 
   const noProgress = repairAction && priorHash != null;
   const repeatedNoProgress = noProgress
-    ? readNumber$i(prior.repeatedStructureNoProgressCount) + 1
-    : readNumber$i(prior.repeatedStructureNoProgressCount);
+    ? readNumber$f(prior.repeatedStructureNoProgressCount) + 1
+    : readNumber$f(prior.repeatedStructureNoProgressCount);
   const nextOpenBlock = {
     section: openGuardrailBlock.section,
-    issueCodes: readStringArray$8(openGuardrailBlock.issueCodes).slice(0, 8),
+    issueCodes: readStringArray(openGuardrailBlock.issueCodes).slice(0, 8),
     sectionHash: currentSectionHash
   };
   const activate = repeatedNoProgress >= config.structureRepairNoProgressThreshold;
@@ -1223,8 +1229,8 @@ function updateGuardrailSectionRepair({
       allowedNextMoves: [],
       requiredCorrection: null,
       repeatedStructureNoProgressCount: repeatedNoProgress,
-      structureProgressCount: readNumber$i(prior.structureProgressCount),
-      lastActionName: readString$1G(actionName) || prior.lastActionName,
+      structureProgressCount: readNumber$f(prior.structureProgressCount),
+      lastActionName: readString(actionName) || prior.lastActionName,
       lastStructureSnapshot: snapshot,
       activeIssueCodes: nextOpenBlock.issueCodes,
       repeatedHeadingSamples: prior.repeatedHeadingSamples,
@@ -1250,8 +1256,8 @@ function updateGuardrailSectionRepair({
     allowedNextMoves: readStructureRepairAllowedNextMoves(runState),
     requiredCorrection: buildGuardrailSectionRequiredCorrection(nextOpenBlock),
     repeatedStructureNoProgressCount: repeatedNoProgress,
-    structureProgressCount: readNumber$i(prior.structureProgressCount),
-    lastActionName: readString$1G(actionName) || prior.lastActionName,
+    structureProgressCount: readNumber$f(prior.structureProgressCount),
+    lastActionName: readString(actionName) || prior.lastActionName,
     lastStructureSnapshot: snapshot,
     activeIssueCodes: nextOpenBlock.issueCodes,
     repeatedHeadingSamples: prior.repeatedHeadingSamples,
@@ -1268,14 +1274,15 @@ function updateWorkspaceMutationGrowthConvergence({
   actionName,
   config = DEFAULT_CONVERGENCE_CONFIG,
   context,
+  progress,
   previous,
   runState
 }) {
   const prior = createWorkspaceMutationGrowthConvergenceState(previous);
-  const cycle = readNullableNumber$6(runState && runState.cycleCount);
-  const name = readString$1G(actionName);
+  const cycle = readNullableNumber$5(runState && runState.cycleCount);
+  const name = readString(actionName);
 
-  if (isTerminalCompleted$1(actionName, context)) {
+  if (isTerminalCompleted(actionName, context)) {
     return {
       ...prior,
       active: false,
@@ -1288,27 +1295,36 @@ function updateWorkspaceMutationGrowthConvergence({
   }
 
   const isMutationAction = [
-    "workspace_write",
-    "workspace_replace",
-    "workspace_insert_after_section"
+    WORKSPACE_WRITE_ACTION,
+    WORKSPACE_REPLACE_ACTION,
+    WORKSPACE_MULTI_EDIT_ACTION,
+    WORKSPACE_INSERT_AFTER_SECTION_ACTION
   ].includes(name);
 
   if (!isMutationAction) {
     return { ...prior, lastUpdatedAtCycle: cycle };
   }
 
-  // Only track workspace_write stalls. append/replace/insert have separate semantics and
-  // clearing their positive delta would reset the overwrite-stall counter, masking the
-  // write→append→write oscillation that this state is designed to catch.
-  if (name !== "workspace_write") {
+  // Track full-document, targeted replace, and aggregate rewrite stalls. Insertions have separate
+  // length-growth semantics and should not clear or increment this rewrite
+  // stall counter; live traces showed write→multi_edit shrink/no-growth loops
+  // and replace/read churn can otherwise continue after write/multi_edit have
+  // been hard-vetoed.
+  if (name !== WORKSPACE_WRITE_ACTION && name !== WORKSPACE_MULTI_EDIT_ACTION && name !== WORKSPACE_REPLACE_ACTION) {
     return { ...prior, lastUpdatedAtCycle: cycle };
   }
 
   const lengthStatus = readRequestedLengthStatus(runState);
   const hasDeficit = lengthStatus != null
-    && readNumber$i(lengthStatus.observed) < readNumber$i(lengthStatus.requested);
+    && readNumber$f(lengthStatus.observed) < readNumber$f(lengthStatus.requested);
+  const status = readString(context && context.output && context.output.status);
+  const blockedNoProgressMutation = status === "destructive_shrink_blocked";
+  const candidateRegression = progress &&
+    progress.hasRegressiveProgress === true &&
+    Array.isArray(progress.regressiveDimensions) &&
+    progress.regressiveDimensions.includes("candidate");
 
-  if (!hasDeficit) {
+  if (!hasDeficit && !blockedNoProgressMutation && !candidateRegression) {
     if (!prior.active && prior.stallCount === 0) return { ...prior, lastUpdatedAtCycle: cycle };
     return {
       ...prior,
@@ -1321,19 +1337,28 @@ function updateWorkspaceMutationGrowthConvergence({
     };
   }
 
-  const deltaWords = readSignedNumber(
+  const reportedDeltaWords = readSignedNumber(
     context &&
     context.output &&
     context.output.mutationStats &&
     context.output.mutationStats.delta &&
-    context.output.mutationStats.delta.words
+      context.output.mutationStats.delta.words
   );
+  const candidateDeltaWords = readSignedNumber(progress && progress.candidateDelta && progress.candidateDelta.words);
+  const regressionDeltaWords = candidateRegression && candidateDeltaWords < 0
+    ? candidateDeltaWords
+    : null;
 
   const minimumEffectiveGrowth = computeMinimumEffectiveWorkspaceGrowth(config);
-  const isStall = deltaWords < minimumEffectiveGrowth;
+  const deltaWords = blockedNoProgressMutation
+    ? Math.min(reportedDeltaWords, -minimumEffectiveGrowth)
+    : regressionDeltaWords != null
+      ? regressionDeltaWords
+    : reportedDeltaWords;
+  const isStall = candidateRegression || deltaWords < minimumEffectiveGrowth;
 
   if (!isStall) {
-    // workspace_write itself grew positively — genuine recovery, clear the stall counter.
+    // The tracked mutation itself grew positively — genuine recovery, clear the stall counter.
     if (!prior.active && prior.stallCount === 0) return { ...prior, lastUpdatedAtCycle: cycle };
     return {
       ...prior,
@@ -1361,13 +1386,15 @@ function updateWorkspaceMutationGrowthConvergence({
     : "advisory";
   return {
     active: true,
-    status: "stalling_without_growth",
-    reason: "workspace_write_not_accumulating",
+    status: candidateRegression ? "candidate_regression" : "stalling_without_growth",
+    reason: candidateRegression ? "candidate_text_regressed" : "workspace_write_not_accumulating",
     escalation,
-    forbiddenMove: "repeat_workspace_write_without_growth",
+    forbiddenMove: candidateRegression ? "repeat_workspace_mutation_after_candidate_regression" : "repeat_workspace_mutation_without_growth",
     forbiddenActions: config.workspaceMutationGrowthForbiddenActions.slice(),
     allowedNextMoves: DEFAULT_WORKSPACE_MUTATION_GROWTH_ALLOWED_NEXT_MOVES.slice(),
-    requiredCorrection: `workspace_write is overwriting or under-growing content instead of accumulating (delta=${deltaWords} words). Use workspace_propose_patch then workspace_apply_patch for risky repair, workspace_insert_after_section to add content, or workspace_finalize_candidate / workspace_publish_candidate when the draft covers the planned sections.`,
+    requiredCorrection: candidateRegression
+      ? `${name || "workspace mutation"} reduced the selected candidate instead of preserving accumulated work (delta=${deltaWords} words). Stop broad rewrites; use workspace_insert_after_section for additive repair, review the latest candidate, or publish limited with explicit remainingGaps when recovery is exhausted.`
+      : `${name || "workspace mutation"} is overwriting or under-growing content instead of accumulating (delta=${deltaWords} words). Use workspace_insert_after_section to add content under an existing section, use workspace_review_candidate after a fresh read, or publish limited only when the draft covers the planned sections and remaining gaps are explicit.`,
     stallCount: newStallCount,
     activatedAtCycle: prior.activatedAtCycle != null ? prior.activatedAtCycle : cycle,
     lastUpdatedAtCycle: cycle,
@@ -1396,8 +1423,8 @@ function updateTerminalCorrectionState({
   signal
 }) {
   const prior = createTerminalCorrectionState(previous);
-  const cycle = readNullableNumber$6(runState && runState.cycleCount);
-  if (isTerminalCompleted$1(actionName, context)) {
+  const cycle = readNullableNumber$5(runState && runState.cycleCount);
+  if (isTerminalCompleted(actionName, context)) {
     return clearTerminalCorrectionState(prior, "terminal_completed", cycle);
   }
   if (progress && progress.hasProgress) {
@@ -1411,10 +1438,10 @@ function updateTerminalCorrectionState({
     return {
       ...prior,
       status: prior.ignoredTerminalCorrectionCount >= config.repeatThreshold ? "escalated" : "active",
-      actionName: readString$1G(actionName) || prior.actionName,
+      actionName: readString(actionName) || prior.actionName,
       lastTriggeredAtCycle: prior.lastTriggeredAtCycle != null ? prior.lastTriggeredAtCycle : cycle,
-      lastSemanticFingerprint: readString$1G(semanticFingerprint) || prior.lastSemanticFingerprint,
-      lastOutcomeHash: readString$1G(outcomeHash) || prior.lastOutcomeHash,
+      lastSemanticFingerprint: readString(semanticFingerprint) || prior.lastSemanticFingerprint,
+      lastOutcomeHash: readString(outcomeHash) || prior.lastOutcomeHash,
       clearedReason: null
     };
   }
@@ -1426,18 +1453,18 @@ function updateTerminalCorrectionState({
     return {
       status: ignoredCount >= config.repeatThreshold ? "escalated" : "active",
       active: true,
-      reason: readString$1G(signal.reason) || "same_terminal_intent_without_observable_progress",
-      actionName: readString$1G(signal.actionName) || readString$1G(actionName) || prior.actionName,
-      forbiddenMove: readString$1G(signal.forbiddenMove) || "repeat_same_terminal_intent",
-      allowedNextMoves: readStringArray$8(signal.allowedNextMoves).slice(0, 8),
-      requiredCorrection: readString$1G(signal.requiredCorrection) ||
+      reason: readString(signal.reason) || "same_terminal_intent_without_observable_progress",
+      actionName: readString(signal.actionName) || readString(actionName) || prior.actionName,
+      forbiddenMove: readString(signal.forbiddenMove) || "repeat_same_terminal_intent",
+      allowedNextMoves: readStringArray(signal.allowedNextMoves).slice(0, 8),
+      requiredCorrection: readString(signal.requiredCorrection) ||
         "Do not repeat the same publish/finalize terminal intent until observable progress changes, or publish a valid limited result with concrete remainingGaps.",
       firstTriggeredAtCycle: prior.firstTriggeredAtCycle != null ? prior.firstTriggeredAtCycle : cycle,
       lastTriggeredAtCycle: cycle,
       ignoredTerminalCorrectionCount: ignoredCount,
       lastIgnoredAtCycle: wasActive && isTerminal ? cycle : prior.lastIgnoredAtCycle,
-      lastSemanticFingerprint: readString$1G(signal.semanticFingerprint) || readString$1G(semanticFingerprint) || prior.lastSemanticFingerprint,
-      lastOutcomeHash: readString$1G(signal.outcomeHash) || readString$1G(outcomeHash) || prior.lastOutcomeHash,
+      lastSemanticFingerprint: readString(signal.semanticFingerprint) || readString(semanticFingerprint) || prior.lastSemanticFingerprint,
+      lastOutcomeHash: readString(signal.outcomeHash) || readString(outcomeHash) || prior.lastOutcomeHash,
       clearedReason: null
     };
   }
@@ -1446,12 +1473,12 @@ function updateTerminalCorrectionState({
     return {
       ...prior,
       status: ignoredCount >= config.repeatThreshold ? "escalated" : "active",
-      actionName: readString$1G(actionName) || prior.actionName,
+      actionName: readString(actionName) || prior.actionName,
       ignoredTerminalCorrectionCount: ignoredCount,
       lastIgnoredAtCycle: cycle,
       lastTriggeredAtCycle: prior.lastTriggeredAtCycle != null ? prior.lastTriggeredAtCycle : cycle,
-      lastSemanticFingerprint: readString$1G(semanticFingerprint) || prior.lastSemanticFingerprint,
-      lastOutcomeHash: readString$1G(outcomeHash) || prior.lastOutcomeHash,
+      lastSemanticFingerprint: readString(semanticFingerprint) || prior.lastSemanticFingerprint,
+      lastOutcomeHash: readString(outcomeHash) || prior.lastOutcomeHash,
       clearedReason: null
     };
   }
@@ -1459,17 +1486,17 @@ function updateTerminalCorrectionState({
 }
 
 function isTerminalCorrectionPreflightBlock(context) {
-  const output = readRecord$1(context && context.output);
-  return readString$1G(output.kind) === "terminal_correction_preflight_block";
+  const output = readRecord(context && context.output);
+  return readString(output.kind) === "terminal_correction_preflight_block";
 }
 
 function isReadOnlyPlanningPreflightBlock(context) {
-  const output = readRecord$1(context && context.output);
-  return readString$1G(output.kind) === "read_only_planning_preflight_block";
+  const output = readRecord(context && context.output);
+  return readString(output.kind) === "read_only_planning_preflight_block";
 }
 
 function isExecutedWorkspacePublish(actionName, context) {
-  if (readString$1G(actionName) !== PUBLISH_DIRECT_ACTION) return false;
+  if (readString(actionName) !== PUBLISH_DIRECT_ACTION) return false;
   return !isTerminalCorrectionPreflightBlock(context);
 }
 
@@ -1520,13 +1547,13 @@ function buildLatestCorrectionSignal(terminalCorrectionState, signal, config = D
   return signal ? cloneValue(signal) : null;
 }
 
-function isTerminalCompleted$1(actionName, context) {
+function isTerminalCompleted(actionName, context) {
   if (!isSemanticTerminalAction(actionName, context)) return false;
-  const output = readRecord$1(context && context.output);
-  const kind = readString$1G(output.kind);
+  const output = readRecord(context && context.output);
+  const kind = readString(output.kind);
   if (kind === "final_response") return true;
-  if (readString$1G(output.control) === "complete") return true;
-  if (readString$1G(context && context.status) === "complete") return true;
+  if (readString(output.control) === "complete") return true;
+  if (readString(context && context.status) === "complete") return true;
   return false;
 }
 
@@ -1560,7 +1587,7 @@ function buildConvergenceSignal({
   if (
     isActionErrorRefresh(context) &&
     fingerprint &&
-    readNumber$i(errorRepeatCount) >= config.repeatThreshold
+    readNumber$f(errorRepeatCount) >= config.repeatThreshold
   ) {
     const allowedNextMoves = readAllowedNextMoves$1(runState, {
       longFormMode: longFormMode === true
@@ -1572,12 +1599,12 @@ function buildConvergenceSignal({
       reason: "same_action_args_thrown_repeatedly",
       actionName: actionName || null,
       fingerprint,
-      errorRepeatCount: readNumber$i(errorRepeatCount),
+      errorRepeatCount: readNumber$f(errorRepeatCount),
       stepsWithoutObservableProgress,
       forbiddenMove: "repeat_same_action_args_after_throw",
       allowedNextMoves,
-      requiredCorrection: `Action "${actionName}" has thrown with the same arguments ${readNumber$i(errorRepeatCount)} times. Read the latest workspace state, choose different arguments, pick a different action, or publish workspace_publish_candidate with decision=limited and concrete remainingGaps explaining the blocker.`,
-      updatedAtCycle: readNullableNumber$6(runState && runState.cycleCount)
+      requiredCorrection: `Action "${actionName}" has thrown with the same arguments ${readNumber$f(errorRepeatCount)} times. Read the latest workspace state, choose different arguments, pick a different action, or publish workspace_publish_candidate with decision=limited and concrete remainingGaps explaining the blocker.`,
+      updatedAtCycle: readNullableNumber$5(runState && runState.cycleCount)
     };
   }
   if (effectiveHasProgress) return null;
@@ -1601,7 +1628,7 @@ function buildConvergenceSignal({
       forbiddenMove: "another_search_or_plan_without_workspace_or_read_url",
       allowedNextMoves,
       requiredCorrection: "Search and planning are means, not deliverables. Capture evidence with read_url, then grow the candidate via workspace_write/workspace_insert_after_section/workspace_replace before any further web_search or todo_plan.",
-      updatedAtCycle: readNullableNumber$6(runState && runState.cycleCount)
+      updatedAtCycle: readNullableNumber$5(runState && runState.cycleCount)
     };
   }
   if (semanticFingerprint && outcomeHash && repeatedSemanticFingerprintCount >= config.repeatThreshold) {
@@ -1621,7 +1648,7 @@ function buildConvergenceSignal({
       forbiddenMove: "repeat_same_terminal_intent",
       allowedNextMoves,
       requiredCorrection,
-      updatedAtCycle: readNullableNumber$6(runState && runState.cycleCount)
+      updatedAtCycle: readNullableNumber$5(runState && runState.cycleCount)
     };
   }
   if (semanticFingerprint) return null;
@@ -1640,7 +1667,7 @@ function buildConvergenceSignal({
     forbiddenMove: "repeat_same_action_args",
     allowedNextMoves,
     requiredCorrection: "Do not repeat the same action+args until observable progress changes.",
-    updatedAtCycle: readNullableNumber$6(runState && runState.cycleCount)
+    updatedAtCycle: readNullableNumber$5(runState && runState.cycleCount)
   };
 }
 
@@ -1650,7 +1677,7 @@ function isStructuredReadOnlyPlanningLoop(runState, actionName, config = DEFAULT
 }
 
 function isLengthDeficitChurnAction(runState, actionName) {
-  const name = readString$1G(actionName);
+  const name = readString(actionName);
   return LENGTH_DEFICIT_CHURN_ACTIONS.includes(name) && hasRequestedLengthDeficit(runState);
 }
 
@@ -1689,7 +1716,7 @@ function readAllowedNextMoves$1(runState, options = {}) {
     moves.push("change_arguments", "choose_different_action");
   }
   moves.push("valid_limited_with_remainingGaps");
-  return Array.from(new Set(moves.map(readString$1G).filter(Boolean))).slice(0, 8);
+  return Array.from(new Set(moves.map(readString).filter(Boolean))).slice(0, 8);
 }
 
 function readReadOnlyPlanningForbiddenActions(runState, config = DEFAULT_CONVERGENCE_CONFIG) {
@@ -1710,7 +1737,7 @@ function readReadOnlyPlanningAllowedNextMoves(signalMoves, forbiddenActions) {
     ...DEFAULT_READ_ONLY_PLANNING_ALLOWED_NEXT_MOVES,
     ...(Array.isArray(signalMoves) ? signalMoves : [])
   ].filter((move) => {
-    const value = readString$1G(move);
+    const value = readString(move);
     return value && !forbidden.has(value);
   });
   return Array.from(new Set(moves)).slice(0, 12);
@@ -1724,23 +1751,23 @@ function readRequiredCorrection(runState) {
 }
 
 function createOutcomeHash(runState, context, actionName) {
-  const output = readRecord$1(context && context.output);
+  const output = readRecord(context && context.output);
   const candidate = readOutputCandidateSnapshot(output) || readCandidateSnapshot(runState);
   const facts = {
-    actionName: readString$1G(actionName) || null,
+    actionName: readString(actionName) || null,
     candidate: summarizeCandidateForHash(candidate),
-    control: readString$1G(output.control) || null,
+    control: readString(output.control) || null,
     issueCodes: readReadinessIssueCodes(context, output),
-    kind: readString$1G(output.kind) || null,
+    kind: readString(output.kind) || null,
     publishBlockStatus: readPublishBlockStatus(runState, output),
-    status: readString$1G(output.status) || readString$1G(context && context.status) || null
+    status: readString(output.status) || readString(context && context.status) || null
   };
   return hashCompactFacts(facts);
 }
 
 function createSemanticTerminalFingerprint(runState, context, actionName) {
   if (!isSemanticTerminalAction(actionName, context)) return null;
-  const output = readRecord$1(context && context.output);
+  const output = readRecord(context && context.output);
   const candidate = readOutputCandidateSnapshot(output) || readCandidateSnapshot(runState);
   const sourceMinimum = readSourceMinimum(runState);
   const deficits = readObservableDeficits$1(runState, candidate, sourceMinimum);
@@ -1749,11 +1776,11 @@ function createSemanticTerminalFingerprint(runState, context, actionName) {
     candidate: summarizeCandidateForHash(candidate),
     issueCodes: readReadinessIssueCodes(context, output),
     sourceMinimum: sourceMinimum ? {
-      minReadSources: readNumber$i(sourceMinimum.minReadSources),
-      minRelevantSources: readNumber$i(sourceMinimum.minRelevantSources),
+      minReadSources: readNumber$f(sourceMinimum.minReadSources),
+      minRelevantSources: readNumber$f(sourceMinimum.minRelevantSources),
       passed: sourceMinimum.passed === true,
-      readSources: readNumber$i(sourceMinimum.readSources),
-      relevantSources: readNumber$i(sourceMinimum.relevantSources)
+      readSources: readNumber$f(sourceMinimum.readSources),
+      relevantSources: readNumber$f(sourceMinimum.relevantSources)
     } : null,
     terminalAction: normalizeTerminalActionName(actionName, context),
     deficits
@@ -1766,53 +1793,53 @@ function hashCompactFacts(value) {
 }
 
 function isSemanticTerminalAction(actionName, context) {
-  const name = readString$1G(actionName);
+  const name = readString(actionName);
   if (name === PUBLISH_DIRECT_ACTION) return true;
   if (name === "finalize" || name === "final" || name === "planner_finalize" || name === "planner_final") return true;
-  const source = readString$1G(context && context.sourceLabel);
+  const source = readString(context && context.sourceLabel);
   return source === "planner_finalize" || source === "planner_final" || source === "planner_finalizer" || source === "plan_synthesize";
 }
 
 function normalizeTerminalActionName(actionName, context) {
-  const name = readString$1G(actionName);
+  const name = readString(actionName);
   if (name === PUBLISH_DIRECT_ACTION) return PUBLISH_DIRECT_ACTION;
-  const source = readString$1G(context && context.sourceLabel);
+  const source = readString(context && context.sourceLabel);
   if (source) return source === "planner_final" ? "planner_finalize" : source;
   return name === "final" ? "planner_finalize" : (name || "finalize");
 }
 
 function readOutputCandidateSnapshot(output) {
   if (!output || typeof output !== "object") return null;
-  const workspaceCandidate = readRecord$1(output.workspaceCandidate);
-  const workspaceStats = readRecord$1(workspaceCandidate && workspaceCandidate.textStats);
+  const workspaceCandidate = readRecord(output.workspaceCandidate);
+  const workspaceStats = readRecord(workspaceCandidate && workspaceCandidate.textStats);
   if (workspaceStats) {
     return {
-      chars: readNumber$i(workspaceStats.chars),
-      cjkChars: readNumber$i(workspaceStats.cjkChars),
-      path: readString$1G(workspaceCandidate.path) || null,
-      words: readNumber$i(workspaceStats.words),
-      version: readNullableNumber$6(workspaceCandidate.version)
+      chars: readNumber$f(workspaceStats.chars),
+      cjkChars: readNumber$f(workspaceStats.cjkChars),
+      path: readString(workspaceCandidate.path) || null,
+      words: readNumber$f(workspaceStats.words),
+      version: readNullableNumber$5(workspaceCandidate.version)
     };
   }
-  const textStats = readRecord$1(output.textStats);
+  const textStats = readRecord(output.textStats);
   if (textStats) {
     return {
-      chars: readNumber$i(textStats.chars),
-      cjkChars: readNumber$i(textStats.cjkChars),
-      path: readString$1G(output.path) || null,
-      words: readNumber$i(textStats.words),
+      chars: readNumber$f(textStats.chars),
+      cjkChars: readNumber$f(textStats.cjkChars),
+      path: readString(output.path) || null,
+      words: readNumber$f(textStats.words),
       version: null
     };
   }
-  const candidate = readRecord$1(output.candidate);
-  const candidateStats = readRecord$1(candidate && candidate.stats);
+  const candidate = readRecord(output.candidate);
+  const candidateStats = readRecord(candidate && candidate.stats);
   if (candidateStats) {
     return {
-      chars: readNumber$i(candidateStats.chars),
-      cjkChars: readNumber$i(candidateStats.cjkChars),
-      path: readString$1G(candidate.path) || null,
-      words: readNumber$i(candidateStats.words),
-      version: readNullableNumber$6(candidate.version)
+      chars: readNumber$f(candidateStats.chars),
+      cjkChars: readNumber$f(candidateStats.cjkChars),
+      path: readString(candidate.path) || null,
+      words: readNumber$f(candidateStats.words),
+      version: readNullableNumber$5(candidate.version)
     };
   }
   return null;
@@ -1821,19 +1848,19 @@ function readOutputCandidateSnapshot(output) {
 function summarizeCandidateForHash(candidate) {
   if (!candidate || typeof candidate !== "object") return null;
   return {
-    chars: readNumber$i(candidate.chars),
-    cjkChars: readNumber$i(candidate.cjkChars),
-    path: readString$1G(candidate.path) || null,
-    words: readNumber$i(candidate.words)
+    chars: readNumber$f(candidate.chars),
+    cjkChars: readNumber$f(candidate.cjkChars),
+    path: readString(candidate.path) || null,
+    words: readNumber$f(candidate.words)
   };
 }
 
 function readPublishBlockStatus(runState, output) {
-  const outputSignal = output && readRecord$1(output.publishBlockSignal);
-  const runSignal = runState && readRecord$1(runState.publishBlockSignal);
-  return readString$1G(output && output.status) ||
-    readString$1G(outputSignal && outputSignal.lastStatus) ||
-    readString$1G(runSignal && runSignal.lastStatus) ||
+  const outputSignal = output && readRecord(output.publishBlockSignal);
+  const runSignal = runState && readRecord(runState.publishBlockSignal);
+  return readString(output && output.status) ||
+    readString(outputSignal && outputSignal.lastStatus) ||
+    readString(runSignal && runSignal.lastStatus) ||
     null;
 }
 
@@ -1848,7 +1875,7 @@ function readReadinessIssueCodes(context, output) {
   for (const list of candidates) {
     if (!Array.isArray(list)) continue;
     for (const issue of list) {
-      const code = readString$1G(issue) || readString$1G(issue && (issue.code || issue.status || issue.reason));
+      const code = readString(issue) || readString(issue && (issue.code || issue.status || issue.reason));
       if (code) codes.push(code);
     }
   }
@@ -1861,17 +1888,17 @@ function readObservableDeficits$1(runState, candidate, sourceMinimum) {
     : null;
   if (recovery && recovery.lastObservableDeficits && typeof recovery.lastObservableDeficits === "object") {
     return {
-      lengthDeficit: readNumber$i(recovery.lastObservableDeficits.lengthDeficit),
-      readSourceDeficit: readNumber$i(recovery.lastObservableDeficits.readSourceDeficit),
-      relevantSourceDeficit: readNumber$i(recovery.lastObservableDeficits.relevantSourceDeficit)
+      lengthDeficit: readNumber$f(recovery.lastObservableDeficits.lengthDeficit),
+      readSourceDeficit: readNumber$f(recovery.lastObservableDeficits.readSourceDeficit),
+      relevantSourceDeficit: readNumber$f(recovery.lastObservableDeficits.relevantSourceDeficit)
     };
   }
   const requested = readRequestedLengthSnapshot$1(runState);
-  const observed = candidate && requested ? readNumber$i(candidate[requested.statsKey]) : 0;
+  const observed = candidate && requested ? readNumber$f(candidate[requested.statsKey]) : 0;
   return {
-    lengthDeficit: requested ? Math.max(0, readNumber$i(requested.value) - observed) : 0,
-    readSourceDeficit: sourceMinimum ? Math.max(0, readNumber$i(sourceMinimum.minReadSources) - readNumber$i(sourceMinimum.readSources)) : 0,
-    relevantSourceDeficit: sourceMinimum ? Math.max(0, readNumber$i(sourceMinimum.minRelevantSources) - readNumber$i(sourceMinimum.relevantSources)) : 0
+    lengthDeficit: requested ? Math.max(0, readNumber$f(requested.value) - observed) : 0,
+    readSourceDeficit: sourceMinimum ? Math.max(0, readNumber$f(sourceMinimum.minReadSources) - readNumber$f(sourceMinimum.readSources)) : 0,
+    relevantSourceDeficit: sourceMinimum ? Math.max(0, readNumber$f(sourceMinimum.minRelevantSources) - readNumber$f(sourceMinimum.relevantSources)) : 0
   };
 }
 
@@ -1881,11 +1908,11 @@ function readRequestedLengthSnapshot$1(runState) {
     ? packet.requestedLength
     : null;
   if (!requested) return null;
-  const unit = readString$1G(requested.unit) || "chars";
+  const unit = readString(requested.unit) || "chars";
   return {
-    statsKey: readString$1G(requested.statsKey) || (unit === "words" ? "words" : unit === "cjkChars" ? "cjkChars" : "chars"),
+    statsKey: readString(requested.statsKey) || (unit === "words" ? "words" : unit === "cjkChars" ? "cjkChars" : "chars"),
     unit,
-    value: readNumber$i(requested.value)
+    value: readNumber$f(requested.value)
   };
 }
 
@@ -1897,14 +1924,14 @@ function normalizeActionPatternConvergenceState(value, config = DEFAULT_CONVERGE
   return {
     kind: "action_pattern_convergence",
     status: readStatus$1(source.status),
-    lastFingerprint: readString$1G(source.lastFingerprint) || null,
-    lastOutcomeHash: readString$1G(source.lastOutcomeHash) || null,
-    lastSemanticFingerprint: readString$1G(source.lastSemanticFingerprint) || null,
-    lastActionName: readString$1G(source.lastActionName) || null,
-    repeatedFingerprintCount: readNumber$i(source.repeatedFingerprintCount),
-    repeatedSemanticFingerprintCount: readNumber$i(source.repeatedSemanticFingerprintCount),
-    errorRepeatCount: readNumber$i(source.errorRepeatCount),
-    stepsWithoutObservableProgress: readNumber$i(source.stepsWithoutObservableProgress),
+    lastFingerprint: readString(source.lastFingerprint) || null,
+    lastOutcomeHash: readString(source.lastOutcomeHash) || null,
+    lastSemanticFingerprint: readString(source.lastSemanticFingerprint) || null,
+    lastActionName: readString(source.lastActionName) || null,
+    repeatedFingerprintCount: readNumber$f(source.repeatedFingerprintCount),
+    repeatedSemanticFingerprintCount: readNumber$f(source.repeatedSemanticFingerprintCount),
+    errorRepeatCount: readNumber$f(source.errorRepeatCount),
+    stepsWithoutObservableProgress: readNumber$f(source.stepsWithoutObservableProgress),
     progressSnapshot: normalizeProgressSnapshot(source.progressSnapshot),
     recentPatterns: Array.isArray(source.recentPatterns)
       ? source.recentPatterns.filter((entry) => entry && typeof entry === "object").slice(-config.maxRecentPatterns)
@@ -1926,7 +1953,7 @@ function normalizeActionPatternConvergenceState(value, config = DEFAULT_CONVERGE
       ? cloneValue(source.latestCorrectionSignal)
       : null,
     terminalRetryCooldown: createTerminalRetryCooldownState(source.terminalRetryCooldown),
-    updatedAtCycle: readNullableNumber$6(source.updatedAtCycle),
+    updatedAtCycle: readNullableNumber$5(source.updatedAtCycle),
     version: 1
   };
 }
@@ -1965,19 +1992,27 @@ function readStructureSnapshot(runState) {
     ? quality.finalCandidateStructure
     : null;
   if (!structure) return normalizeStructureSnapshot(null);
-  const issueCodes = readStringArray$8(structure.issueCodes).sort().slice(0, 8);
-  const repeatedHeadingSamples = normalizeStructureSamples$1(structure.repeatedHeadingSamples, "heading");
-  const repeatedNumberSamples = normalizeStructureSamples$1(structure.repeatedNumberSamples, "number");
-  const duplicateHeadingCount = readNumber$i(structure.duplicateHeadingCount);
-  const duplicateNumberCount = readNumber$i(structure.duplicateNumberCount);
+  const issueCodes = readStringArray(structure.issueCodes).sort().slice(0, 8);
+  const repeatedHeadingSamples = normalizeStructureSamples(structure.repeatedHeadingSamples, "heading");
+  const repeatedNumberSamples = normalizeStructureSamples(structure.repeatedNumberSamples, "number");
+  const semanticDuplicateHeadingContexts = normalizeSemanticDuplicateHeadingContexts(structure.semanticDuplicateHeadingContexts);
+  const bodyAfterFinalSectionContexts = normalizeBodyAfterFinalSectionContexts(structure.bodyAfterFinalSectionContexts);
+  const duplicateHeadingCount = readNumber$f(structure.duplicateHeadingCount);
+  const duplicateNumberCount = readNumber$f(structure.duplicateNumberCount);
+  const semanticDuplicateHeadingCount = semanticDuplicateHeadingContexts.length;
+  const bodyAfterFinalSectionCount = bodyAfterFinalSectionContexts.length;
   const facts = {
+    bodyAfterFinalSectionCount,
+    bodyAfterFinalSectionContexts,
     duplicateHeadingCount,
     duplicateNumberCount,
     issueCodes,
     ok: structure.ok === true,
     repeatedHeadingSamples,
     repeatedNumberSamples,
-    status: readString$1G(structure.status) || (structure.ok === true ? "pass" : "fail")
+    semanticDuplicateHeadingContexts,
+    semanticDuplicateHeadingCount,
+    status: readString(structure.status) || (structure.ok === true ? "pass" : "fail")
   };
   return normalizeStructureSnapshot({
     ...facts,
@@ -1988,24 +2023,32 @@ function readStructureSnapshot(runState) {
 
 function normalizeStructureSnapshot(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const issueCodes = readStringArray$8(source.issueCodes).sort().slice(0, 8);
-  const repeatedHeadingSamples = normalizeStructureSamples$1(source.repeatedHeadingSamples, "heading");
-  const repeatedNumberSamples = normalizeStructureSamples$1(source.repeatedNumberSamples, "number");
-  const duplicateHeadingCount = readNumber$i(source.duplicateHeadingCount);
-  const duplicateNumberCount = readNumber$i(source.duplicateNumberCount);
+  const issueCodes = readStringArray(source.issueCodes).sort().slice(0, 8);
+  const repeatedHeadingSamples = normalizeStructureSamples(source.repeatedHeadingSamples, "heading");
+  const repeatedNumberSamples = normalizeStructureSamples(source.repeatedNumberSamples, "number");
+  const semanticDuplicateHeadingContexts = normalizeSemanticDuplicateHeadingContexts(source.semanticDuplicateHeadingContexts);
+  const bodyAfterFinalSectionContexts = normalizeBodyAfterFinalSectionContexts(source.bodyAfterFinalSectionContexts);
+  const duplicateHeadingCount = readNumber$f(source.duplicateHeadingCount);
+  const duplicateNumberCount = readNumber$f(source.duplicateNumberCount);
+  const semanticDuplicateHeadingCount = readNumber$f(source.semanticDuplicateHeadingCount) || semanticDuplicateHeadingContexts.length;
+  const bodyAfterFinalSectionCount = readNumber$f(source.bodyAfterFinalSectionCount) || bodyAfterFinalSectionContexts.length;
   const ok = source.ok === true;
   const present = source.present === true;
-  const status = readString$1G(source.status) || (present ? (ok ? "pass" : "fail") : "missing");
-  const signature = readString$1G(source.signature) || hashCompactFacts({
+  const status = readString(source.status) || (present ? (ok ? "pass" : "fail") : "missing");
+  const signature = readString(source.signature) || hashCompactFacts({
+    bodyAfterFinalSectionCount,
     duplicateHeadingCount,
     duplicateNumberCount,
     issueCodes,
     ok,
     repeatedHeadingSamples,
     repeatedNumberSamples,
+    semanticDuplicateHeadingCount,
     status
   });
   return {
+    bodyAfterFinalSectionCount,
+    bodyAfterFinalSectionContexts,
     duplicateHeadingCount,
     duplicateNumberCount,
     issueCodes,
@@ -2013,9 +2056,11 @@ function normalizeStructureSnapshot(value) {
     present,
     repeatedHeadingSamples,
     repeatedNumberSamples,
+    semanticDuplicateHeadingContexts,
+    semanticDuplicateHeadingCount,
     signature,
     status,
-    totalDuplicateCount: duplicateHeadingCount + duplicateNumberCount
+    totalDuplicateCount: duplicateHeadingCount + duplicateNumberCount + semanticDuplicateHeadingCount + bodyAfterFinalSectionCount
   };
 }
 
@@ -2024,33 +2069,71 @@ function summarizeStructureSnapshot(value) {
   return {
     duplicateHeadingCount: snapshot.duplicateHeadingCount,
     duplicateNumberCount: snapshot.duplicateNumberCount,
+    semanticDuplicateHeadingCount: snapshot.semanticDuplicateHeadingCount,
+    bodyAfterFinalSectionCount: snapshot.bodyAfterFinalSectionCount,
     issueCodes: snapshot.issueCodes,
     ok: snapshot.ok,
     present: snapshot.present,
     repeatedHeadingSamples: snapshot.repeatedHeadingSamples,
     repeatedNumberSamples: snapshot.repeatedNumberSamples,
+    semanticDuplicateHeadingContexts: snapshot.semanticDuplicateHeadingContexts,
+    bodyAfterFinalSectionContexts: snapshot.bodyAfterFinalSectionContexts,
     signature: snapshot.signature,
     status: snapshot.status,
     totalDuplicateCount: snapshot.totalDuplicateCount
   };
 }
 
-function normalizeStructureSamples$1(value, key) {
+function normalizeSemanticDuplicateHeadingContexts(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((entry) => {
+      const source = readRecord(entry);
+      const first = readRecord(source && source.first);
+      const second = readRecord(source && source.second);
+      const firstRaw = readString(first && first.raw);
+      const secondRaw = readString(second && second.raw);
+      if (!firstRaw || !secondRaw) return null;
+      return {
+        first: { lineNumber: readNumber$f(first && first.lineNumber), raw: firstRaw.slice(0, 160) },
+        relation: readString(source && source.relation) || "similar",
+        second: { lineNumber: readNumber$f(second && second.lineNumber), raw: secondRaw.slice(0, 160) }
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeBodyAfterFinalSectionContexts(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((entry) => {
+      const source = readRecord(entry);
+      const raw = readString(source && source.raw);
+      if (!raw) return null;
+      return {
+        lineNumber: readNumber$f(source && source.lineNumber),
+        raw: raw.slice(0, 160)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeStructureSamples(value, key) {
   const name = key === "number" ? "number" : "heading";
   const list = Array.isArray(value) ? value : [];
   return list
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
-      const label = readString$1G(entry[name]);
-      const count = readNumber$i(entry.count);
+      const label = readString(entry[name]);
+      const count = readNumber$f(entry.count);
       if (!label || count <= 0) return null;
       return { [name]: label, count };
     })
     .filter(Boolean)
     .sort((a, b) => {
-      const countDelta = readNumber$i(b.count) - readNumber$i(a.count);
+      const countDelta = readNumber$f(b.count) - readNumber$f(a.count);
       if (countDelta !== 0) return countDelta;
-      return readString$1G(a[name]).localeCompare(readString$1G(b[name]));
+      return readString(a[name]).localeCompare(readString(b[name]));
     })
     .slice(0, 5);
 }
@@ -2058,15 +2141,15 @@ function normalizeStructureSamples$1(value, key) {
 function isStructureRepairAction(actionName) {
   return [
     FINALIZE_CANDIDATE_ACTION,
-    "workspace_insert_after_section",
-    "workspace_list",
-    "workspace_multi_edit",
-    "workspace_propose_patch",
-    "workspace_apply_patch",
-    "workspace_read",
-    "workspace_replace",
-    "workspace_write"
-  ].includes(readString$1G(actionName));
+    WORKSPACE_INSERT_AFTER_SECTION_ACTION,
+    WORKSPACE_LIST_ACTION,
+    WORKSPACE_MULTI_EDIT_ACTION,
+    WORKSPACE_PROPOSE_PATCH_ACTION,
+    WORKSPACE_APPLY_PATCH_ACTION,
+    WORKSPACE_READ_ACTION,
+    WORKSPACE_REPLACE_ACTION,
+    WORKSPACE_WRITE_ACTION
+  ].includes(readString(actionName));
 }
 
 function readStructureRepairAllowedNextMoves(runState) {
@@ -2096,16 +2179,16 @@ function buildStructureRepairRequiredCorrection(snapshot) {
 }
 
 function readActionName$3(decision) {
-  return readString$1G(decision && (decision.name || decision.actionName));
+  return readString(decision && (decision.name || decision.actionName));
 }
 
 function isTrackableAction(actionName, context) {
-  if (readString$1G(context && context.status) === "before_action") return false;
-  return Boolean(readString$1G(actionName));
+  if (readString(context && context.status) === "before_action") return false;
+  return Boolean(readString(actionName));
 }
 
 function isReadOnlyPlanningAction(actionName, config = DEFAULT_CONVERGENCE_CONFIG) {
-  return config.readOnlyPlanningForbiddenActions.includes(readString$1G(actionName));
+  return config.readOnlyPlanningForbiddenActions.includes(readString(actionName));
 }
 
 // AGRUN-263 helpers — fingerprint for tool-result dedup. The `decision`
@@ -2115,7 +2198,7 @@ function isReadOnlyPlanningAction(actionName, config = DEFAULT_CONVERGENCE_CONFI
 // on convergence state. Missing args fold to empty so action-name-only
 // repeats still register as duplicates.
 function buildToolCallFingerprint(actionName, decision) {
-  const name = readString$1G(actionName) || readString$1G(decision && decision.name);
+  const name = readString(actionName) || readString(decision && decision.name);
   if (!name) return null;
   const args = decision && decision.args && typeof decision.args === "object" ? decision.args : {};
   return name + ":" + stableStringify(args);
@@ -2129,7 +2212,7 @@ function updateRecentToolFingerprints(previousList, fingerprint, toolHistoryGrew
 }
 
 function readStatus$1(value) {
-  const status = readString$1G(value);
+  const status = readString(value);
   if (status === "terminal_correction_active") return status;
   if (status === "read_only_planning_active") return status;
   if (status === "structure_repair_active") return status;
@@ -2139,23 +2222,15 @@ function readStatus$1(value) {
 }
 
 function readPatternKind(value) {
-  const text = readString$1G(value);
+  const text = readString(value);
   if (text === "transitional_only_progress") return "transitional_only_progress";
   return text === "semantic_terminal" ? "semantic_terminal" : "exact_action";
-}
-
-function readString$1G(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readStringArray$8(value) {
-  return Array.isArray(value) ? value.map(readString$1G).filter(Boolean) : [];
 }
 
 // Mirror normalizeActionGuardrailConfig.readPositiveInteger: a host override is
 // honored only when it is a non-negative integer, otherwise the DEFAULT_* falls
 // through. This keeps default behavior byte-identical when config is absent.
-function readPositiveInteger$k(value, fallback) {
+function readPositiveInteger$j(value, fallback) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
@@ -2163,15 +2238,15 @@ function readPositiveInteger$k(value, fallback) {
 // outright, an absent/empty one falls back to the DEFAULT_* list. Replacement
 // mirrors resolveProductiveProgressDimensions so misconfiguration is loud.
 function readForbiddenActionList(value, fallback) {
-  const list = readStringArray$8(value);
+  const list = readStringArray(value);
   return list.length > 0 ? list : fallback.slice();
 }
 
-function readRecord$1(value) {
+function readRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 
-function readNumber$i(value) {
+function readNumber$f(value) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
@@ -2181,7 +2256,7 @@ function readSignedNumber(value) {
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
-function readNullableNumber$6(value) {
+function readNullableNumber$5(value) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }

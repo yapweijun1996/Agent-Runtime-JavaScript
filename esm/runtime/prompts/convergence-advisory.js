@@ -9,15 +9,26 @@
 // `stripOodaeSignals` is the SPIKE/oodae-ablation flag (planner-prompt.js
 // SPIKE_STRIP_OODAE_SIGNALS) threaded in so the A/B knob keeps working; in
 // production it is false and every line renders.
-function buildLines$2({ compactSystemPrompt, stripOodaeSignals = false } = {}) {
+//
+// AGRUN-492 (audit M11) — `wireQualityContext` mirrors planner-prompt.js
+// SPIKE_WIRE_QUALITYCONTEXT, the flag that decides whether the qualityContext
+// DATA field is injected. The qualityContext INSTRUCTION below is gated on the
+// same flag so the prompt never tells the AI to read a field the runtime did
+// not populate. Production default is off → the qualityContext mentions drop
+// out and the prompt matches the data.
+function buildLines$2({ compactSystemPrompt, stripOodaeSignals = false, wireQualityContext = false } = {}) {
   const lines = [];
 
   if (compactSystemPrompt) {
-    lines.push("If plannerInvalidSignal, planValidationFeedback, qualityContext, actionFailureSignal, or readAttemptSignal is present, read it and choose a corrected next envelope yourself.");
+    const compactSignals = ["plannerInvalidSignal", "planValidationFeedback"];
+    if (wireQualityContext) compactSignals.push("qualityContext");
+    compactSignals.push("actionFailureSignal", "readAttemptSignal");
+    const lastSignal = compactSignals.pop();
+    lines.push(`If ${compactSignals.join(", ")}, or ${lastSignal} is present, read it and choose a corrected next envelope yourself.`);
   } else {
     lines.push("If your previous envelope was invalid or empty, the runtime surfaces loopState.plannerInvalidSignal as read-only repair facts. Return one corrected planner JSON envelope yourself; runtime will not synthesize web_search or any other fallback action.");
     lines.push("If loopState.planValidationFeedback is present, your previous type:\"plan\" envelope failed the runtime envelope contract. Read its code/detail/error and choose the next valid envelope yourself; do not repeat the same invalid plan shape.");
-    if (!stripOodaeSignals) {
+    if (!stripOodaeSignals && wireQualityContext) {
       lines.push("If your previous final answer triggered runtime quality issues, runtime emits enum codes via loopState.qualityContext (issues: ['placeholder_artifact', 'claim_count_exceeds_source_coverage', 'missing_research_report_sections', etc.], noteCount). The runtime no longer blocks finalize on these — read the codes and either expand the answer (workspace_replace, fresh finalize) or accept and re-emit if you disagree with the diagnosis.");
     }
     // ADR-0026 — read-only signal replacing the deleted consecutive-failure

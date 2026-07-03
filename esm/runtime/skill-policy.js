@@ -1,3 +1,5 @@
+import { readString } from './semantic-json.js';
+
 const SUPPORTED_POLICY_ACTIONS = new Set(["allow", "ask", "deny"]);
 
 function normalizeSkillPolicy(value) {
@@ -18,10 +20,10 @@ function evaluateSkillPolicy(options = {}) {
     : {};
   const policy = runtimeConfig.skillPolicy || normalizeSkillPolicy(null);
   const manifest = normalizeSkillPolicyManifest(options.manifest || options.skill || {});
-  const skillKey = readString$V(options.skillId) || readString$V(manifest && manifest.skillId) || readString$V(manifest && manifest.name);
-  const skillName = readString$V(options.skillName) || readString$V(manifest && manifest.name) || skillKey;
-  const toolName = readString$V(options.toolName) || readString$V(options.tool && options.tool.name);
-  const operation = readString$V(options.operation) || "unknown";
+  const skillKey = readString(options.skillId) || readString(manifest && manifest.skillId) || readString(manifest && manifest.name);
+  const skillName = readString(options.skillName) || readString(manifest && manifest.name) || skillKey;
+  const toolName = readString(options.toolName) || readString(options.tool && options.tool.name);
+  const operation = readString(options.operation) || "unknown";
 
   const explicitToolPolicy = lookupToolPolicy(policy.tools, skillKey, skillName, toolName);
   if (explicitToolPolicy) {
@@ -99,7 +101,7 @@ function filterAvailableSkillManifests(manifests, runtimeConfig, options = {}) {
 }
 
 async function getPolicyManifestForSkill(context, skillIdOrName) {
-  const target = readString$V(skillIdOrName);
+  const target = readString(skillIdOrName);
   if (!target) return null;
 
   const local = findManifest$1(context && context.agentSkills, target);
@@ -136,11 +138,11 @@ function sanitizeDecision(decision) {
     : {};
   const safe = {
     action: readPolicy(source.action) || "allow",
-    operation: readString$V(source.operation) || null,
-    reason: readString$V(source.reason) || "default_allow",
-    skillId: readString$V(source.skillId) || null,
-    skillName: readString$V(source.skillName) || null,
-    toolName: readString$V(source.toolName) || null
+    operation: readString(source.operation) || null,
+    reason: readString(source.reason) || "default_allow",
+    skillId: readString(source.skillId) || null,
+    skillName: readString(source.skillName) || null,
+    toolName: readString(source.toolName) || null
   };
   if (Number.isInteger(source.tier)) safe.tier = source.tier;
   if (Array.isArray(source.missingFeatures)) safe.missingFeatures = source.missingFeatures.slice();
@@ -155,7 +157,7 @@ function normalizePolicyMap(value) {
   const result = {};
 
   for (const [key, policy] of Object.entries(source)) {
-    const normalizedKey = readString$V(key).toLowerCase();
+    const normalizedKey = readString(key).toLowerCase();
     const normalizedPolicy = readPolicy(policy);
     if (!normalizedKey) continue;
     if (!normalizedPolicy) {
@@ -220,10 +222,10 @@ function evaluateAvailability(manifest, hostAvailability, detail) {
 }
 
 function lookupToolPolicy(tools, skillId, skillName, toolName) {
-  const toolKey = readString$V(toolName).toLowerCase();
+  const toolKey = readString(toolName).toLowerCase();
   if (!toolKey) return null;
   for (const skillKey of [skillId, skillName]) {
-    const key = readString$V(skillKey).toLowerCase();
+    const key = readString(skillKey).toLowerCase();
     if (!key) continue;
     const exact = tools[`${key}.${toolKey}`];
     if (exact) return exact;
@@ -233,7 +235,7 @@ function lookupToolPolicy(tools, skillId, skillName, toolName) {
 
 function lookupSkillPolicy(skills, skillId, skillName) {
   for (const key of [skillId, skillName]) {
-    const normalized = readString$V(key).toLowerCase();
+    const normalized = readString(key).toLowerCase();
     if (normalized && skills[normalized]) return skills[normalized];
   }
   return null;
@@ -244,12 +246,12 @@ function createDecision(action, reason, detail = {}) {
     action: readPolicy(action) || "allow",
     missingFeatures: Array.isArray(detail.missingFeatures) ? detail.missingFeatures.slice() : undefined,
     missingInputTypes: Array.isArray(detail.missingInputTypes) ? detail.missingInputTypes.slice() : undefined,
-    operation: readString$V(detail.operation) || null,
+    operation: readString(detail.operation) || null,
     reason,
-    skillId: readString$V(detail.skillId) || null,
-    skillName: readString$V(detail.skillName) || null,
+    skillId: readString(detail.skillId) || null,
+    skillName: readString(detail.skillName) || null,
     tier: Number.isInteger(detail.tier) ? detail.tier : undefined,
-    toolName: readString$V(detail.toolName) || null
+    toolName: readString(detail.toolName) || null
   };
 }
 
@@ -258,13 +260,13 @@ function createReason(decision) {
 }
 
 function findManifest$1(manifests, skillIdOrName) {
-  const target = readString$V(skillIdOrName).toLowerCase();
+  const target = readString(skillIdOrName).toLowerCase();
   if (!target) return null;
 
   for (const item of Array.isArray(manifests) ? manifests : []) {
     const manifest = normalizeSkillPolicyManifest(item);
     if (!manifest) continue;
-    if (readString$V(manifest.skillId).toLowerCase() === target || readString$V(manifest.name).toLowerCase() === target) {
+    if (readString(manifest.skillId).toLowerCase() === target || readString(manifest.name).toLowerCase() === target) {
       return manifest;
     }
   }
@@ -274,22 +276,22 @@ function findManifest$1(manifests, skillIdOrName) {
 
 function normalizeSkillPolicyManifest(skill) {
   if (!skill || typeof skill !== "object" || Array.isArray(skill)) return null;
-  const name = readString$V(skill.name);
-  const skillId = readString$V(skill.skillId) || readString$V(skill.id) || name;
+  const name = readString(skill.name);
+  const skillId = readString(skill.skillId) || readString(skill.id) || name;
   if (!name || !skillId) return null;
   return {
     availability: normalizeManifestAvailability(skill.availability),
-    checksum: readString$V(skill.checksum),
-    description: readString$V(skill.description),
+    checksum: readString(skill.checksum),
+    description: readString(skill.description),
     inputTypes: normalizeStringArray$1(skill.inputTypes),
     name,
     requires: normalizeStringArray$1(skill.requires),
     riskTier: readRiskTier(skill),
     skillId,
-    sourcePath: readString$V(skill.sourcePath),
+    sourcePath: readString(skill.sourcePath),
     tags: normalizeStringArray$1(skill.tags),
     tools: normalizeToolSummaries(skill.tools),
-    version: readString$V(skill.version)
+    version: readString(skill.version)
   };
 }
 
@@ -321,8 +323,8 @@ function normalizeToolSummaries(tools) {
   return (Array.isArray(tools) ? tools : [])
     .map((tool) => {
       if (!tool || typeof tool !== "object" || Array.isArray(tool)) return null;
-      const name = readString$V(tool.name);
-      const description = readString$V(tool.description);
+      const name = readString(tool.name);
+      const description = readString(tool.description);
       if (!name || !description) return null;
       return {
         description,
@@ -346,7 +348,7 @@ function normalizeParameters$1(parameters) {
     required: Array.isArray(source.required)
       ? source.required.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
       : [],
-    type: readString$V(source.type) || "object"
+    type: readString(source.type) || "object"
   };
 }
 
@@ -399,7 +401,7 @@ function readRiskTier(value) {
 }
 
 function readPolicy(value) {
-  const policy = readString$V(value);
+  const policy = readString(value);
   return SUPPORTED_POLICY_ACTIONS.has(policy) ? policy : null;
 }
 
@@ -407,10 +409,6 @@ function normalizeStringArray$1(value) {
   return (Array.isArray(value) ? value : [])
     .filter((item) => typeof item === "string" && item.trim())
     .map((item) => item.trim());
-}
-
-function readString$V(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { createSkillPolicyError, emitSkillPolicyStep, evaluateSkillPolicy, filterAvailableSkillManifests, getPolicyManifestForSkill, normalizeSkillPolicy, sanitizeDecision };

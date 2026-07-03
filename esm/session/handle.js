@@ -1,5 +1,5 @@
 import { createMemoryStore } from '../memory/store.js';
-import { wrapHookForAbort, isAbortSignalAborted, createAbortError } from '../runtime/abort-signal.js';
+import { readAbortSignal, wrapHookForAbort, isAbortSignalAborted, createAbortError } from '../runtime/abort-signal.js';
 import { isApprovalResolutionRequest } from '../runtime/approval-state.js';
 import { runLoop } from '../runtime/run-loop.js';
 import { routeTopic } from '../runtime/topic-router.js';
@@ -11,6 +11,8 @@ import { isToolLoopProviderRequest } from '../runtime/provider.js';
 import { serializeResearchSlice, normalizeResearchSlice } from '../runtime/research-thread-sync.js';
 import { readActiveThreadId, readActiveTurnId } from '../runtime/thread-provenance.js';
 import { createSessionRunIdGenerator } from '../runtime/run-identity.js';
+import { createWriteQueue } from '../runtime/durable-write-queue.js';
+import { createRunEventStream } from '../runtime/run-event-stream.js';
 import { prepareSessionApprovalResumeInput } from './approval-resume.js';
 import { prepareProviderSessionContext } from './compaction.js';
 import { buildThreadScopedEvidenceUrls } from './evidence.js';
@@ -20,9 +22,11 @@ import { createPendingUserMessage, readPersistedMessageStatus, createAssistantMe
 import { createUsageSnapshot, accumulateUsage } from './token-budget.js';
 import { recordCostEntry } from '../runtime/cost-ledger.js';
 import { projectTodoRunState, projectResearchRunState } from '../runtime/run-state-projections.js';
+import { readFiniteNumber } from '../runtime/semantic-json.js';
 import { projectSessionContextFromSnapshot, createSessionContextViewFromSnapshot } from './context-snapshot-projection.js';
 import { summarizeSessionContextMeta } from './prompt.js';
-import { shouldExtractSessionMemory, extractMemoryEntries, createSessionFailureResult } from './handle-turn.js';
+import { createSessionFailureResult, shouldExtractSessionMemory, evaluateMemoryExtractionPolicy, extractMemoryEntries } from './handle-turn.js';
+import { normalizeThrownError } from '../runtime/errors.js';
 
 function createSessionHandle(options) {
   let sessionRecord = cloneValue(options.sessionRecord);
@@ -35,6 +39,58 @@ function createSessionHandle(options) {
     sessionRecord,
     sessionStore: options.sessionStore
   });
+
+  // AGRUN-440/444 — opt-in async memory extraction. Default OFF: extraction (an
+  // LLM call) + appendMemory run on the turn's critical path and
+  // result.memoryEntriesAdded is populated. When ON, that whole side-effect runs
+  // off the critical path through a durable ordered queue, so the turn returns
+  // before the extraction completes. Consistency is preserved automatically:
+  // every later read (next turn start, getMemory, flushMemory) drains the queue
+  // first, so the next turn always sees the prior turn's memory — only
+  // result.memoryEntriesAdded for the CURRENT turn becomes eventual.
+  // AGRUN-514 — host-visible async memory diagnostics. The extract->append->
+  // promote side-effect runs off the critical path, so its outcome can no longer
+  // ride the returned result. `lastExtraction` carries the most recent extraction
+  // status (completed/failed); `errors` accumulates storage/promotion failures
+  // the queue captured. Mirrors the message store's getState() error surface so a
+  // host/inspector can see async failures without depending on timing.
+  const MAX_MEMORY_ERRORS = 20;
+  const memoryDiagnostics = { errors: [], lastExtraction: null };
+
+  function recordMemoryExtraction(status) {
+    if (status) memoryDiagnostics.lastExtraction = status;
+  }
+
+  function recordMemoryError(error, label) {
+    memoryDiagnostics.errors.push({
+      label: typeof label === "string" && label.trim() ? label.trim() : "memory",
+      message: normalizeThrownError(error).message
+    });
+    if (memoryDiagnostics.errors.length > MAX_MEMORY_ERRORS) {
+      memoryDiagnostics.errors.splice(0, memoryDiagnostics.errors.length - MAX_MEMORY_ERRORS);
+    }
+  }
+
+  // AGRUN-517 — optional host policy that decides, per eligible turn, whether to
+  // spend the memory-extraction LLM call. Null = always extract (historical
+  // default). Memory extraction is a session-handle-only mechanism (runtime.run
+  // never extracts), so this is a single-door capability — no runtime.run parity
+  // to wire. See evaluateMemoryExtractionPolicy in handle-turn.js.
+  const memoryExtractionPolicy = typeof options.memoryExtractionPolicy === "function"
+    ? options.memoryExtractionPolicy
+    : null;
+
+  const asyncMemoryExtraction = options.asyncMemoryExtraction === true;
+  const memoryQueue = asyncMemoryExtraction
+    ? createWriteQueue({
+        label: "memory",
+        onError: ({ error, label }) => recordMemoryError(error, label)
+      })
+    : null;
+
+  async function flushMemoryQueue() {
+    if (memoryQueue) await memoryQueue.flush();
+  }
 
   return {
     id: sessionRecord.id,
@@ -53,6 +109,18 @@ function createSessionHandle(options) {
         wrapHookForAbort(readOnToken$1(mergedRunOptions), callerAbortSignal),
         mergedRunOptions,
         callerAbortSignal
+      );
+    },
+
+    // AGRUN-442 — streaming engine surface (dispatch-parity with runtime.runStream).
+    // Iterate typed AgentLoopEvents at your own pace; break / generator.return()
+    // aborts the turn. Delegates to this.run, so session setup (compaction, memory,
+    // thread routing) and every run mechanism carry over unchanged.
+    runStream(input, runOptions) {
+      const self = this;
+      return createRunEventStream(
+        (hookedOptions) => self.run(input, hookedOptions),
+        runOptions || {}
       );
     },
 
@@ -76,7 +144,29 @@ function createSessionHandle(options) {
     },
 
     async getMemory() {
+      await flushMemoryQueue();
       return cloneValue(await options.sessionStore.readMemory(sessionRecord.id));
+    },
+
+    // AGRUN-440/444 — await durability of any in-flight async memory extraction.
+    // A no-op unless asyncMemoryExtraction is enabled. Hosts can call it at a
+    // checkpoint; turn-start and getMemory already drain it automatically.
+    async flushMemory() {
+      await flushMemoryQueue();
+    },
+
+    // AGRUN-514 — host-visible async memory extraction state, parallel to the
+    // message store's getState(). `enabled` reflects asyncMemoryExtraction;
+    // `pendingWrites` is the in-flight queue depth; `lastExtraction` is the most
+    // recent extraction outcome; `errors` lists captured storage/promotion
+    // failures. Lets a host/inspector see async failures without timing tricks.
+    getMemoryState() {
+      return {
+        enabled: Boolean(memoryQueue),
+        pendingWrites: memoryQueue ? memoryQueue.size() : 0,
+        lastExtraction: cloneValue(memoryDiagnostics.lastExtraction),
+        errors: cloneValue(memoryDiagnostics.errors)
+      };
     },
 
     getState() {
@@ -102,6 +192,11 @@ function createSessionHandle(options) {
     if (userMessage) {
       await options.sessionStore.appendMessage(userMessage);
     }
+
+    // AGRUN-440/444 — drain any in-flight async memory extraction from a prior
+    // turn BEFORE this turn reads memory, so the next turn always sees the last
+    // turn's extracted memory (no-op when asyncMemoryExtraction is off).
+    await flushMemoryQueue();
 
     // Route the turn to a thread BEFORE preparing session context so
     // compaction/recall see only memory entries scoped to the active thread
@@ -193,8 +288,18 @@ function createSessionHandle(options) {
       disabledActions: readDisabledActions$1(runOptions),
       onStep,
       onToken,
+      // AGRUN-419-followup — dispatch-parity (both doors): runtime.run forwards
+      // onReasoning, so session.run must too or a session host's live-thinking
+      // listener never fires. Same abort wrapping as onToken (sibling per-event
+      // emission hook).
+      onReasoning: wrapHookForAbort(readFunctionOption$1(runOptions, "onReasoning"), callerAbortSignal),
       onInvalidPlannerOutput: wrapHookForAbort(readFunctionOption$1(runOptions, "onInvalidPlannerOutput"), callerAbortSignal),
       onPlannerDecision: wrapHookForAbort(readFunctionOption$1(runOptions, "onPlannerDecision"), callerAbortSignal),
+      onStreamEvent: wrapHookForAbort(readFunctionOption$1(runOptions, "onStreamEvent"), callerAbortSignal),
+      // AGRUN-465 — dispatch-parity: runtime.run always forwarded
+      // onStreamEvent; this door silently dropped it, so a session host's
+      // stream listener never fired. Same abort wrapping as onToken (its
+      // closest sibling — both are per-event emission hooks).
       onToolResult: wrapHookForAbort(readFunctionOption$1(runOptions, "onToolResult"), callerAbortSignal),
       onBeforeFinalize: wrapHookForAbort(readFunctionOption$1(runOptions, "onBeforeFinalize"), callerAbortSignal),
       // Crash-recovery (run-state-export-import-design.md P2). The session
@@ -304,56 +409,100 @@ function createSessionHandle(options) {
       result,
       sessionId: sessionRecord.id
     });
-    const extractedEntries = globalMemoryEnabled
-      && shouldExtractSessionMemory(userMessage, assistantMessage, result, prepared.input)
-      ? await extractMemoryEntries({
-          assistantMessage,
-          preparedInput: prepared.input,
-          result,
-          userMessage
-        })
-      : [];
+    // AGRUN-440/444 — the turn's memory side-effects: extract (LLM) -> append to
+    // the session store -> promote candidates to global memory. `mutateResult`
+    // controls whether the current turn's result.memoryEntriesAdded / lastRun
+    // count are updated; it is true on the sync (default) path and false on the
+    // async path (where the result was already returned, so the extracted
+    // entries surface only via the next memory read).
+    const applyTurnMemorySideEffects = async (mutateResult) => {
+      const structurallyEligible = globalMemoryEnabled
+        && shouldExtractSessionMemory(userMessage, assistantMessage, result, prepared.input);
 
-    for (const entry of extractedEntries) {
-      await options.sessionStore.appendMemory(sessionRecord.id, entry);
-    }
-
-    if (extractedEntries.length > 0) {
-      result.memoryEntriesAdded = [
-        ...(Array.isArray(result.memoryEntriesAdded) ? result.memoryEntriesAdded : []),
-        ...extractedEntries.map(cloneValue)
-      ];
-
-      if (runtimeState.lastRun && typeof runtimeState.lastRun === "object") {
-        runtimeState.lastRun.memoryEntriesAdded = result.memoryEntriesAdded.length;
+      // AGRUN-517 — let the host policy veto the extraction LLM call on an
+      // eligible turn. No policy => extract (default). A skip is recorded as a
+      // first-class outcome so getMemoryState() surfaces extracted/skipped/failed.
+      let policyDecision = { extract: true };
+      if (structurallyEligible && memoryExtractionPolicy) {
+        policyDecision = await evaluateMemoryExtractionPolicy(memoryExtractionPolicy, {
+          sessionId: sessionRecord.id,
+          runId: result.runState && result.runState.runId,
+          userText: readMessageText(userMessage),
+          assistantText: readMessageText(assistantMessage)
+        });
+        if (policyDecision.error) recordMemoryError(policyDecision.error, "memory-policy");
       }
-    }
 
-    const allMemoryEntries = [
-      ...(Array.isArray(result.memoryEntriesAdded) ? result.memoryEntriesAdded : []),
-      ...extractedEntries
-    ];
-    const globalMemoryConfig = (options.runtimeConfig && options.runtimeConfig.globalMemory) || {};
-    const sourceTurn = {
-      user: readMessageText(userMessage),
-      assistant: readMessageText(assistantMessage)
-    };
-    const globalMemoryOptions = {
-      minConfidence: globalMemoryConfig.minConfidence,
-      maxEntries: globalMemoryConfig.maxEntries,
-      hookTimeoutMs: globalMemoryConfig.hookTimeoutMs,
-      sensitivityFilter: globalMemoryConfig.sensitivityFilter || null,
-      promotionValidator: globalMemoryConfig.promotionValidator || null,
-      sessionId: sessionRecord.id,
-      sourceTurn,
-      onTelemetry: (event) => emitGlobalMemoryStep(onStep, event)
-    };
-    if (globalMemoryEnabled) {
-      for (const entry of allMemoryEntries) {
-        if (isGlobalMemoryCandidate(entry, globalMemoryOptions)) {
-          await promoteToGlobalMemory(options.sessionStore, entry, globalMemoryOptions);
+      const extraction = structurallyEligible && policyDecision.extract
+        ? await extractMemoryEntries({
+            assistantMessage,
+            preparedInput: prepared.input,
+            result,
+            userMessage,
+            mutateResult
+          })
+        : {
+            entries: [],
+            status: structurallyEligible && !policyDecision.extract
+              ? { status: "skipped", reason: policyDecision.reason || "" }
+              : null
+          };
+
+      // Record the extraction outcome before any storage write, so a later
+      // append/promote failure (captured by the queue) does not hide whether the
+      // extraction itself completed. Host reads it via session.getMemoryState().
+      recordMemoryExtraction(extraction.status);
+
+      const extractedEntries = extraction.entries;
+      for (const entry of extractedEntries) {
+        await options.sessionStore.appendMemory(sessionRecord.id, entry);
+      }
+
+      if (mutateResult && extractedEntries.length > 0) {
+        result.memoryEntriesAdded = [
+          ...(Array.isArray(result.memoryEntriesAdded) ? result.memoryEntriesAdded : []),
+          ...extractedEntries.map(cloneValue)
+        ];
+
+        if (runtimeState.lastRun && typeof runtimeState.lastRun === "object") {
+          runtimeState.lastRun.memoryEntriesAdded = result.memoryEntriesAdded.length;
         }
       }
+
+      const allMemoryEntries = [
+        ...(Array.isArray(result.memoryEntriesAdded) ? result.memoryEntriesAdded : []),
+        ...extractedEntries
+      ];
+      const globalMemoryConfig = (options.runtimeConfig && options.runtimeConfig.globalMemory) || {};
+      const sourceTurn = {
+        user: readMessageText(userMessage),
+        assistant: readMessageText(assistantMessage)
+      };
+      const globalMemoryOptions = {
+        minConfidence: globalMemoryConfig.minConfidence,
+        maxEntries: globalMemoryConfig.maxEntries,
+        hookTimeoutMs: globalMemoryConfig.hookTimeoutMs,
+        sensitivityFilter: globalMemoryConfig.sensitivityFilter || null,
+        promotionValidator: globalMemoryConfig.promotionValidator || null,
+        sessionId: sessionRecord.id,
+        sourceTurn,
+        onTelemetry: (event) => emitGlobalMemoryStep(onStep, event)
+      };
+      if (globalMemoryEnabled) {
+        for (const entry of allMemoryEntries) {
+          if (isGlobalMemoryCandidate(entry, globalMemoryOptions)) {
+            await promoteToGlobalMemory(options.sessionStore, entry, globalMemoryOptions);
+          }
+        }
+      }
+    };
+
+    if (memoryQueue) {
+      // Off the critical path: enqueue and return immediately. The queue
+      // preserves ordering + captures errors; the next memory read drains it.
+      memoryQueue.enqueue(() => applyTurnMemorySideEffects(false), "memory");
+    } else {
+      await applyTurnMemorySideEffects(true);
     }
 
     const usageSnapshot = createUsageSnapshot(result.output);
@@ -738,15 +887,6 @@ function createSessionHandle(options) {
   }
 }
 
-function readAbortSignal(options) {
-  if (!options || typeof options !== "object") return null;
-  const signal = options.abortSignal;
-  if (!signal || typeof signal !== "object") return null;
-  if (typeof signal.aborted !== "boolean") return null;
-  if (typeof signal.addEventListener !== "function") return null;
-  return signal;
-}
-
 function readOnStep$1(options) {
   return options && typeof options === "object" && typeof options.onStep === "function"
     ? options.onStep
@@ -819,6 +959,12 @@ function readThreadScope(runtimeConfig, threadRouting) {
   if (!threadsConfig || threadsConfig.enabled !== true) return null;
   if (threadsConfig.crossThreadRecall === true) return null;
   if (!threadRouting || !threadRouting.activeThreadId) return null;
+  // AGRUN-593 — a cross_thread_recall verdict gives THIS turn the whole-
+  // session view (null scope = pre-AGRUN-145 behavior the compaction layer
+  // already supports): the turn references facts that live outside the
+  // active thread, so thread-scoped history cannot answer it. Thread state
+  // itself stays on the active thread (applyRouterVerdict).
+  if (threadRouting.verdict && threadRouting.verdict.action === "cross_thread_recall") return null;
   return { threadId: threadRouting.activeThreadId, crossThread: false };
 }
 
@@ -848,10 +994,6 @@ function readFunctionOption$1(options, key) {
   return options && typeof options === "object" && typeof options[key] === "function"
     ? options[key]
     : null;
-}
-
-function readFiniteNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export { createSessionHandle };

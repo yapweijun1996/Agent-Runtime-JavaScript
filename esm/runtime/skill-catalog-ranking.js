@@ -1,4 +1,5 @@
 import { normalizeSkillManifests, createAgentSkillSummary } from './agent-skills.js';
+import { readString } from './semantic-json.js';
 
 const DEFAULT_SKILL_CATALOG_TOP_K = 10;
 const DEFAULT_SKILL_CATALOG_MAX_K = 30;
@@ -120,7 +121,7 @@ async function selectSkillCatalogCandidates(options = {}) {
     const ranked = await ranker({
       manifests,
       maxK: normalizeSkillCatalogMaxK(options.maxK),
-      prompt: readString$3(options.prompt),
+      prompt: readString(options.prompt),
       topK
     });
     return normalizeCustomRankerResult(ranked, {
@@ -157,7 +158,7 @@ function scoreSkillManifest(queryTokens, manifest) {
 }
 
 function tokenizeSkillCatalogText(value) {
-  const text = readString$3(value)
+  const text = readString(value)
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .toLowerCase();
   if (!text) return [];
@@ -189,9 +190,9 @@ function normalizeCustomRankerResult(value, defaults) {
         .filter((item) => item && typeof item === "object" && !Array.isArray(item))
         .map((item) => ({
           matchedFields: Array.isArray(item.matchedFields) ? item.matchedFields.filter((field) => typeof field === "string") : [],
-          name: readString$3(item.name),
+          name: readString(item.name),
           score: typeof item.score === "number" && Number.isFinite(item.score) ? item.score : 0,
-          skillId: readString$3(item.skillId)
+          skillId: readString(item.skillId)
         }))
     : selected.map((manifest) => ({
         matchedFields: ["custom"],
@@ -233,9 +234,9 @@ function createManifestTokenFields(manifest) {
   return {
     name: tokenizeSkillCatalogText(manifest && manifest.name),
     tags: tokenizeSkillCatalogText((Array.isArray(manifest && manifest.tags) ? manifest.tags : []).join(" ")),
-    toolNames: tokenizeSkillCatalogText(tools.map((tool) => readString$3(tool && tool.name)).join(" ")),
+    toolNames: tokenizeSkillCatalogText(tools.map((tool) => readString(tool && tool.name)).join(" ")),
     description: tokenizeSkillCatalogText(manifest && manifest.description),
-    toolDescriptions: tokenizeSkillCatalogText(tools.map((tool) => readString$3(tool && tool.description)).join(" ")),
+    toolDescriptions: tokenizeSkillCatalogText(tools.map((tool) => readString(tool && tool.description)).join(" ")),
     inputTypes: tokenizeSkillCatalogText((Array.isArray(manifest && manifest.inputTypes) ? manifest.inputTypes : []).join(" "))
   };
 }
@@ -256,10 +257,6 @@ function countOverlap(queryTokens, targetTokens) {
 function splitCompoundToken(token) {
   if (!token) return [];
   return token.split(/[_+-]+/).filter(Boolean).concat(token);
-}
-
-function readString$3(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { DEFAULT_SKILL_CATALOG_MAX_K, DEFAULT_SKILL_CATALOG_TOP_K, normalizeSkillCatalogMaxK, normalizeSkillCatalogRanker, normalizeSkillCatalogTopK, rankSkillManifests, scoreSkillManifest, selectSkillCatalogCandidates, tokenizeSkillCatalogText };

@@ -2,6 +2,7 @@ import { cloneValue } from '../runtime/utils.js';
 import { readActiveTurnId, readActiveThreadId } from '../runtime/thread-provenance.js';
 import { createAssistantSessionContent, createUserSessionContent } from './content.js';
 import { DEFAULT_THREAD_ID } from './thread.js';
+import { readString } from '../runtime/semantic-json.js';
 
 function createSessionRecord(id) {
   const now = Date.now();
@@ -42,19 +43,19 @@ function createPendingUserMessage(sessionId, value) {
 function createCompactionTurnMessages(sessionId, options = {}) {
   const source = options && typeof options === "object" ? options : {};
   const now = readTimestamp(source.createdAt, Date.now());
-  const runId = readString$8(source.runId) || createId("cmp");
-  const turnId = readString$8(source.turnId) || runId;
-  const threadId = readString$8(source.threadId) || DEFAULT_THREAD_ID;
+  const runId = readString(source.runId) || createId("cmp");
+  const turnId = readString(source.turnId) || runId;
+  const threadId = readString(source.threadId) || DEFAULT_THREAD_ID;
   const sourceMessageIds = Array.isArray(source.sourceMessageIds)
-    ? source.sourceMessageIds.map(readString$8).filter(Boolean)
+    ? source.sourceMessageIds.map(readString).filter(Boolean)
     : [];
-  const summaryText = readString$8(source.summaryText);
-  const summaryId = readString$8(source.summaryId) || null;
-  const uptoMessageId = readString$8(source.uptoMessageId) || null;
-  const oldestPreservedTurnId = readString$8(source.oldestPreservedTurnId) || null;
-  const reason = readString$8(source.reason) || "budget";
-  const userMessageId = readString$8(source.userMessageId) || createId("msg");
-  const assistantMessageId = readString$8(source.assistantMessageId) || createId("msg");
+  const summaryText = readString(source.summaryText);
+  const summaryId = readString(source.summaryId) || null;
+  const uptoMessageId = readString(source.uptoMessageId) || null;
+  const oldestPreservedTurnId = readString(source.oldestPreservedTurnId) || null;
+  const reason = readString(source.reason) || "budget";
+  const userMessageId = readString(source.userMessageId) || createId("msg");
+  const assistantMessageId = readString(source.assistantMessageId) || createId("msg");
   const compactionBase = {
     oldestPreservedTurnId,
     reason,
@@ -128,7 +129,7 @@ function isCompactionMessage(message) {
   const compaction = message.compaction && typeof message.compaction === "object"
     ? message.compaction
     : null;
-  return Boolean(compaction && readString$8(compaction.role));
+  return Boolean(compaction && readString(compaction.role));
 }
 
 function normalizeSeedMessages(sessionId, seedMessages) {
@@ -215,11 +216,11 @@ function createAssistantSeedContent(message) {
 }
 
 function readUserSeedText(message) {
-  return readString$8(message.content) || readString$8(message.text);
+  return readString(message.content) || readString(message.text);
 }
 
 function readAssistantSeedText(message) {
-  return readString$8(message.content) || readString$8(message.text);
+  return readString(message.content) || readString(message.text);
 }
 
 function readSeedRole(value) {
@@ -228,10 +229,6 @@ function readSeedRole(value) {
 
 function readTimestamp(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function readString$8(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function buildCompactionBoundaryText(sourceMessageIds, uptoMessageId) {

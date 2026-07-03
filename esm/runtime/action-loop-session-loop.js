@@ -1,13 +1,14 @@
 import { isAbortSignalAborted, createAbortError } from './abort-signal.js';
+import { ASK_CLARIFICATION_ACTION, TODO_PLAN_ACTION, TODO_INSPECT_ACTION, PUBLISH_DIRECT_ACTION, WEB_SEARCH_ACTION, EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
 import { maybeCompactActionHistory, projectActionHistory } from './action-history-compaction.js';
-import { PUBLISH_DIRECT_ACTION } from './kernel-terminal-actions.js';
 import { executeAction } from './action-loop-action.js';
 import { handleInvalidPlannerDecision, finalizeActionLoopFailure } from './action-loop-failure.js';
+import { handlePolicyBlock, maybeSalvageBudgetExhaustedCandidate } from './action-loop-terminal.js';
 import { maybeFinalizeMaxStepsContinuation } from './action-loop-continuation.js';
 import { finishRun } from './finalizer.js';
 import { completePhase, startPhase } from './oodae.js';
+import { readString } from './semantic-json.js';
 import { cloneValue } from './utils.js';
-import { handlePolicyBlock } from './action-loop-terminal.js';
 import { requestPlanner } from './action-loop-planner.js';
 import { resolveBlockedPolicyDecision } from './hooks/policy-hook.js';
 import { ensureSessionHookRunner } from './hooks/session-hooks.js';
@@ -20,7 +21,8 @@ import { exportState } from './run-state-portable.js';
 import { executePlan } from './action-loop-plan.js';
 import { beginActionLoopCycle } from './action-loop-session-cycle.js';
 import { isDecisionActionAvailable, summarizeActionFailureSignal } from './action-loop-session-decision-utils.js';
-import { isWorkspacePublishCandidateGatedForMode } from './planner-action-surface.js';
+import { resolveClosedNamespaceForAction, ACTION_NAMESPACE_CLOSED_CODE } from './action-namespace-gate.js';
+import { resolveTerminalAvailability } from './terminal-repair/availability.js';
 import { readActionArgs } from './action-loop-utils.js';
 import { handlePlannerFinalDecision, handlePlannerFinalizeDecision, maybeHandleDirectFinalAfterSkillTool } from './action-loop-session-terminals.js';
 import { fingerprintAction } from './action-fingerprint.js';
@@ -123,6 +125,24 @@ async function continueActionLoop(session) {
     // for every state consumer. Observer failure degrades to a mechanical
     // omission marker inside the call — compaction never breaks the loop.
     await maybeCompactActionHistory(session);
+    // ROADMAP D2 — opt-in heap cap on actionHistory, same cycle-boundary
+    // class as the compaction above (which bounds PROMPT cost; this bounds
+    // MEMORY on very long runs). In-place splice keeps the shared array
+    // reference every pusher/consumer holds; the compaction cursor shifts
+    // left by the trimmed count so folded-observation bookkeeping stays
+    // aligned with the surviving entries.
+    const historyLimit = session.runtimeConfig && session.runtimeConfig.actionHistoryLimit;
+    if (Number.isInteger(historyLimit) && historyLimit > 0 && session.actionHistory.length > historyLimit) {
+      const trimmed = session.actionHistory.length - historyLimit;
+      session.actionHistory.splice(0, trimmed);
+      if (session.historyCompaction && Number.isInteger(session.historyCompaction.compactedThrough)) {
+        session.historyCompaction.compactedThrough = Math.max(0, session.historyCompaction.compactedThrough - trimmed);
+      }
+      session.pushStep("action-history-trimmed", {
+        limit: historyLimit,
+        trimmed
+      });
+    }
     const cycleRecord = await beginActionLoopCycle(session, "planner", {
       continuingInterruptedTurn
     });
@@ -191,6 +211,15 @@ async function continueActionLoop(session) {
       debug: session.debug,
       memoryEntriesAdded: session.memoryEntriesAdded,
       normalizedInput: session.normalizedInput,
+      // AGRUN-419-followup — stream the planner's reasoning (model thoughts) so a
+      // direct planner_final answer (no separate finalize call) still surfaces a
+      // live "Thinking" stream during the wait. onStreamEvent also carries the
+      // provider-reasoning-delta events to host inspectors.
+      onReasoning: session.onReasoning,
+      onStreamEvent: session.onStreamEvent,
+      // C3c (AGRUN-585) — native mode streams a fenced direct answer through
+      // onToken at TTFT (the envelope door ignores this; its output is JSON).
+      onToken: session.onToken,
       plannerMode: session.runtimeConfig.plannerMode,
       plannerDirectives: session.plannerDirectives,
       plannerDirectivesMode: session.plannerDirectivesMode,
@@ -260,7 +289,7 @@ async function continueActionLoop(session) {
     // decisions.
     let decision = plannerResult.decision;
     let actionName = decision.type === "clarify"
-      ? "ask_clarification"
+      ? ASK_CLARIFICATION_ACTION
       : decision.type === "finalize"
         ? "finalize"
         : decision.type === "plan"
@@ -269,8 +298,8 @@ async function continueActionLoop(session) {
 
     if (
       isTodoPlanningPlaceholder(session.runState.todoState) &&
-      actionName !== "todo_plan" &&
-      actionName !== "todo_inspect"
+      actionName !== TODO_PLAN_ACTION &&
+      actionName !== TODO_INSPECT_ACTION
     ) {
       const message =
         "TodoState autopilot: planning placeholder must be replaced with todo_plan before work continues.";
@@ -278,14 +307,12 @@ async function continueActionLoop(session) {
         actionName,
         cycle: session.runState.cycleCount
       });
-      session.actionHistory.push({
-        kind: "todo_plan_required",
-        summary: message
-      });
-      session.runState.observation = {
-        kind: "hint",
+      recordVetoedActionObservation(session, {
+        actionName,
+        historyKind: "todo_plan_required",
+        summary: message,
         message
-      };
+      });
       recordLoopTransition(session, LOOP_TRANSITIONS.TODO_PLACEHOLDER_REQUIRED);
       continue;
     }
@@ -300,14 +327,12 @@ async function continueActionLoop(session) {
         actionName: todoPlanRequired.actionName,
         cycle: session.runState.cycleCount
       });
-      session.actionHistory.push({
-        kind: "todo_plan_required",
-        summary: todoPlanRequired.observation
-      });
-      session.runState.observation = {
-        kind: "hint",
+      recordVetoedActionObservation(session, {
+        actionName: todoPlanRequired.actionName,
+        historyKind: "todo_plan_required",
+        summary: todoPlanRequired.observation,
         message: todoPlanRequired.observation
-      };
+      });
       recordLoopTransition(session, LOOP_TRANSITIONS.TODO_PLAN_REQUIRED);
       continue;
     }
@@ -322,14 +347,12 @@ async function continueActionLoop(session) {
         consecutiveInspects: todoInspectLoop.consecutiveInspects,
         cycle: session.runState.cycleCount
       });
-      session.actionHistory.push({
-        kind: "todo_inspect_loop_vetoed",
-        summary: todoInspectLoop.observation
-      });
-      session.runState.observation = {
-        kind: "hint",
+      recordVetoedActionObservation(session, {
+        actionName,
+        historyKind: "todo_inspect_loop_vetoed",
+        summary: todoInspectLoop.observation,
         message: todoInspectLoop.observation
-      };
+      });
       recordLoopTransition(session, LOOP_TRANSITIONS.TODO_INSPECT_LOOP_BLOCKED);
       continue;
     }
@@ -426,6 +449,33 @@ async function continueActionLoop(session) {
       continue;
     }
 
+    // ADR-0057 Phase 1 — closed-namespace gate, single-action door. Sits
+    // beside the disabled-action check above (availability class, BEFORE any
+    // policy/permission handling) and calls the SAME shared predicate as the
+    // plan-batch door (action-loop-plan-validation.js) per the CLAUDE.md
+    // Dispatch-Path Parity rule; both doors surface the gate's `hint`
+    // word-for-word. Recoverable structured observation — the run continues,
+    // no exception, no runtime-synthesized fallback: the next planner cycle
+    // sees the hint in the action history and can call open_action_namespace.
+    const closedNamespace = resolvedAction
+      ? resolveClosedNamespaceForAction(session.runState, session.runtimeConfig, actionName)
+      : null;
+    if (closedNamespace) {
+      session.pushStep("action-namespace-closed", {
+        actionName,
+        code: ACTION_NAMESPACE_CLOSED_CODE,
+        cycle: session.runState.cycleCount,
+        detail: closedNamespace.hint,
+        namespace: closedNamespace.namespace
+      });
+      session.actionHistory.push({
+        kind: ACTION_NAMESPACE_CLOSED_CODE,
+        summary: closedNamespace.hint
+      });
+      recordLoopTransition(session, LOOP_TRANSITIONS.ACTION_NAMESPACE_CLOSED);
+      continue;
+    }
+
     // AGRUN-256 — runtime guard against hallucinated workspace_publish_candidate
     // emissions outside an evidence-convergence run. selectPlannerActions already hides
     // the action from the planner catalog, but envelope/native_tools planners
@@ -434,14 +484,17 @@ async function continueActionLoop(session) {
     // a recoverable observation ("use finalize instead") rather than re-emitting
     // the same action until maxSteps — the 884-step loop Globe3 reproduced
     // when a host disabled the action without a paired planner directive.
+    // AGRUN-559 — routed through resolveTerminalAvailability (the terminal-door
+    // SSOT; it delegates to isWorkspacePublishCandidateGatedForMode) so this
+    // single-action door, the plan-validation door, and the prompt-side
+    // readEnvelopeTerminalPolicy all read ONE mutually-consistent fact object.
     if (
       resolvedAction &&
       actionName === PUBLISH_DIRECT_ACTION &&
-      isWorkspacePublishCandidateGatedForMode({
-        runState: session.runState,
+      resolveTerminalAvailability(session.runState, {
         runtimeConfig: session.runtimeConfig,
         terminalRepairState: session.runState && session.runState.terminalRepairState
-      })
+      }).publishOpen === false
     ) {
       const gateDetail = [
         "workspace_publish_candidate is a publish-direct terminal (skips the runtime finalize LLM; usedRuntimeFinalize=false, tokens=0 audit blind spot) and is gated by default.",
@@ -541,8 +594,19 @@ async function continueActionLoop(session) {
     const judgedPolicyDecision = resolveBlockedPolicyDecision(policyHookOutcome, resolvedAction);
 
     if (judgedPolicyDecision) {
-      recordLoopTransition(session, LOOP_TRANSITIONS.TERMINAL_APPROVAL_PAUSE, { source: "policy" });
-      return handlePolicyBlock({
+      // AGRUN-562 — "deny" is planner-recoverable (loop continues), "ask" is
+      // a real host pause. Pick the transition label BEFORE the call so the
+      // Inspector reflects which one actually happened, then branch on
+      // handlePolicyBlock's { done: false } sentinel (deny) vs. its real
+      // RunResult (ask) to decide continue-vs-return.
+      recordLoopTransition(
+        session,
+        judgedPolicyDecision.action === "deny"
+          ? LOOP_TRANSITIONS.POLICY_DENIED_CONTINUE
+          : LOOP_TRANSITIONS.TERMINAL_APPROVAL_PAUSE,
+        { source: "policy" }
+      );
+      const policyOutcome = await handlePolicyBlock({
         actionHistory: session.actionHistory,
         actionName,
         cycleRecord,
@@ -558,13 +622,21 @@ async function continueActionLoop(session) {
         runtimeState: session.runtimeState,
         steps: session.steps
       });
+      if (policyOutcome && policyOutcome.done === false) {
+        continue;
+      }
+      return policyOutcome;
     }
 
     const skillPolicyDecision = await evaluateSkillPolicyForStandaloneAction(session, actionName, decision);
     if (skillPolicyDecision && skillPolicyDecision.action === "ask") {
       emitSkillPolicyStep(session.pushStep, "skill-policy-approval-required", skillPolicyDecision);
       recordLoopTransition(session, LOOP_TRANSITIONS.TERMINAL_APPROVAL_PAUSE, { source: "skill_policy" });
-      return handlePolicyBlock({
+      // This site only ever passes policyDecision.action: "ask" (the guard
+      // above), so handlePolicyBlock always returns a real RunResult here
+      // today. The { done: false } check is still required to honor its full
+      // return contract (AGRUN-562) — see the sibling action-policy call site.
+      const policyOutcome = await handlePolicyBlock({
         actionHistory: session.actionHistory,
         actionName,
         cycleRecord,
@@ -585,6 +657,10 @@ async function continueActionLoop(session) {
         runtimeState: session.runtimeState,
         steps: session.steps
       });
+      if (policyOutcome && policyOutcome.done === false) {
+        continue;
+      }
+      return policyOutcome;
     }
 
     const actionFingerprint = fingerprintAction(decision);
@@ -597,7 +673,7 @@ async function continueActionLoop(session) {
           fingerprint: actionFingerprint,
           repeatCount
         });
-        if (actionName === "web_search" && isRepeatedWebSearchQuery(session.runState, decision)) {
+        if (actionName === WEB_SEARCH_ACTION && isRepeatedWebSearchQuery(session.runState, decision)) {
           createRepeatedWebSearchSkip(session, actionName, decision, "repeat_query");
           recordLoopTransition(session, LOOP_TRANSITIONS.WEB_SEARCH_REPEAT_ESCALATED);
           continue;
@@ -659,6 +735,9 @@ async function continueActionLoop(session) {
   }
 
   recordLoopTransition(session, LOOP_TRANSITIONS.TERMINAL_MAX_STEPS_EXCEEDED);
+  // AGRUN-553 — never return empty: deliver a drafted candidate instead of a stub.
+  const maxStepsSalvage = maybeSalvageBudgetExhaustedCandidate(session, ERROR_CODES.MAX_STEPS_EXCEEDED);
+  if (maxStepsSalvage) return maxStepsSalvage;
   return finalizeActionLoopFailure({
     code: ERROR_CODES.MAX_STEPS_EXCEEDED,
     cycleRecord: session.runState.oodae.cycles[session.runState.oodae.cycles.length - 1],
@@ -723,7 +802,7 @@ function finishInterruptedTurn(session) {
     ? runState.turnControl
     : {};
   const pendingApproval = cloneValue(runState.pendingApproval || turnControl.pendingApproval || null);
-  const actionName = readString$g(
+  const actionName = readString(
     (pendingApproval && pendingApproval.actionName) || turnControl.actionName
   ) || "action";
 
@@ -736,7 +815,7 @@ function finishInterruptedTurn(session) {
     output: {
       kind: "approval_required",
       pendingApproval,
-      text: readString$g(turnControl.output && turnControl.output.text) ||
+      text: readString(turnControl.output && turnControl.output.text) ||
         `Approval required before running ${actionName}.`
     },
     memoryEntriesAdded: session.memoryEntriesAdded,
@@ -783,6 +862,8 @@ function finalizeRunDeadlineExceeded(session, runDeadlineMs) {
       ? session.runState.costLedger.totals.totalTokens
       : null
   });
+  const deadlineSalvage = maybeSalvageBudgetExhaustedCandidate(session, ERROR_CODES.RUN_DEADLINE_EXCEEDED);
+  if (deadlineSalvage) return deadlineSalvage;
   return finalizeActionLoopFailure({
     code: ERROR_CODES.RUN_DEADLINE_EXCEEDED,
     cycleRecord: cycles[cycles.length - 1] || null,
@@ -812,6 +893,8 @@ function finalizeCostBudgetExceeded(session, maxCostUsd, spentUsd) {
       ? session.runState.costLedger.totals.cost.currency
       : null
   });
+  const costSalvage = maybeSalvageBudgetExhaustedCandidate(session, ERROR_CODES.COST_BUDGET_EXCEEDED);
+  if (costSalvage) return costSalvage;
   return finalizeActionLoopFailure({
     code: ERROR_CODES.COST_BUDGET_EXCEEDED,
     cycleRecord: cycles[cycles.length - 1] || null,
@@ -827,7 +910,7 @@ function finalizeCostBudgetExceeded(session, maxCostUsd, spentUsd) {
 }
 
 function createRepeatedWebSearchSkip(session, actionName, decision, reason) {
-  if (actionName !== "web_search" || !isRepeatedWebSearchQuery(session.runState, decision)) {
+  if (actionName !== WEB_SEARCH_ACTION || !isRepeatedWebSearchQuery(session.runState, decision)) {
     return null;
   }
   // AGRUN-217 / ADR-0012 — `research_report_backstop` synthetic search
@@ -837,7 +920,7 @@ function createRepeatedWebSearchSkip(session, actionName, decision, reason) {
   // remaining caller and is removed here. Any future planner/skill-owned
   // duplicate query is blocked by the normal guard, exactly per ADR-0012:
   // runtime detects duplicates, AI decides what to do next.
-  const query = readString$g(readActionArgs(decision) && readActionArgs(decision).query);
+  const query = readString(readActionArgs(decision) && readActionArgs(decision).query);
   const skipState = recordRepeatedWebSearchSkip(session.runState, query, reason);
   const escalated = skipState.count > 1;
   const message = [
@@ -895,11 +978,11 @@ function recordRepeatedWebSearchSkip(runState, query, reason) {
     : {};
   const key = normalizedQuery || "__missing_query__";
   const prior = previous[key] && typeof previous[key] === "object" ? previous[key] : {};
-  const count = readPositiveInteger$9(prior.count) + 1;
+  const count = readPositiveInteger$8(prior.count) + 1;
   const nextEntry = {
     count,
-    lastReason: readString$g(reason) || null,
-    query: readString$g(query) || null
+    lastReason: readString(reason) || null,
+    query: readString(query) || null
   };
   if (runState && typeof runState === "object") {
     runState.researchContext = {
@@ -913,28 +996,56 @@ function recordRepeatedWebSearchSkip(runState, query, reason) {
   return nextEntry;
 }
 
+// AGRUN-405 — uniform observation shape for a session-loop guard that VETOES the
+// planner's chosen action WITHOUT dispatching it (todo-placeholder, todo-plan-
+// required, todo-inspect-loop). A veto must still tell the planner WHY on the
+// next cycle, so it records the reason on BOTH actionHistory and
+// runState.observation and ALWAYS carries `actionName` (the vetoed action) — so
+// observation consumers (the planner prompt's lastObservation and
+// planner-plan-validation-feedback, which reads observation.actionName) get the
+// same shape as the proven web-search-repeat-blocked guard. Previously these
+// three paths emitted a thin {kind,message} observation + {kind,summary} history
+// with no actionName, so the planner could not tell WHICH action was vetoed.
+//
+// runState.lastAction is intentionally LEFT UNTOUCHED: it records the last
+// EXECUTED action, and a vetoed-and-skipped guard executes nothing (matching
+// web-search-repeat-blocked, which also leaves it alone).
+function recordVetoedActionObservation(session, { actionName, historyKind, summary, message }) {
+  const name = readString(actionName) || null;
+  session.actionHistory.push({
+    actionName: name,
+    kind: historyKind,
+    summary
+  });
+  session.runState.observation = {
+    actionName: name,
+    kind: "hint",
+    message
+  };
+}
+
 function isRepeatedWebSearchQuery(runState, decision) {
   const args = readActionArgs(decision);
-  const query = normalizeSearchQuery(readString$g(args && args.query));
+  const query = normalizeSearchQuery(readString(args && args.query));
   if (!query) return false;
   const context = runState && runState.researchContext && typeof runState.researchContext === "object"
     ? runState.researchContext
     : {};
   const passes = Array.isArray(context.searchPasses) ? context.searchPasses : [];
-  return passes.some((pass) => normalizeSearchQuery(readString$g(pass && pass.query)) === query);
+  return passes.some((pass) => normalizeSearchQuery(readString(pass && pass.query)) === query);
 }
 
 function normalizeSearchQuery(value) {
-  return readString$g(value).toLowerCase().replace(/\s+/g, " ");
+  return readString(value).toLowerCase().replace(/\s+/g, " ");
 }
 
 async function evaluateSkillPolicyForStandaloneAction(session, actionName, decision) {
-  if (actionName !== "execute_skill_tool") return null;
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) return null;
   const args = readActionArgs(decision);
   const activeSkill = session.runState.agentSkillContext && session.runState.agentSkillContext.activeSkill;
-  const skillName = readString$g(args && args.skillName) ||
-    readString$g(activeSkill && (activeSkill.skillId || activeSkill.name));
-  const toolName = readString$g(args && args.toolName);
+  const skillName = readString(args && args.skillName) ||
+    readString(activeSkill && (activeSkill.skillId || activeSkill.name));
+  const toolName = readString(args && args.toolName);
   if (!skillName && !toolName) return null;
 
   const manifest = await getPolicyManifestForSkill({
@@ -952,11 +1063,7 @@ async function evaluateSkillPolicyForStandaloneAction(session, actionName, decis
   });
 }
 
-function readString$g(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readPositiveInteger$9(value) {
+function readPositiveInteger$8(value) {
   return Number.isInteger(value) && value > 0 ? value : 0;
 }
 
@@ -998,4 +1105,4 @@ function updateActionFailureSignal(session) {
   }
 }
 
-export { InterruptedTurnControl, continueActionLoop, handleInterruptedOutcome };
+export { InterruptedTurnControl, continueActionLoop, handleInterruptedOutcome, recordVetoedActionObservation };

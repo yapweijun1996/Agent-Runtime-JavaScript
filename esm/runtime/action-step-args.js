@@ -1,3 +1,6 @@
+import { readString } from './semantic-json.js';
+import { EXECUTE_SKILL_TOOL_ACTION } from './action-names.js';
+
 const MAX_STRING_CHARS = 40;
 const MAX_KEYS_PER_LEVEL = 6;
 const CONTROL_KEYS_SKILL_TOOL = new Set(["skillName", "toolName", "args", "reasoning"]);
@@ -7,7 +10,7 @@ function sanitizeActionStepArgs(actionName, rawArgs) {
     return undefined;
   }
 
-  if (actionName === "execute_skill_tool") {
+  if (actionName === EXECUTE_SKILL_TOOL_ACTION) {
     return sanitizeSkillToolArgs(rawArgs);
   }
 
@@ -25,8 +28,8 @@ function sanitizeActionStepArgs(actionName, rawArgs) {
 }
 
 function sanitizeSkillToolArgs(rawArgs) {
-  const skillName = readString$15(rawArgs.skillName) || undefined;
-  const toolName = readString$15(rawArgs.toolName) || undefined;
+  const skillName = readString(rawArgs.skillName) || undefined;
+  const toolName = readString(rawArgs.toolName) || undefined;
 
   const nested = rawArgs.args && typeof rawArgs.args === "object" && !Array.isArray(rawArgs.args)
     ? rawArgs.args
@@ -140,10 +143,6 @@ function renderValue(value, depth) {
     return nested ? `{${nested}}` : "{}";
   }
   return String(value);
-}
-
-function readString$15(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export { sanitizeActionStepArgs };

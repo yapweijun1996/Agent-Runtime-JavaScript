@@ -1,3 +1,7 @@
+import { readString, readFiniteNumber } from './semantic-json.js';
+import { isSecretKey, scrubSecretText } from './secret-redaction.js';
+export { redactSecretFields } from './secret-redaction.js';
+
 const TEXT_PREVIEW_CHARS = 1200;
 const RAW_PREVIEW_CHARS = 2000;
 const MAX_MESSAGES = 12;
@@ -7,10 +11,10 @@ const TRACE_REDACTION_POLICY = "safe_summary_no_secrets_no_image_bytes";
 function createProviderRequestTrace(options = {}) {
   const messages = Array.isArray(options.messages) ? options.messages : [];
   const tools = normalizeTools(options.tools);
-  const system = readString$F(options.system);
+  const system = readString(options.system);
   const providerOptions = sanitizeStructuredValue(options.providerOptions);
   const sessionContext = summarizeSessionContext$1(options.sessionContext);
-  const prompt = readString$F(options.prompt);
+  const prompt = readString(options.prompt);
   const messageSummary = summarizeMessages(messages);
   const toolSchemaChars = measureJsonChars(tools.raw);
 
@@ -18,11 +22,11 @@ function createProviderRequestTrace(options = {}) {
     type: "llm_request_trace",
     version: 1,
     redaction: "safe_summary_no_secrets_no_image_bytes",
-    provider: readString$F(options.provider) || "n/a",
-    model: readString$F(options.model) || "n/a",
-    apiVariant: readString$F(options.apiVariant) || null,
-    authMode: readString$F(options.authMode) || null,
-    callKind: readString$F(options.callKind) || null,
+    provider: readString(options.provider) || "n/a",
+    model: readString(options.model) || "n/a",
+    apiVariant: readString(options.apiVariant) || null,
+    authMode: readString(options.authMode) || null,
+    callKind: readString(options.callKind) || null,
     endpoint: summarizeEndpoint$1(options.endpoint),
     payload: {
       providerOptions,
@@ -30,7 +34,7 @@ function createProviderRequestTrace(options = {}) {
       prompt: summarizeText(prompt),
       messages: messageSummary.messages,
       tools: tools.summary,
-      toolChoice: readString$F(options.toolChoice) || null,
+      toolChoice: readString(options.toolChoice) || null,
       sessionContext
     },
     metrics: {
@@ -50,18 +54,18 @@ function createProviderRequestTrace(options = {}) {
 
 function createProviderResponseTrace(options = {}) {
   const response = options.response && typeof options.response === "object" ? options.response : {};
-  const text = readString$F(options.text);
+  const text = readString(options.text);
   const toolCalls = summarizeToolCalls(options.toolCalls);
   const usageSummary = summarizeUsage$1(options.usage);
-  const latencyMs = readFiniteNumber$1(options.durationMs);
+  const latencyMs = readFiniteNumber(options.durationMs);
   return {
     type: "llm_response_trace",
     version: 1,
     redaction: "safe_summary_no_secrets",
-    provider: readString$F(options.provider) || "n/a",
-    model: readString$F(options.model) || "n/a",
+    provider: readString(options.provider) || "n/a",
+    model: readString(options.model) || "n/a",
     status: typeof options.status === "number" && Number.isFinite(options.status) ? options.status : null,
-    finishReason: readString$F(options.finishReason) || null,
+    finishReason: readString(options.finishReason) || null,
     metrics: {
       inputTokens: usageSummary.inputTokens,
       latencyMs,
@@ -79,7 +83,7 @@ function createProviderResponseTrace(options = {}) {
 }
 
 function summarizeTraceText(value, max = TEXT_PREVIEW_CHARS) {
-  const text = readString$F(value);
+  const text = readString(value);
   return {
     chars: text.length,
     hash: text ? stableHash(text) : null,
@@ -88,7 +92,7 @@ function summarizeTraceText(value, max = TEXT_PREVIEW_CHARS) {
 }
 
 function stableTraceHash(value) {
-  return stableHash(readString$F(value));
+  return stableHash(readString(value));
 }
 
 function sanitizeTraceValue(value) {
@@ -96,7 +100,7 @@ function sanitizeTraceValue(value) {
 }
 
 function sanitizeTraceString(value) {
-  return sanitizeString(readString$F(value));
+  return sanitizeString(readString(value));
 }
 
 function summarizeMessages(messages) {
@@ -105,7 +109,7 @@ function summarizeMessages(messages) {
   const summarized = [];
   for (const message of messages.slice(0, MAX_MESSAGES)) {
     if (!message || typeof message !== "object" || Array.isArray(message)) continue;
-    const role = readString$F(message.role) || "unknown";
+    const role = readString(message.role) || "unknown";
     const content = summarizeContent(message.content);
     textChars += content.textChars;
     omittedImages += content.omittedImages;
@@ -145,7 +149,7 @@ function summarizeContent(content) {
   const parts = content.slice(0, 16).map((part) => {
     if (!part || typeof part !== "object" || Array.isArray(part)) return { type: "unknown" };
     if (part.type === "text") {
-      const text = readString$F(part.text);
+      const text = readString(part.text);
       textChars += text.length;
       return {
         type: "text",
@@ -157,11 +161,11 @@ function summarizeContent(content) {
       return {
         type: "image",
         image: "[omitted]",
-        mimeType: readString$F(part.mimeType) || null
+        mimeType: readString(part.mimeType) || null
       };
     }
     return {
-      type: readString$F(part.type) || "unknown"
+      type: readString(part.type) || "unknown"
     };
   });
   return {
@@ -192,11 +196,11 @@ function normalizeTools(tools) {
     for (const tool of tools) {
       if (tool && Array.isArray(tool.functionDeclarations)) {
         for (const declaration of tool.functionDeclarations) {
-          const name = readString$F(declaration && declaration.name);
+          const name = readString(declaration && declaration.name);
           if (name) names.push(name);
         }
       } else {
-        const name = readString$F(tool && (tool.name || (tool.function && tool.function.name)));
+        const name = readString(tool && (tool.name || (tool.function && tool.function.name)));
         if (name) names.push(name);
       }
     }
@@ -219,7 +223,7 @@ function summarizeToolCalls(value) {
   return calls.slice(0, MAX_TOOLS).map((call) => {
     const args = parseMaybeJson(call && (call.arguments || call.args || call.input));
     return {
-      name: readString$F(call && (call.name || call.toolName)) || null,
+      name: readString(call && (call.name || call.toolName)) || null,
       argsShape: summarizeShape(args)
     };
   });
@@ -333,29 +337,7 @@ function sanitizeStructuredValue(value, depth = 0, seen = new WeakSet()) {
 
 function sanitizeString(value) {
   if (value.startsWith("data:image/")) return "[image data omitted]";
-  return value
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "[redacted]")
-    .replace(/sk-[A-Za-z0-9_-]{12,}/g, "[redacted]")
-    .replace(/gw_[A-Za-z0-9_-]{20,}/g, "[redacted]");
-}
-
-function isSecretKey(key) {
-  const normalized = readString$F(key).toLowerCase().replace(/[^a-z0-9]/g, "");
-  return normalized === "apikey"
-    || normalized.endsWith("apikey")
-    || normalized === "authorization"
-    || normalized === "bearer"
-    || normalized === "token"
-    || normalized.endsWith("token")
-    || normalized === "secret"
-    || normalized.endsWith("secret")
-    || normalized === "password"
-    || normalized.endsWith("password")
-    || normalized === "credential"
-    || normalized.endsWith("credential")
-    || normalized === "cookie"
-    || normalized.endsWith("cookie")
-    || normalized === "xgoogapikey";
+  return scrubSecretText(value);
 }
 
 function summarizeUsage$1(value) {
@@ -390,14 +372,10 @@ function summarizeUsage$1(value) {
 
 function firstFiniteNumber(...values) {
   for (const value of values) {
-    const number = readFiniteNumber$1(value);
+    const number = readFiniteNumber(value);
     if (number != null) return number;
   }
   return null;
-}
-
-function readFiniteNumber$1(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function summarizeText(value) {
@@ -405,7 +383,7 @@ function summarizeText(value) {
 }
 
 function summarizeEndpoint$1(value) {
-  const endpoint = readString$F(value);
+  const endpoint = readString(value);
   if (!endpoint) return null;
   try {
     const url = new URL(endpoint);
@@ -438,12 +416,8 @@ function measureJsonChars(value) {
   }
 }
 
-function readString$F(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function stableHash(value) {
-  const text = readString$F(value);
+  const text = readString(value);
   let hash = 5381;
   for (let index = 0; index < text.length; index += 1) {
     hash = ((hash << 5) + hash) ^ text.charCodeAt(index);
@@ -452,7 +426,7 @@ function stableHash(value) {
 }
 
 function truncate$1(value, max) {
-  const text = readString$F(value);
+  const text = readString(value);
   return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
 }
 

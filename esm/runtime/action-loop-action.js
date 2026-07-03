@@ -1,20 +1,29 @@
 import { readString } from './semantic-json.js';
-import { PUBLISH_DIRECT_ACTION, FINALIZE_CANDIDATE_ACTION } from './kernel-terminal-actions.js';
+import { WEB_SEARCH_ACTION, READ_URL_ACTION, TODO_RUN_NEXT_ACTION, ASK_CLARIFICATION_ACTION, LIST_AGENT_SKILLS_ACTION, READ_AGENT_SKILL_ACTION, USE_AGENT_SKILL_ACTION, HANDOFF_TO_SKILL_ACTION, EXECUTE_SKILL_TOOL_ACTION, PUBLISH_DIRECT_ACTION } from './action-names.js';
+import { maybeBlockUnnecessaryLongResearchClarification, maybeBlockLongResearchSearchWithoutRead } from './blocks/long-research.js';
+import { maybeBlockLateBudgetWorkspaceProtocolWindow } from './blocks/late-budget.js';
+import { readWorkspaceLengthDeficit, readCurrentWorkspaceLengthStatus } from './blocks/workspace-deficit-reads.js';
+import { maybeBlockActionGuardrail } from './blocks/guardrail.js';
+import { maybeBlockSatisfiedCandidateMutation } from './blocks/satisfied-candidate.js';
+import { maybeBlockWorkspaceNoProgressLoop } from './blocks/no-progress.js';
+import { maybeBlockLengthDeficitRewrite } from './blocks/length-deficit-rewrite.js';
+import { maybeBlockWorkspaceSourceDeficitAfterPublishBlock } from './blocks/source-deficit-after-publish.js';
+import { maybeBlockWorkspaceMutationGrowthLoop, maybeBlockStructureRepairLoop, maybeBlockReadOnlyPlanningLoop } from './blocks/convergence-loops.js';
+import { maybeBlockTerminalRepairAction, maybeBlockTerminalCorrectionRetry } from './blocks/terminal-repair.js';
 import { ERROR_CODES, normalizeThrownError, serializeError } from './errors.js';
 import { finalizeActionLoopFailure } from './action-loop-failure.js';
 import { handleActionResult } from './action-loop-action-result.js';
 import { cloneValue } from './utils.js';
 import './tool-schema.js';
 import { stampThreadProvenance } from './thread-provenance.js';
-import { refreshActionGuardrail, evaluateActionGuardrailBefore, createActionGuardrailSyntheticResult } from './action-guardrail-controller.js';
+import { refreshActionGuardrail } from './action-guardrail-controller.js';
 import { refreshActionPatternConvergence, shouldEmitActionPatternConvergenceRefreshed } from './action-pattern-convergence.js';
 import { refreshRequirementRecoveryEvaluator } from './requirement-recovery-evaluator.js';
 import { refreshReadUrlRecoverySignal } from './read-url-recovery-signal.js';
 import { refreshResearchState } from './research-state.js';
 import { markActionProgress } from './session-budget.js';
-import { refreshTerminalRepairState, buildTerminalRepairRefreshedStepDetail, shouldEmitAdvisoryPersistenceSignalStep, explainTerminalRepairPublishArgs, buildBudgetRemainingForExpansionSignal, isPublishProtocolRequiredActionForRepair } from './terminal-repair-state.js';
+import { refreshTerminalRepairState, buildTerminalRepairRefreshedStepDetail, shouldEmitAdvisoryPersistenceSignalStep } from './terminal-repair/core.js';
 import { applyInvalidActionConvergenceOnSuccess } from './invalid-action-convergence.js';
-import { inspectWorkspacePublishProtocol } from './virtual-workspace.js';
 import './runtime-event-classifier.js';
 import { readActionArgs, readWebSearchEndpoint, nextActionCallId } from './action-loop-utils.js';
 import { sanitizeActionStepArgs } from './action-step-args.js';
@@ -22,8 +31,6 @@ import { validateActionArgs } from './action-args-validation.js';
 import { fingerprintAction } from './action-fingerprint.js';
 import { appendWebSearchOutput, appendResearchReadSource } from './search-research-context.js';
 import { createRuntimeStreamEmitter } from './provider-stream-events.js';
-import { isResearchQualityGateRequired } from './convergence-activation.js';
-import { DEFAULT_TERMINAL_REPAIR_STRINGS } from './terminal-repair-strings.js';
 import { maybeCreateTodoActionProgressDecision } from './todo-action-progress.js';
 import { applyTodoRunNextToRunState } from './actions/todo-actions.js';
 import { pushReadUrlRequestedStep, pushReadUrlCompletedStep, readResearchQuery, syncSearchInquiryContext, createResearchReadSource, syncReadInquiryContext, syncPendingClarification, shouldRefreshLongRunRequirementRecovery } from './action-loop-action-context.js';
@@ -31,23 +38,7 @@ import { resetAgentHandoffChainForSkill, applyAgentHandoffToSession } from './ha
 import { normalizeActionResultEnvelope, createExecuteErrorEnvelope, createProtocolErrorEnvelope, envelopeToObservation } from './action-result-envelope.js';
 import { executeActionWithTimeout, ACTION_TIMEOUT_REASON, buildActionTimeoutMessage } from './action-execute-timeout.js';
 import { callHostHookWithTimeout } from './host-hook-timeout.js';
-import { buildValidLimitedPublishArgsExample } from './publish-prescription.js';
 import { shouldRecordStructuredToolEvidence, recordStructuredToolEvidence } from './action-evidence.js';
-
-const LATE_BUDGET_PATCH_PREVIEW_ACTIONS = new Set([
-  "workspace_propose_patch"
-]);
-
-const LATE_BUDGET_WORKSPACE_MUTATION_ACTIONS = new Set([
-  "workspace_apply_patch",
-  "workspace_insert_after_section",
-  "workspace_move",
-  "workspace_multi_edit",
-  "workspace_remove",
-  "workspace_replace",
-  "workspace_write"
-]);
-
 
 async function executeAction(options) {
   const {
@@ -232,7 +223,11 @@ async function executeAction(options) {
     actionName,
     decision,
     pushStep,
-    runState
+    runState,
+    // AGRUN-509 — forward runtimeConfig so the budget-expansion advisory gate
+    // honors host-overridden terminalRepair thresholds (parity with the
+    // onResponse hook door).
+    runtimeConfig
   });
   if (terminalRepairBlock) {
     actionHistory.push({
@@ -513,7 +508,7 @@ async function executeAction(options) {
       summary: actionResult.summary
     });
 
-    if (actionName === "web_search") {
+    if (actionName === WEB_SEARCH_ACTION) {
       runState.researchContext = appendWebSearchOutput(
         runState.researchContext,
         actionResult.output,
@@ -541,7 +536,7 @@ async function executeAction(options) {
       });
     }
 
-    if (actionName === "read_url") {
+    if (actionName === READ_URL_ACTION) {
       const readSource = stampThreadProvenance(
         cloneValue(createResearchReadSource(
           actionResult.output,
@@ -577,7 +572,7 @@ async function executeAction(options) {
       runtimeConfig && runtimeConfig.todoAutopilot,
       { actionName }
     );
-    if (todoProgressDecision && todoProgressDecision.name === "todo_run_next") {
+    if (todoProgressDecision && todoProgressDecision.name === TODO_RUN_NEXT_ACTION) {
       const todoProgressResult = applyTodoRunNextToRunState(runState, todoProgressDecision.args, {
         pushStep,
         request,
@@ -596,15 +591,15 @@ async function executeAction(options) {
       });
     }
 
-    if (actionName === "ask_clarification") {
+    if (actionName === ASK_CLARIFICATION_ACTION) {
       syncPendingClarification(runState, actionResult.output);
     }
 
-    if (actionName === "list_agent_skills") {
+    if (actionName === LIST_AGENT_SKILLS_ACTION) {
       runState.agentSkillContext.catalogListed = true;
     }
 
-    if (actionName === "read_agent_skill") {
+    if (actionName === READ_AGENT_SKILL_ACTION) {
       const skillRecord = cloneValue(actionResult.output.skill || null);
       runState.agentSkillContext.lastReadSkill = skillRecord;
       // ADR-0013: when AI engages a skill via read_agent_skill, mark it as
@@ -620,7 +615,7 @@ async function executeAction(options) {
       });
     }
 
-    if (actionName === "use_agent_skill") {
+    if (actionName === USE_AGENT_SKILL_ACTION) {
       const selectedSkill = cloneValue(actionResult.output.skill || null);
       runState.agentSkillContext.activeSkill = selectedSkill;
       resetAgentHandoffChainForSkill(runState.agentSkillContext, selectedSkill);
@@ -630,7 +625,7 @@ async function executeAction(options) {
       });
     }
 
-    if (actionName === "handoff_to_skill") {
+    if (actionName === HANDOFF_TO_SKILL_ACTION) {
       await applyAgentHandoffToSession({
         actionHistory,
         pushStep,
@@ -644,7 +639,7 @@ async function executeAction(options) {
       });
     }
 
-    if (actionName === "execute_skill_tool") {
+    if (actionName === EXECUTE_SKILL_TOOL_ACTION) {
       // Hook: allow caller to augment/replace tool result before it becomes
       // lastResult visible to the planner. Raced — a hung host hook degrades
       // to "ignored", never freezes the loop.
@@ -676,7 +671,7 @@ async function executeAction(options) {
       recordStructuredToolEvidence(runState, actionResult.output, runtimeConfig);
     }
 
-    if (actionName !== "web_search" && actionName !== "read_url") {
+    if (actionName !== WEB_SEARCH_ACTION && actionName !== READ_URL_ACTION) {
       refreshLongRunRequirementRecovery({
         actionName,
         pushStep,
@@ -820,28 +815,6 @@ function createActionTimeoutEnvelope({ action, durationMs, timeoutMs }) {
   });
 }
 
-function maybeBlockActionGuardrail(options) {
-  const runtimeConfig = options && options.runtimeConfig;
-  const guardrailConfig = runtimeConfig && runtimeConfig.actionGuardrail;
-  const decision = evaluateActionGuardrailBefore(
-    options && options.runState && options.runState.actionGuardrail,
-    options && options.action,
-    options && options.actionArgs,
-    guardrailConfig
-  );
-  if (!decision || decision.action === "allow" || decision.action === "warn") return null;
-  const result = createActionGuardrailSyntheticResult(decision);
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("action-guardrail-blocked", {
-      actionName: options.actionName,
-      code: decision.code,
-      count: decision.count,
-      guardrailAction: decision.action
-    });
-  }
-  return { message: decision.message, result };
-}
-
 function readActionStepDetail({ actionName, actionArgs, callId, skillName, toolName }) {
   const detail = {
     actionName,
@@ -857,7 +830,7 @@ function readActionStepDetail({ actionName, actionArgs, callId, skillName, toolN
 }
 
 function readToolSkillName$1(actionName, runState, output, decision) {
-  if (actionName !== "execute_skill_tool") {
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) {
     return undefined;
   }
 
@@ -875,7 +848,7 @@ function readToolSkillName$1(actionName, runState, output, decision) {
 }
 
 function readToolName$1(actionName, output, decision) {
-  if (actionName !== "execute_skill_tool") {
+  if (actionName !== EXECUTE_SKILL_TOOL_ACTION) {
     return undefined;
   }
 
@@ -1011,196 +984,6 @@ function refreshTerminalRepair(options) {
   return repair;
 }
 
-function maybeBlockTerminalRepairAction(options) {
-  const runState = options && options.runState;
-  const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
-    ? runState.terminalRepairState
-    : null;
-  if (!repair || repair.active !== true) return null;
-  const actionName = readString(options && options.actionName);
-  if (!actionName) return null;
-  const allowedActions = Array.isArray(repair.allowedActions)
-    ? repair.allowedActions.map(readString).filter(Boolean)
-    : [];
-  const allowed = allowedActions.includes(actionName);
-  const isPublish = actionName === PUBLISH_DIRECT_ACTION;
-  // AGRUN publish-loop escape: once terminal-repair grants the publish-loop
-  // escape (hard_veto reached with a real drafted candidate — see
-  // terminal-repair-state.js publishLoopEscapeGranted), stop vetoing the AI's
-  // workspace_publish_candidate. The AI has demonstrably failed the brittle
-  // multi-gate publish protocol past the high-water mark; pinning it further
-  // just burns the budget and returns the "paused" stub. Let the publish reach
-  // the action, which publishes the real candidate ARTIFACT with the unmet
-  // facts recorded as limitations. Narrow: hard_veto + real candidate only.
-  if (isPublish && repair.publishLoopEscapeGranted === true) return null;
-  const publishValidation = isPublish
-    ? explainTerminalRepairPublishArgs(options.actionArgs, repair, { runState })
-    : { valid: false, reasons: [] };
-  const validPublish = isPublish && publishValidation.valid;
-  const readinessOnlyPublishRetry = isPublish &&
-    allowed &&
-    isReadinessOnlyPublishRetryAllowed(repair);
-  if (allowed && (!isPublish || validPublish || readinessOnlyPublishRetry)) return null;
-
-  const ignoredCount = readFiniteNumber$2(repair.ignoredCount) + 1;
-  const reason = isPublish && !validPublish
-    ? "terminal_repair_invalid_publish"
-    : "terminal_repair_action_not_allowed";
-  const escalation = readString(repair.escalation);
-    const isHardVeto = escalation === "hard_veto" && reason === "terminal_repair_action_not_allowed";
-    const protocolHint = buildTerminalRepairProtocolHint(repair);
-    const budgetExpansionSignal = isHardVeto
-      ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount)
-      : null;
-    const message = isHardVeto
-    ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
-        actionName,
-        ignoredCount,
-        budgetState: repair.budgetState,
-        activeDeficits: repair.activeDeficits,
-        allowedActions: repair.allowedActions,
-        observableDeficits: repair.observableDeficits
-      })
-    : isPublish && !validPublish
-      ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.invalidPublish({ protocolHint })
-      : DEFAULT_TERMINAL_REPAIR_STRINGS.block.actionNotAllowed({ actionName });
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: isHardVeto ? "terminal_repair_hard_veto_block" : "terminal_repair_preflight_block",
-    status: "blocked",
-    reason,
-    actionName,
-    activeDeficits: Array.isArray(repair.activeDeficits) ? repair.activeDeficits.slice(0, 8) : [],
-    allowedActions: allowedActions.slice(0, 16),
-    forbiddenDecisions: Array.isArray(repair.forbiddenDecisions) ? repair.forbiddenDecisions.slice(0, 8) : [],
-    escalation: escalation || "advisory",
-      ignoredCount,
-      invalidPublishReasons: isPublish ? publishValidation.reasons.slice(0, 8) : [],
-      budgetRemainingForExpansionSignal: budgetExpansionSignal,
-      terminalRepairState: {
-      active: true,
-      mode: repair.mode || "terminal_repair",
-      reason: repair.reason || null,
-      requiredRepair: repair.requiredRepair || null,
-      validPublishContract: cloneValue(repair.validPublishContract || null)
-    },
-    requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
-    message
-  };
-  if (typeof options.pushStep === "function") {
-    options.pushStep(isHardVeto ? "terminal-repair-hard-veto-blocked" : "terminal-repair-action-blocked", {
-      actionName,
-      activeDeficits: output.activeDeficits,
-      escalation: output.escalation,
-        ignoredCount,
-        invalidPublishReasons: output.invalidPublishReasons,
-        budgetRemainingForExpansionSignal: output.budgetRemainingForExpansionSignal,
-        reason
-      });
-  }
-  return { message, output };
-}
-
-function buildTerminalRepairProtocolHint(repair) {
-  const reason = readString(repair && repair.reason);
-  if (reason === "missing_finalize_after_latest_write") {
-    return " Current publish protocol blocker requires workspace_finalize_candidate for the candidate, then workspace_read, before another publish attempt.";
-  }
-  if (reason === "missing_latest_workspace_read") {
-    return " Current publish protocol blocker requires workspace_read of the latest candidate before another publish attempt.";
-  }
-  return "";
-}
-
-function isReadinessOnlyPublishRetryAllowed(repair) {
-  const deficits = Array.isArray(repair && repair.activeDeficits)
-    ? repair.activeDeficits.map(readString).filter(Boolean)
-    : [];
-  if (!deficits.includes("readiness")) return false;
-  return !deficits.some((name) => [
-    "length",
-    "source",
-    "structure",
-    "terminal_loop",
-    "todo"
-  ].includes(name));
-}
-
-function maybeBlockTerminalCorrectionRetry(options) {
-  const actionName = readString(options && options.actionName);
-  if (actionName !== PUBLISH_DIRECT_ACTION) return null;
-  const runState = options && options.runState;
-  const convergence = runState && runState.actionPatternConvergence && typeof runState.actionPatternConvergence === "object"
-    ? runState.actionPatternConvergence
-    : null;
-  const correction = convergence && convergence.terminalCorrectionState && typeof convergence.terminalCorrectionState === "object"
-    ? convergence.terminalCorrectionState
-    : null;
-  const cooldown = convergence && convergence.terminalRetryCooldown && typeof convergence.terminalRetryCooldown === "object"
-    ? convergence.terminalRetryCooldown
-    : null;
-  const ignoredCount = Math.max(
-    readFiniteNumber$2(convergence && convergence.ignoredTerminalCorrectionCount),
-    readFiniteNumber$2(correction && correction.ignoredTerminalCorrectionCount)
-  );
-  const cooldownActive = cooldown && cooldown.active === true;
-  const correctionActive = correction && correction.active === true;
-  if (!cooldownActive && !correctionActive) return null;
-  const repairState = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
-    ? runState.terminalRepairState
-    : { active: true, activeDeficits: ["terminal_loop"] };
-  // AGRUN publish-loop escape: once the hard_veto publish-acceptance escape is
-  // granted (terminal-repair-state.js publishLoopEscapeGranted), the
-  // terminal-correction cooldown must NOT re-pin the publish — otherwise this
-  // sibling gate would block the very workspace_publish_candidate the escape
-  // exists to let through, and the run would still thrash to the maxSteps stub.
-  if (repairState.publishLoopEscapeGranted === true) return null;
-  const publishValidation = explainTerminalRepairPublishArgs(options.actionArgs, repairState, { runState });
-  if (publishValidation.valid) return null;
-  const blockedTerminalRetryCount = readFiniteNumber$2(cooldown && cooldown.blockedTerminalRetryCount) + 1;
-  const message = "Terminal correction is escalated: do not repeat clean ready or plain workspace_publish_candidate after repeated publish/finalize no-progress. Do evidence/workspace/TodoState recovery first, or publish only a valid limited finalReadiness with non-empty remainingGaps and false flags for failed dimensions.";
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "terminal_correction_preflight_block",
-    status: "blocked",
-    reason: "terminal_correction_escalated",
-    ignoredTerminalCorrectionCount: ignoredCount,
-    forbiddenMove: "repeat_same_terminal_intent",
-    allowedNextMoves: Array.isArray(correction && correction.allowedNextMoves)
-      ? correction.allowedNextMoves.slice(0, 8)
-      : Array.isArray(cooldown && cooldown.allowedNextMoves)
-        ? cooldown.allowedNextMoves.slice(0, 8)
-        : [],
-    terminalRetryCooldown: {
-      active: true,
-      forbiddenTerminalActions: Array.isArray(cooldown && cooldown.forbiddenTerminalActions)
-        ? cooldown.forbiddenTerminalActions.slice(0, 8)
-        : [PUBLISH_DIRECT_ACTION, "finalize"],
-      validTerminalException: readString(cooldown && cooldown.validTerminalException) ||
-        "workspace_publish_candidate with decision=limited + non-empty remainingGaps + false failed-dimension flags",
-      blockedTerminalRetryCount,
-      executedPublishCount: readFiniteNumber$2(cooldown && cooldown.executedPublishCount),
-      consecutiveExecutedPublishCount: readFiniteNumber$2(cooldown && cooldown.consecutiveExecutedPublishCount),
-      reason: readString(cooldown && cooldown.reason) || "terminal_retry_cooldown_active"
-    },
-    invalidPublishReasons: publishValidation.reasons.slice(0, 8),
-    requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
-    message
-  };
-  if (typeof options.pushStep === "function") {
-    options.pushStep("terminal-correction-action-blocked", {
-      actionName,
-      blockedTerminalRetryCount,
-      forbiddenMove: output.forbiddenMove,
-      ignoredTerminalCorrectionCount: ignoredCount,
-      reason: output.reason
-    });
-  }
-  return { message, output };
-}
-
 function maybeBlockActionPatternRepeat(options) {
   const actionName = readString(options && options.actionName);
   if (!actionName || actionName === PUBLISH_DIRECT_ACTION || actionName === "finalize") return null;
@@ -1218,13 +1001,15 @@ function maybeBlockActionPatternRepeat(options) {
     actionName,
     pushStep: options && options.pushStep,
     request: options && options.request,
-    runState
+    runState,
+    readWorkspaceLengthDeficit
   });
   if (unnecessaryClarificationBlock) return unnecessaryClarificationBlock;
   const searchWithoutReadBlock = maybeBlockLongResearchSearchWithoutRead({
     actionName,
     pushStep: options && options.pushStep,
-    runState
+    runState,
+    readWorkspaceLengthDeficit
   });
   if (searchWithoutReadBlock) return searchWithoutReadBlock;
   // workspaceMutationGrowthConvergence hard_veto is not overridable by terminal
@@ -1249,7 +1034,8 @@ function maybeBlockActionPatternRepeat(options) {
     actionArgs: options && options.actionArgs,
     actionName,
     pushStep: options && options.pushStep,
-    runState
+    runState,
+    readCurrentWorkspaceLengthStatus
   });
   if (lateBudgetProtocolBlock) return lateBudgetProtocolBlock;
   if (repairAllowedActions.includes(actionName)) return null;
@@ -1299,7 +1085,7 @@ function maybeBlockActionPatternRepeat(options) {
   if (readString(signal.forbiddenMove) !== "repeat_same_action_args") return null;
   const currentFingerprint = fingerprintAction(options.decision);
   if (!currentFingerprint || currentFingerprint !== readString(signal.fingerprint)) return null;
-  const repeatCount = readFiniteNumber$2(signal.repeatCount) || readFiniteNumber$2(convergence.repeatedFingerprintCount);
+  const repeatCount = readFiniteNumber(signal.repeatCount) || readFiniteNumber(convergence.repeatedFingerprintCount);
   const message = `Action pattern convergence is active: do not repeat ${actionName} with the same arguments after ${repeatCount} no-progress attempt(s). Change arguments, choose a different recovery action, mutate the workspace meaningfully, gather evidence, or publish only a valid limited result when allowed.`;
   const output = {
     ok: false,
@@ -1314,7 +1100,7 @@ function maybeBlockActionPatternRepeat(options) {
       ? signal.allowedNextMoves.slice(0, 8)
       : ["change_arguments", "choose_different_action", "valid_limited_with_remainingGaps"],
     repeatCount,
-    stepsWithoutObservableProgress: readFiniteNumber$2(convergence.stepsWithoutObservableProgress),
+    stepsWithoutObservableProgress: readFiniteNumber(convergence.stepsWithoutObservableProgress),
     message
   };
   if (typeof options.pushStep === "function") {
@@ -1329,1076 +1115,8 @@ function maybeBlockActionPatternRepeat(options) {
   return { message, output };
 }
 
-function maybeBlockUnnecessaryLongResearchClarification(options) {
-  const actionName = readString(options && options.actionName);
-  if (actionName !== "ask_clarification") return null;
-  const runState = options && options.runState;
-  if (!isLongResearchHarnessActive(runState, {
-    prompt: readString(options && options.request && options.request.prompt)
-  })) {
-    return null;
-  }
-  if (hasOpenClarificationNeed(runState)) return null;
-  if (!hasResearchProgressSignal(runState)) return null;
-  const sourceFacts = readResearchSourceFacts(runState);
-  const candidateCount = countResearchCandidateUrls(runState);
-  const message = [
-    "Long research clarification guard: no open ambiguity is recorded for this run.",
-    "Missing terminology coverage, thin search results, or weak source confidence are research limitations, not user ambiguity.",
-    "Continue with read_url on an unread candidate, write/update the workspace with visible limitations, or publish limited only with concrete remainingGaps if evidence is exhausted."
-  ].join(" ");
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "evidence_convergence_clarification_preflight_block",
-    status: "blocked",
-    reason: "clarification_without_open_ambiguity",
-    actionName,
-    forbiddenMove: "ask_clarification_without_open_ambiguity",
-    allowedNextMoves: buildLongResearchAllowedNextMoves(runState, {
-      preferReadUrl: candidateCount > 0 && sourceFacts.successfulReadUrlCount === 0
-    }),
-    researchFacts: {
-      candidateUrlCount: candidateCount,
-      searchPassCount: countSearchPasses(runState),
-      successfulReadUrlCount: sourceFacts.successfulReadUrlCount,
-      sourceMinimum: sourceFacts.sourceMinimum
-    },
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("long-research-clarification-blocked", {
-      candidateUrlCount: candidateCount,
-      reason: output.reason,
-      searchPassCount: output.researchFacts.searchPassCount,
-      successfulReadUrlCount: sourceFacts.successfulReadUrlCount
-    });
-  }
-  return { message, output };
-}
-
-function maybeBlockLongResearchSearchWithoutRead(options) {
-  const actionName = readString(options && options.actionName);
-  if (actionName !== "web_search") return null;
-  const runState = options && options.runState;
-  if (!isLongResearchHarnessActive(runState, {
-    prompt: readString(options && options.request && options.request.prompt)
-  })) return null;
-  const searchPassCount = countSearchPasses(runState);
-  if (searchPassCount < 2) return null;
-  const sourceFacts = readResearchSourceFacts(runState);
-  const candidateCount = countResearchCandidateUrls(runState);
-  if (candidateCount === 0) return null;
-  const sourceMinimum = sourceFacts.sourceMinimum;
-  const readSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.readSources);
-  const minReadSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.minReadSources);
-  const relevantSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.relevantSources);
-  const minRelevantSources = readFiniteNumber$2(sourceMinimum && sourceMinimum.minRelevantSources);
-  const sourceMinimumUnmet = Boolean(
-    sourceMinimum &&
-    sourceMinimum.passed !== true &&
-    (
-      (minReadSources > 0 && readSources < minReadSources) ||
-      (minRelevantSources > 0 && relevantSources < minRelevantSources)
-    )
-  );
-  const unreadCandidatesAvailable = candidateCount > sourceFacts.successfulReadUrlCount;
-  if (sourceFacts.successfulReadUrlCount > 0 && (!sourceMinimumUnmet || !unreadCandidatesAvailable)) {
-    return null;
-  }
-  const hasNoSuccessfulRead = sourceFacts.successfulReadUrlCount === 0;
-  const message = [
-    hasNoSuccessfulRead
-      ? `Long research evidence handoff is active: ${searchPassCount} search pass(es) already produced ${candidateCount} candidate URL(s), but no successful read_url evidence exists.`
-      : `Long research source minimum is still unmet: ${readSources}/${minReadSources} read source(s), ${relevantSources}/${minRelevantSources} relevant source(s), and ${candidateCount} candidate URL(s) are available.`,
-    "More broad web_search calls are lower-value than reading an unread candidate or documenting a concrete source blocker.",
-    "Use read_url on an unread candidate, or publish limited only if the remaining source blockers are concrete."
-  ].join(" ");
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "evidence_convergence_search_read_handoff_block",
-    status: "blocked",
-    reason: hasNoSuccessfulRead
-      ? "search_candidates_exist_without_read_url"
-      : "source_minimum_unmet_with_unread_candidates",
-    actionName,
-    forbiddenMove: hasNoSuccessfulRead
-      ? "repeat_web_search_before_reading_candidates"
-      : "repeat_web_search_before_meeting_source_minimum",
-    allowedNextMoves: buildLongResearchAllowedNextMoves(runState, { preferReadUrl: true }),
-    researchFacts: {
-      candidateUrlCount: candidateCount,
-      searchPassCount,
-      successfulReadUrlCount: sourceFacts.successfulReadUrlCount,
-      sourceMinimum: sourceFacts.sourceMinimum
-    },
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("long-research-search-read-handoff-blocked", {
-      candidateUrlCount: candidateCount,
-      reason: output.reason,
-      searchPassCount,
-      successfulReadUrlCount: sourceFacts.successfulReadUrlCount
-    });
-  }
-  return { message, output };
-}
-
-function isLongResearchHarnessActive(runState, options = {}) {
-  if (isResearchQualityGateRequired(runState, options)) return true;
-  const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-    ? runState.researchReportLoop
-    : null;
-  if (!loop) return false;
-  if (loop.enabled === true) return true;
-  const status = readString(loop.status);
-  if (status && status !== "idle" && status !== "none") return true;
-  return Boolean(
-    loop.gateSignal &&
-    loop.gateSignal.acceptancePacket &&
-    typeof loop.gateSignal.acceptancePacket === "object"
-  );
-}
-
-function hasOpenClarificationNeed(runState) {
-  const plannerState = runState && runState.plannerState && typeof runState.plannerState === "object"
-    ? runState.plannerState
-    : {};
-  const inquiryContext = runState && runState.inquiryContext && typeof runState.inquiryContext === "object"
-    ? runState.inquiryContext
-    : {};
-  if (plannerState.hasOpenAmbiguity === true) return true;
-  if (readString(plannerState.openAmbiguity)) return true;
-  if (plannerState.pendingClarification && typeof plannerState.pendingClarification === "object") return true;
-  if (inquiryContext.pendingClarification && typeof inquiryContext.pendingClarification === "object") return true;
-  if (readString(inquiryContext.openAmbiguity)) return true;
-  return false;
-}
-
-function hasResearchProgressSignal(runState) {
-  if (!runState || typeof runState !== "object") return false;
-  if (countSearchPasses(runState) > 0) return true;
-  if (countResearchCandidateUrls(runState) > 0) return true;
-  const facts = readResearchSourceFacts(runState);
-  if (facts.successfulReadUrlCount > 0) return true;
-  const workspace = runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
-    ? runState.virtualWorkspace
-    : null;
-  if (!workspace) return false;
-  const files = workspace.files && typeof workspace.files === "object" && !Array.isArray(workspace.files)
-    ? workspace.files
-    : {};
-  return Object.values(files).some((file) => readString(file && file.content));
-}
-
-function countSearchPasses(runState) {
-  const context = runState && runState.researchContext && typeof runState.researchContext === "object"
-    ? runState.researchContext
-    : {};
-  return Array.isArray(context.searchPasses) ? context.searchPasses.length : 0;
-}
-
-function countResearchCandidateUrls(runState) {
-  const context = runState && runState.researchContext && typeof runState.researchContext === "object"
-    ? runState.researchContext
-    : {};
-  const candidates = [];
-  for (const key of ["aggregatedSearchResults", "searchResults"]) {
-    const items = Array.isArray(context[key]) ? context[key] : [];
-    candidates.push(...items);
-  }
-  const passes = Array.isArray(context.searchPasses) ? context.searchPasses : [];
-  for (const pass of passes) {
-    if (!pass || typeof pass !== "object") continue;
-    const items = Array.isArray(pass.items)
-      ? pass.items
-      : Array.isArray(pass.results)
-        ? pass.results
-        : Array.isArray(pass.rankedItems)
-          ? pass.rankedItems
-          : [];
-    candidates.push(...items);
-  }
-  const urls = new Set();
-  for (const item of candidates) {
-    const url = readString(item && item.url);
-    if (url) urls.add(url);
-  }
-  return urls.size;
-}
-
-function readResearchSourceFacts(runState) {
-  const context = runState && runState.researchContext && typeof runState.researchContext === "object"
-    ? runState.researchContext
-    : {};
-  const readSources = Array.isArray(context.readSources) ? context.readSources : [];
-  const successfulReadUrlCount = readSources.filter((source) => source && source.ok !== false).length;
-  const loop = runState && runState.researchReportLoop && typeof runState.researchReportLoop === "object"
-    ? runState.researchReportLoop
-    : {};
-  const packet = loop.gateSignal &&
-    loop.gateSignal.acceptancePacket &&
-    typeof loop.gateSignal.acceptancePacket === "object"
-    ? loop.gateSignal.acceptancePacket
-    : {};
-  const sourceMinimum = packet.evidence &&
-    packet.evidence.sourceMinimum &&
-    typeof packet.evidence.sourceMinimum === "object"
-    ? packet.evidence.sourceMinimum
-    : loop.sourceMinimum && typeof loop.sourceMinimum === "object"
-      ? loop.sourceMinimum
-      : null;
-  const packetSuccessful = readFiniteNumber$2(packet.evidence && packet.evidence.successfulReadUrlCount);
-  return {
-    successfulReadUrlCount: Math.max(successfulReadUrlCount, packetSuccessful),
-    sourceMinimum: sourceMinimum ? {
-      minReadSources: readFiniteNumber$2(sourceMinimum.minReadSources) || readFiniteNumber$2(sourceMinimum.minReads),
-      minRelevantSources: readFiniteNumber$2(sourceMinimum.minRelevantSources) || readFiniteNumber$2(sourceMinimum.minRelevant),
-      passed: sourceMinimum.passed === true,
-      readSources: readFiniteNumber$2(sourceMinimum.readSources) || readFiniteNumber$2(sourceMinimum.reads),
-      relevantSources: readFiniteNumber$2(sourceMinimum.relevantSources) || readFiniteNumber$2(sourceMinimum.relevant)
-    } : null
-  };
-}
-
-function buildLongResearchAllowedNextMoves(runState, options = {}) {
-  const moves = [];
-  if (options.preferReadUrl === true) moves.push("read_url");
-  const workspaceDeficit = readWorkspaceLengthDeficit(runState);
-  if (workspaceDeficit) {
-    moves.push("workspace_insert_after_section");
-  } else {
-    moves.push("workspace_write", "workspace_insert_after_section");
-  }
-  moves.push("workspace_publish_candidate_limited_with_remainingGaps");
-  return Array.from(new Set(moves));
-}
-
-function maybeBlockReadOnlyPlanningLoop(options) {
-  const actionName = readString(options && options.actionName);
-  const runState = options && options.runState;
-  const repair = runState && runState.terminalRepairState && typeof runState.terminalRepairState === "object"
-    ? runState.terminalRepairState
-    : null;
-  const repairAllowedActions = repair && repair.active === true && Array.isArray(repair.allowedActions)
-    ? repair.allowedActions.map(readString).filter(Boolean)
-    : [];
-  const convergence = options && options.convergence && typeof options.convergence === "object"
-    ? options.convergence
-    : null;
-  const state = convergence && convergence.readOnlyPlanningState && typeof convergence.readOnlyPlanningState === "object"
-    ? convergence.readOnlyPlanningState
-    : null;
-  if (repairAllowedActions.includes(actionName)) {
-    if (isPublishProtocolRequiredActionForRepair(repair, actionName)) return null;
-    // Repair allowlist is bypassed only when readOnlyPlanningState has NOT reached hard_veto
-    // for this specific action. Hard_veto means the model has repeatedly ignored the advisory
-    // and the action is demonstrably causing churn — override the repair allowance.
-    const isHardVetoForAction = state && state.active === true &&
-      readString(state.escalation) === "hard_veto" &&
-      Array.isArray(state.forbiddenActions) &&
-      state.forbiddenActions.map(readString).filter(Boolean).includes(actionName);
-    if (!isHardVetoForAction) return null;
-  }
-  if (!state || state.active !== true) return null;
-  if (readString(state.escalation) !== "hard_veto") return null;
-  const forbiddenActions = Array.isArray(state.forbiddenActions)
-    ? state.forbiddenActions.map(readString).filter(Boolean)
-    : [];
-  if (!forbiddenActions.includes(actionName)) return null;
-  const ignoredCount = readFiniteNumber$2(state.ignoredCount) + 1;
-  const allowedMoves = readStateAllowedNextMovesWithSignal(state, 12, "readOnlyPlanningState");
-  const message = `HARD VETO — read-only planning has blocked ${actionName} ${ignoredCount} time(s) without source or workspace progress. The harness will reject any further ${actionName} calls. Choose any action from allowedNextMoves when populated. If no recovery is feasible, workspace_publish_candidate with finalReadiness.decision='limited' and concrete remainingGaps is valid.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "read_only_planning_hard_veto_block",
-    status: "blocked",
-    reason: "read_only_planning_without_productive_progress",
-    actionName,
-    forbiddenMove: "repeat_read_only_planning_without_productive_progress",
-    forbiddenActions,
-    allowedNextMoves: allowedMoves.allowedNextMoves,
-    allowedNextMovesSignal: allowedMoves.signal,
-    ignoredCount,
-    stepsWithoutProductiveProgress: readFiniteNumber$2(state.stepsWithoutProductiveProgress),
-    message
-  };
-  if (typeof options.pushStep === "function") {
-    options.pushStep("read-only-planning-hard-veto-blocked", {
-      actionName,
-      escalation: "hard_veto",
-      forbiddenMove: output.forbiddenMove,
-      allowedNextMovesSignal: output.allowedNextMovesSignal,
-      ignoredCount,
-      reason: output.reason,
-      stepsWithoutProductiveProgress: output.stepsWithoutProductiveProgress
-    });
-  }
-  return { message, output };
-}
-
-function readStateAllowedNextMovesWithSignal(state, limit, source) {
-  const allowedNextMoves = Array.isArray(state && state.allowedNextMoves)
-    ? state.allowedNextMoves.map(readString).filter(Boolean).slice(0, limit)
-    : [];
-  return {
-    allowedNextMoves,
-    signal: allowedNextMoves.length > 0
-      ? null
-      : {
-          kind: "allowed_next_moves_not_populated",
-          source,
-          reason: "state_allowedNextMoves_missing_or_empty"
-        }
-  };
-}
-
-function maybeBlockWorkspaceNoProgressLoop(options) {
-  const actionName = readString(options && options.actionName);
-  if (actionName !== "workspace_read" && actionName !== "workspace_replace") return null;
-  const convergence = options && options.convergence && typeof options.convergence === "object"
-    ? options.convergence
-    : null;
-  const stepsWithoutObservableProgress = readFiniteNumber$2(convergence && convergence.stepsWithoutObservableProgress);
-  const structureDeficit = hasWorkspaceStructureDeficit(options && options.runState);
-  const repairActive = options &&
-    options.runState &&
-    options.runState.terminalRepairState &&
-    options.runState.terminalRepairState.active === true;
-  const threshold = repairActive && structureDeficit ? 2 : 6;
-  if (stepsWithoutObservableProgress < threshold) return null;
-  const deficit = readWorkspaceLengthDeficit(options && options.runState);
-  if (!deficit) {
-    const sourceDeficit = readWorkspaceSourceDeficit(options && options.runState);
-    if (!sourceDeficit) {
-      if (!structureDeficit) return null;
-      const structureMessage = `Workspace structure repair is active: the candidate still has structural issues after ${stepsWithoutObservableProgress} step(s) without observable progress. More workspace_read calls cannot repair duplicate headings or section numbering. Use workspace_replace, workspace_write, or workspace_insert_after_section to produce one coherent candidate structure before publishing.`;
-      const structureOutput = {
-        ok: false,
-        control: "continue",
-        kind: "action_pattern_preflight_block",
-        status: "blocked",
-        reason: "workspace_no_progress_structure_deficit",
-        actionName,
-        forbiddenMove: "repeat_workspace_read_replace_without_structure_progress",
-        allowedNextMoves: [
-          "workspace_replace",
-          "workspace_write",
-          "workspace_insert_after_section"
-        ],
-        observableDeficit: readWorkspaceStructureDeficit(options && options.runState),
-        stepsWithoutObservableProgress,
-        message: structureMessage
-      };
-      if (typeof (options && options.pushStep) === "function") {
-        options.pushStep("action-pattern-repeat-blocked", {
-          actionName,
-          forbiddenMove: structureOutput.forbiddenMove,
-          reason: structureOutput.reason,
-          stepsWithoutObservableProgress
-        });
-      }
-      return { message: structureMessage, output: structureOutput };
-    }
-    const sourceMessage = `Workspace recovery cooldown is active: source minimum is still not satisfied after ${stepsWithoutObservableProgress} step(s) without observable progress (readSources ${sourceDeficit.readSources}/${sourceDeficit.minReadSources}, relevantSources ${sourceDeficit.relevantSources}/${sourceDeficit.minRelevantSources}). More workspace_read/workspace_replace calls cannot fix an evidence deficit. Continue evidence work with web_search/read_url, or publish only a valid limited result with evidenceSatisfied=false and concrete remainingGaps when allowed.`;
-    const sourceOutput = {
-      ok: false,
-      control: "continue",
-      kind: "action_pattern_preflight_block",
-      status: "blocked",
-      reason: "workspace_no_progress_source_deficit",
-      actionName,
-      forbiddenMove: "repeat_workspace_read_replace_without_source_progress",
-      allowedNextMoves: [
-        "web_search",
-        "read_url",
-        "workspace_publish_candidate_limited_with_remainingGaps"
-      ],
-      observableDeficit: sourceDeficit,
-      stepsWithoutObservableProgress,
-      message: sourceMessage
-    };
-    if (typeof (options && options.pushStep) === "function") {
-      options.pushStep("action-pattern-repeat-blocked", {
-        actionName,
-        forbiddenMove: sourceOutput.forbiddenMove,
-        reason: sourceOutput.reason,
-        readSources: sourceDeficit.readSources,
-        relevantSources: sourceDeficit.relevantSources,
-        stepsWithoutObservableProgress
-      });
-    }
-    return { message: sourceMessage, output: sourceOutput };
-  }
-  const message = `Workspace recovery cooldown is active: the candidate is still below the requested ${deficit.requested} ${deficit.unit} (observed ${deficit.observed}) after ${stepsWithoutObservableProgress} step(s) without observable progress. Do not continue workspace_read/workspace_replace loops. Add substantial user-facing content with workspace_insert_after_section or workspace_write, or publish only a valid limited result when allowed.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "action_pattern_preflight_block",
-    status: "blocked",
-    reason: "workspace_no_progress_length_deficit",
-    actionName,
-    forbiddenMove: "repeat_workspace_read_replace_without_progress",
-    allowedNextMoves: [
-      "workspace_insert_after_section",
-      "workspace_write",
-      "valid_limited_with_remainingGaps"
-    ],
-    observableDeficit: deficit,
-    stepsWithoutObservableProgress,
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("action-pattern-repeat-blocked", {
-      actionName,
-      forbiddenMove: output.forbiddenMove,
-      reason: output.reason,
-      requested: deficit.requested,
-      observed: deficit.observed,
-      stepsWithoutObservableProgress
-    });
-  }
-  return { message, output };
-}
-
-function maybeBlockSatisfiedCandidateMutation(options) {
-  const actionName = readString(options && options.actionName);
-  if (![
-    "workspace_write",
-    "workspace_insert_after_section",
-    "workspace_replace"
-  ].includes(actionName)) {
-    return null;
-  }
-  const runState = options && options.runState;
-  if (readWorkspaceSourceDeficit(runState) || hasWorkspaceStructureDeficit(runState) || readWorkspaceLengthDeficit(runState)) {
-    return null;
-  }
-  const lengthStatus = readCurrentWorkspaceLengthStatus(runState);
-  if (!lengthStatus || lengthStatus.requested <= 0 || lengthStatus.observed < lengthStatus.requested) return null;
-  const message = `Workspace candidate already satisfies observable source, length, and structure gates (${lengthStatus.observed}/${lengthStatus.requested} ${lengthStatus.unit}). More workspace mutation can introduce duplicate headings or regressions. Use workspace_read, workspace_finalize_candidate, TodoState sync, or workspace_publish_candidate instead.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "action_pattern_preflight_block",
-    status: "blocked",
-    reason: "satisfied_candidate_mutation",
-    actionName,
-    forbiddenMove: "mutate_after_observable_gates_satisfied",
-    allowedNextMoves: [
-      "workspace_read",
-      FINALIZE_CANDIDATE_ACTION,
-      "todo_advance",
-      "todo_run_next",
-      PUBLISH_DIRECT_ACTION
-    ],
-    observableFacts: {
-      observed: lengthStatus.observed,
-      requested: lengthStatus.requested,
-      unit: lengthStatus.unit
-    },
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("action-pattern-repeat-blocked", {
-      actionName,
-      forbiddenMove: output.forbiddenMove,
-      observed: lengthStatus.observed,
-      reason: output.reason,
-      requested: lengthStatus.requested
-    });
-  }
-  return { message, output };
-}
-
-function maybeBlockLengthDeficitRewrite(options) {
-  const actionName = readString(options && options.actionName);
-  if (actionName !== "workspace_write" && actionName !== "workspace_replace") return null;
-  const runState = options && options.runState;
-  const deficit = readWorkspaceLengthDeficit(runState);
-  if (!deficit || deficit.observed <= 0) return null;
-  const structureDeficit = hasWorkspaceStructureDeficit(runState);
-  const args = options && options.actionArgs && typeof options.actionArgs === "object"
-    ? options.actionArgs
-    : {};
-  const proposedText = actionName === "workspace_write"
-    ? readString(args.content || args.text || args.markdown)
-    : "";
-  const proposedLength = actionName === "workspace_replace"
-    ? estimateWorkspaceReplaceLength(runState, args, deficit)
-    : proposedText
-      ? countTextByLengthUnit(proposedText, deficit)
-      : 0;
-  const proposedGrowth = proposedLength - deficit.observed;
-  const minimumEffectiveGrowth = computeMinimumEffectiveLengthDeficitGrowth(deficit);
-  const materiallyGrows = proposedGrowth >= minimumEffectiveGrowth;
-  if (proposedLength >= deficit.requested || (proposedLength > deficit.observed && materiallyGrows)) return null;
-  const remaining = Math.max(deficit.requested - deficit.observed, 0);
-  const growthHint = minimumEffectiveGrowth > 0
-    ? ` A replacement under the target must grow by at least ${minimumEffectiveGrowth} ${deficit.unit} from the current observed length; this proposal grows by ${Math.max(proposedGrowth, 0)}.`
-    : "";
-  const message = `${structureDeficit ? "Length + structure repair" : "Length-only repair"} is active: current candidate has ${deficit.observed}/${deficit.requested} ${deficit.unit}. ${actionName} would not increase the candidate enough and can erase prior expansion.${growthHint} Use workspace_insert_after_section or workspace_replace with enough user-facing material to close the ${remaining} ${deficit.unit} gap, or rewrite with content that preserves/grows the current length before workspace_read/finalize/publish.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "action_pattern_preflight_block",
-    status: "blocked",
-    reason: "length_deficit_rewrite_without_growth",
-    actionName,
-    forbiddenMove: "rewrite_under_length_deficit_without_growth",
-    allowedNextMoves: [
-      "workspace_insert_after_section",
-      "workspace_read",
-      FINALIZE_CANDIDATE_ACTION,
-      "workspace_publish_candidate_limited_with_remainingGaps"
-    ],
-    observableDeficit: {
-      observed: deficit.observed,
-      minimumEffectiveGrowth,
-      proposed: proposedLength,
-      proposedGrowth,
-      requested: deficit.requested,
-      unit: deficit.unit
-    },
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("action-pattern-repeat-blocked", {
-      actionName,
-      forbiddenMove: output.forbiddenMove,
-      observed: deficit.observed,
-      proposed: proposedLength,
-      reason: output.reason,
-      requested: deficit.requested
-    });
-  }
-  return { message, output };
-}
-
-function maybeBlockLateBudgetWorkspaceProtocolWindow(options) {
-  const actionName = readString(options && options.actionName);
-  const isPatchPreview = LATE_BUDGET_PATCH_PREVIEW_ACTIONS.has(actionName);
-  const isWorkspaceMutation = LATE_BUDGET_WORKSPACE_MUTATION_ACTIONS.has(actionName);
-  if (!isPatchPreview && !isWorkspaceMutation) return null;
-  const runState = options && options.runState;
-  if (!isLateBudgetWorkspaceProtocolRelevant(runState)) return null;
-  const remaining = readRemainingCyclesAfterCurrentAction(runState);
-  if (remaining == null) return null;
-  const requiredFutureCycles = isPatchPreview ? 4 : 3;
-  if (remaining >= requiredFutureCycles) return null;
-
-  const targetPath = readLateBudgetWorkspaceProtocolPath(runState, options && options.actionArgs);
-  const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
-    ? runState.virtualWorkspace
-    : null;
-  const publishProtocol = inspectWorkspacePublishProtocol(workspace, targetPath);
-  const requiredProtocol = isPatchPreview
-    ? ["workspace_apply_patch", FINALIZE_CANDIDATE_ACTION, "workspace_read", PUBLISH_DIRECT_ACTION]
-    : [FINALIZE_CANDIDATE_ACTION, "workspace_read", PUBLISH_DIRECT_ACTION];
-  const allowedNextMoves = buildLateBudgetProtocolAllowedNextMoves(runState, publishProtocol);
-  const todoFacts = readUnfinishedTodoFacts(runState);
-  const message = [
-    `Late workspace protocol budget window: ${actionName} would leave ${remaining} future cycle(s), but publishing changed workspace content requires at least ${requiredFutureCycles}.`,
-    `Required sequence for that change: ${requiredProtocol.join(" -> ")}.`,
-    `Current candidate protocol surface: ${allowedNextMoves.join(", ") || "none"}.`
-  ].join(" ");
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "late_budget_workspace_protocol_window",
-    status: "blocked",
-    reason: "late_workspace_mutation_without_publish_protocol_budget",
-    actionName,
-    forbiddenMove: "late_workspace_mutation_without_protocol_budget",
-    allowedNextMoves,
-    cyclesRemainingAfterCurrentAction: remaining,
-    currentCandidatePath: publishProtocol.path,
-    publishProtocol,
-    requiredFutureCycles,
-    requiredProtocol,
-    todoState: todoFacts,
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("late-budget-workspace-protocol-blocked", {
-      actionName,
-      forbiddenMove: output.forbiddenMove,
-      reason: output.reason,
-      cyclesRemainingAfterCurrentAction: remaining,
-      currentCandidatePath: publishProtocol.path,
-      requiredFutureCycles,
-      todoUnfinishedCount: todoFacts.unfinishedCount
-    });
-  }
-  return { message, output };
-}
-
-function isLateBudgetWorkspaceProtocolRelevant(runState) {
-  const lengthStatus = readCurrentWorkspaceLengthStatus(runState);
-  if (!lengthStatus || lengthStatus.requested <= 0) return false;
-  if (lengthStatus.observed > 0) return true;
-  const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
-    ? runState.virtualWorkspace
-    : null;
-  const path = readLateBudgetWorkspaceProtocolPath(runState, null);
-  const file = workspace && workspace.files && workspace.files[path] && typeof workspace.files[path] === "object"
-    ? workspace.files[path]
-    : null;
-  return Boolean(readString(file && file.content));
-}
-
-function readRemainingCyclesAfterCurrentAction(runState) {
-  const maxSteps = readFiniteNumber$2(runState && runState.maxSteps);
-  const cycleCount = readFiniteNumber$2(runState && runState.cycleCount);
-  if (maxSteps <= 0 || cycleCount <= 0) return null;
-  return Math.max(maxSteps - cycleCount, 0);
-}
-
-function readLateBudgetWorkspaceProtocolPath(runState, actionArgs) {
-  const args = actionArgs && typeof actionArgs === "object" && !Array.isArray(actionArgs)
-    ? actionArgs
-    : {};
-  const pendingPatch = runState &&
-    runState.virtualWorkspace &&
-    runState.virtualWorkspace.pendingPatch &&
-    typeof runState.virtualWorkspace.pendingPatch === "object"
-    ? runState.virtualWorkspace.pendingPatch
-    : null;
-  const firstOperationWithPath = Array.isArray(args.operations)
-    ? args.operations.find((operation) => readString(operation && operation.path))
-    : null;
-  const operationPath = readString(firstOperationWithPath && firstOperationWithPath.path);
-  const workspaceQuality = runState &&
-    runState.virtualWorkspace &&
-    runState.virtualWorkspace.quality &&
-    typeof runState.virtualWorkspace.quality === "object"
-    ? runState.virtualWorkspace.quality
-    : {};
-  const packet = runState &&
-    runState.researchReportLoop &&
-    runState.researchReportLoop.gateSignal &&
-    runState.researchReportLoop.gateSignal.acceptancePacket &&
-    typeof runState.researchReportLoop.gateSignal.acceptancePacket === "object"
-    ? runState.researchReportLoop.gateSignal.acceptancePacket
-    : {};
-  const candidate = packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
-    ? packet.workspace.candidate
-    : packet.candidate && typeof packet.candidate === "object"
-      ? packet.candidate
-      : {};
-  return readString(args.path) ||
-    readString(args.to) ||
-    readString(pendingPatch && pendingPatch.path) ||
-    operationPath ||
-    readString(workspaceQuality.finalCandidatePath) ||
-    readString(candidate.path) ||
-    "final_candidate.md";
-}
-
-function buildLateBudgetProtocolAllowedNextMoves(runState, publishProtocol) {
-  const protocol = publishProtocol && typeof publishProtocol === "object" ? publishProtocol : {};
-  const todoFacts = readUnfinishedTodoFacts(runState);
-  const moves = [];
-  if (protocol.finalizedAfterLatestWrite !== true) {
-    moves.push(FINALIZE_CANDIDATE_ACTION);
-  } else if (protocol.readAfterLatestContentChange !== true) {
-    moves.push("workspace_read");
-  } else {
-    if (todoFacts.unfinishedCount > 0) {
-      moves.push("todo_run_next", "todo_advance", "todo_cancel");
-    }
-    moves.push(PUBLISH_DIRECT_ACTION);
-  }
-  return Array.from(new Set(moves));
-}
-
-function readUnfinishedTodoFacts(runState) {
-  const todoState = runState && runState.todoState && typeof runState.todoState === "object"
-    ? runState.todoState
-    : null;
-  if (!todoState || todoState.terminatedAt) {
-    return { active: false, unfinishedCount: 0 };
-  }
-  const items = Array.isArray(todoState.items) ? todoState.items : [];
-  const unfinished = items.filter((item) => {
-    const status = readString(item && item.status) || "pending";
-    return status === "active" || status === "pending" || status === "blocked";
-  });
-  return {
-    active: unfinished.length > 0,
-    unfinishedCount: unfinished.length,
-    statuses: countTodoStatusFacts(items)
-  };
-}
-
-function countTodoStatusFacts(items) {
-  const counts = {
-    abandoned: 0,
-    active: 0,
-    blocked: 0,
-    done: 0,
-    pending: 0,
-    total: Array.isArray(items) ? items.length : 0
-  };
-  for (const item of Array.isArray(items) ? items : []) {
-    const status = readString(item && item.status) || "pending";
-    if (Object.prototype.hasOwnProperty.call(counts, status)) {
-      counts[status] += 1;
-    }
-  }
-  return counts;
-}
-
-function maybeBlockStructureRepairLoop(options) {
-  const actionName = readString(options && options.actionName);
-  const convergence = options && options.convergence && typeof options.convergence === "object"
-    ? options.convergence
-    : null;
-  const state = convergence && convergence.structureRepairConvergence && typeof convergence.structureRepairConvergence === "object"
-    ? convergence.structureRepairConvergence
-    : null;
-  if (!state || state.active !== true) return null;
-  const forbiddenActions = Array.isArray(state.forbiddenActions)
-    ? state.forbiddenActions.map(readString).filter(Boolean)
-    : [];
-  if (!forbiddenActions.includes(actionName)) return null;
-  const repeatedStructureNoProgressCount = readFiniteNumber$2(state.repeatedStructureNoProgressCount);
-  const isHardVeto = readString(state.escalation) === "hard_veto";
-  const allowedMoves = readStateAllowedNextMovesWithSignal(state, 12, "structureRepairConvergence");
-  const message = isHardVeto
-    ? `HARD VETO — structure repair convergence has blocked ${actionName} ${repeatedStructureNoProgressCount} time(s) without improving the structure audit. allowedNextMoves is the recovery surface when populated. A coherent repair can use workspace_write or workspace_replace to produce a deduplicated outline with unique headings and section numbers, then workspace_finalize_candidate. If recovery is not feasible, workspace_publish_candidate with finalReadiness.decision='limited' is valid when remainingGaps names every structure issue.`
-    : `Structure repair convergence is active: ${actionName} will not fix the duplicate headings or section numbers. Use a targeted workspace_write/workspace_replace full-outline repair, sync TodoState, or publish only a valid limited result that names the structure gap.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: isHardVeto ? "structure_repair_hard_veto_block" : "structure_repair_preflight_block",
-    status: "blocked",
-    reason: "structure_repair_without_audit_delta",
-    actionName,
-    escalation: isHardVeto ? "hard_veto" : "advisory",
-    forbiddenMove: "repeat_structure_repair_without_audit_delta",
-    forbiddenActions,
-    allowedNextMoves: allowedMoves.allowedNextMoves,
-    allowedNextMovesSignal: allowedMoves.signal,
-    repeatedStructureNoProgressCount,
-    activeIssueCodes: Array.isArray(state.activeIssueCodes) ? state.activeIssueCodes.slice(0, 8) : [],
-    repeatedHeadingSamples: Array.isArray(state.repeatedHeadingSamples) ? state.repeatedHeadingSamples.slice(0, 5) : [],
-    repeatedNumberSamples: Array.isArray(state.repeatedNumberSamples) ? state.repeatedNumberSamples.slice(0, 5) : [],
-    requiredCorrection: readString(state.requiredCorrection) || null,
-    message
-  };
-  if (typeof options.pushStep === "function") {
-    options.pushStep(isHardVeto ? "structure-repair-hard-veto-blocked" : "structure-repair-action-blocked", {
-      actionName,
-      escalation: output.escalation,
-      forbiddenMove: output.forbiddenMove,
-      allowedNextMovesSignal: output.allowedNextMovesSignal,
-      reason: output.reason,
-      repeatedStructureNoProgressCount,
-      activeIssueCodes: output.activeIssueCodes
-    });
-  }
-  return { message, output };
-}
-
-function maybeBlockWorkspaceMutationGrowthLoop(options) {
-  const actionName = readString(options && options.actionName);
-  const convergence = options && options.convergence && typeof options.convergence === "object"
-    ? options.convergence
-    : null;
-  const state = convergence && convergence.workspaceMutationGrowthConvergence && typeof convergence.workspaceMutationGrowthConvergence === "object"
-    ? convergence.workspaceMutationGrowthConvergence
-    : null;
-  if (!state || state.active !== true || readString(state.escalation) !== "hard_veto") return null;
-  const forbiddenActions = Array.isArray(state.forbiddenActions)
-    ? state.forbiddenActions.map(readString).filter(Boolean)
-    : [];
-  if (!forbiddenActions.includes(actionName)) return null;
-  const stallCount = readFiniteNumber$2(state.stallCount);
-  const allowedMoves = readStateAllowedNextMovesWithSignal(state, 8, "workspaceMutationGrowthConvergence");
-  const message = `Workspace mutation hard veto: repeated ${actionName} attempts are not growing the candidate while a length deficit remains. Use an allowed non-overwrite recovery action such as workspace_insert_after_section, workspace_multi_edit, workspace_propose_patch/workspace_apply_patch, or a valid limited publish with concrete remainingGaps.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "workspace_mutation_growth_hard_veto_block",
-    status: "blocked",
-    reason: "workspace_write_not_accumulating",
-    actionName,
-    escalation: "hard_veto",
-    forbiddenMove: "repeat_workspace_write_without_growth",
-    forbiddenActions,
-    allowedNextMoves: allowedMoves.allowedNextMoves,
-    allowedNextMovesSignal: allowedMoves.signal,
-    stallCount,
-    requiredCorrection: readString(state.requiredCorrection) || null,
-    message
-  };
-  if (typeof options.pushStep === "function") {
-    options.pushStep("workspace-mutation-growth-hard-veto-blocked", {
-      actionName,
-      escalation: output.escalation,
-      forbiddenMove: output.forbiddenMove,
-      allowedNextMovesSignal: output.allowedNextMovesSignal,
-      reason: output.reason,
-      stallCount
-    });
-  }
-  return { message, output };
-}
-
-function maybeBlockWorkspaceSourceDeficitAfterPublishBlock(options) {
-  const actionName = readString(options && options.actionName);
-  if (![
-    FINALIZE_CANDIDATE_ACTION,
-    "workspace_insert_after_section",
-    "workspace_read",
-    "workspace_replace",
-    "workspace_write"
-  ].includes(actionName)) {
-    return null;
-  }
-  const runState = options && options.runState;
-  if (!runState || !runState.publishBlockSignal || typeof runState.publishBlockSignal !== "object") return null;
-  const sourceDeficit = readWorkspaceSourceDeficit(runState);
-  if (!sourceDeficit || sourceDeficit.lengthSatisfied !== true) return null;
-  if (hasWorkspaceStructureDeficit(runState)) return null;
-  const message = `Workspace source-deficit cooldown is active: publish was already blocked, the candidate meets the requested length, but source minimum is still short (readSources ${sourceDeficit.readSources}/${sourceDeficit.minReadSources}, relevantSources ${sourceDeficit.relevantSources}/${sourceDeficit.minRelevantSources}). More workspace editing cannot fix source evidence. Continue web_search/read_url, or publish only a valid limited result with evidenceSatisfied=false and concrete remainingGaps.`;
-  const output = {
-    ok: false,
-    control: "continue",
-    kind: "action_pattern_preflight_block",
-    status: "blocked",
-    reason: "workspace_edit_blocked_by_source_deficit_after_publish_block",
-    actionName,
-    forbiddenMove: "workspace_edit_without_source_progress_after_publish_block",
-    allowedNextMoves: [
-      "web_search",
-      "read_url",
-      "workspace_publish_candidate_limited_with_remainingGaps"
-    ],
-    observableDeficit: sourceDeficit,
-    publishBlockSignal: {
-      count: readFiniteNumber$2(runState.publishBlockSignal.count),
-      lastStatus: readString(runState.publishBlockSignal.lastStatus) || null
-    },
-    requiredArgsExample: buildValidLimitedPublishArgsExample(runState),
-    message
-  };
-  if (typeof (options && options.pushStep) === "function") {
-    options.pushStep("action-pattern-repeat-blocked", {
-      actionName,
-      forbiddenMove: output.forbiddenMove,
-      reason: output.reason,
-      readSources: sourceDeficit.readSources,
-      relevantSources: sourceDeficit.relevantSources
-    });
-  }
-  return { message, output };
-}
-
-
-function readWorkspaceSourceDeficit(runState) {
-  const packet = runState &&
-    runState.researchReportLoop &&
-    runState.researchReportLoop.gateSignal &&
-    runState.researchReportLoop.gateSignal.acceptancePacket &&
-    typeof runState.researchReportLoop.gateSignal.acceptancePacket === "object"
-    ? runState.researchReportLoop.gateSignal.acceptancePacket
-    : null;
-  const evidence = packet && packet.evidence && typeof packet.evidence === "object"
-    ? packet.evidence
-    : {};
-  const sourceMinimum = evidence.sourceMinimum && typeof evidence.sourceMinimum === "object"
-    ? evidence.sourceMinimum
-    : runState && runState.researchReportLoop && runState.researchReportLoop.sourceMinimum && typeof runState.researchReportLoop.sourceMinimum === "object"
-      ? runState.researchReportLoop.sourceMinimum
-      : null;
-  if (!sourceMinimum || sourceMinimum.passed === true) return null;
-  const minReadSources = readFiniteNumber$2(sourceMinimum.minReadSources);
-  const minRelevantSources = readFiniteNumber$2(sourceMinimum.minRelevantSources);
-  const readSources = readFiniteNumber$2(sourceMinimum.readSources);
-  const relevantSources = readFiniteNumber$2(sourceMinimum.relevantSources);
-  const readSourceDeficit = Math.max(minReadSources - readSources, 0);
-  const relevantSourceDeficit = Math.max(minRelevantSources - relevantSources, 0);
-  if (readSourceDeficit <= 0 && relevantSourceDeficit <= 0) return null;
-  const lengthStatus = readWorkspaceRequestedLengthStatus(packet);
-  return {
-    lengthSatisfied: lengthStatus ? lengthStatus.satisfied : null,
-    minReadSources,
-    minRelevantSources,
-    observedLength: lengthStatus ? lengthStatus.observed : null,
-    requestedLength: lengthStatus ? lengthStatus.requested : null,
-    requestedLengthUnit: lengthStatus ? lengthStatus.unit : null,
-    readSourceDeficit,
-    readSources,
-    relevantSourceDeficit,
-    relevantSources,
-    successfulReadUrlCount: readFiniteNumber$2(evidence.successfulReadUrlCount)
-  };
-}
-
-function readWorkspaceRequestedLengthStatus(packet) {
-  const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
-    ? packet.requestedLength
-    : null;
-  const statsKey = readString(requested && requested.statsKey);
-  const requestedValue = readFiniteNumber$2(requested && requested.value);
-  if (!statsKey || requestedValue <= 0) return null;
-  const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
-    ? packet.workspace.candidate
-    : packet && packet.candidate && typeof packet.candidate === "object"
-      ? packet.candidate
-      : null;
-  const stats = candidate && candidate.stats && typeof candidate.stats === "object"
-    ? candidate.stats
-    : candidate && candidate.textStats && typeof candidate.textStats === "object"
-      ? candidate.textStats
-      : null;
-  const observed = readFiniteNumber$2(stats && stats[statsKey]);
-  return {
-    observed,
-    requested: requestedValue,
-    satisfied: observed >= requestedValue,
-    statsKey,
-    unit: readString(requested.unit) || statsKey
-  };
-}
-
-function hasWorkspaceStructureDeficit(runState) {
-  const structure = readWorkspaceStructureDeficit(runState);
-  return Boolean(structure && structure.ok === false);
-}
-
-function readWorkspaceStructureDeficit(runState) {
-  const structure = runState &&
-    runState.virtualWorkspace &&
-    runState.virtualWorkspace.quality &&
-    runState.virtualWorkspace.quality.finalCandidateStructure &&
-    typeof runState.virtualWorkspace.quality.finalCandidateStructure === "object"
-    ? runState.virtualWorkspace.quality.finalCandidateStructure
-    : null;
-  if (!structure || structure.ok !== false) return null;
-  return {
-    ok: false,
-    status: readString(structure.status) || "fail",
-    reason: readString(structure.reason) || "candidate structure is not publishable",
-    issueCodes: Array.isArray(structure.issueCodes)
-      ? structure.issueCodes.map(readString).filter(Boolean).slice(0, 8)
-      : []
-  };
-}
-
-function readWorkspaceLengthDeficit(runState) {
-  const status = readCurrentWorkspaceLengthStatus(runState);
-  if (!status || status.observed >= status.requested) return null;
-  return status;
-}
-
-function estimateWorkspaceReplaceLength(runState, args, deficit) {
-  const source = args && typeof args === "object" && !Array.isArray(args) ? args : {};
-  const path = readString(source.path);
-  const find = typeof source.find === "string" ? source.find : "";
-  const replace = typeof source.replace === "string"
-    ? source.replace
-    : typeof source.replacement === "string"
-      ? source.replacement
-      : typeof source.newText === "string"
-        ? source.newText
-        : typeof source.text === "string"
-          ? source.text
-          : "";
-  if (!path || !find.trim()) return 0;
-  const workspace = runState && runState.virtualWorkspace && typeof runState.virtualWorkspace === "object"
-    ? runState.virtualWorkspace
-    : null;
-  const files = workspace && workspace.files && typeof workspace.files === "object"
-    ? workspace.files
-    : null;
-  const file = files && files[path] && typeof files[path] === "object" ? files[path] : null;
-  const current = typeof (file && file.content) === "string" ? file.content : "";
-  if (!current || !current.includes(find)) return 0;
-  const next = source.replace_all === true
-    ? current.split(find).join(replace)
-    : current.replace(find, replace);
-  return countTextByLengthUnit(next, deficit);
-}
-
-function computeMinimumEffectiveLengthDeficitGrowth(deficit) {
-  // AGRUN-244 Phase 3 — fixed anti-noop / anti-shrink floor, NOT a word-count
-  // target proportion. A workspace_write/replace with genuine positive growth
-  // is never a "no-growth rewrite" merely because it is small relative to a
-  // requested length; only a write that shrinks or barely changes the draft is.
-  const source = deficit && typeof deficit === "object" ? deficit : {};
-  const statsKey = readString(source.statsKey);
-  const unit = readString(source.unit);
-  if (statsKey !== "words" && unit !== "words") return 1;
-  return 30;
-}
-
-function readCurrentWorkspaceLengthStatus(runState) {
-  const packet = runState &&
-    runState.researchReportLoop &&
-    runState.researchReportLoop.gateSignal &&
-    runState.researchReportLoop.gateSignal.acceptancePacket &&
-    typeof runState.researchReportLoop.gateSignal.acceptancePacket === "object"
-    ? runState.researchReportLoop.gateSignal.acceptancePacket
-    : null;
-  const requested = packet && packet.requestedLength && typeof packet.requestedLength === "object"
-    ? packet.requestedLength
-    : null;
-  const statsKey = readString(requested && requested.statsKey);
-  const requestedValue = readFiniteNumber$2(requested && requested.value);
-  if (!statsKey || requestedValue <= 0) return null;
-  const candidate = packet && packet.workspace && packet.workspace.candidate && typeof packet.workspace.candidate === "object"
-    ? packet.workspace.candidate
-    : packet && packet.candidate && typeof packet.candidate === "object"
-      ? packet.candidate
-      : null;
-  const stats = candidate && candidate.stats && typeof candidate.stats === "object"
-    ? candidate.stats
-    : candidate && candidate.textStats && typeof candidate.textStats === "object"
-      ? candidate.textStats
-      : null;
-  const observed = readFiniteNumber$2(stats && stats[statsKey]);
-  return {
-    observed,
-    requested: requestedValue,
-    statsKey,
-    unit: readString(requested.unit) || statsKey
-  };
-}
-
-function readFiniteNumber$2(value) {
+function readFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function countLatinWords(value) {
-  const text = readString(value);
-  if (!text) return 0;
-  const words = text.match(/[A-Za-z0-9]+(?:[.'_-][A-Za-z0-9]+)*/g);
-  return Array.isArray(words) ? words.length : 0;
-}
-
-function countTextByLengthUnit(value, deficit) {
-  const statsKey = readString(deficit && deficit.statsKey);
-  const unit = readString(deficit && deficit.unit);
-  if (statsKey === "cjkChars" || unit === "cjk_chars" || unit === "cjkChars" || unit === "cjk") {
-    return countCjkChars(value);
-  }
-  if (statsKey === "chars" || unit === "chars" || unit === "characters") {
-    return readString(value).length;
-  }
-  return countLatinWords(value);
-}
-
-function countCjkChars(value) {
-  const text = readString(value);
-  if (!text) return 0;
-  const chars = text.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g);
-  return Array.isArray(chars) ? chars.length : 0;
 }
 
 function countRecentActionErrors(actionHistory, actionName) {
@@ -2522,4 +1240,4 @@ function recordRecoverableActionError({
   return { done: false };
 }
 
-export { buildValidLimitedPublishArgsExample, executeAction, maybeBlockActionPatternRepeat };
+export { executeAction, maybeBlockActionPatternRepeat };
