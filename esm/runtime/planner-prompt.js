@@ -32,8 +32,9 @@ import { isRequirementRecoverySummaryActionable } from './prompts/planner-direct
 import { buildLines as buildLines$2 } from './prompts/skill-directives.js';
 import { buildLines as buildLines$3 } from './prompts/workspace-directives.js';
 import { buildLines as buildLines$4 } from './prompts/research-directives.js';
-import { buildLines as buildLines$6 } from './prompts/convergence-advisory.js';
-import { buildLines as buildLines$5 } from './prompts/todo-directives.js';
+import { buildLines as buildLines$5 } from './prompts/memory-directives.js';
+import { buildLines as buildLines$7 } from './prompts/convergence-advisory.js';
+import { buildLines as buildLines$6 } from './prompts/todo-directives.js';
 import { resolvePromptSection } from './prompts/resolve.js';
 
 // SPIKE/oodae-ablation — A/B knob, NOT production logic. When the env var
@@ -173,13 +174,15 @@ function buildSystemPromptLines(availableActions, options) {
 
   lines.push(...resolvePromptSection(prompts.researchDirectives, buildLines$4, ctx));
 
+  lines.push(...resolvePromptSection(prompts.memoryDirectives, buildLines$5, ctx));
+
   if (!compactSystemPrompt && preferFinalizeOnLastResult && hasAction("execute_skill_tool")) {
     lines.push("If the needed skill tool result is already present in toolContext.lastResult, prefer finalize instead of repeating the same execute_skill_tool call. Exception: when toolContext.lastResult.resultKind is one of \"resolution\", \"lookup\", \"preparatory\", \"intermediate\", \"partial\", or \"other\", the tool call was preparatory — continue with the next evidence-gathering tool call instead of finalizing.");
   }
 
-  lines.push(...resolvePromptSection(prompts.todoDirectives, buildLines$5, ctx));
+  lines.push(...resolvePromptSection(prompts.todoDirectives, buildLines$6, ctx));
 
-  lines.push(...resolvePromptSection(prompts.convergenceAdvisory, buildLines$6, ctx));
+  lines.push(...resolvePromptSection(prompts.convergenceAdvisory, buildLines$7, ctx));
 
   return lines;
 }

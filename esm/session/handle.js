@@ -203,6 +203,18 @@ function createSessionHandle(options) {
     // (unless threads.crossThreadRecall is on, in which case scope is null
     // and the full memory set flows through — preserving legacy behavior).
     const sessionMemoryEntries = await options.sessionStore.readMemory(sessionRecord.id);
+    // Read cross-session global memory ONCE, before prompt prep, so both
+    // consumers agree: prepareSessionInput merges it into the actual prompt
+    // context (compaction.js), and the resolvedMemory facade built below
+    // reuses the same fetched entries for the in-loop memory tools.
+    const globalMemoryEnabled = ((options.runtimeConfig && options.runtimeConfig.globalMemory) || {}).enabled !== false;
+    const globalMemoryEntries = globalMemoryEnabled ? await options.sessionStore.readAllGlobalMemory() : [];
+    if (globalMemoryEnabled) {
+      emitGlobalMemoryStep(onStep, {
+        type: "global-memory-recalled",
+        count: Array.isArray(globalMemoryEntries) ? globalMemoryEntries.length : 0
+      });
+    }
     const threadRouting = await routeTurnToThread({
       input,
       onStep,
@@ -212,7 +224,7 @@ function createSessionHandle(options) {
     });
     const threadScope = readThreadScope(options.runtimeConfig, threadRouting);
 
-    const prepared = await prepareSessionInput(input, userMessage, threadScope, callerAbortSignal);
+    const prepared = await prepareSessionInput(input, userMessage, threadScope, callerAbortSignal, globalMemoryEntries);
 
     const compactionSnapshot = prepared.compactionUsage
       ? createUsageSnapshot(prepared.compactionUsage)
@@ -269,16 +281,6 @@ function createSessionHandle(options) {
     const runtimeState = {
       lastRun: cloneValue(sessionRecord.lastRun)
     };
-    const globalMemoryEnabled = ((options.runtimeConfig && options.runtimeConfig.globalMemory) || {}).enabled !== false;
-    const globalMemoryEntries = globalMemoryEnabled
-      ? await options.sessionStore.readAllGlobalMemory()
-      : [];
-    if (globalMemoryEnabled) {
-      emitGlobalMemoryStep(onStep, {
-        type: "global-memory-recalled",
-        count: Array.isArray(globalMemoryEntries) ? globalMemoryEntries.length : 0
-      });
-    }
     const resolvedMemory = createMemoryStore(mergeGlobalIntoSessionMemory(sessionMemoryEntries, globalMemoryEntries));
     // AGRUN-206 — `nextRunId` is now async (CAS retry loop), so the
     // run id must be claimed before constructing the runLoop options.
@@ -397,7 +399,18 @@ function createSessionHandle(options) {
     }
 
     if (Array.isArray(result.memoryEntriesAdded)) {
+      // Model-initiated entries (remember action) are created inside the run
+      // loop, before the router's threadId is stamped onto runState — so the
+      // session layer (which owns threads) fills in missing provenance here.
+      // Without a threadId the entry would fall into the legacy "default"
+      // bucket and be invisible to every real thread's scoped recall.
+      const activeThreadId = readActiveThreadId(result.runState);
+      const activeTurnId = readActiveTurnId(result.runState) || (result.runState && result.runState.runId) || null;
       for (const entry of result.memoryEntriesAdded) {
+        if (entry && entry.metadata && typeof entry.metadata === "object") {
+          if (activeThreadId && !entry.metadata.threadId) entry.metadata.threadId = activeThreadId;
+          if (activeTurnId && !entry.metadata.turnId) entry.metadata.turnId = activeTurnId;
+        }
         await options.sessionStore.appendMemory(sessionRecord.id, entry);
       }
     }
@@ -703,7 +716,7 @@ function createSessionHandle(options) {
     };
   }
 
-  async function prepareSessionInput(input, userMessage, threadScope, callerAbortSignal) {
+  async function prepareSessionInput(input, userMessage, threadScope, callerAbortSignal, globalMemoryEntries) {
     const preparedInput = cloneValue(input);
 
     if (isToolLoopProviderRequest(input)) {
@@ -711,6 +724,7 @@ function createSessionHandle(options) {
         callerAbortSignal: callerAbortSignal || null,
         compactionPolicy: options.runtimeConfig && options.runtimeConfig.compactionPolicy,
         excludeMessageId: userMessage ? userMessage.id : null,
+        globalMemoryEntries: globalMemoryEntries || [],
         input: {
           ...preparedInput,
           agrunSessionId: sessionRecord.id
@@ -744,6 +758,7 @@ function createSessionHandle(options) {
         sessionStore: options.sessionStore,
         approvalSigner: options.runtimeConfig && options.runtimeConfig.approvalSigner,
         enforceSessionBinding: !!(options.runtimeConfig && options.runtimeConfig.approvalSigning && options.runtimeConfig.approvalSigning.enforceSessionBinding),
+        globalMemoryEntries: globalMemoryEntries || [],
         threadScope: threadScope || null
       });
     }

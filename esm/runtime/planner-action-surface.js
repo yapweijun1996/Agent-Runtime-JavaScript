@@ -155,6 +155,32 @@ function isWorkspacePublishCandidateGatedForMode(options = {}) {
   return shouldHideWorkspacePublishCandidateForMode(options);
 }
 
+// AGRUN-615 — the names selectPlannerActions dropped specifically for a
+// static policy "deny" (not the other filter reasons above: terminal
+// repair, convergence, namespace gates, publish-candidate mode). Those
+// other reasons have no equivalent execution-side safety net; a policy
+// "deny" does (handlePolicyDenied, action-loop-terminal.js) — it existed
+// before AGRUN-588 removed denied actions from the offered surface, for
+// exactly the case AGRUN-588's own comment names: "a model can still
+// hallucinate a tool name it was never offered." Without this list, the
+// envelope decision-validator (planner-repair.js normalizeActionName) had
+// no way to tell "hallucinated, never existed" apart from "real action,
+// currently policy-denied," and rejected both as unknown_action_name —
+// the hallucinated-name safety net AGRUN-588 promised was silently dead
+// for the policy-denied case specifically.
+function readPolicyDeniedActionNames(actions, runtimeConfig) {
+  const source = Array.isArray(actions) ? actions : [];
+  const names = [];
+  for (const action of source) {
+    const name = readString(action && action.name);
+    if (!name) continue;
+    if (evaluateActionPolicy(runtimeConfig && runtimeConfig.actionPolicy, action).action === "deny") {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
 function shouldHideWorkspacePublishCandidateForMode(options) {
   const runState = options && options.runState && typeof options.runState === "object"
     ? options.runState
@@ -449,4 +475,4 @@ function readNumber$5(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-export { isWorkspacePublishCandidateGatedForMode, selectPlannerActions, shouldShowSkillSurface };
+export { isWorkspacePublishCandidateGatedForMode, readPolicyDeniedActionNames, selectPlannerActions, shouldShowSkillSurface };

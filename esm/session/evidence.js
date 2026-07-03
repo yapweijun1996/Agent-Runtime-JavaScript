@@ -143,6 +143,15 @@ function filterMemoryEntriesByThread(entries, scope) {
   return list.filter((entry) => {
     if (!entry || typeof entry !== "object") return false;
     const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
+    // User preferences are about the interlocutor, not the topic — the user
+    // is the same person on every thread, so preference entries are
+    // session-scoped by definition and thread scoping never hides them
+    // (standing-instruction fix, 2026-07-03: "always reply in Mandarin"
+    // must survive the router opening a new thread). Facts and decisions
+    // stay thread-scoped; cross-thread recall (AGRUN-593) remains their
+    // escape hatch. The MODEL judges applicability of a visible preference;
+    // this filter only decides visibility.
+    if (readString(metadata.kind) === "preference") return true;
     const entryThread = readString(metadata.threadId) || DEFAULT_THREAD_ID;
     return entryThread === threadId;
   });
@@ -201,7 +210,7 @@ function normalizeEvidenceItem(entry, index) {
     return null;
   }
 
-  const slot = normalizeSlot$1(metadata.slot);
+  const slot = normalizeSlot$2(metadata.slot);
   const threadId = readString(metadata.threadId) || DEFAULT_THREAD_ID;
   const turnId = readString(metadata.turnId) || null;
   const source = readString(metadata.source) || null;
@@ -414,7 +423,7 @@ function readPositiveInteger$l(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
-function normalizeSlot$1(value) {
+function normalizeSlot$2(value) {
   return normalizeText(value) || "";
 }
 

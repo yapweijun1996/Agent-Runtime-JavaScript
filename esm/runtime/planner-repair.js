@@ -289,6 +289,21 @@ function normalizeActionName(record, options) {
     }
   }
 
+  // AGRUN-615 — a name absent from the OFFERED surface only because a static
+  // policy denies it (selectPlannerActions, planner-action-surface.js) is a
+  // real, registered action, not a hallucinated one. Accept it here so the
+  // decision reaches normal dispatch, where the execution-side policy check
+  // (handlePolicyDenied) applies the graceful, AGRUN-562-shaped denial —
+  // instead of this validator rejecting it as unknown_action_name and
+  // burning a repair cycle the model can never resolve (the action is
+  // permanently denied; no repaired envelope makes it available).
+  const deniedNames = Array.isArray(options && options.policyDeniedActionNames)
+    ? options.policyDeniedActionNames
+    : [];
+  if (deniedNames.includes(candidate)) {
+    return candidate;
+  }
+
   return "";
 }
 

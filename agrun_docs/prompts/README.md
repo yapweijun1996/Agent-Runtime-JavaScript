@@ -13,4 +13,4 @@ any section per-host via `createRuntime({ prompts: { <key>: ... } })`.
 | `researchDirectives` | `src/runtime/prompts/research-directives.js` | 5 | [researchDirectives.md](researchDirectives.md) |
 | `convergenceAdvisory` | `src/runtime/prompts/convergence-advisory.js` | 10 | [convergenceAdvisory.md](convergenceAdvisory.md) |
 | `todoDirectives` | `src/runtime/prompts/todo-directives.js` | 4 | [todoDirectives.md](todoDirectives.md) |
-| `nativePlannerDirectives` | `src/runtime/prompts/planner-native-directives.js` | 38 | [nativePlannerDirectives.md](nativePlannerDirectives.md) |
+| `nativePlannerDirectives` | `src/runtime/prompts/planner-native-directives.js` | 39 | [nativePlannerDirectives.md](nativePlannerDirectives.md) |

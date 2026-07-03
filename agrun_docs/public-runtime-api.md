@@ -1607,7 +1607,7 @@ console.log(runtime.getMemory().readAll());
 
 ## Global Memory Configuration
 
-Cross-session "global" memory is auto-promoted from per-turn session memory when an extracted entry has sufficient confidence and is not flagged by the generic sensitive-content filter. Hosts can tune thresholds and inject policy via hooks.
+Cross-session "global" memory is auto-promoted from per-turn session memory when an entry has sufficient confidence and is not flagged by the generic sensitive-content filter. Entries come from two sources: the per-turn extraction LLM call, and the model-initiated `remember` action (which stamps a fixed `confidence: 0.9`). **Raising `minConfidence` above 0.9 silently stops `remember`-authored entries from ever being promoted** — they still persist to session memory (so the current session keeps honoring them), they just never reach the cross-session store. Hosts can tune thresholds and inject policy via hooks.
 
 ### Runtime Options
 

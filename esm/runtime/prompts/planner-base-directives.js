@@ -14,7 +14,7 @@ import { computeDirectiveGates } from './planner-directive-gates.js';
 // planner-directive-gates.js). Without ctx.runState every gate is open, so the
 // frozen default export below stays byte-identical.
 
-function buildLines$7({ runtimeConfig, runState } = {}) {
+function buildLines$8({ runtimeConfig, runState } = {}) {
   const config = normalizeConvergenceConfig(runtimeConfig);
   const gates = computeDirectiveGates({ runState });
   return [
@@ -76,6 +76,6 @@ function buildLines$7({ runtimeConfig, runState } = {}) {
   ];
 }
 
-Object.freeze(buildLines$7());
+Object.freeze(buildLines$8());
 
-export { buildLines$7 as buildLines };
+export { buildLines$8 as buildLines };

@@ -1,8 +1,9 @@
-import { buildLines as buildLines$7 } from './planner-base-directives.js';
-import { buildLines as buildLines$6 } from './planner-compact-directives.js';
-import { buildLines as buildLines$5 } from './skill-directives.js';
-import { buildLines as buildLines$4 } from './workspace-directives.js';
-import { buildLines as buildLines$3 } from './research-directives.js';
+import { buildLines as buildLines$8 } from './planner-base-directives.js';
+import { buildLines as buildLines$7 } from './planner-compact-directives.js';
+import { buildLines as buildLines$6 } from './skill-directives.js';
+import { buildLines as buildLines$5 } from './workspace-directives.js';
+import { buildLines as buildLines$4 } from './research-directives.js';
+import { buildLines as buildLines$3 } from './memory-directives.js';
 import { buildLines as buildLines$2 } from './convergence-advisory.js';
 import { buildLines as buildLines$1 } from './todo-directives.js';
 import { buildLines } from './planner-native-directives.js';
@@ -17,11 +18,12 @@ import { PROMPT_SECTION_KEYS } from './resolve.js';
 // time; this module just maps key → default.
 
 const PROMPT_SECTION_DEFAULTS = Object.freeze({
-  basePlannerDirectives: buildLines$7,
-  compactPlannerDirectives: buildLines$6,
-  skillDirectives: buildLines$5,
-  workspaceDirectives: buildLines$4,
-  researchDirectives: buildLines$3,
+  basePlannerDirectives: buildLines$8,
+  compactPlannerDirectives: buildLines$7,
+  skillDirectives: buildLines$6,
+  workspaceDirectives: buildLines$5,
+  researchDirectives: buildLines$4,
+  memoryDirectives: buildLines$3,
   convergenceAdvisory: buildLines$2,
   todoDirectives: buildLines$1,
   nativePlannerDirectives: buildLines

@@ -7,7 +7,7 @@ import { PUBLISH_DIRECT_ACTION } from '../action-names.js';
 // action's presence. Host override key: `workspaceDirectives`. Default output
 // is byte-identical (locked by test/unit/prompt-snapshot.test.js).
 
-function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
+function buildLines$5({ availableActions, compactSystemPrompt } = {}) {
   const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
   const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
   const lines = [];
@@ -59,4 +59,4 @@ function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
   return lines;
 }
 
-export { buildLines$4 as buildLines };
+export { buildLines$5 as buildLines };

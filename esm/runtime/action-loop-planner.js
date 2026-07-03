@@ -15,7 +15,7 @@ import { requestSemanticRecall, createSemanticRecallDecision, createSessionRecal
 import { createPlannerState } from './task-state.js';
 import { projectSessionContextFromPlannerState } from './session-context-projection.js';
 import { createControlEnvelopeDetail } from './control-envelope.js';
-import { selectPlannerActions } from './planner-action-surface.js';
+import { selectPlannerActions, readPolicyDeniedActionNames } from './planner-action-surface.js';
 import { maybeCreatePlannerFailureTodoState } from './todo-failure-state.js';
 import { createUsageDetail } from './runtime-events.js';
 import { createProviderErrorStepDetail } from './provider-error.js';
@@ -82,6 +82,10 @@ async function requestPlanner(options) {
       runtimeConfig: options.runtimeConfig,
       terminalRepairState: plannerTerminalRepairState || runState.terminalRepairState
     });
+    // AGRUN-615 — computed from the SAME pre-filter `availableActions` so a
+    // policy-denied name still validates as a real (if currently forbidden)
+    // action if the model emits it anyway; see readPolicyDeniedActionNames.
+    const policyDeniedActionNames = readPolicyDeniedActionNames(availableActions, options.runtimeConfig);
     const plannerPrompt = buildPlannerPrompt({
       activeAgentSkill,
       // ADR-0026 — read-only signal exposed to the AI when the same
@@ -288,6 +292,7 @@ async function requestPlanner(options) {
       availableAgentSkills: plannerAgentSkills,
       catalogListed: runState.agentSkillContext.catalogListed === true,
       deniedActions: readDeniedActions(actionHistory),
+      policyDeniedActionNames,
       history: plannerPromptHistory,
       invalidActionCount: runState.plannerInvalidCount,
       lastReadAgentSkill: runState.agentSkillContext.lastReadSkill,

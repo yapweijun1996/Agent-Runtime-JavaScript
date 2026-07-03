@@ -3835,6 +3835,8 @@
   const REPO_READ_FILE_ACTION = "repo_read_file";
 
   const ASK_CLARIFICATION_ACTION = "ask_clarification";
+  // Standing-instruction fix (2026-07-03) — model-initiated durable memory.
+  const REMEMBER_ACTION = "remember";
   // ADR-0057 Phase 1 (AGRUN-565) — opens a deferred action namespace. Only
   // registered when createRuntime({deferredNamespaces}) is non-empty (see
   // createOpenActionNamespaceAction), so default catalogs are unchanged.
@@ -3856,6 +3858,7 @@
     PUBLISH_DIRECT_ACTION,
     READ_AGENT_SKILL_ACTION,
     READ_URL_ACTION,
+    REMEMBER_ACTION,
     REPO_READ_FILE_ACTION,
     REPO_RG_ACTION,
     SPAWN_SUBAGENT_ACTION,
@@ -11903,7 +11906,10 @@
   // treated as the terminal candidate when no finalSectionTitle was declared.
   // Exact-title match (optional numbering prefix, optional trailing colon) so
   // mid-document headings like "Sources of Error" never false-positive.
-  const SOURCES_HEADING_PATTERN = /^(?:\d+[\.)]?\s*)?(sources?|references?|bibliography|citations?|参考文献|参考资料|来源)\s*[:：]?\s*$/iu;
+  // Chinese heading synonyms below (meaning "references"/"bibliography" and
+  // "source(s)") are Unicode-escaped, not literal CJK, per this repo's
+  // english-codebase.test.js source-file convention.
+  const SOURCES_HEADING_PATTERN = /^(?:\d+[\.)]?\s*)?(sources?|references?|bibliography|citations?|\u53c2\u8003\u6587\u732e|\u53c2\u8003\u8d44\u6599|\u6765\u6e90)\s*[:：]?\s*$/iu;
 
   function inspectContentAfterSourcesHeading(content) {
     const headings = collectHeadingLines(content);
@@ -16798,7 +16804,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "62aa2f818"
+      "b5e3b59a3"
         
     );
   }
@@ -16927,7 +16933,7 @@
     return entry;
   }
 
-  function readProvenance$1(entry) {
+  function readProvenance$2(entry) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       return null;
     }
@@ -16980,7 +16986,7 @@
       return entries.slice();
     }
     return entries.filter((entry) => {
-      const provenance = readProvenance$1(entry);
+      const provenance = readProvenance$2(entry);
       if (!provenance) return true; // legacy / unlabeled — keep
       if (threadFilter && provenance.threadId !== threadFilter) return false;
       if (windowFloor && provenance.turnId && isTurnIdBefore(provenance.turnId, windowFloor)) return false;
@@ -17634,6 +17640,15 @@
     return list.filter((entry) => {
       if (!entry || typeof entry !== "object") return false;
       const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
+      // User preferences are about the interlocutor, not the topic — the user
+      // is the same person on every thread, so preference entries are
+      // session-scoped by definition and thread scoping never hides them
+      // (standing-instruction fix, 2026-07-03: "always reply in Mandarin"
+      // must survive the router opening a new thread). Facts and decisions
+      // stay thread-scoped; cross-thread recall (AGRUN-593) remains their
+      // escape hatch. The MODEL judges applicability of a visible preference;
+      // this filter only decides visibility.
+      if (readString$5(metadata.kind) === "preference") return true;
       const entryThread = readString$5(metadata.threadId) || DEFAULT_THREAD_ID;
       return entryThread === threadId;
     });
@@ -17692,7 +17707,7 @@
       return null;
     }
 
-    const slot = normalizeSlot$1(metadata.slot);
+    const slot = normalizeSlot$2(metadata.slot);
     const threadId = readString$5(metadata.threadId) || DEFAULT_THREAD_ID;
     const turnId = readString$5(metadata.turnId) || null;
     const source = readString$5(metadata.source) || null;
@@ -17905,7 +17920,7 @@
     return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 
-  function normalizeSlot$1(value) {
+  function normalizeSlot$2(value) {
     return normalizeText(value) || "";
   }
 
@@ -30391,11 +30406,22 @@
     // loop: "Global headlines please. Yes, run the web search now." got the
     // identical question again). Only a breakout to a clearly new topic
     // (above) or an upstream new_task escapes resolution.
+    //
+    // AGRUN-614 — a NEAR match still promotes the topic. The `clarifiedTopic &&
+    // matchesClarificationAnswer` branch above requires the reply to contain
+    // every token of the inferred topic verbatim, so a one-word typo ("tno
+    // systen pte ltd" answering "Do you mean TNO System Pte Ltd?") falls
+    // through here instead — and unconditionally keeping the STALE currentTopic
+    // meant the reply that corrected/restated the topic never actually updated
+    // it. When the reply itself is topic-shaped (short, not a question — the
+    // same structural primitive topic_refinement/breakout already use), treat
+    // it as the topic the user is providing; a longer sentence-shaped reply
+    // (an instruction, not a topic label) still preserves currentTopic.
     if (pendingClarification) {
       return {
         activeGoal: currentGoal || normalizedPrompt,
         activeQuery: normalizedPrompt,
-        activeTopic: currentTopic || normalizedPrompt,
+        activeTopic: looksLikeTopicPrompt(normalizedPrompt) ? normalizedPrompt : (currentTopic || normalizedPrompt),
         continuityKind: "clarification_free_form_answer",
         hasUserClarification: true,
         lastClarificationResolution: {
@@ -33038,7 +33064,7 @@
   // plans, the verifier nudge is not worth the loop cost.
   const VERIFIER_NUDGE_MIN_ITEMS = 3;
 
-  function readProvenance(runState) {
+  function readProvenance$1(runState) {
     if (!runState || typeof runState !== "object") return null;
     const threadId = readString$5(runState.threadId);
     const turnId = readString$5(runState.runId);
@@ -33146,7 +33172,7 @@
       throw new Error("todo_plan: runState is required");
     }
     const opts = args && typeof args === "object" ? args : {};
-    const provenance = readProvenance(runState);
+    const provenance = readProvenance$1(runState);
     const rawItems = Array.isArray(opts.items) ? opts.items : [];
     const maxItems = readTodoMaxItems(context);
     const items = rawItems
@@ -33306,7 +33332,7 @@
     if (!current || typeof current !== "object") {
       throw new Error("todo_advance: no TodoState exists yet — call todo_plan first");
     }
-    const provenance = readProvenance(runState);
+    const provenance = readProvenance$1(runState);
     const previousItem = Array.isArray(current.items)
       ? current.items.find((item) => item && item.id === itemId)
       : null;
@@ -33380,7 +33406,7 @@
     }
     const opts = args && typeof args === "object" ? args : {};
     const cancellableBefore = countCancellableTodoItems(current);
-    const provenance = readProvenance(runState);
+    const provenance = readProvenance$1(runState);
     const next = applyTodoCancel(current, {
       reason: opts.reason,
       note: opts.note,
@@ -33448,7 +33474,7 @@
     }
 
     const opts = args && typeof args === "object" ? args : {};
-    const provenance = readProvenance(runState);
+    const provenance = readProvenance$1(runState);
     const activeItem = findActiveTodoItem$2(current);
 
     if (current.status === "completed" || current.status === "abandoned") {
@@ -35107,6 +35133,11 @@
         agentSkills: Array.isArray(agentSkills) ? agentSkills : [],
         agentSkillContext: runState.agentSkillContext,
         debug: debug || null,
+        // Model-initiated memory sink (remember action). Entries pushed here
+        // ride result.memoryEntriesAdded; session.run persists them to the
+        // session store. Mirrored on the plan door (createActionContext in
+        // action-loop-plan-validation.js) per the dispatch-parity rule.
+        memoryEntriesAdded,
         pushStep,
         request,
         runState,
@@ -36170,6 +36201,135 @@
       },
       summary: "ask_clarification"
     };
+  }
+
+  // Model-initiated durable memory (standing-instruction fix, 2026-07-03).
+  //
+  // WHY AN ACTION: the only other judgment point for "is this worth remembering"
+  // is the per-turn extraction LLM call, which hosts may disable for cost
+  // (memoryExtractionPolicy, AGRUN-517) and which only runs AFTER the turn.
+  // Giving the planner a tier-0 memory action moves that judgment into the
+  // model's own in-loop reasoning — zero extra LLM calls, no keyword matching,
+  // language-agnostic. The runtime stays pure plumbing: it stores exactly what
+  // the AI decided to store, in the same entry shape the extractor produces, so
+  // everything downstream (evidence classification, Confirmed Preferences
+  // prompt injection, last-wins slot supersede, global-memory promotion) works
+  // unchanged.
+  //
+  // Memory persistence is a session capability: entries pushed here ride
+  // result.memoryEntriesAdded, which session.run appends to the session store.
+  // Under plain runtime.run the entry still reaches the host on the result, but
+  // nothing persists it — same contract as extractor output.
+
+  const MEMORY_KINDS$2 = new Set(["decision", "fact", "preference"]);
+
+  const rememberAction = Object.freeze({
+    description: "Store a durable user preference, fact, or decision in session memory so future turns and topics honor it.",
+    name: "remember",
+    planner: {
+      aliases: ["remember_preference", "save_memory"],
+      argsExample: { kind: "preference", slot: "reply_language", text: "User wants every reply written in Mandarin Chinese." },
+      argsSchema: {
+        kind: {
+          description: "Memory category: 'preference' (a standing instruction or taste about how to behave — applies to every future topic), 'fact' (a stable statement about the user or their world), or 'decision' (a settled choice for the current work).",
+          required: true,
+          type: "string"
+        },
+        slot: {
+          description: "Short snake_case topic key (e.g. 'reply_language', 'user_name'). Reusing a slot replaces the previous value, so use the same slot to update or revoke an earlier memory.",
+          required: true,
+          type: "string"
+        },
+        text: {
+          description: "The durable statement to remember, written as a complete standalone sentence about the user (e.g. 'User wants every reply written in Mandarin Chinese.').",
+          required: true,
+          type: "string"
+        }
+      },
+      guidance: "When the user states something meant to persist beyond the current turn — a standing instruction ('always reply in Mandarin', 'keep answers short'), a stable fact about themselves, or an explicit 'remember ...' request — call remember to store it, then continue with the answer in the same turn. Preferences apply to every future topic until the user changes them; store an update to the same slot to revise or revoke. Do not use remember for one-off task details that only matter this turn."
+    },
+    tier: 0,
+    execute: executeRememberAction,
+    outputSchema: {
+      controls: ["continue"],
+      kinds: ["memory_saved", "memory_rejected"],
+      metrics: {}
+    }
+  });
+
+  async function executeRememberAction(context, args) {
+    const text = readString$5(args && args.text);
+    const requestedKind = readString$5(args && args.kind);
+    const slot = normalizeSlot$1(args && args.slot);
+
+    if (!text || !slot) {
+      return {
+        control: "continue",
+        output: {
+          kind: "memory_rejected",
+          reason: !text ? "missing_text" : "missing_slot",
+          text: "Nothing was stored: remember requires a non-empty text and a snake_case slot."
+        },
+        summary: "remember rejected: missing text or slot"
+      };
+    }
+
+    // Unknown categories default to preference — the standing-instruction case
+    // this action exists for — and the summary tells the model about the
+    // normalization so it can correct the category next time if it disagrees.
+    const kind = MEMORY_KINDS$2.has(requestedKind) ? requestedKind : "preference";
+    const metadata = {
+      confidence: 0.9,
+      kind,
+      slot,
+      source: "model_initiated",
+      status: "confirmed"
+    };
+    stampProvenance(metadata, readProvenance(context));
+
+    const entry = {
+      input: { text, type: "text" },
+      metadata,
+      output: { text },
+      skill: "session-memory",
+      timestamp: new Date().toISOString()
+    };
+
+    const sink = context && Array.isArray(context.memoryEntriesAdded) ? context.memoryEntriesAdded : null;
+    if (sink) {
+      sink.push(entry);
+    }
+
+    return {
+      control: "continue",
+      output: {
+        kind: "memory_saved",
+        memoryKind: kind,
+        persisted: Boolean(sink),
+        slot,
+        text: `Stored ${kind} '${slot}': ${text}`
+      },
+      summary: kind === requestedKind
+        ? `remember stored ${kind} '${slot}'`
+        : `remember stored '${slot}' as ${kind} (unrecognized kind '${requestedKind}' normalized)`
+    };
+  }
+
+  function readProvenance(context) {
+    const runState = context && context.runState && typeof context.runState === "object" ? context.runState : {};
+    const out = { source: "model_initiated" };
+    const threadId = readString$5(runState.threadId);
+    if (threadId) out.threadId = threadId;
+    const runId = readString$5(runState.runId);
+    if (runId) out.turnId = runId;
+    return out;
+  }
+
+  function normalizeSlot$1(value) {
+    return readString$5(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
   }
 
   const SUPPORTED_POLICY_ACTIONS = new Set(["allow", "ask", "deny"]);
@@ -44248,6 +44408,7 @@
       workspacePublishCandidateAction,
       createRepoSearchAction(repoFileTools),
       createRepoReadFileAction(repoFileTools),
+      rememberAction,
       askClarificationAction
     ].filter(Boolean);
     const reservedActionNames = [
@@ -44318,6 +44479,10 @@
     // virtual planner-surface mutation; no approval, checkpoint-required
     // interrupt behavior).
     open_action_namespace: virtualMutationPermission("action_namespace_state"),
+    // Standing-instruction fix (2026-07-03) — model-initiated durable memory.
+    // A local session-memory mutation: reversible via slot supersede, no
+    // external I/O, no approval (same shape as todo/workspace mutations).
+    remember: virtualMutationPermission("session_memory"),
     spawn_subagent: dynamicPermission("subagent_run"),
     todo_advance: virtualMutationPermission("todo_state"),
     todo_cancel: virtualMutationPermission("todo_state"),
@@ -66599,16 +66764,33 @@ Error message: ${getErrorMessage(cause)}`,
   function buildAISDKMessages$2(request) {
     const messages = [];
     for (const message of Array.isArray(request.conversation) ? request.conversation : []) {
+      assertNoImageParts(message.parts, request);
       messages.push({
         role: message.role,
         content: mapAISDKParts$2(message.role, message.parts)
       });
     }
+    const currentTurnParts = buildCurrentTurnParts(request.prompt, request.parts);
+    assertNoImageParts(currentTurnParts, request);
     messages.push({
       role: "user",
-      content: mapAISDKParts$2("user", buildCurrentTurnParts(request.prompt, request.parts))
+      content: mapAISDKParts$2("user", currentTurnParts)
     });
     return messages;
+  }
+
+  // The @ai-sdk/deepseek adapter silently drops image content parts (they fall
+  // into an internal `warnings` array agrun never reads) instead of erroring or
+  // sending them, so the model answers as if it saw an image it never received.
+  // Fail loudly here -- for both the current turn's parts and any replayed
+  // image from earlier in the conversation -- rather than let DeepSeek
+  // hallucinate a description.
+  function assertNoImageParts(parts, request) {
+    if (!Array.isArray(parts) || !parts.some((part) => isImagePart(part))) return;
+    throw createProviderError$2(
+      "DeepSeek does not support image input in agrun (the underlying AI SDK adapter silently drops image content). Use openai, gemini, or a vision-capable custom provider for requests with image attachments.",
+      { request: { model: request.model, provider: "deepseek" } }
+    );
   }
 
   function mapAISDKParts$2(role, parts) {
@@ -79619,6 +79801,32 @@ ${user}:`]
     return shouldHideWorkspacePublishCandidateForMode(options);
   }
 
+  // AGRUN-615 — the names selectPlannerActions dropped specifically for a
+  // static policy "deny" (not the other filter reasons above: terminal
+  // repair, convergence, namespace gates, publish-candidate mode). Those
+  // other reasons have no equivalent execution-side safety net; a policy
+  // "deny" does (handlePolicyDenied, action-loop-terminal.js) — it existed
+  // before AGRUN-588 removed denied actions from the offered surface, for
+  // exactly the case AGRUN-588's own comment names: "a model can still
+  // hallucinate a tool name it was never offered." Without this list, the
+  // envelope decision-validator (planner-repair.js normalizeActionName) had
+  // no way to tell "hallucinated, never existed" apart from "real action,
+  // currently policy-denied," and rejected both as unknown_action_name —
+  // the hallucinated-name safety net AGRUN-588 promised was silently dead
+  // for the policy-denied case specifically.
+  function readPolicyDeniedActionNames(actions, runtimeConfig) {
+    const source = Array.isArray(actions) ? actions : [];
+    const names = [];
+    for (const action of source) {
+      const name = readString$5(action && action.name);
+      if (!name) continue;
+      if (evaluateActionPolicy(runtimeConfig && runtimeConfig.actionPolicy, action).action === "deny") {
+        names.push(name);
+      }
+    }
+    return names;
+  }
+
   function shouldHideWorkspacePublishCandidateForMode(options) {
     const runState = options && options.runState && typeof options.runState === "object"
       ? options.runState
@@ -80634,7 +80842,7 @@ ${user}:`]
   // planner-directive-gates.js). Without ctx.runState every gate is open, so the
   // frozen default export below stays byte-identical.
 
-  function buildLines$7({ runtimeConfig, runState } = {}) {
+  function buildLines$8({ runtimeConfig, runState } = {}) {
     const config = normalizeConvergenceConfig(runtimeConfig);
     const gates = computeDirectiveGates({ runState });
     return [
@@ -80696,7 +80904,7 @@ ${user}:`]
     ];
   }
 
-  Object.freeze(buildLines$7());
+  Object.freeze(buildLines$8());
 
   // ADR-0035 (AGRUN-262) — compact-mode planner system directives (lite-tier).
   // Extracted verbatim from planner-prompt.js `COMPACT_SYSTEM_LINES`. Default
@@ -80711,7 +80919,7 @@ ${user}:`]
   // planner-directive-gates.js). Without ctx.runState every gate is open, so the
   // frozen default export below stays byte-identical.
 
-  function buildLines$6({ runtimeConfig, runState } = {}) {
+  function buildLines$7({ runtimeConfig, runState } = {}) {
     const config = normalizeConvergenceConfig(runtimeConfig);
     const gates = computeDirectiveGates({ runState });
     return [
@@ -80758,7 +80966,7 @@ ${user}:`]
     ];
   }
 
-  Object.freeze(buildLines$6());
+  Object.freeze(buildLines$7());
 
   // ADR-0035 (AGRUN-262) — skill-discovery planner directives.
   // Extracted verbatim from planner-prompt.js buildSystemPromptLines (the
@@ -80766,7 +80974,7 @@ ${user}:`]
   // is gated on the action's presence, so a host that disables a skill action
   // never sees a directive naming it. Host override key: `skillDirectives`.
   // Default output is byte-identical (locked by test/unit/prompt-snapshot.test.js).
-  function buildLines$5({ availableActions, compactSystemPrompt } = {}) {
+  function buildLines$6({ availableActions, compactSystemPrompt } = {}) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
     const lines = [];
@@ -80800,7 +81008,7 @@ ${user}:`]
   // action's presence. Host override key: `workspaceDirectives`. Default output
   // is byte-identical (locked by test/unit/prompt-snapshot.test.js).
 
-  function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
+  function buildLines$5({ availableActions, compactSystemPrompt } = {}) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
     const lines = [];
@@ -80858,7 +81066,7 @@ ${user}:`]
   // host that disables both research actions sees NO web_search/read_url directive
   // (the Globe3 leak ADR-0034 closed). Host override key: `researchDirectives`.
   // Default output is byte-identical (locked by test/unit/prompt-snapshot.test.js).
-  function buildLines$3({ availableActions, compactSystemPrompt } = {}) {
+  function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
     const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
     const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
     const lines = [];
@@ -80886,6 +81094,41 @@ ${user}:`]
       lines.push("If loopState.readUrlRecoverySignal tells you the last URL is blocked/non-retryable, do not loop on that same URL; use alternate candidates, refined web_search, or honest limited with concrete remainingGaps.");
     }
 
+    return lines;
+  }
+
+  // Standing-instruction fix (2026-07-03) — envelope-mode memory directives.
+  //
+  // Two concerns, one section:
+  //   1. HONOR: Confirmed Preferences rendered into the session context are
+  //      standing user instructions. The observed failure mode without this
+  //      line: the model mirrors the CURRENT message's language/style instead
+  //      of the stored preference ("always reply in Mandarin" answered in
+  //      English because the user's follow-up was English). Ungated — the
+  //      preferences block can be populated by extraction even when the
+  //      remember action is not registered.
+  //   2. CAPTURE: when the remember action is available, tell the model when
+  //      to call it. Gated on the action so hosts that disable it never see a
+  //      directive the runtime cannot honour (the ADR-0034 lesson).
+  //
+  // Host override key: `memoryDirectives`.
+  function buildLines$3({ availableActions, compactSystemPrompt } = {}) {
+    const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
+    const hasAction = (name) => actionDefinitions.some((action) => action && action.name === name);
+    const lines = [];
+
+    if (compactSystemPrompt) {
+      lines.push("Confirmed Preferences in the session context are standing user instructions (reply language, tone, format). Follow them on every turn and topic until the user changes them, even when the current message is written differently.");
+      if (hasAction("remember")) {
+        lines.push("When the user states a durable preference, instruction, or stable fact ('remember ...', 'from now on ...', 'always ...'), call remember to store it, then continue answering in the same turn.");
+      }
+      return lines;
+    }
+
+    lines.push("Confirmed Preferences in the session context are standing user instructions (e.g. reply language, tone, format). Keep honoring them on every turn and every topic until the user explicitly changes them — do not drop them because the topic changed or because the current message happens to be written in a different language or style.");
+    if (hasAction("remember")) {
+      lines.push("When the user states a durable preference, standing instruction, or stable fact meant to persist beyond this turn (e.g. 'remember ...', 'from now on ...', 'always ...'), call remember to store it, then continue answering in the same turn. Store an update to the same slot to change or revoke an earlier memory. Do not use remember for one-off task details.");
+    }
     return lines;
   }
 
@@ -80992,6 +81235,7 @@ ${user}:`]
     "skillDirectives",          // envelope skill-discovery blocks
     "workspaceDirectives",      // envelope virtual-workspace blocks
     "researchDirectives",       // envelope web_search/read_url blocks
+    "memoryDirectives",         // envelope standing-preference + remember blocks
     "convergenceAdvisory",      // envelope signal/finalize advisory block
     "todoDirectives",           // envelope TodoState auto-planner block
     "nativePlannerDirectives"   // native tool-calling mode directive body
@@ -81139,14 +81383,14 @@ ${user}:`]
     const lines = [
       ...resolvePromptSection(
         compactSystemPrompt ? prompts.compactPlannerDirectives : prompts.basePlannerDirectives,
-        compactSystemPrompt ? buildLines$6 : buildLines$7,
+        compactSystemPrompt ? buildLines$7 : buildLines$8,
         ctx
       )
     ];
     const standaloneActionNames = formatStandalonePlanActionNames(actionDefinitions);
     lines.push(`Current standalone-only actions for plan validation: ${standaloneActionNames}.`);
 
-    lines.push(...resolvePromptSection(prompts.skillDirectives, buildLines$5, ctx));
+    lines.push(...resolvePromptSection(prompts.skillDirectives, buildLines$6, ctx));
 
     // ADR-0057 Phase 1 — one hint line naming the currently-closed deferred
     // namespaces, beside the ADR-0013 skill-discovery hint above (the closest
@@ -81155,9 +81399,11 @@ ${user}:`]
     // zero prompt change (prompt-snapshot.test.js byte-identity).
     lines.push(...renderClosedNamespaceHintLines(listClosedNamespaces(opts.runState, opts.runtimeConfig)));
 
-    lines.push(...resolvePromptSection(prompts.workspaceDirectives, buildLines$4, ctx));
+    lines.push(...resolvePromptSection(prompts.workspaceDirectives, buildLines$5, ctx));
 
-    lines.push(...resolvePromptSection(prompts.researchDirectives, buildLines$3, ctx));
+    lines.push(...resolvePromptSection(prompts.researchDirectives, buildLines$4, ctx));
+
+    lines.push(...resolvePromptSection(prompts.memoryDirectives, buildLines$3, ctx));
 
     if (!compactSystemPrompt && preferFinalizeOnLastResult && hasAction("execute_skill_tool")) {
       lines.push("If the needed skill tool result is already present in toolContext.lastResult, prefer finalize instead of repeating the same execute_skill_tool call. Exception: when toolContext.lastResult.resultKind is one of \"resolution\", \"lookup\", \"preparatory\", \"intermediate\", \"partial\", or \"other\", the tool call was preparatory — continue with the next evidence-gathering tool call instead of finalizing.");
@@ -82731,6 +82977,21 @@ ${user}:`]
       }
     }
 
+    // AGRUN-615 — a name absent from the OFFERED surface only because a static
+    // policy denies it (selectPlannerActions, planner-action-surface.js) is a
+    // real, registered action, not a hallucinated one. Accept it here so the
+    // decision reaches normal dispatch, where the execution-side policy check
+    // (handlePolicyDenied) applies the graceful, AGRUN-562-shaped denial —
+    // instead of this validator rejecting it as unknown_action_name and
+    // burning a repair cycle the model can never resolve (the action is
+    // permanently denied; no repaired envelope makes it available).
+    const deniedNames = Array.isArray(options && options.policyDeniedActionNames)
+      ? options.policyDeniedActionNames
+      : [];
+    if (deniedNames.includes(candidate)) {
+      return candidate;
+    }
+
     return "";
   }
 
@@ -83889,6 +84150,10 @@ ${user}:`]
       "You may request multiple INDEPENDENT non-mutating tool calls in a single response; they run in parallel and every result comes back together. Emit dependent, mutating, approval-gated, or standalone-only actions one at a time.",
       "User-visible text inside the final answer or finalize instruction must follow only the host system prompt's persona above. Never expose internal terms such as 'agrun.js', 'planner', 'action planner', 'envelope', 'action loop', 'tool loop', or 'runtime' to the user, including when greeting, introducing yourself, or being asked what you are.",
       "Check the current topic, current goal, open ambiguity, confirmed memory, and recent turns before asking for clarification.",
+      "Confirmed Preferences in the session context are standing user instructions (e.g. reply language, tone, format). Keep honoring them on every turn and every topic until the user explicitly changes them — do not drop them because the topic changed or because the current message happens to be written in a different language or style.",
+      ...(hasAction("remember")
+        ? ["When the user states a durable preference, standing instruction, or stable fact meant to persist beyond this turn (e.g. 'remember ...', 'from now on ...', 'always ...'), call remember to store it, then continue answering in the same turn. Store an update to the same slot to change or revoke an earlier memory. Do not use remember for one-off task details."]
+        : []),
       "Treat clarification as a last resort.",
       "If YOU judge the current session evidence is sufficient to answer, use finalize. Use final_answer only when that tool is available for a simple no-tool answer.",
       "When current or factual evidence is needed and evidence is missing, gather evidence before asking for clarification or finalizing.",
@@ -85660,6 +85925,10 @@ ${user}:`]
         runtimeConfig: options.runtimeConfig,
         terminalRepairState: plannerTerminalRepairState || runState.terminalRepairState
       });
+      // AGRUN-615 — computed from the SAME pre-filter `availableActions` so a
+      // policy-denied name still validates as a real (if currently forbidden)
+      // action if the model emits it anyway; see readPolicyDeniedActionNames.
+      const policyDeniedActionNames = readPolicyDeniedActionNames(availableActions, options.runtimeConfig);
       const plannerPrompt = buildPlannerPrompt({
         activeAgentSkill,
         // ADR-0026 — read-only signal exposed to the AI when the same
@@ -85866,6 +86135,7 @@ ${user}:`]
         availableAgentSkills: plannerAgentSkills,
         catalogListed: runState.agentSkillContext.catalogListed === true,
         deniedActions: readDeniedActions(actionHistory),
+        policyDeniedActionNames,
         history: plannerPromptHistory,
         invalidActionCount: runState.plannerInvalidCount,
         lastReadAgentSkill: runState.agentSkillContext.lastReadSkill,
@@ -88350,6 +88620,18 @@ ${user}:`]
     if (isActionAvailable(actionName, selectedActions)) {
       return { ok: true };
     }
+    // AGRUN-615 — a name hidden ONLY because a static policy denies it is not
+    // an "action surface" problem; it's a policy problem with its OWN dedicated
+    // feedback (ACTION_POLICY_DENIED_IN_PLAN_FEEDBACK below, via the
+    // runPreToolCall/resolveBlockedPolicyDecision check the caller runs right
+    // after this returns ok). Without this, every policy-denied plan action hit
+    // this generic "hidden by the runtime action surface" rejection first and
+    // never reached the AGRUN-562 deny-specific message — the plan-batch door's
+    // half of the same gap AGRUN-615 fixed on the single-action door
+    // (planner-repair.js normalizeActionName).
+    if (readPolicyDeniedActionNames(session.availableActions, session.runtimeConfig).includes(actionName)) {
+      return { ok: true };
+    }
     const selectedActionNames = selectedActions.map((action) => readString$5(action && action.name)).filter(Boolean);
     const detail = buildRuntimeActionSurfaceDetail(session, selectedActionNames, actionName);
     return createPlanValidationError(
@@ -88500,6 +88782,9 @@ ${user}:`]
       agentSkills: Array.isArray(session.runtimeConfig.agentSkills) ? session.runtimeConfig.agentSkills : [],
       agentSkillContext: session.runState.agentSkillContext,
       debug: session.debug || null,
+      // Model-initiated memory sink (remember action) — mirrors the
+      // single-action door's context in action-loop-action.js.
+      memoryEntriesAdded: session.memoryEntriesAdded,
       request: session.request,
       runState: session.runState,
       runtimeConfig: session.runtimeConfig,
@@ -94970,6 +95255,380 @@ ${user}:`]
       : "completed";
   }
 
+  const GLOBAL_MEMORY_MAX_ENTRIES = 100;
+  const GLOBAL_MEMORY_MIN_CONFIDENCE = 0.7;
+
+  const KIND_TO_CATEGORY = {
+    preference: "user_preference",
+    fact: "learned_fact",
+    decision: "project_context"
+  };
+
+  const SENSITIVE_PATTERNS = [
+    // Generic keyword labels
+    /api[_-]?key/i,
+    /secret/i,
+    /password/i,
+    /\btoken\b/i,
+    /bearer\s+/i,
+    /\bauthorization\s*[:=]/i,
+    /x[_-]api[_-]key/i,
+    /aws[_-]?secret[_-]?access[_-]?key/i,
+
+    // Provider-specific API key shapes
+    /\bsk-[a-zA-Z0-9_-]{20,}/,
+    /\bAIza[0-9A-Za-z_-]{35}\b/,
+    /\bya29\.[0-9A-Za-z_-]{20,}/,
+    /\bgh[pousr]_[A-Za-z0-9]{36,}\b/,
+    /\bAKIA[0-9A-Z]{16}\b/,
+
+    // Private keys and JWTs
+    /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |)PRIVATE KEY-----/,
+    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/
+  ];
+
+  const SENSITIVE_KEY_NAMES = /(^|[_-])(?:api[_-]?key|apikey|secret|password|passwd|token|authorization|bearer|private[_-]?key|client[_-]?secret|access[_-]?key)($|[_-])/i;
+
+  function mapSessionMemoryKindToGlobalCategory(kind) {
+    return KIND_TO_CATEGORY[kind] || null;
+  }
+
+  function isGlobalMemoryCandidate(entry, options) {
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+
+    const kind = readNestedString(entry, "metadata", "kind");
+    const category = mapSessionMemoryKindToGlobalCategory(kind);
+
+    if (!category) {
+      return false;
+    }
+
+    const minConfidence = typeof options?.minConfidence === "number" ? options.minConfidence : GLOBAL_MEMORY_MIN_CONFIDENCE;
+    const confidence = typeof entry.metadata?.confidence === "number" ? entry.metadata.confidence : 0;
+    if (confidence < minConfidence) {
+      return false;
+    }
+
+    const text = readEntryText(entry);
+    if (!text) {
+      return false;
+    }
+
+    if (containsSensitiveContent(text) || containsSensitiveContent(entry)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function containsSensitiveContent(value, seen) {
+    if (value == null) {
+      return false;
+    }
+
+    if (typeof value === "string") {
+      return SENSITIVE_PATTERNS.some((pattern) => pattern.test(value));
+    }
+
+    if (typeof value !== "object") {
+      return false;
+    }
+
+    const visited = seen || new WeakSet();
+    if (visited.has(value)) {
+      return false;
+    }
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      return value.some((item) => containsSensitiveContent(item, visited));
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      if (typeof key === "string" && SENSITIVE_KEY_NAMES.test(key)) {
+        return true;
+      }
+      if (containsSensitiveContent(child, visited)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function createGlobalMemoryEntry(options) {
+    const now = Date.now();
+
+    return {
+      id: options.id || `${now}-${Math.random().toString(36).slice(2, 10)}`,
+      category: options.category || "learned_fact",
+      text: options.text || "",
+      slot: options.slot || "",
+      confidence: typeof options.confidence === "number" ? options.confidence : 0.7,
+      source: options.source || "auto_extract",
+      createdAt: typeof options.createdAt === "number" ? options.createdAt : now,
+      updatedAt: now
+    };
+  }
+
+  function mergeGlobalIntoSessionMemory(sessionEntries, globalEntries) {
+    const sessionArray = Array.isArray(sessionEntries) ? sessionEntries : [];
+    const globalArray = Array.isArray(globalEntries) ? globalEntries : [];
+
+    if (globalArray.length === 0) {
+      return sessionArray;
+    }
+
+    const sessionSlots = new Set();
+
+    for (const entry of sessionArray) {
+      // AGRUN-494 (audit M17) — derive the session slot key via the shared SSOT
+      // so the read-merge dedup and the write-time appendMemory dedup can never
+      // disagree on what "same slot" means. Behavior-identical to the prior
+      // inline `${kind}:${slot}` (slot must be present; kind may be empty).
+      const slotKey = readSessionMemorySlotKey(entry);
+      if (slotKey) {
+        sessionSlots.add(slotKey);
+      }
+    }
+
+    const converted = [];
+
+    for (const global of globalArray) {
+      const kind = categoryToKind(global.category);
+      const slot = typeof global.slot === "string" ? global.slot : "";
+      const dedupeKey = `${kind}:${slot}`;
+
+      if (slot && sessionSlots.has(dedupeKey)) {
+        continue;
+      }
+
+      converted.push({
+        timestamp: typeof global.createdAt === "number" ? new Date(global.createdAt).toISOString() : new Date().toISOString(),
+        skill: null,
+        input: {},
+        output: { text: global.text || "" },
+        metadata: {
+          kind,
+          slot,
+          confidence: typeof global.confidence === "number" ? global.confidence : 0.7,
+          source: global.source || "global_memory",
+          status: "confirmed"
+        }
+      });
+    }
+
+    return [...converted, ...sessionArray];
+  }
+
+  // AGRUN-478 (audit M16) — the read-all → decide → write sequence in
+  // promoteToGlobalMemory is a read-modify-write that is NOT atomic across
+  // concurrent promotions sharing one store. Global memory is cross-session by
+  // design, so two concurrent session.run calls against the same store interleave
+  // their readAllGlobalMemory and appendGlobalMemory: both miss the slot-dedup
+  // match and both insert → duplicate slot rows (breaking the slot-uniqueness
+  // invariant mergeGlobalIntoSessionMemory and the upsert path rely on); at the
+  // cap they also double-evict / overflow maxEntries. We serialize the critical
+  // section per store with a promise-chain mutex keyed on the store instance.
+  const GLOBAL_MEMORY_WRITE_LOCKS = new WeakMap();
+
+  function runExclusiveGlobalMemoryWrite(store, critical) {
+    // WeakMap needs an object key; if the store isn't one (defensive), run
+    // unserialized rather than throw — correctness degrades to the prior
+    // behavior only for that pathological case.
+    if (!store || typeof store !== "object") {
+      return critical();
+    }
+    const prev = GLOBAL_MEMORY_WRITE_LOCKS.get(store) || Promise.resolve();
+    // `prev` is always a resolved tail (errors swallowed below), so `critical`
+    // runs exactly once after the previous critical section drains. The returned
+    // promise carries critical's real result/throw to THIS caller; the stored
+    // tail swallows so one failing promotion never wedges the next.
+    const result = prev.then(critical, critical);
+    GLOBAL_MEMORY_WRITE_LOCKS.set(store, result.then(NOOP, NOOP));
+    return result;
+  }
+
+  async function promoteToGlobalMemory(sessionStore, entry, options) {
+    const kind = readNestedString(entry, "metadata", "kind");
+    const category = mapSessionMemoryKindToGlobalCategory(kind);
+
+    if (!category) {
+      return;
+    }
+
+    const maxEntries = typeof options?.maxEntries === "number" && options.maxEntries > 0
+      ? options.maxEntries
+      : GLOBAL_MEMORY_MAX_ENTRIES;
+    const onTelemetry = typeof options?.onTelemetry === "function" ? options.onTelemetry : null;
+    const sensitivityFilter = typeof options?.sensitivityFilter === "function" ? options.sensitivityFilter : null;
+    const promotionValidator = typeof options?.promotionValidator === "function" ? options.promotionValidator : null;
+    const hookTimeoutMs = typeof options?.hookTimeoutMs === "number" && options.hookTimeoutMs > 0 ? options.hookTimeoutMs : 2000;
+
+    const text = readEntryText(entry);
+    const slot = readNestedString(entry, "metadata", "slot") || "";
+    const source = readNestedString(entry, "metadata", "source") || "auto_extract";
+    const confidence = typeof entry.metadata?.confidence === "number" ? entry.metadata.confidence : GLOBAL_MEMORY_MIN_CONFIDENCE;
+
+    const hookContext = {
+      sessionId: options?.sessionId || null,
+      sessionStore,
+      kind,
+      category,
+      slot,
+      source,
+      sourceTurn: options?.sourceTurn || { user: "", assistant: "" }
+    };
+
+    if (sensitivityFilter) {
+      const outcome = await runHook(sensitivityFilter, entry, hookContext, hookTimeoutMs);
+      // sensitivityFilter: true => sensitive => block. fail-closed: error/timeout => block.
+      const blocked = !outcome.ok || outcome.value === true;
+      if (blocked) {
+        if (onTelemetry) onTelemetry({
+          type: "global-memory-filtered",
+          id: null,
+          category,
+          slot,
+          reason: !outcome.ok ? (outcome.timedOut ? "hook_timeout" : "hook_error") : "sensitivity_blocked",
+          hook: "sensitivityFilter",
+          message: !outcome.ok ? (outcome.message || "hook error") : null
+        });
+        return;
+      }
+    }
+
+    if (promotionValidator) {
+      const outcome = await runHook(promotionValidator, entry, hookContext, hookTimeoutMs);
+      // promotionValidator: true => valid => allow. false/error/timeout => block.
+      const blocked = !outcome.ok || outcome.value !== true;
+      if (blocked) {
+        if (onTelemetry) onTelemetry({
+          type: "global-memory-filtered",
+          id: null,
+          category,
+          slot,
+          reason: !outcome.ok ? (outcome.timedOut ? "hook_timeout" : "hook_error") : "validator_blocked",
+          hook: "promotionValidator",
+          message: !outcome.ok ? (outcome.message || "hook error") : null
+        });
+        return;
+      }
+    }
+
+    // Serialized per store so the read-all → decide → write below is atomic
+    // against concurrent promotions (see runExclusiveGlobalMemoryWrite). The
+    // slow hooks above intentionally stay OUTSIDE the lock — they touch no
+    // global-memory state and would otherwise hold the lock for up to hookTimeoutMs.
+    return runExclusiveGlobalMemoryWrite(sessionStore, async () => {
+      const existing = await sessionStore.readAllGlobalMemory();
+      const match = slot ? existing.find((e) => e.slot === slot && e.category === category) : null;
+
+      if (match) {
+        if (confidence > (match.confidence || 0)) {
+          match.text = text;
+          match.confidence = confidence;
+          match.updatedAt = Date.now();
+          await sessionStore.appendGlobalMemory(match);
+          if (onTelemetry) onTelemetry({ type: "global-memory-written", id: match.id, category, slot, confidence, reason: "upsert" });
+        }
+        return;
+      }
+
+      if (existing.length >= maxEntries) {
+        const sorted = existing
+          .slice()
+          .sort((a, b) => (a.confidence || 0) - (b.confidence || 0) || (a.createdAt || 0) - (b.createdAt || 0));
+        const victim = sorted[0];
+
+        if (victim && confidence > (victim.confidence || 0)) {
+          await sessionStore.deleteGlobalMemory(victim.id);
+          if (onTelemetry) onTelemetry({ type: "global-memory-purged", id: victim.id, reason: "lru_evict" });
+        } else {
+          return;
+        }
+      }
+
+      const created = await sessionStore.appendGlobalMemory(createGlobalMemoryEntry({
+        category,
+        confidence,
+        slot,
+        source: readNestedString(entry, "metadata", "source") || "auto_extract",
+        text
+      }));
+      if (onTelemetry) onTelemetry({ type: "global-memory-written", id: created?.id, category, slot, confidence, reason: "insert" });
+    });
+  }
+
+  async function runHook(hook, entry, context, timeoutMs) {
+    let timer = null;
+    // Pass an AbortSignal so well-behaved hooks can cancel their work when the
+    // timeout wins. Falls back gracefully on runtimes without AbortController.
+    const abortController = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const hookContext = abortController ? { ...context, signal: abortController.signal } : context;
+    const hookCall = Promise.resolve().then(() => hook(entry, hookContext));
+
+    try {
+      const timeout = new Promise((resolve) => {
+        timer = setTimeout(() => resolve({ __timeout: true }), timeoutMs);
+      });
+      const raced = await Promise.race([hookCall, timeout]);
+      if (raced && raced.__timeout === true) {
+        if (abortController) abortController.abort();
+        // The hook promise is still pending. Attach a no-op handler so that a
+        // late rejection doesn't leak as an unhandled promise rejection, and a
+        // late success can't accidentally touch caller state (we've already
+        // returned). Without this, slow hooks that throw after the timeout
+        // surface as "UnhandledPromiseRejection" in logs and their side
+        // effects race with the next turn's state.
+        hookCall.then(NOOP, NOOP);
+        return { ok: false, timedOut: true, value: null, message: `hook exceeded ${timeoutMs}ms` };
+      }
+      return { ok: true, timedOut: false, value: raced === true, message: null };
+    } catch (error) {
+      return {
+        ok: false,
+        timedOut: false,
+        value: null,
+        message: normalizeThrownError(error).message
+      };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function NOOP() {}
+
+  function categoryToKind(category) {
+    if (category === "user_preference") return "preference";
+    if (category === "project_context") return "decision";
+    return "fact";
+  }
+
+  function readEntryText(entry) {
+    if (entry.output && typeof entry.output.text === "string" && entry.output.text.trim()) {
+      return entry.output.text.trim();
+    }
+    if (entry.metadata && typeof entry.metadata.text === "string" && entry.metadata.text.trim()) {
+      return entry.metadata.text.trim();
+    }
+    if (typeof entry.text === "string" && entry.text.trim()) {
+      return entry.text.trim();
+    }
+    return "";
+  }
+
+  function readNestedString(obj, ...keys) {
+    let current = obj;
+    for (const key of keys) {
+      if (!current || typeof current !== "object") return "";
+      current = current[key];
+    }
+    return typeof current === "string" ? current.trim() : "";
+  }
+
   function buildSessionMemorySnapshot(options) {
     const snapshot = buildSessionEvidenceSnapshot({
       ...options,
@@ -95032,7 +95691,16 @@ ${user}:`]
       : DEFAULT_THREAD_ID$1;
     const summary = await sessionStore.getSummary(sessionId, compactionThreadId);
     const messages = await sessionStore.readMessages(sessionId);
-    const memoryEntries = await sessionStore.readMemory(sessionId);
+    const sessionMemoryEntries = await sessionStore.readMemory(sessionId);
+    // Cross-session global memory (promoted preferences/facts/decisions) must
+    // reach the ACTUAL prompt-building path, not just the in-loop memory
+    // facade (handle.js's separate resolvedMemory) — otherwise a brand-new
+    // session never inherits a standing instruction like "always reply in
+    // Mandarin" that a prior session promoted. The caller reads global memory
+    // once (it alone knows the runtimeConfig.globalMemory gate) and passes the
+    // raw entries down; this reuses the same merge/dedupe rules handle.js
+    // already applies to resolvedMemory so the two views never disagree.
+    const memoryEntries = mergeGlobalIntoSessionMemory(sessionMemoryEntries, options.globalMemoryEntries);
     const completedMessages = messages.filter((message) => (
       message &&
       !isCompactionMessage(message) &&
@@ -95592,6 +96260,11 @@ ${user}:`]
         sessionId,
         sessionPolicy: options.sessionPolicy,
         sessionStore: options.sessionStore,
+        // Two-door parity (AGRUN-474 precedent) — the tool-loop door merges
+        // cross-session global memory into the prompt context; the approval-
+        // resume door builds a prompt via this same function and must not
+        // silently drop it.
+        globalMemoryEntries: options && options.globalMemoryEntries ? options.globalMemoryEntries : [],
         threadScope: options && options.threadScope ? options.threadScope : null
       });
 
@@ -95741,380 +96414,6 @@ ${user}:`]
     return value && typeof value === "object" && !Array.isArray(value)
       ? cloneValue$1(value)
       : null;
-  }
-
-  const GLOBAL_MEMORY_MAX_ENTRIES = 100;
-  const GLOBAL_MEMORY_MIN_CONFIDENCE = 0.7;
-
-  const KIND_TO_CATEGORY = {
-    preference: "user_preference",
-    fact: "learned_fact",
-    decision: "project_context"
-  };
-
-  const SENSITIVE_PATTERNS = [
-    // Generic keyword labels
-    /api[_-]?key/i,
-    /secret/i,
-    /password/i,
-    /\btoken\b/i,
-    /bearer\s+/i,
-    /\bauthorization\s*[:=]/i,
-    /x[_-]api[_-]key/i,
-    /aws[_-]?secret[_-]?access[_-]?key/i,
-
-    // Provider-specific API key shapes
-    /\bsk-[a-zA-Z0-9_-]{20,}/,
-    /\bAIza[0-9A-Za-z_-]{35}\b/,
-    /\bya29\.[0-9A-Za-z_-]{20,}/,
-    /\bgh[pousr]_[A-Za-z0-9]{36,}\b/,
-    /\bAKIA[0-9A-Z]{16}\b/,
-
-    // Private keys and JWTs
-    /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |)PRIVATE KEY-----/,
-    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/
-  ];
-
-  const SENSITIVE_KEY_NAMES = /(^|[_-])(?:api[_-]?key|apikey|secret|password|passwd|token|authorization|bearer|private[_-]?key|client[_-]?secret|access[_-]?key)($|[_-])/i;
-
-  function mapSessionMemoryKindToGlobalCategory(kind) {
-    return KIND_TO_CATEGORY[kind] || null;
-  }
-
-  function isGlobalMemoryCandidate(entry, options) {
-    if (!entry || typeof entry !== "object") {
-      return false;
-    }
-
-    const kind = readNestedString(entry, "metadata", "kind");
-    const category = mapSessionMemoryKindToGlobalCategory(kind);
-
-    if (!category) {
-      return false;
-    }
-
-    const minConfidence = typeof options?.minConfidence === "number" ? options.minConfidence : GLOBAL_MEMORY_MIN_CONFIDENCE;
-    const confidence = typeof entry.metadata?.confidence === "number" ? entry.metadata.confidence : 0;
-    if (confidence < minConfidence) {
-      return false;
-    }
-
-    const text = readEntryText(entry);
-    if (!text) {
-      return false;
-    }
-
-    if (containsSensitiveContent(text) || containsSensitiveContent(entry)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  function containsSensitiveContent(value, seen) {
-    if (value == null) {
-      return false;
-    }
-
-    if (typeof value === "string") {
-      return SENSITIVE_PATTERNS.some((pattern) => pattern.test(value));
-    }
-
-    if (typeof value !== "object") {
-      return false;
-    }
-
-    const visited = seen || new WeakSet();
-    if (visited.has(value)) {
-      return false;
-    }
-    visited.add(value);
-
-    if (Array.isArray(value)) {
-      return value.some((item) => containsSensitiveContent(item, visited));
-    }
-
-    for (const [key, child] of Object.entries(value)) {
-      if (typeof key === "string" && SENSITIVE_KEY_NAMES.test(key)) {
-        return true;
-      }
-      if (containsSensitiveContent(child, visited)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  function createGlobalMemoryEntry(options) {
-    const now = Date.now();
-
-    return {
-      id: options.id || `${now}-${Math.random().toString(36).slice(2, 10)}`,
-      category: options.category || "learned_fact",
-      text: options.text || "",
-      slot: options.slot || "",
-      confidence: typeof options.confidence === "number" ? options.confidence : 0.7,
-      source: options.source || "auto_extract",
-      createdAt: typeof options.createdAt === "number" ? options.createdAt : now,
-      updatedAt: now
-    };
-  }
-
-  function mergeGlobalIntoSessionMemory(sessionEntries, globalEntries) {
-    const sessionArray = Array.isArray(sessionEntries) ? sessionEntries : [];
-    const globalArray = Array.isArray(globalEntries) ? globalEntries : [];
-
-    if (globalArray.length === 0) {
-      return sessionArray;
-    }
-
-    const sessionSlots = new Set();
-
-    for (const entry of sessionArray) {
-      // AGRUN-494 (audit M17) — derive the session slot key via the shared SSOT
-      // so the read-merge dedup and the write-time appendMemory dedup can never
-      // disagree on what "same slot" means. Behavior-identical to the prior
-      // inline `${kind}:${slot}` (slot must be present; kind may be empty).
-      const slotKey = readSessionMemorySlotKey(entry);
-      if (slotKey) {
-        sessionSlots.add(slotKey);
-      }
-    }
-
-    const converted = [];
-
-    for (const global of globalArray) {
-      const kind = categoryToKind(global.category);
-      const slot = typeof global.slot === "string" ? global.slot : "";
-      const dedupeKey = `${kind}:${slot}`;
-
-      if (slot && sessionSlots.has(dedupeKey)) {
-        continue;
-      }
-
-      converted.push({
-        timestamp: typeof global.createdAt === "number" ? new Date(global.createdAt).toISOString() : new Date().toISOString(),
-        skill: null,
-        input: {},
-        output: { text: global.text || "" },
-        metadata: {
-          kind,
-          slot,
-          confidence: typeof global.confidence === "number" ? global.confidence : 0.7,
-          source: global.source || "global_memory",
-          status: "confirmed"
-        }
-      });
-    }
-
-    return [...converted, ...sessionArray];
-  }
-
-  // AGRUN-478 (audit M16) — the read-all → decide → write sequence in
-  // promoteToGlobalMemory is a read-modify-write that is NOT atomic across
-  // concurrent promotions sharing one store. Global memory is cross-session by
-  // design, so two concurrent session.run calls against the same store interleave
-  // their readAllGlobalMemory and appendGlobalMemory: both miss the slot-dedup
-  // match and both insert → duplicate slot rows (breaking the slot-uniqueness
-  // invariant mergeGlobalIntoSessionMemory and the upsert path rely on); at the
-  // cap they also double-evict / overflow maxEntries. We serialize the critical
-  // section per store with a promise-chain mutex keyed on the store instance.
-  const GLOBAL_MEMORY_WRITE_LOCKS = new WeakMap();
-
-  function runExclusiveGlobalMemoryWrite(store, critical) {
-    // WeakMap needs an object key; if the store isn't one (defensive), run
-    // unserialized rather than throw — correctness degrades to the prior
-    // behavior only for that pathological case.
-    if (!store || typeof store !== "object") {
-      return critical();
-    }
-    const prev = GLOBAL_MEMORY_WRITE_LOCKS.get(store) || Promise.resolve();
-    // `prev` is always a resolved tail (errors swallowed below), so `critical`
-    // runs exactly once after the previous critical section drains. The returned
-    // promise carries critical's real result/throw to THIS caller; the stored
-    // tail swallows so one failing promotion never wedges the next.
-    const result = prev.then(critical, critical);
-    GLOBAL_MEMORY_WRITE_LOCKS.set(store, result.then(NOOP, NOOP));
-    return result;
-  }
-
-  async function promoteToGlobalMemory(sessionStore, entry, options) {
-    const kind = readNestedString(entry, "metadata", "kind");
-    const category = mapSessionMemoryKindToGlobalCategory(kind);
-
-    if (!category) {
-      return;
-    }
-
-    const maxEntries = typeof options?.maxEntries === "number" && options.maxEntries > 0
-      ? options.maxEntries
-      : GLOBAL_MEMORY_MAX_ENTRIES;
-    const onTelemetry = typeof options?.onTelemetry === "function" ? options.onTelemetry : null;
-    const sensitivityFilter = typeof options?.sensitivityFilter === "function" ? options.sensitivityFilter : null;
-    const promotionValidator = typeof options?.promotionValidator === "function" ? options.promotionValidator : null;
-    const hookTimeoutMs = typeof options?.hookTimeoutMs === "number" && options.hookTimeoutMs > 0 ? options.hookTimeoutMs : 2000;
-
-    const text = readEntryText(entry);
-    const slot = readNestedString(entry, "metadata", "slot") || "";
-    const source = readNestedString(entry, "metadata", "source") || "auto_extract";
-    const confidence = typeof entry.metadata?.confidence === "number" ? entry.metadata.confidence : GLOBAL_MEMORY_MIN_CONFIDENCE;
-
-    const hookContext = {
-      sessionId: options?.sessionId || null,
-      sessionStore,
-      kind,
-      category,
-      slot,
-      source,
-      sourceTurn: options?.sourceTurn || { user: "", assistant: "" }
-    };
-
-    if (sensitivityFilter) {
-      const outcome = await runHook(sensitivityFilter, entry, hookContext, hookTimeoutMs);
-      // sensitivityFilter: true => sensitive => block. fail-closed: error/timeout => block.
-      const blocked = !outcome.ok || outcome.value === true;
-      if (blocked) {
-        if (onTelemetry) onTelemetry({
-          type: "global-memory-filtered",
-          id: null,
-          category,
-          slot,
-          reason: !outcome.ok ? (outcome.timedOut ? "hook_timeout" : "hook_error") : "sensitivity_blocked",
-          hook: "sensitivityFilter",
-          message: !outcome.ok ? (outcome.message || "hook error") : null
-        });
-        return;
-      }
-    }
-
-    if (promotionValidator) {
-      const outcome = await runHook(promotionValidator, entry, hookContext, hookTimeoutMs);
-      // promotionValidator: true => valid => allow. false/error/timeout => block.
-      const blocked = !outcome.ok || outcome.value !== true;
-      if (blocked) {
-        if (onTelemetry) onTelemetry({
-          type: "global-memory-filtered",
-          id: null,
-          category,
-          slot,
-          reason: !outcome.ok ? (outcome.timedOut ? "hook_timeout" : "hook_error") : "validator_blocked",
-          hook: "promotionValidator",
-          message: !outcome.ok ? (outcome.message || "hook error") : null
-        });
-        return;
-      }
-    }
-
-    // Serialized per store so the read-all → decide → write below is atomic
-    // against concurrent promotions (see runExclusiveGlobalMemoryWrite). The
-    // slow hooks above intentionally stay OUTSIDE the lock — they touch no
-    // global-memory state and would otherwise hold the lock for up to hookTimeoutMs.
-    return runExclusiveGlobalMemoryWrite(sessionStore, async () => {
-      const existing = await sessionStore.readAllGlobalMemory();
-      const match = slot ? existing.find((e) => e.slot === slot && e.category === category) : null;
-
-      if (match) {
-        if (confidence > (match.confidence || 0)) {
-          match.text = text;
-          match.confidence = confidence;
-          match.updatedAt = Date.now();
-          await sessionStore.appendGlobalMemory(match);
-          if (onTelemetry) onTelemetry({ type: "global-memory-written", id: match.id, category, slot, confidence, reason: "upsert" });
-        }
-        return;
-      }
-
-      if (existing.length >= maxEntries) {
-        const sorted = existing
-          .slice()
-          .sort((a, b) => (a.confidence || 0) - (b.confidence || 0) || (a.createdAt || 0) - (b.createdAt || 0));
-        const victim = sorted[0];
-
-        if (victim && confidence > (victim.confidence || 0)) {
-          await sessionStore.deleteGlobalMemory(victim.id);
-          if (onTelemetry) onTelemetry({ type: "global-memory-purged", id: victim.id, reason: "lru_evict" });
-        } else {
-          return;
-        }
-      }
-
-      const created = await sessionStore.appendGlobalMemory(createGlobalMemoryEntry({
-        category,
-        confidence,
-        slot,
-        source: readNestedString(entry, "metadata", "source") || "auto_extract",
-        text
-      }));
-      if (onTelemetry) onTelemetry({ type: "global-memory-written", id: created?.id, category, slot, confidence, reason: "insert" });
-    });
-  }
-
-  async function runHook(hook, entry, context, timeoutMs) {
-    let timer = null;
-    // Pass an AbortSignal so well-behaved hooks can cancel their work when the
-    // timeout wins. Falls back gracefully on runtimes without AbortController.
-    const abortController = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const hookContext = abortController ? { ...context, signal: abortController.signal } : context;
-    const hookCall = Promise.resolve().then(() => hook(entry, hookContext));
-
-    try {
-      const timeout = new Promise((resolve) => {
-        timer = setTimeout(() => resolve({ __timeout: true }), timeoutMs);
-      });
-      const raced = await Promise.race([hookCall, timeout]);
-      if (raced && raced.__timeout === true) {
-        if (abortController) abortController.abort();
-        // The hook promise is still pending. Attach a no-op handler so that a
-        // late rejection doesn't leak as an unhandled promise rejection, and a
-        // late success can't accidentally touch caller state (we've already
-        // returned). Without this, slow hooks that throw after the timeout
-        // surface as "UnhandledPromiseRejection" in logs and their side
-        // effects race with the next turn's state.
-        hookCall.then(NOOP, NOOP);
-        return { ok: false, timedOut: true, value: null, message: `hook exceeded ${timeoutMs}ms` };
-      }
-      return { ok: true, timedOut: false, value: raced === true, message: null };
-    } catch (error) {
-      return {
-        ok: false,
-        timedOut: false,
-        value: null,
-        message: normalizeThrownError(error).message
-      };
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
-
-  function NOOP() {}
-
-  function categoryToKind(category) {
-    if (category === "user_preference") return "preference";
-    if (category === "project_context") return "decision";
-    return "fact";
-  }
-
-  function readEntryText(entry) {
-    if (entry.output && typeof entry.output.text === "string" && entry.output.text.trim()) {
-      return entry.output.text.trim();
-    }
-    if (entry.metadata && typeof entry.metadata.text === "string" && entry.metadata.text.trim()) {
-      return entry.metadata.text.trim();
-    }
-    if (typeof entry.text === "string" && entry.text.trim()) {
-      return entry.text.trim();
-    }
-    return "";
-  }
-
-  function readNestedString(obj, ...keys) {
-    let current = obj;
-    for (const key of keys) {
-      if (!current || typeof current !== "object") return "";
-      current = current[key];
-    }
-    return typeof current === "string" ? current.trim() : "";
   }
 
   const MEMORY_KINDS$1 = new Set(["decision", "fact", "preference"]);
@@ -96672,6 +96971,18 @@ ${user}:`]
       // (unless threads.crossThreadRecall is on, in which case scope is null
       // and the full memory set flows through — preserving legacy behavior).
       const sessionMemoryEntries = await options.sessionStore.readMemory(sessionRecord.id);
+      // Read cross-session global memory ONCE, before prompt prep, so both
+      // consumers agree: prepareSessionInput merges it into the actual prompt
+      // context (compaction.js), and the resolvedMemory facade built below
+      // reuses the same fetched entries for the in-loop memory tools.
+      const globalMemoryEnabled = ((options.runtimeConfig && options.runtimeConfig.globalMemory) || {}).enabled !== false;
+      const globalMemoryEntries = globalMemoryEnabled ? await options.sessionStore.readAllGlobalMemory() : [];
+      if (globalMemoryEnabled) {
+        emitGlobalMemoryStep(onStep, {
+          type: "global-memory-recalled",
+          count: Array.isArray(globalMemoryEntries) ? globalMemoryEntries.length : 0
+        });
+      }
       const threadRouting = await routeTurnToThread({
         input,
         onStep,
@@ -96681,7 +96992,7 @@ ${user}:`]
       });
       const threadScope = readThreadScope(options.runtimeConfig, threadRouting);
 
-      const prepared = await prepareSessionInput(input, userMessage, threadScope, callerAbortSignal);
+      const prepared = await prepareSessionInput(input, userMessage, threadScope, callerAbortSignal, globalMemoryEntries);
 
       const compactionSnapshot = prepared.compactionUsage
         ? createUsageSnapshot(prepared.compactionUsage)
@@ -96738,16 +97049,6 @@ ${user}:`]
       const runtimeState = {
         lastRun: cloneValue$1(sessionRecord.lastRun)
       };
-      const globalMemoryEnabled = ((options.runtimeConfig && options.runtimeConfig.globalMemory) || {}).enabled !== false;
-      const globalMemoryEntries = globalMemoryEnabled
-        ? await options.sessionStore.readAllGlobalMemory()
-        : [];
-      if (globalMemoryEnabled) {
-        emitGlobalMemoryStep(onStep, {
-          type: "global-memory-recalled",
-          count: Array.isArray(globalMemoryEntries) ? globalMemoryEntries.length : 0
-        });
-      }
       const resolvedMemory = createMemoryStore(mergeGlobalIntoSessionMemory(sessionMemoryEntries, globalMemoryEntries));
       // AGRUN-206 — `nextRunId` is now async (CAS retry loop), so the
       // run id must be claimed before constructing the runLoop options.
@@ -96866,7 +97167,18 @@ ${user}:`]
       }
 
       if (Array.isArray(result.memoryEntriesAdded)) {
+        // Model-initiated entries (remember action) are created inside the run
+        // loop, before the router's threadId is stamped onto runState — so the
+        // session layer (which owns threads) fills in missing provenance here.
+        // Without a threadId the entry would fall into the legacy "default"
+        // bucket and be invisible to every real thread's scoped recall.
+        const activeThreadId = readActiveThreadId(result.runState);
+        const activeTurnId = readActiveTurnId(result.runState) || (result.runState && result.runState.runId) || null;
         for (const entry of result.memoryEntriesAdded) {
+          if (entry && entry.metadata && typeof entry.metadata === "object") {
+            if (activeThreadId && !entry.metadata.threadId) entry.metadata.threadId = activeThreadId;
+            if (activeTurnId && !entry.metadata.turnId) entry.metadata.turnId = activeTurnId;
+          }
           await options.sessionStore.appendMemory(sessionRecord.id, entry);
         }
       }
@@ -97172,7 +97484,7 @@ ${user}:`]
       };
     }
 
-    async function prepareSessionInput(input, userMessage, threadScope, callerAbortSignal) {
+    async function prepareSessionInput(input, userMessage, threadScope, callerAbortSignal, globalMemoryEntries) {
       const preparedInput = cloneValue$1(input);
 
       if (isToolLoopProviderRequest(input)) {
@@ -97180,6 +97492,7 @@ ${user}:`]
           callerAbortSignal: callerAbortSignal || null,
           compactionPolicy: options.runtimeConfig && options.runtimeConfig.compactionPolicy,
           excludeMessageId: userMessage ? userMessage.id : null,
+          globalMemoryEntries: globalMemoryEntries || [],
           input: {
             ...preparedInput,
             agrunSessionId: sessionRecord.id
@@ -97213,6 +97526,7 @@ ${user}:`]
           sessionStore: options.sessionStore,
           approvalSigner: options.runtimeConfig && options.runtimeConfig.approvalSigner,
           enforceSessionBinding: !!(options.runtimeConfig && options.runtimeConfig.approvalSigning && options.runtimeConfig.approvalSigning.enforceSessionBinding),
+          globalMemoryEntries: globalMemoryEntries || [],
           threadScope: threadScope || null
         });
       }
@@ -97488,11 +97802,12 @@ ${user}:`]
   // time; this module just maps key → default.
 
   const PROMPT_SECTION_DEFAULTS = Object.freeze({
-    basePlannerDirectives: buildLines$7,
-    compactPlannerDirectives: buildLines$6,
-    skillDirectives: buildLines$5,
-    workspaceDirectives: buildLines$4,
-    researchDirectives: buildLines$3,
+    basePlannerDirectives: buildLines$8,
+    compactPlannerDirectives: buildLines$7,
+    skillDirectives: buildLines$6,
+    workspaceDirectives: buildLines$5,
+    researchDirectives: buildLines$4,
+    memoryDirectives: buildLines$3,
     convergenceAdvisory: buildLines$2,
     todoDirectives: buildLines$1,
     nativePlannerDirectives: buildLines

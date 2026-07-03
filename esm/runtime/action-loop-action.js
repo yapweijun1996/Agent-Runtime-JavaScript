@@ -363,6 +363,11 @@ async function executeAction(options) {
       agentSkills: Array.isArray(agentSkills) ? agentSkills : [],
       agentSkillContext: runState.agentSkillContext,
       debug: debug || null,
+      // Model-initiated memory sink (remember action). Entries pushed here
+      // ride result.memoryEntriesAdded; session.run persists them to the
+      // session store. Mirrored on the plan door (createActionContext in
+      // action-loop-plan-validation.js) per the dispatch-parity rule.
+      memoryEntriesAdded,
       pushStep,
       request,
       runState,

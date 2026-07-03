@@ -4,7 +4,7 @@
 // is gated on the action's presence, so a host that disables a skill action
 // never sees a directive naming it. Host override key: `skillDirectives`.
 // Default output is byte-identical (locked by test/unit/prompt-snapshot.test.js).
-function buildLines$5({ availableActions, compactSystemPrompt } = {}) {
+function buildLines$6({ availableActions, compactSystemPrompt } = {}) {
   const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
   const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
   const lines = [];
@@ -31,4 +31,4 @@ function buildLines$5({ availableActions, compactSystemPrompt } = {}) {
   return lines;
 }
 
-export { buildLines$5 as buildLines };
+export { buildLines$6 as buildLines };

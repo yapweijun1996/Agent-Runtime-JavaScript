@@ -517,7 +517,10 @@ function inspectContentAfterFinalSection(content, finalSectionTitle) {
 // treated as the terminal candidate when no finalSectionTitle was declared.
 // Exact-title match (optional numbering prefix, optional trailing colon) so
 // mid-document headings like "Sources of Error" never false-positive.
-const SOURCES_HEADING_PATTERN = /^(?:\d+[\.)]?\s*)?(sources?|references?|bibliography|citations?|参考文献|参考资料|来源)\s*[:：]?\s*$/iu;
+// Chinese heading synonyms below (meaning "references"/"bibliography" and
+// "source(s)") are Unicode-escaped, not literal CJK, per this repo's
+// english-codebase.test.js source-file convention.
+const SOURCES_HEADING_PATTERN = /^(?:\d+[\.)]?\s*)?(sources?|references?|bibliography|citations?|\u53c2\u8003\u6587\u732e|\u53c2\u8003\u8d44\u6599|\u6765\u6e90)\s*[:：]?\s*$/iu;
 
 function inspectContentAfterSourcesHeading(content) {
   const headings = collectHeadingLines(content);

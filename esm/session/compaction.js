@@ -10,6 +10,7 @@ import { filterMessagesByThread, sliceAfterSummary, selectCompactionMessages, su
 import { buildProviderConversation } from './provider-conversation.js';
 import { readSessionParts } from './content.js';
 import { isCompactionMessage } from './messages.js';
+import { mergeGlobalIntoSessionMemory } from './global-memory.js';
 import { buildSessionMemorySnapshot } from './session-memory.js';
 import { DEFAULT_THREAD_ID } from './thread.js';
 import { evaluateProviderPromptBudget } from './token-budget.js';
@@ -48,7 +49,16 @@ async function prepareProviderSessionContext(options) {
     : DEFAULT_THREAD_ID;
   const summary = await sessionStore.getSummary(sessionId, compactionThreadId);
   const messages = await sessionStore.readMessages(sessionId);
-  const memoryEntries = await sessionStore.readMemory(sessionId);
+  const sessionMemoryEntries = await sessionStore.readMemory(sessionId);
+  // Cross-session global memory (promoted preferences/facts/decisions) must
+  // reach the ACTUAL prompt-building path, not just the in-loop memory
+  // facade (handle.js's separate resolvedMemory) — otherwise a brand-new
+  // session never inherits a standing instruction like "always reply in
+  // Mandarin" that a prior session promoted. The caller reads global memory
+  // once (it alone knows the runtimeConfig.globalMemory gate) and passes the
+  // raw entries down; this reuses the same merge/dedupe rules handle.js
+  // already applies to resolvedMemory so the two views never disagree.
+  const memoryEntries = mergeGlobalIntoSessionMemory(sessionMemoryEntries, options.globalMemoryEntries);
   const completedMessages = messages.filter((message) => (
     message &&
     !isCompactionMessage(message) &&

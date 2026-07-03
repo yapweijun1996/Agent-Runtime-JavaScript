@@ -10,6 +10,73 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Active work on `main` that has not shipped to a version tag.
 
+### Added
+- **`remember` action — model-initiated durable memory (AGRUN-613).** New
+  tier-0 built-in action: the model itself stores a durable user preference,
+  fact, or decision (`{kind, slot, text}`, last-wins per slot) the moment the
+  user states one — no extra LLM call, no keyword matching, works even when
+  the host disables per-turn extraction (`memoryExtractionPolicy`). Entries
+  use the extractor's shape, so evidence classification, Confirmed
+  Preferences prompt injection, working-memory projection, and global-memory
+  promotion all apply unchanged. New `memoryDirectives` prompt section
+  (host-overridable) plus native-door lines teach the model to honor
+  Confirmed Preferences as standing instructions and when to call `remember`.
+
+### Fixed
+- **Preference entries no longer vanish behind thread scoping (AGRUN-613).**
+  `filterMemoryEntriesByThread` treats `kind: "preference"` entries as
+  session-scoped — the user is the same person on every topic thread, so
+  "always reply in Mandarin" survives the router opening a new thread.
+  Facts/decisions stay thread-scoped (cross-thread recall remains their
+  escape hatch). The session layer also stamps missing thread/turn
+  provenance onto model-initiated memory entries before persisting them.
+
+- **Free-form clarification replies now promote the topic (AGRUN-614).** A
+  typo'd or near-match reply to a clarification question (e.g. "tno systen
+  pte ltd" answering "Do you mean TNO System Pte Ltd?") fell through every
+  exact-match branch to the AGRUN-595 catch-all, which unconditionally kept
+  the stale prior topic. It now promotes the reply itself when the reply is
+  topic-shaped (short, non-question), matching the structural check
+  `topic_refinement`/breakout already use, and only preserves the stale topic
+  for sentence/instruction-shaped replies.
+
+- **The graceful "deny" policy path works again on both dispatch doors (AGRUN-615).**
+  AGRUN-588 correctly stopped OFFERING policy-denied actions to the planner,
+  but its own decision-validator (`normalizeActionName`, shared by the
+  single-action and plan-array doors) only recognized action names that were
+  still in that filtered list — so a policy-denied name a model still emits
+  (envelope mode has no structural tool-schema constraint against this) was
+  misclassified `unknown_action_name` and burned a repair cycle instead of
+  reaching the execution-side `handlePolicyDenied` safety net AGRUN-588's own
+  comment promised. The plan-batch re-validator had the same bug from another
+  angle: a generic "hidden by the runtime action surface" rejection ran
+  before the dedicated `action_policy_denied_in_plan` feedback ever got a
+  chance to fire, leaving that AGRUN-562 code path unreachable. Both doors
+  now recognize a policy-denied name as real (just forbidden) and route it to
+  the correct graceful-denial contract.
+
+- **A brand-new session now inherits promoted global memory (AGRUN-616).**
+  `promoteToGlobalMemory` always wrote confirmed preferences/facts/decisions
+  to the cross-session store correctly, and `handle.js` read them back
+  correctly — but only into `resolvedMemory`, the facade used by in-loop
+  memory tools, never into the actual prompt. The prompt's "Confirmed
+  Preferences" block is built by `compaction.js`'s
+  `prepareProviderSessionContext`, which read only session-scoped memory —
+  so a preference promoted from one session (e.g. "always reply in
+  Mandarin") was durably stored yet invisible to a brand-new session's own
+  prompt. `prepareProviderSessionContext` now accepts the caller's already-
+  fetched global memory and merges it in via the same
+  `mergeGlobalIntoSessionMemory` rule `resolvedMemory` already uses (no new
+  merge policy invented). `handle.js` reads global memory once and reuses it
+  for both consumers; the approval-resume door was wired too (two-door
+  parity, AGRUN-474 precedent). Live-verified across openai/gemini/deepseek:
+  a preference remembered in session A reaches session B's outbound request
+  body (fetch-intercepted) and session B replies in the requested language.
+
+`npm run check` is fully green again (verified twice); `main` had been
+carrying the research-flows.test.js failure above and the AGRUN-614
+topic-promotion failure since earlier the same day.
+
 ## [4.1.0] — 2026-07-03 (production-ready hardening)
 
 The 2026-07-02 → 07-03 arc: native-tools default planner (ADR-0058), 2-5×

@@ -153,11 +153,22 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
   // loop: "Global headlines please. Yes, run the web search now." got the
   // identical question again). Only a breakout to a clearly new topic
   // (above) or an upstream new_task escapes resolution.
+  //
+  // AGRUN-614 — a NEAR match still promotes the topic. The `clarifiedTopic &&
+  // matchesClarificationAnswer` branch above requires the reply to contain
+  // every token of the inferred topic verbatim, so a one-word typo ("tno
+  // systen pte ltd" answering "Do you mean TNO System Pte Ltd?") falls
+  // through here instead — and unconditionally keeping the STALE currentTopic
+  // meant the reply that corrected/restated the topic never actually updated
+  // it. When the reply itself is topic-shaped (short, not a question — the
+  // same structural primitive topic_refinement/breakout already use), treat
+  // it as the topic the user is providing; a longer sentence-shaped reply
+  // (an instruction, not a topic label) still preserves currentTopic.
   if (pendingClarification) {
     return {
       activeGoal: currentGoal || normalizedPrompt,
       activeQuery: normalizedPrompt,
-      activeTopic: currentTopic || normalizedPrompt,
+      activeTopic: looksLikeTopicPrompt(normalizedPrompt) ? normalizedPrompt : (currentTopic || normalizedPrompt),
       continuityKind: "clarification_free_form_answer",
       hasUserClarification: true,
       lastClarificationResolution: {

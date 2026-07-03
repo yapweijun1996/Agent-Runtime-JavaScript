@@ -8,7 +8,7 @@ import { normalizeThrownError } from './errors.js';
 import { validateActionArgs } from './action-args-validation.js';
 import { readPlanActionContract } from './action-plan-contract.js';
 import { resolveClosedNamespaceForAction, ACTION_NAMESPACE_CLOSED_CODE } from './action-namespace-gate.js';
-import { selectPlannerActions } from './planner-action-surface.js';
+import { selectPlannerActions, readPolicyDeniedActionNames } from './planner-action-surface.js';
 import { resolveTerminalAvailability } from './terminal-repair/availability.js';
 import { readString, readStringArray } from './semantic-json.js';
 
@@ -275,6 +275,18 @@ function validateRuntimeActionSurface(session, actionName, index) {
   if (isActionAvailable(actionName, selectedActions)) {
     return { ok: true };
   }
+  // AGRUN-615 — a name hidden ONLY because a static policy denies it is not
+  // an "action surface" problem; it's a policy problem with its OWN dedicated
+  // feedback (ACTION_POLICY_DENIED_IN_PLAN_FEEDBACK below, via the
+  // runPreToolCall/resolveBlockedPolicyDecision check the caller runs right
+  // after this returns ok). Without this, every policy-denied plan action hit
+  // this generic "hidden by the runtime action surface" rejection first and
+  // never reached the AGRUN-562 deny-specific message — the plan-batch door's
+  // half of the same gap AGRUN-615 fixed on the single-action door
+  // (planner-repair.js normalizeActionName).
+  if (readPolicyDeniedActionNames(session.availableActions, session.runtimeConfig).includes(actionName)) {
+    return { ok: true };
+  }
   const selectedActionNames = selectedActions.map((action) => readString(action && action.name)).filter(Boolean);
   const detail = buildRuntimeActionSurfaceDetail(session, selectedActionNames, actionName);
   return createPlanValidationError(
@@ -425,6 +437,9 @@ function createActionContext(session) {
     agentSkills: Array.isArray(session.runtimeConfig.agentSkills) ? session.runtimeConfig.agentSkills : [],
     agentSkillContext: session.runState.agentSkillContext,
     debug: session.debug || null,
+    // Model-initiated memory sink (remember action) — mirrors the
+    // single-action door's context in action-loop-action.js.
+    memoryEntriesAdded: session.memoryEntriesAdded,
     request: session.request,
     runState: session.runState,
     runtimeConfig: session.runtimeConfig,

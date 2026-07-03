@@ -4,7 +4,7 @@
 // host that disables both research actions sees NO web_search/read_url directive
 // (the Globe3 leak ADR-0034 closed). Host override key: `researchDirectives`.
 // Default output is byte-identical (locked by test/unit/prompt-snapshot.test.js).
-function buildLines$3({ availableActions, compactSystemPrompt } = {}) {
+function buildLines$4({ availableActions, compactSystemPrompt } = {}) {
   const actionDefinitions = Array.isArray(availableActions) ? availableActions : [];
   const hasAction = (name) => actionDefinitions.some((action) => action.name === name);
   const lines = [];
@@ -35,4 +35,4 @@ function buildLines$3({ availableActions, compactSystemPrompt } = {}) {
   return lines;
 }
 
-export { buildLines$3 as buildLines };
+export { buildLines$4 as buildLines };

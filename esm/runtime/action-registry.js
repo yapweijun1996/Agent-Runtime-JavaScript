@@ -1,4 +1,5 @@
 import { askClarificationAction } from './actions/ask-clarification-action.js';
+import { rememberAction } from './actions/remember-action.js';
 import { createExecuteSkillToolAction } from './actions/execute-skill-tool-action.js';
 import { createListAgentSkillsAction } from './actions/list-agent-skills-action.js';
 import { createReadAgentSkillAction } from './actions/read-agent-skill-action.js';
@@ -98,6 +99,7 @@ function buildActions(options) {
     workspacePublishCandidateAction,
     createRepoSearchAction(repoFileTools),
     createRepoReadFileAction(repoFileTools),
+    rememberAction,
     askClarificationAction
   ].filter(Boolean);
   const reservedActionNames = [
@@ -168,6 +170,10 @@ const BUILT_IN_PERMISSION_METADATA = Object.freeze({
   // virtual planner-surface mutation; no approval, checkpoint-required
   // interrupt behavior).
   open_action_namespace: virtualMutationPermission("action_namespace_state"),
+  // Standing-instruction fix (2026-07-03) — model-initiated durable memory.
+  // A local session-memory mutation: reversible via slot supersede, no
+  // external I/O, no approval (same shape as todo/workspace mutations).
+  remember: virtualMutationPermission("session_memory"),
   spawn_subagent: dynamicPermission("subagent_run"),
   todo_advance: virtualMutationPermission("todo_state"),
   todo_cancel: virtualMutationPermission("todo_state"),

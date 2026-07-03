@@ -238,16 +238,33 @@ function extractReasoningSummary$1(result) {
 function buildAISDKMessages$2(request) {
   const messages = [];
   for (const message of Array.isArray(request.conversation) ? request.conversation : []) {
+    assertNoImageParts(message.parts, request);
     messages.push({
       role: message.role,
       content: mapAISDKParts$2(message.role, message.parts)
     });
   }
+  const currentTurnParts = buildCurrentTurnParts(request.prompt, request.parts);
+  assertNoImageParts(currentTurnParts, request);
   messages.push({
     role: "user",
-    content: mapAISDKParts$2("user", buildCurrentTurnParts(request.prompt, request.parts))
+    content: mapAISDKParts$2("user", currentTurnParts)
   });
   return messages;
+}
+
+// The @ai-sdk/deepseek adapter silently drops image content parts (they fall
+// into an internal `warnings` array agrun never reads) instead of erroring or
+// sending them, so the model answers as if it saw an image it never received.
+// Fail loudly here -- for both the current turn's parts and any replayed
+// image from earlier in the conversation -- rather than let DeepSeek
+// hallucinate a description.
+function assertNoImageParts(parts, request) {
+  if (!Array.isArray(parts) || !parts.some((part) => isImagePart(part))) return;
+  throw createProviderError$2(
+    "DeepSeek does not support image input in agrun (the underlying AI SDK adapter silently drops image content). Use openai, gemini, or a vision-capable custom provider for requests with image attachments.",
+    { request: { model: request.model, provider: "deepseek" } }
+  );
 }
 
 function mapAISDKParts$2(role, parts) {
@@ -327,4 +344,4 @@ function readErrorResponseBody$2(error) {
   return null;
 }
 
-export { buildDeepSeekProviderOptions, requestDeepSeekChatCompletion, requestDeepSeekChatCompletionStreaming };
+export { buildAISDKMessages$2 as buildAISDKMessages, buildDeepSeekProviderOptions, requestDeepSeekChatCompletion, requestDeepSeekChatCompletionStreaming };

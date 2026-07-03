@@ -36,7 +36,7 @@ import { readString } from '../semantic-json.js';
 // plans, the verifier nudge is not worth the loop cost.
 const VERIFIER_NUDGE_MIN_ITEMS = 3;
 
-function readProvenance(runState) {
+function readProvenance$1(runState) {
   if (!runState || typeof runState !== "object") return null;
   const threadId = readString(runState.threadId);
   const turnId = readString(runState.runId);
@@ -144,7 +144,7 @@ async function executeTodoPlanAction(context, args) {
     throw new Error("todo_plan: runState is required");
   }
   const opts = args && typeof args === "object" ? args : {};
-  const provenance = readProvenance(runState);
+  const provenance = readProvenance$1(runState);
   const rawItems = Array.isArray(opts.items) ? opts.items : [];
   const maxItems = readTodoMaxItems(context);
   const items = rawItems
@@ -304,7 +304,7 @@ async function executeTodoAdvanceAction(context, args) {
   if (!current || typeof current !== "object") {
     throw new Error("todo_advance: no TodoState exists yet — call todo_plan first");
   }
-  const provenance = readProvenance(runState);
+  const provenance = readProvenance$1(runState);
   const previousItem = Array.isArray(current.items)
     ? current.items.find((item) => item && item.id === itemId)
     : null;
@@ -378,7 +378,7 @@ async function executeTodoCancelAction(context, args) {
   }
   const opts = args && typeof args === "object" ? args : {};
   const cancellableBefore = countCancellableTodoItems(current);
-  const provenance = readProvenance(runState);
+  const provenance = readProvenance$1(runState);
   const next = applyTodoCancel(current, {
     reason: opts.reason,
     note: opts.note,
@@ -446,7 +446,7 @@ function applyTodoRunNextToRunState(runState, args, context) {
   }
 
   const opts = args && typeof args === "object" ? args : {};
-  const provenance = readProvenance(runState);
+  const provenance = readProvenance$1(runState);
   const activeItem = findActiveTodoItem(current);
 
   if (current.status === "completed" || current.status === "abandoned") {

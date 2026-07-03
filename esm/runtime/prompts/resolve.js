@@ -16,6 +16,7 @@ const PROMPT_SECTION_KEYS = Object.freeze([
   "skillDirectives",          // envelope skill-discovery blocks
   "workspaceDirectives",      // envelope virtual-workspace blocks
   "researchDirectives",       // envelope web_search/read_url blocks
+  "memoryDirectives",         // envelope standing-preference + remember blocks
   "convergenceAdvisory",      // envelope signal/finalize advisory block
   "todoDirectives",           // envelope TodoState auto-planner block
   "nativePlannerDirectives"   // native tool-calling mode directive body

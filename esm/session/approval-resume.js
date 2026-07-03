@@ -33,6 +33,11 @@ async function prepareSessionApprovalResumeInput(options) {
       sessionId,
       sessionPolicy: options.sessionPolicy,
       sessionStore: options.sessionStore,
+      // Two-door parity (AGRUN-474 precedent) — the tool-loop door merges
+      // cross-session global memory into the prompt context; the approval-
+      // resume door builds a prompt via this same function and must not
+      // silently drop it.
+      globalMemoryEntries: options && options.globalMemoryEntries ? options.globalMemoryEntries : [],
       threadScope: options && options.threadScope ? options.threadScope : null
     });
 

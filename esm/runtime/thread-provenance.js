@@ -57,7 +57,7 @@ function stampThreadProvenance(entry, runState) {
   return entry;
 }
 
-function readProvenance$1(entry) {
+function readProvenance$2(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     return null;
   }
@@ -110,7 +110,7 @@ function filterByThreadWindow(entries, options) {
     return entries.slice();
   }
   return entries.filter((entry) => {
-    const provenance = readProvenance$1(entry);
+    const provenance = readProvenance$2(entry);
     if (!provenance) return true; // legacy / unlabeled — keep
     if (threadFilter && provenance.threadId !== threadFilter) return false;
     if (windowFloor && provenance.turnId && isTurnIdBefore(provenance.turnId, windowFloor)) return false;
@@ -152,4 +152,4 @@ function trimRunStateForThreadWindow(runState, options) {
   return runState;
 }
 
-export { filterByThreadWindow, readActiveThreadId, readActiveTurnId, readProvenance$1 as readProvenance, stampThreadProvenance, trimRunStateForThreadWindow };
+export { filterByThreadWindow, readActiveThreadId, readActiveTurnId, readProvenance$2 as readProvenance, stampThreadProvenance, trimRunStateForThreadWindow };
