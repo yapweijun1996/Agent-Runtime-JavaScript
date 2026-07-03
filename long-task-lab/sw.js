@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agrun-long-task-lab-shell-mr4q57tc';
+const CACHE_NAME = 'agrun-long-task-lab-shell-mr4rx3s8';
 const SHELL_ASSETS = [
   '/',
   '/offline.html',
@@ -13,7 +13,7 @@ const SHELL_ASSETS = [
   '/icons/maskable-icon.svg',
 ];
 // Injected at build time by inject-sw-precache Vite plugin — empty in dev
-const PRECACHE_ASSETS = ["/assets/index-BRFkPcCS.css","/assets/react-vendor-auj285-g.js","/assets/ui-vendor-DTzWvfsn.js","/assets/runtime-vendor-BF7kPTC4.js","/assets/index-CwbqHUMp.js"];
+const PRECACHE_ASSETS = ["/assets/index-BRFkPcCS.css","/assets/react-vendor-auj285-g.js","/assets/ui-vendor-DTzWvfsn.js","/assets/runtime-vendor-BF7kPTC4.js","/assets/index-fVlbEvTG.js"];
 const PRIVATE_PREFIXES = ['/openai-gateway'];
 
 self.addEventListener('install', (event) => {
