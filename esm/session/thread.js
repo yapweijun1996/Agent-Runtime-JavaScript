@@ -198,8 +198,23 @@ function applyRouterVerdict(options) {
  * `{prompt}`, `{messages:[...{content}]}`, and normalized-input shapes.
  * Returns an empty string when nothing meaningful is found (e.g. image-
  * only turns) so callers can skip routing gracefully.
+ *
+ * AGRUN-618 — attachment filenames are appended to the extracted text.
+ * Image parts contribute zero topic tokens on their own, so a turn like
+ * "ocr" + Receipt.png used to seed a thread whose entire vocabulary was
+ * {ocr}: no later question could ever route back to it, stranding the
+ * image permanently. The filename is factual turn metadata, not inferred
+ * meaning — including it keeps routing purely mechanical while making
+ * multimodal turns visible to both Jaccard scoring and the LLM planner's
+ * thread summaries.
  */
 function extractUserMessageText(input) {
+  const text = extractPromptText(input);
+  const filenames = collectAttachmentFilenames(input);
+  return [text, ...filenames].filter(Boolean).join(" ").trim();
+}
+
+function extractPromptText(input) {
   if (typeof input === "string") return input.trim();
   if (!input || typeof input !== "object") return "";
   if (typeof input.text === "string" && input.text.trim()) return input.text.trim();
@@ -213,6 +228,17 @@ function extractUserMessageText(input) {
     }
   }
   return "";
+}
+
+function collectAttachmentFilenames(input) {
+  if (!input || typeof input !== "object" || !Array.isArray(input.parts)) return [];
+  const filenames = [];
+  for (const part of input.parts) {
+    if (!part || typeof part !== "object" || part.type !== "image") continue;
+    const filename = typeof part.filename === "string" ? part.filename.trim() : "";
+    if (filename) filenames.push(filename);
+  }
+  return filenames;
 }
 
 function readMessageText$2(message) {

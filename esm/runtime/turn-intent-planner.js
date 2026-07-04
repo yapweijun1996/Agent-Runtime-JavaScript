@@ -195,6 +195,21 @@ function mergeTurnIntent(structural, planned) {
   if (out.recallIntent && out.divergentIntent) {
     delete out.divergentIntent;
   }
+  // AGRUN-618 — when the planner was consulted and explicitly classified the
+  // turn as a continuation of existing context (follow_up / drill_down /
+  // referential), a structural divergentIntent is an overruled guess: the AI
+  // saw the thread summaries and the message, the extractor only saw token
+  // overlap. Planner kind "unknown" (or a planner error → planned {}) leaves
+  // the structural signal standing — override requires a positive AI verdict,
+  // absence of one is not evidence.
+  const plannerContinues = planned && typeof planned === "object" && (
+    planned.kind === "follow_up"
+    || planned.kind === "drill_down"
+    || planned.referentialIntent === true
+  );
+  if (plannerContinues && planned.divergentIntent !== true && out.divergentIntent) {
+    delete out.divergentIntent;
+  }
   return out;
 }
 

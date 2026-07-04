@@ -1136,8 +1136,23 @@
    * `{prompt}`, `{messages:[...{content}]}`, and normalized-input shapes.
    * Returns an empty string when nothing meaningful is found (e.g. image-
    * only turns) so callers can skip routing gracefully.
+   *
+   * AGRUN-618 — attachment filenames are appended to the extracted text.
+   * Image parts contribute zero topic tokens on their own, so a turn like
+   * "ocr" + Receipt.png used to seed a thread whose entire vocabulary was
+   * {ocr}: no later question could ever route back to it, stranding the
+   * image permanently. The filename is factual turn metadata, not inferred
+   * meaning — including it keeps routing purely mechanical while making
+   * multimodal turns visible to both Jaccard scoring and the LLM planner's
+   * thread summaries.
    */
   function extractUserMessageText(input) {
+    const text = extractPromptText(input);
+    const filenames = collectAttachmentFilenames(input);
+    return [text, ...filenames].filter(Boolean).join(" ").trim();
+  }
+
+  function extractPromptText(input) {
     if (typeof input === "string") return input.trim();
     if (!input || typeof input !== "object") return "";
     if (typeof input.text === "string" && input.text.trim()) return input.text.trim();
@@ -1151,6 +1166,17 @@
       }
     }
     return "";
+  }
+
+  function collectAttachmentFilenames(input) {
+    if (!input || typeof input !== "object" || !Array.isArray(input.parts)) return [];
+    const filenames = [];
+    for (const part of input.parts) {
+      if (!part || typeof part !== "object" || part.type !== "image") continue;
+      const filename = typeof part.filename === "string" ? part.filename.trim() : "";
+      if (filename) filenames.push(filename);
+    }
+    return filenames;
   }
 
   function readMessageText$2(message) {
@@ -16804,7 +16830,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "b5e3b59a3"
+      "b9bb1fc82"
         
     );
   }
@@ -93456,6 +93482,21 @@ ${user}:`]
     if (out.recallIntent && out.divergentIntent) {
       delete out.divergentIntent;
     }
+    // AGRUN-618 — when the planner was consulted and explicitly classified the
+    // turn as a continuation of existing context (follow_up / drill_down /
+    // referential), a structural divergentIntent is an overruled guess: the AI
+    // saw the thread summaries and the message, the extractor only saw token
+    // overlap. Planner kind "unknown" (or a planner error → planned {}) leaves
+    // the structural signal standing — override requires a positive AI verdict,
+    // absence of one is not evidence.
+    const plannerContinues = planned && typeof planned === "object" && (
+      planned.kind === "follow_up"
+      || planned.kind === "drill_down"
+      || planned.referentialIntent === true
+    );
+    if (plannerContinues && planned.divergentIntent !== true && out.divergentIntent) {
+      delete out.divergentIntent;
+    }
     return out;
   }
 
@@ -97379,19 +97420,31 @@ ${user}:`]
         activeThreadId
       });
 
-      // Escalation to LLM-backed planner only when:
-      //  (a) A classifier callback was configured (runtime opts in),
-      //  (b) Structural extractor found no signal,
-      //  (c) More than one thread exists so there is something to pivot to.
-      // Keeps the cheap path hot and makes the LLM cost explicit — Slice G
-      // contract: planner augments, never replaces, the structural layer.
+      // Escalation to LLM-backed planner when:
+      //  (a) A classifier callback was configured (runtime opts in), AND
+      //  (b) At least one thread exists so there is something to route against, AND
+      //  (c) EITHER the structural extractor found no signal, OR it claims
+      //      divergentIntent. AGRUN-618 — a structural divergent is a pure
+      //      zero-Jaccard-overlap guess, and acting on it unconfirmed splits
+      //      the session into a brand-new EMPTY thread (destructive: recall/
+      //      meta questions like "summarize this session" or "what was the
+      //      image I uploaded" land with no context at all). Only the AI can
+      //      distinguish a genuinely new topic from a recall/referential turn
+      //      that happens to share no tokens, so a divergent claim must be
+      //      confirmed by the planner whenever one is available. Structural
+      //      signals remain the complete fallback when no classifier is
+      //      configured, and a planner failure ({}) leaves the structural
+      //      verdict standing — graceful degrade, never a blocked turn.
+      //      Structural pivotIntent stays unescalated: it requires positive
+      //      dominant overlap with an existing thread and lands on related
+      //      context, so a misfire is non-destructive.
       let turnIntent = structuralIntent;
       const classify = typeof threadsConfig.intentClassifier === "function"
         ? threadsConfig.intentClassifier
         : null;
       const needsPlanner = classify
-        && Object.keys(structuralIntent).length === 0
-        && threads.length >= 1;
+        && threads.length >= 1
+        && (Object.keys(structuralIntent).length === 0 || structuralIntent.divergentIntent === true);
       if (needsPlanner) {
         const planned = await planTurnIntent({
           userMessage: userText,

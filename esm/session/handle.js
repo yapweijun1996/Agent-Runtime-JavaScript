@@ -611,19 +611,31 @@ function createSessionHandle(options) {
       activeThreadId
     });
 
-    // Escalation to LLM-backed planner only when:
-    //  (a) A classifier callback was configured (runtime opts in),
-    //  (b) Structural extractor found no signal,
-    //  (c) More than one thread exists so there is something to pivot to.
-    // Keeps the cheap path hot and makes the LLM cost explicit — Slice G
-    // contract: planner augments, never replaces, the structural layer.
+    // Escalation to LLM-backed planner when:
+    //  (a) A classifier callback was configured (runtime opts in), AND
+    //  (b) At least one thread exists so there is something to route against, AND
+    //  (c) EITHER the structural extractor found no signal, OR it claims
+    //      divergentIntent. AGRUN-618 — a structural divergent is a pure
+    //      zero-Jaccard-overlap guess, and acting on it unconfirmed splits
+    //      the session into a brand-new EMPTY thread (destructive: recall/
+    //      meta questions like "summarize this session" or "what was the
+    //      image I uploaded" land with no context at all). Only the AI can
+    //      distinguish a genuinely new topic from a recall/referential turn
+    //      that happens to share no tokens, so a divergent claim must be
+    //      confirmed by the planner whenever one is available. Structural
+    //      signals remain the complete fallback when no classifier is
+    //      configured, and a planner failure ({}) leaves the structural
+    //      verdict standing — graceful degrade, never a blocked turn.
+    //      Structural pivotIntent stays unescalated: it requires positive
+    //      dominant overlap with an existing thread and lands on related
+    //      context, so a misfire is non-destructive.
     let turnIntent = structuralIntent;
     const classify = typeof threadsConfig.intentClassifier === "function"
       ? threadsConfig.intentClassifier
       : null;
     const needsPlanner = classify
-      && Object.keys(structuralIntent).length === 0
-      && threads.length >= 1;
+      && threads.length >= 1
+      && (Object.keys(structuralIntent).length === 0 || structuralIntent.divergentIntent === true);
     if (needsPlanner) {
       const planned = await planTurnIntent({
         userMessage: userText,

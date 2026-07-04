@@ -23,6 +23,27 @@ Active work on `main` that has not shipped to a version tag.
   Confirmed Preferences as standing instructions and when to call `remember`.
 
 ### Fixed
+- **Thread routing is AI-first: the classifier now confirms every divergent
+  split, and image turns are routable (AGRUN-618).** The structural
+  zero-overlap heuristic (`extractTurnIntent`) used to bypass the LLM
+  `intentClassifier` whenever it fired `divergentIntent`, so recall/meta
+  questions ("summarize this session", "what did I ask at the beginning",
+  "what was the image I uploaded") — which share no tokens with prior
+  threads by nature — were split into brand-new EMPTY threads and answered
+  with "I cannot see earlier conversation". The planner is now escalated to
+  confirm any structural divergent claim; a positive continuation verdict
+  (`recallIntent` / `follow_up` / `drill_down` / `referentialIntent`)
+  overrides the structural guess, while classifier absence or failure leaves
+  structural signals as the complete fallback. Attachment filenames are now
+  part of the routing text, so an "ocr" + Receipt.png turn no longer seeds a
+  thread with near-empty vocabulary that nothing can ever route back to —
+  uploaded images stay reachable (and are replayed) for later questions.
+  Live-verified on openai + gemini (routing events + image bytes asserted in
+  outbound payloads); deepseek routing verified equally. (An apparent deepseek
+  image-input failure surfaced during this live run turned out to be a test
+  harness artifact, not a product gap — see AGRUN-619 correction; production
+  deepseek traffic already goes through AGRUN-612's guard.)
+
 - **Preference entries no longer vanish behind thread scoping (AGRUN-613).**
   `filterMemoryEntriesByThread` treats `kind: "preference"` entries as
   session-scoped — the user is the same person on every topic thread, so
