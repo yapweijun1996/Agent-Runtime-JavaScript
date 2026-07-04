@@ -23,11 +23,22 @@ Active work on `main` that has not shipped to a version tag.
   tab regains visibility. The service worker only precaches build output (no
   `runtimeCaching` rules), so LLM provider requests and the OpenAI-gateway
   proxy are never intercepted or cached. PWA is build-only — `devOptions`
-  stays unset, so `npm run dev` / HMR is completely untouched. Live-verified:
-  built + served via `vite preview`, forced a `registration.update()` against
-  a rebuilt dist, confirmed the banner appears, clicking it reloads onto the
-  new build (asserted via a build-only marker), and confirmed zero service
-  worker registrations during `npm run dev`.
+  stays unset, so `npm run dev` / HMR is completely untouched. `base: './'`
+  plus relative manifest/icon/`start_url`/`scope` paths mean the same built
+  `dist/` works unmodified whether copied to a domain-root static host or a
+  GitHub Pages `/repo-name/` subpath — no rebuild-per-target needed.
+  Live-verified: built + served via `vite preview`, forced a
+  `registration.update()` against a rebuilt dist, confirmed the banner
+  appears, clicking it reloads onto the new build (asserted via a build-only
+  marker); confirmed zero service worker registrations during `npm run dev`;
+  separately verified the same `dist/` served from both a domain root and a
+  synthetic `/agrun-demo/` subpath — manifest, all 3 icons, and the service
+  worker (correctly scoped to the subpath) all resolved with no absolute-path
+  404s in either case. Mobile pinch/double-tap zoom is disabled (AGRUN-621) —
+  viewport `maximum-scale=1.0, user-scalable=no` plus a `touch-action: pan-x
+  pan-y` CSS fallback on `<html>` (iOS Safari only honors the viewport
+  restriction in installed standalone mode, not a regular tab) — so the app
+  keeps a native-app feel on mobile while normal scrolling still works.
 
 - **`remember` action — model-initiated durable memory (AGRUN-613).** New
   tier-0 built-in action: the model itself stores a durable user preference,
