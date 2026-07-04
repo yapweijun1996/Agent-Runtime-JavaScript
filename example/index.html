@@ -21,17 +21,20 @@
           : theme;
       })();
     </script>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Relative hrefs (no leading /) so these resolve correctly whether the
+         built dist/ is served from a domain root or a subpath — see
+         `base: './'` in vite.config.ts. -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <meta name="theme-color" content="#111111" />
     <title>AI Chatbox Workspace</title>
-    <script type="module" crossorigin src="/assets/index-DEHdBOE2.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-vendor-KgvQAEbf.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-vendor-gOwAs0hm.js">
-    <link rel="modulepreload" crossorigin href="/assets/runtime-vendor-BF7kPTC4.js">
-    <link rel="modulepreload" crossorigin href="/assets/markdown-vendor-BtUIYVzu.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DaoVOQec.css">
-  <link rel="manifest" href="/manifest.webmanifest"></head>
+    <script type="module" crossorigin src="./assets/index-DRNfDQ2B.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/react-vendor-KgvQAEbf.js">
+    <link rel="modulepreload" crossorigin href="./assets/ui-vendor-gOwAs0hm.js">
+    <link rel="modulepreload" crossorigin href="./assets/runtime-vendor-BF7kPTC4.js">
+    <link rel="modulepreload" crossorigin href="./assets/markdown-vendor-BtUIYVzu.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-Dq5KK1K7.css">
+  <link rel="manifest" href="./manifest.webmanifest"></head>
   <body>
     <div id="root"></div>
   </body>
