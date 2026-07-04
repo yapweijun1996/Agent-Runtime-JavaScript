@@ -11,6 +11,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Active work on `main` that has not shipped to a version tag.
 
 ### Added
+- **Browser example is now an installable PWA with an explicit update prompt
+  (AGRUN-620).** `examples/browser` ships a web manifest + service worker
+  (`vite-plugin-pwa`, `registerType: 'prompt'`) so it can be installed to a
+  device home screen / dock and launched standalone. Deliberately NOT
+  auto-update: `useRegisterSW()` (`src/components/UpdatePrompt.tsx`) surfaces
+  `needRefresh` and renders an "Update now" banner only when the server has a
+  newer build — clicking it is the only thing that swaps the running app, so
+  a mid-conversation session is never silently reloaded out from under the
+  user. An open tab re-checks the server hourly and immediately whenever the
+  tab regains visibility. The service worker only precaches build output (no
+  `runtimeCaching` rules), so LLM provider requests and the OpenAI-gateway
+  proxy are never intercepted or cached. PWA is build-only — `devOptions`
+  stays unset, so `npm run dev` / HMR is completely untouched. Live-verified:
+  built + served via `vite preview`, forced a `registration.update()` against
+  a rebuilt dist, confirmed the banner appears, clicking it reloads onto the
+  new build (asserted via a build-only marker), and confirmed zero service
+  worker registrations during `npm run dev`.
+
 - **`remember` action — model-initiated durable memory (AGRUN-613).** New
   tier-0 built-in action: the model itself stores a durable user preference,
   fact, or decision (`{kind, slot, text}`, last-wins per slot) the moment the
