@@ -17277,7 +17277,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "08a04cf60"
+      "ef217deba"
         
     );
   }
@@ -20552,12 +20552,23 @@
         ? progress.productiveDimensions
         : [];
       const hasSourceProgress = productiveDims.includes("source") || productiveDims.includes("evidence");
+      // AGRUN-625: a non-duplicate tool_result tick (AGRUN-263, opt-in via
+      // productiveProgressDimensions) is an equally strong recovery signal for
+      // tool-loop hosts that do no read_url/workspace work at all — without
+      // this, a genuinely new (dedup-fingerprint-checked) tool call only reset
+      // a counter instead of clearing, so a multi-skill discovery pivot after
+      // one productive-but-empty tool result still accumulated ignoredCount
+      // from an already-active prior state and hard-vetoed the very next
+      // discovery wave (Globe3 job d7ddf1e9). The AGRUN-263 dedup-fingerprint
+      // gate (recentToolFingerprints) is the anti-gaming control already in
+      // place; promoting tool_result here does not weaken it.
+      const hasImmediateClearProgress = hasSourceProgress || productiveDims.includes("tool_result");
       // Source progress (successful read_url adding a relevant source) is a
       // strong signal of recovery — clear immediately. Workspace-only
       // progress (e.g. a single workspace_replace after several reads) is
       // weak and can be gamed; require stickiness threshold consecutive
       // workspace-productive steps before clearing.
-      if (hasSourceProgress || !prior.active) {
+      if (hasImmediateClearProgress || !prior.active) {
         return clearReadOnlyPlanningState(prior, "productive_progress", cycle);
       }
       const consecutive = readNumber$f(prior.consecutiveProductiveSteps) + 1;
