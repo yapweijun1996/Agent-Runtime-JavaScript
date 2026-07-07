@@ -9,7 +9,7 @@ import { buildEnvelopeLines } from './planner-envelope-lines.js';
 export { readEnvelopeTerminalPolicy } from './planner-envelope-lines.js';
 import { readContextSnapshot } from '../session/context-snapshot-normalize.js';
 import { projectSessionContextFromSnapshot, summarizeInquiryContext } from '../session/context-snapshot-projection.js';
-import { toSkillPromptValue, readString, serializePromptValue, toSkillCatalogSummary, toSkillCatalogCompact, formatActiveSkillTools } from './planner-prompt-skills.js';
+import { toSkillPromptValue, readString, serializePromptValue, toSkillCatalogSummary, toSkillCatalogCompact, formatActiveSkillTools, serializeStructuredPromptValue } from './planner-prompt-skills.js';
 import { summarizePlanValidationFeedbackForPrompt } from './planner-plan-validation-feedback.js';
 import { summarizeActionPatternConvergence } from './action-pattern-convergence.js';
 import { summarizeReadUrlRecoverySignal } from './read-url-recovery-signal.js';
@@ -678,8 +678,12 @@ function normalizeToolContext(toolContext, projection = {}) {
 
   return {
     historyCount: history.length,
-    lastResult: serializePromptValue(source.lastResult, lastResultChars),
-    recentHistory: deduplicated ? [] : history.slice(-recentHistoryCount).map((entry) => serializePromptValue(entry, historyEntryChars))
+    // AGRUN-626: lastResult/history entries are arbitrary tool/skill result
+    // payloads (host-defined shapes) -- use the structure-aware serializer so
+    // a blind char cut can't silently drop list items or scalar count fields
+    // with no signal to the planner.
+    lastResult: serializeStructuredPromptValue(source.lastResult, lastResultChars),
+    recentHistory: deduplicated ? [] : history.slice(-recentHistoryCount).map((entry) => serializeStructuredPromptValue(entry, historyEntryChars))
   };
 }
 

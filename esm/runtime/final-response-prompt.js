@@ -4,6 +4,7 @@ import { isReadableEvidenceSource } from './read-source-quality.js';
 import { buildVirtualWorkspacePromptBlock } from './virtual-workspace.js';
 import { readVerificationState } from './web-search-verification.js';
 import { readString } from './semantic-json.js';
+import { serializeStructuredPromptValue } from './planner-prompt-skills.js';
 
 function buildFinalResponsePrompt(originalPrompt, instruction, researchContext, sessionContext, toolContext, failedTools, budgetOverrides, options = {}) {
   const normalizedInstruction = readString(instruction);
@@ -351,11 +352,15 @@ function buildSkillToolBlock(toolContext, budgetOverrides) {
     ? overrides.historyEntryBudget
     : (deduplicated ? 600 : 6000);
 
+  // AGRUN-626: same structure-aware serializer as the per-cycle planner
+  // prompt (planner-prompt.js normalizeToolContext) -- this is a separate
+  // door (runtime-finalize.js's answer-composing prompt) that was doing its
+  // own independent blind char-slice on the same tool-result payload shape.
   return [
     "Skill tool results:",
-    source.lastResult ? `Last result:\n${serializePromptValue$1(source.lastResult, lastResultBudget)}` : null,
+    source.lastResult ? `Last result:\n${serializeStructuredPromptValue(source.lastResult, lastResultBudget)}` : null,
     !deduplicated && history.length > 0
-      ? `Recent history:\n${history.slice(-3).map((entry) => serializePromptValue$1(entry, historyEntryBudget)).join("\n\n")}`
+      ? `Recent history:\n${history.slice(-3).map((entry) => serializeStructuredPromptValue(entry, historyEntryBudget)).join("\n\n")}`
       : null
   ].filter(Boolean).join("\n\n");
 }

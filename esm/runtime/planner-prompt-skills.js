@@ -105,6 +105,134 @@ function serializePromptValue$2(value, maxChars) {
   return `${text.slice(0, maxChars - 3)}...`;
 }
 
+// AGRUN-626: arbitrary tool/skill results (host-defined payload shapes agrun
+// cannot know the schema of) were previously projected into the prompt via a
+// blind text.slice() of their full JSON serialization. Past the char budget
+// this cuts an array mid-element and can drop scalar fields entirely (e.g. a
+// host's own has_more/row_count), leaving the model no reliable signal that
+// anything is missing -- just a bare "..." inside an otherwise-unparseable
+// string. shapeValueForPromptBudget walks the structure instead: every
+// scalar field survives verbatim, and any array (top-level or nested) that
+// would blow the budget is cut at a whole-element boundary with an explicit
+// sentinel marker ({_truncated, _totalCount, _shownCount}) appended as its
+// last entry, so completeness is a structural fact instead of an inference.
+const STRUCTURED_TRUNCATION_MAX_DEPTH = 3;
+
+function shapeValueForPromptBudget(value, maxChars, maxDepth = STRUCTURED_TRUNCATION_MAX_DEPTH) {
+  if (Array.isArray(value)) {
+    return shapeArrayForPromptBudget(value, maxChars);
+  }
+  if (value && typeof value === "object") {
+    return shapeObjectForPromptBudget(value, maxChars, maxDepth);
+  }
+  return value;
+}
+
+function shapeArrayForPromptBudget(arr, maxChars) {
+  const kept = [];
+  let used = 2; // "[]"
+  for (let i = 0; i < arr.length; i += 1) {
+    const addedChars = estimateJsonLength(arr[i]) + 1; // +1 for the separating comma
+    if (used + addedChars > maxChars) {
+      return [...kept, { _truncated: true, _totalCount: arr.length, _shownCount: kept.length }];
+    }
+    kept.push(arr[i]);
+    used += addedChars;
+  }
+  return kept;
+}
+
+function shapeObjectForPromptBudget(obj, maxChars, maxDepth) {
+  const keys = Object.keys(obj);
+  const scalarKeys = [];
+  const complexKeys = [];
+  for (const key of keys) {
+    const entryValue = obj[key];
+    if (entryValue !== null && typeof entryValue === "object") {
+      complexKeys.push(key);
+    } else {
+      scalarKeys.push(key);
+    }
+  }
+
+  const result = {};
+  let used = 2; // "{}"
+  for (const key of scalarKeys) {
+    result[key] = obj[key];
+    used += key.length + estimateJsonLength(obj[key]) + 4; // quotes + colon + comma
+  }
+
+  if (maxDepth <= 0 || complexKeys.length === 0) {
+    for (const key of complexKeys) {
+      result[key] = obj[key];
+    }
+    return result;
+  }
+
+  const remaining = Math.max(0, maxChars - used);
+  const share = Math.max(40, Math.floor(remaining / complexKeys.length));
+  for (const key of complexKeys) {
+    const entryValue = obj[key];
+    const entryChars = estimateJsonLength(entryValue);
+    if (used + entryChars <= maxChars) {
+      result[key] = entryValue;
+      used += entryChars;
+      continue;
+    }
+    result[key] = shapeValueForPromptBudget(entryValue, share, maxDepth - 1);
+  }
+  return result;
+}
+
+function estimateJsonLength(value) {
+  try {
+    return JSON.stringify(value).length;
+  } catch {
+    return String(value).length;
+  }
+}
+
+// String-returning counterpart of shapeValueForPromptBudget, for call sites
+// whose contract is a prompt-ready string (toolContext.lastResult/history,
+// final-response skill-tool blocks) rather than a re-embedded structured
+// value. Always tries structural shaping first; only falls back to the old
+// blind slice (with a plain "..." ellipsis) if shaping still can't fit the
+// budget, which preserves the pre-existing hard ceiling on prompt size.
+function serializeStructuredPromptValue(value, maxChars) {
+  if (value == null) {
+    return null;
+  }
+
+  const budget = Number.isInteger(maxChars) && maxChars > 0 ? maxChars : 2000;
+
+  let text = "";
+  try {
+    text = JSON.stringify(value, null, 2);
+  } catch {
+    text = String(value);
+  }
+  if (text.length <= budget) {
+    return text;
+  }
+
+  try {
+    const shaped = shapeValueForPromptBudget(value, budget);
+    // Compact, not pretty-printed: shapeValueForPromptBudget's internal
+    // element/field budgeting (estimateJsonLength) is computed against
+    // compact JSON size, so the fit-check here must use the same basis or
+    // shaping can under-budget and fall through to the blind slice below
+    // even though it actually fit.
+    const shapedText = JSON.stringify(shaped);
+    if (shapedText.length <= budget) {
+      return shapedText;
+    }
+  } catch {
+    // Fall through to the blind slice below.
+  }
+
+  return `${text.slice(0, Math.max(0, budget - 3))}...`;
+}
+
 function readString$3(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -246,4 +374,4 @@ function clonePromptParameters(parameters) {
   };
 }
 
-export { formatActiveSkillTools, readString$3 as readString, serializePromptValue$2 as serializePromptValue, toSkillCatalogCompact, toSkillCatalogSummary, toSkillPromptValue };
+export { formatActiveSkillTools, readString$3 as readString, serializePromptValue$2 as serializePromptValue, serializeStructuredPromptValue, shapeValueForPromptBudget, toSkillCatalogCompact, toSkillCatalogSummary, toSkillPromptValue };

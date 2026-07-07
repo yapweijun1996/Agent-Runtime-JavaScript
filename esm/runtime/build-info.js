@@ -2,7 +2,7 @@ const DEFAULT_BUILD_ID = "dev";
 
 function getRuntimeBuildId() {
   return readBuildId(
-    "ef217deba"
+    "ef217deba-dirty"
       
   );
 }

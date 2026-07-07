@@ -1,4 +1,4 @@
-import { readString, serializePromptValue } from './planner-prompt-skills.js';
+import { readString, serializePromptValue, shapeValueForPromptBudget } from './planner-prompt-skills.js';
 
 function summarizeLastObservationForPrompt(value, options = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -266,6 +266,23 @@ function summarizeGenericOutputForPrompt(output, options = {}) {
     const text = JSON.stringify(output, null, 2);
     if (text.length <= genericChars) {
       return JSON.parse(text);
+    }
+  } catch {
+    // Fall through to structural shaping.
+  }
+  // AGRUN-626: this is the fallback path for any tool/skill result kind with
+  // no dedicated projection (e.g. execute_skill_tool's agent_skill_tool_result
+  // -- an arbitrary host-defined payload). A blind char-slice here dropped
+  // list items and scalar fields (has_more/row_count/...) past the budget
+  // with no signal the planner could rely on (Globe3 job 69edd07f: a 45-row
+  // category list cut to ~11 with a bare "...", model concluded a real
+  // category "didn't exist"). Shape the structure instead -- scalars survive,
+  // arrays truncate at an element boundary with an explicit marker -- and
+  // only fall back to the old blind slice if shaping still can't fit budget.
+  const shaped = shapeValueForPromptBudget(output, genericChars);
+  try {
+    if (JSON.stringify(shaped).length <= genericChars) {
+      return shaped;
     }
   } catch {
     // Fall through to capped string summary.
