@@ -1,4 +1,4 @@
-import { resolveFetch, normalizePositiveInteger, normalizeHeaders, readContentType, deriveReadMode, isTextLikeContentType, DEFAULT_READ_URL_TIMEOUT_MS, DEFAULT_READ_URL_MAX_BYTES, buildAcceptHeader, extractReadableHtmlText, htmlToText } from './url-reader-utils.js';
+import { resolveFetch, normalizePositiveInteger, normalizeHeaders, READ_URL_WATCHDOG_GRACE_MS, readContentType, deriveReadMode, isTextLikeContentType, DEFAULT_READ_URL_TIMEOUT_MS, DEFAULT_READ_URL_MAX_BYTES, buildAcceptHeader, extractReadableHtmlText, htmlToText } from './url-reader-utils.js';
 import { readResponseMeta, readServiceReadFailure, createReadUrlFailure, createReadUrlSuccess, detectReadQualityFailure, createReadUrlFetchFailure } from './url-reader-response.js';
 
 const MIN_EXTRACTED_HTML_TEXT_LENGTH = 200;
@@ -16,7 +16,12 @@ async function readUrl(request) {
     ...normalizeHeaders(request && request.headers)
   };
   const abortController = typeof AbortController === "function" ? new AbortController() : null;
-  const timer = abortController ? setTimeout(() => abortController.abort(), timeoutMs) : null;
+  // Watchdog sits READ_URL_WATCHDOG_GRACE_MS above the render budget so a
+  // proxied read that legitimately uses the full timeoutMs server-side is
+  // not aborted mid-response; see url-reader-utils.js for the arithmetic.
+  const timer = abortController
+    ? setTimeout(() => abortController.abort(), timeoutMs + READ_URL_WATCHDOG_GRACE_MS)
+    : null;
 
   try {
     const fetchInit = {

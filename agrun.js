@@ -10318,6 +10318,14 @@
   // so they never approach it.
   const TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP = 8;
 
+  // AGRUN-542 — content-level structure repair attempt budget. Once length and
+  // read sources are satisfied but semantic_duplicate_headings /
+  // body_after_final_section remain on the final candidate, the model gets
+  // exactly this many content-changing repair attempts (candidate file-version
+  // advances) before the runtime forces the honest limited-publish exit. See
+  // terminal-repair/content-structure-exit.js.
+  const TERMINAL_REPAIR_CONTENT_STRUCTURE_REPAIR_ATTEMPTS = 1;
+
   // AGRUN: thresholds are host-overridable policy, not hardcoded runtime law.
   // Defaults preserve the historical behavior; a host can retune escalation via
   // runtimeConfig.terminalRepair.thresholds without forking the runtime. The
@@ -10327,7 +10335,8 @@
     hardVeto: TERMINAL_REPAIR_HARD_VETO_THRESHOLD,
     highWaterMark: TERMINAL_REPAIR_HIGH_WATER_MARK,
     advisorySignal: TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD,
-    absoluteIgnoredCap: TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP
+    absoluteIgnoredCap: TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP,
+    contentStructureRepairAttempts: TERMINAL_REPAIR_CONTENT_STRUCTURE_REPAIR_ATTEMPTS
   });
 
   function readPositiveThreshold(value, fallback) {
@@ -10349,7 +10358,11 @@
       hardVeto: readPositiveThreshold(overrides.hardVeto, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.hardVeto),
       highWaterMark: readPositiveThreshold(overrides.highWaterMark, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.highWaterMark),
       advisorySignal: readPositiveThreshold(overrides.advisorySignal, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.advisorySignal),
-      absoluteIgnoredCap: readPositiveThreshold(overrides.absoluteIgnoredCap, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.absoluteIgnoredCap)
+      absoluteIgnoredCap: readPositiveThreshold(overrides.absoluteIgnoredCap, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.absoluteIgnoredCap),
+      contentStructureRepairAttempts: readPositiveThreshold(
+        overrides.contentStructureRepairAttempts,
+        DEFAULT_TERMINAL_REPAIR_THRESHOLDS.contentStructureRepairAttempts
+      )
     };
   }
 
@@ -13380,6 +13393,263 @@
     return countWorkspaceWriteOperations(options.runState) < 3;
   }
 
+  // AGRUN-542 — content-level structure repair exit contract (SSOT).
+  //
+  // Live evidence (agrun_debug_runs/2026-06-17T08-05-00-854Z.*): once the
+  // candidate satisfied the requested length (1739/1500 words) and the read-
+  // source minimum, semantic duplicate sections / body-after-final-section kept
+  // terminal repair in an ADVISORY loop — the model burned provider calls on
+  // repeated blocked finalize attempts (ignoredCount 3→6) before hard_veto
+  // finally forced a limited publish. The repair loop had no bounded contract:
+  // "keep trying structure repair" was open-ended.
+  //
+  // This module is the single owner of the bounded contract:
+  //   - EPISODE: while terminal repair is active AND the final candidate has a
+  //     content-level structure issue (semantic_duplicate_headings /
+  //     body_after_final_section) AND length + source facts are satisfied AND a
+  //     real candidate exists, a content-structure exit episode is active.
+  //   - ONE ATTEMPT: the model gets exactly `thresholds.contentStructureRepairAttempts`
+  //     (default 1) content-changing repair attempts on the final candidate
+  //     (detected via the candidate FILE VERSION, which only advances on accepted
+  //     content mutations — blocked destructive shrinks and blocked heading-only
+  //     patch previews never bump it, so AGRUN-540/541 semantics are preserved).
+  //   - FORCED EXIT: once the attempt budget is used (or the model keeps
+  //     ignoring the repair contract — ignoredCount reaches the hardVeto
+  //     threshold) and the deficit still remains, the episode flips to
+  //     forcedPublish: buildAllowedActions collapses to
+  //     [workspace_publish_candidate] and the contentStructureExitForcedPublishGranted
+  //     escape (opensPublish, NOT opensFinalize) is granted, so every door —
+  //     single-action preflight, plan-batch surface filter, and the onResponse
+  //     finalize hook — converges on one honest limited publish. Direct
+  //     finalize/final_answer stay mechanically blocked throughout (no
+  //     finalize-opening escape can be granted while the episode is active).
+  //
+  // Everything here is issue-code / fact driven — no topic, section-name, or
+  // word-count hardcoding (AGRUN project rule).
+  //
+  // Import graph: leaf-adjacent by design — depends only on internal-utils, so
+  // allowed-actions.js, core.js, and escape-rules consumers can all import it
+  // without cycles.
+
+
+  // Content-level structure issue codes: these cannot be fixed by heading-only
+  // renames/renumbering (AGRUN-540) — they require merging or removing duplicate
+  // content blocks, or removing body content after the final section.
+  const CONTENT_STRUCTURE_ISSUE_CODES = Object.freeze([
+    "semantic_duplicate_headings",
+    "body_after_final_section"
+  ]);
+
+  // Does the candidate currently show a content-level structure issue? Reads the
+  // SAME two fact sources the allowed-action builder historically read
+  // (observableDeficits.structure + workspace quality.finalCandidateStructure) —
+  // extracted here so the episode tracker and the action surface share one
+  // predicate instead of two drifting copies.
+  function hasContentLevelStructureIssue(observableDeficits, runState) {
+    const issueCodes = new Set([
+      ...readIssueCodes(observableDeficitsRecord(observableDeficits, "structure")),
+      ...readIssueCodes(readRecord$1(
+        runState &&
+        runState.virtualWorkspace &&
+        runState.virtualWorkspace.quality &&
+        runState.virtualWorkspace.quality.finalCandidateStructure
+      ))
+    ]);
+    return CONTENT_STRUCTURE_ISSUE_CODES.some((code) => issueCodes.has(code));
+  }
+
+  function readIssueCodes(structure) {
+    return readStringArray$4(structure && structure.issueCodes);
+  }
+
+  function createContentStructureExitState() {
+    return {
+      kind: "content_structure_exit_state",
+      active: false,
+      attemptCount: 0,
+      attemptLimit: 1,
+      failedAttemptCount: 0,
+      lastCountedCandidateVersion: 0,
+      forcedPublish: false
+    };
+  }
+
+  function readContentStructureExitState(runState) {
+    const source = readRecord$1(runState && runState.contentStructureExitState);
+    if (!source) return createContentStructureExitState();
+    return {
+      kind: "content_structure_exit_state",
+      active: source.active === true,
+      attemptCount: readNumber$j(source.attemptCount),
+      attemptLimit: Math.max(readNumber$j(source.attemptLimit), 1),
+      failedAttemptCount: readNumber$j(source.failedAttemptCount),
+      lastCountedCandidateVersion: readNumber$j(source.lastCountedCandidateVersion),
+      forcedPublish: source.forcedPublish === true
+    };
+  }
+
+  // Workspace mutation actions whose FAILED outcomes count toward the failed-
+  // attempt bound below. A blocked/missed mutation makes no observable progress
+  // and never bumps the candidate file version, so without this bound a model
+  // looping on destructive-shrink-blocked or not_found replaces would never
+  // trigger the forced exit (observed live: 3x destructive_shrink_blocked in
+  // the 2026-06-17 run, 5x replace not_found in the 2026-07-06 baseline).
+  const CANDIDATE_MUTATION_ACTIONS = new Set([
+    WORKSPACE_APPLY_PATCH_ACTION,
+    WORKSPACE_INSERT_AFTER_SECTION_ACTION,
+    WORKSPACE_MULTI_EDIT_ACTION,
+    WORKSPACE_PROPOSE_PATCH_ACTION,
+    WORKSPACE_REPLACE_ACTION,
+    WORKSPACE_WRITE_ACTION
+  ]);
+
+  const FAILED_MUTATION_STATUSES = new Set([
+    "ambiguous",
+    "destructive_shrink_blocked",
+    "heading_not_found",
+    "not_found",
+    "preview_blocked",
+    "repeated_find_vetoed"
+  ]);
+
+  function isFailedCandidateMutation(actionName, output) {
+    const name = readString$4(actionName);
+    if (!CANDIDATE_MUTATION_ACTIONS.has(name)) return false;
+    const result = readRecord$1(output);
+    return FAILED_MUTATION_STATUSES.has(readString$4(result && result.status));
+  }
+
+  function resetContentStructureExitEpisode(runState) {
+    if (!runState || typeof runState !== "object") return createContentStructureExitState();
+    const next = createContentStructureExitState();
+    runState.contentStructureExitState = next;
+    return next;
+  }
+
+  // The episode predicate: content-level structure issue remains, length and
+  // source facts are satisfied, and a real drafted candidate exists. All inputs
+  // come from the SAME repair-facts bundle evaluateTerminalRepairState already
+  // computed for this cycle, so the episode can never disagree with the deficits
+  // the planner is shown.
+  function isContentStructureExitEligible({ activeDeficits, observableDeficits, runState }) {
+    const deficits = readStringArray$4(activeDeficits);
+    if (deficits.includes("source")) return false;
+    if (observableDeficitsRecord(observableDeficits, "length")) return false;
+    if (!hasContentLevelStructureIssue(observableDeficits, runState)) return false;
+    return hasSelectedFinalCandidateContent(runState);
+  }
+
+  // STATE-TRANSITION (same contract as refreshTerminalRepairState): mutates
+  // runState.contentStructureExitState. Must be called ONLY from the active
+  // branch of evaluateTerminalRepairState so an episode can never start outside
+  // an active terminal-repair evaluation (a drafting-phase duplicate heading must
+  // not silently burn the repair-attempt budget before repair is even engaged).
+  //
+  // Idempotent across the phased refresh calls (before_planner / onResponse /
+  // post-action): attempts are detected via the final-candidate file version,
+  // and each observed version is counted at most once
+  // (lastCountedCandidateVersion high-water mark).
+  function updateContentStructureExitEpisode(runState, context = {}) {
+    if (!runState || typeof runState !== "object") return createContentStructureExitState();
+    const eligible = isContentStructureExitEligible({
+      activeDeficits: context.activeDeficits,
+      observableDeficits: context.observableDeficits,
+      runState
+    });
+    if (!eligible) {
+      // Deficit cleared (or length/source reopened): the episode contract no
+      // longer applies. Reset so a future, genuinely new content-structure
+      // deficit gets a fresh single-attempt budget.
+      return resetContentStructureExitEpisode(runState);
+    }
+    const previous = readContentStructureExitState(runState);
+    const attemptLimit = Math.max(readNumber$j(
+      context.thresholds && context.thresholds.contentStructureRepairAttempts
+    ) || 1, 1);
+    const candidateVersion = readFinalCandidateVersion(runState);
+    let attemptCount = previous.attemptCount;
+    let failedAttemptCount = previous.failedAttemptCount;
+    let lastCountedCandidateVersion = previous.lastCountedCandidateVersion;
+    if (!previous.active) {
+      // Episode start: baseline the candidate version; nothing counted yet.
+      attemptCount = 0;
+      failedAttemptCount = 0;
+      lastCountedCandidateVersion = candidateVersion;
+    } else if (candidateVersion > lastCountedCandidateVersion) {
+      // An accepted content mutation of the final candidate happened while the
+      // episode contract was in force and the deficit is STILL present — that
+      // consumes one repair attempt. Blocked mutations (destructive shrink,
+      // blocked patch previews) never advance the file version, so they are
+      // never counted here (AGRUN-540/541 stay authoritative for what is
+      // rejected) — they count toward the failed-attempt bound below instead.
+      attemptCount += 1;
+      lastCountedCandidateVersion = candidateVersion;
+    } else if (isFailedCandidateMutation(context.actionName, context.output)) {
+      // A blocked/missed repair mutation: no content progress, no version bump,
+      // one full provider round-trip burned. Bounded separately so a model
+      // looping on destructive-shrink-blocked or not_found finds the forced
+      // exit instead of the run deadline. This branch only fires on the
+      // post-action refresh (the phased before_planner refresh carries no
+      // actionName), so one failed action counts exactly once.
+      failedAttemptCount += 1;
+    }
+    const hardVetoThreshold = Math.max(readNumber$j(
+      context.thresholds && context.thresholds.hardVeto
+    ) || 3, 1);
+    const forcedPublish =
+      attemptCount >= attemptLimit ||
+      failedAttemptCount > attemptLimit ||
+      readNumber$j(context.ignoredCount) >= hardVetoThreshold;
+    const next = {
+      kind: "content_structure_exit_state",
+      active: true,
+      attemptCount,
+      attemptLimit,
+      failedAttemptCount,
+      lastCountedCandidateVersion,
+      forcedPublish
+    };
+    runState.contentStructureExitState = next;
+    return next;
+  }
+
+  // True when the episode has consumed its repair-attempt budget (or the model
+  // kept ignoring the contract) and the deficit still remains: the ONLY sane
+  // action left is one honest limited workspace_publish_candidate. Consumed by
+  // buildAllowedActions (both dispatch doors read the resulting allowedActions)
+  // and by the escape grant in evaluateTerminalRepairState.
+  function isContentStructureForcedPublish(runState) {
+    const state = readContentStructureExitState(runState);
+    return state.active === true && state.forcedPublish === true;
+  }
+
+  // Prompt/step-facing signal. Null while no episode is active so the planner
+  // prompt and Inspector steps stay clean for unrelated runs.
+  function buildContentStructureExitSignal(state) {
+    const episode = state && typeof state === "object" ? state : null;
+    if (!episode || episode.active !== true) return null;
+    return {
+      kind: "content_structure_exit",
+      attemptLimit: Math.max(readNumber$j(episode.attemptLimit), 1),
+      attemptsUsed: readNumber$j(episode.attemptCount),
+      failedAttempts: readNumber$j(episode.failedAttemptCount),
+      forcedPublish: episode.forcedPublish === true,
+      rule: episode.forcedPublish === true
+        ? "The single content-structure repair attempt budget is used and the content-level structure issue remains. workspace_publish_candidate with finalReadiness.decision='limited' and the structure gap in remainingGaps is the ONLY allowed action; finalize/final_answer stay blocked."
+        : "Length and sources are satisfied but a content-level structure issue remains (duplicate-purpose section blocks or body after the final section). Exactly ONE content-changing repair attempt is available: merge or remove the duplicate/late blocks in a single workspace_replace/workspace_write. If the issue remains after that attempt, the runtime forces an honest limited publish."
+    };
+  }
+
+  function readFinalCandidateVersion(runState) {
+    const workspace = readRecord$1(runState && runState.virtualWorkspace);
+    const files = workspace && workspace.files && typeof workspace.files === "object"
+      ? workspace.files
+      : null;
+    const path = readFinalCandidatePathFromWorkspace(runState);
+    const file = files && path ? readRecord$1(files[path]) : null;
+    return readNumber$j(file && file.version);
+  }
+
   // H10 split, Step 5 (AGRUN-507) — terminal-repair allowed-action whitelist.
   // VERBATIM moves from terminal-repair-state.js (see
   // agrun_docs/terminal-repair-split-design-2026-06-12.md). buildAllowedActions
@@ -13391,6 +13661,19 @@
 
   function buildAllowedActions(deficits, budgetState, reason, observableDeficits, runState, escalation, runtimeConfig) {
     const actions = new Set();
+    // AGRUN-542 — content-structure exit forced publish: the single content-
+    // changing repair attempt budget is used (or the repair contract was
+    // repeatedly ignored) while length + sources are satisfied, and the content-
+    // level structure issue remains. Every further repair/finalize cycle is out
+    // of contract — the honest limited publish is the ONLY action. This is the
+    // FIRST branch on purpose: both dispatch doors (single-action preflight
+    // allowlist and plan-batch planner-action-surface filter) consume the
+    // resulting allowedActions, so collapsing here enforces the exit on both.
+    // evaluateTerminalRepairState updates runState.contentStructureExitState
+    // immediately before calling this builder.
+    if (isContentStructureForcedPublish(runState)) {
+      return [PUBLISH_DIRECT_ACTION];
+    }
     // ADR-0033 Tier A.8 (X1 fix) — treat hard_veto state as a budget-constrained
     // exit condition for the structure-deficit branch, so AI can publish a
     // limited candidate (with structure in remainingGaps) instead of being
@@ -13846,17 +14129,11 @@
     return false;
   }
 
+  // AGRUN-542 — delegates to the shared content-structure predicate
+  // (content-structure-exit.js) so the repair-surface choice and the exit
+  // episode can never disagree about what counts as a content-level issue.
   function shouldPreferFullRewriteForStructureRepair(observableDeficits, runState) {
-    const issueCodes = new Set([
-      ...readStructureIssueCodes(observableDeficitsRecord(observableDeficits, "structure")),
-      ...readStructureIssueCodes(readRecord$1(runState && runState.virtualWorkspace && runState.virtualWorkspace.quality && runState.virtualWorkspace.quality.finalCandidateStructure))
-    ]);
-    return issueCodes.has("semantic_duplicate_headings") ||
-      issueCodes.has("body_after_final_section");
-  }
-
-  function readStructureIssueCodes(structure) {
-    return readStringArray$4(structure && structure.issueCodes);
+    return hasContentLevelStructureIssue(observableDeficits, runState);
   }
 
   function hasEmptyFinalCandidateDeficit(observableDeficits, runState) {
@@ -14071,6 +14348,24 @@
 
   const TERMINAL_ESCAPE_RULE_DESCRIPTORS = Object.freeze([
     Object.freeze({
+      // AGRUN-542 — content-level structure exit: length and sources are
+      // satisfied, a real candidate exists, but semantic duplicate sections /
+      // body-after-final-section remain after the single content-changing repair
+      // attempt budget is used (or the model kept ignoring the repair contract).
+      // Opens PUBLISH (honest limited delivery of the drafted artifact) and
+      // NEVER finalize — a finalize here would re-summarize/compress a candidate
+      // whose length contract is already satisfied (the AGRUN-541 regression
+      // shape). FIRST in priority: its grant predicate is mutually exclusive
+      // with the source/candidate-quality escapes (those require source
+      // deficits; this requires source satisfied) and it must outrank the
+      // generic publish-loop escape so the observability reason names the real
+      // cause.
+      key: "contentStructureExitForcedPublishGranted",
+      opensFinalize: false,
+      opensPublish: true,
+      escapeReason: "content_structure_exit_forced_publish"
+    }),
+    Object.freeze({
       // AGRUN-307 — zero-evidence source deficit is unresolvable; opens an honest
       // finalize (answer with disclosed limitations) instead of a dead repair loop.
       key: "sourceDeficitEscapeGranted",
@@ -14182,6 +14477,8 @@
       if (runState && typeof runState === "object") {
         runState.terminalRepairCumulativeIgnored = 0;
       }
+      // AGRUN-542 — genuine completion ends any content-structure exit episode.
+      resetContentStructureExitEpisode(runState);
       return clearTerminalRepairState(previous, "terminal_completed", cycle, snapshot);
     }
 
@@ -14217,6 +14514,10 @@
       !publishProtocolStillBlocked &&
       !publishProtocolTransitionPending
     ) {
+      // AGRUN-542 — all observable deficits resolved: any content-structure exit
+      // episode is over (the structure fact must have cleared for this branch to
+      // be reachable — finalizedStructureBlocked would otherwise force-activate).
+      resetContentStructureExitEpisode(runState);
       return clearTerminalRepairState(
         previous,
         progress.hasProgress ? progress.reason || "observable_progress" : "observable_deficits_resolved",
@@ -14307,6 +14608,22 @@
       cumulativeIgnoredCount >= thresholds.absoluteIgnoredCap
         ? "hard_veto"
         : "advisory";
+      // AGRUN-542 — content-structure exit episode (STATE-TRANSITION, mutates
+      // runState.contentStructureExitState). MUST run before buildAllowedActions:
+      // once forcedPublish flips true, the allowed-action surface collapses to
+      // [workspace_publish_candidate] on BOTH dispatch doors (single-action
+      // preflight allowlist + plan-batch planner-action-surface filter both read
+      // the same allowedActions this evaluation produces). Called only inside
+      // this active branch so a drafting-phase duplicate heading can never burn
+      // the repair-attempt budget before terminal repair is engaged.
+      const contentStructureExit = updateContentStructureExitEpisode(runState, {
+        actionName,
+        activeDeficits,
+        observableDeficits: facts.observableDeficits,
+        ignoredCount,
+        output,
+        thresholds
+      });
       const allowedActions = buildAllowedActions(activeDeficits, facts.budgetState, activeReason, facts.observableDeficits, runState, escalation, context.runtimeConfig);
       // AGRUN-555 (Staff review 2026-07-02) — the four graceful-degradation escape
       // valves below (AGRUN-307 source, AGRUN-307 publish-loop, AGRUN-309
@@ -14328,6 +14645,17 @@
       // the hook/blocks/publish doors honor it automatically instead of each
       // hardcoding flag names (the AGRUN-550 bug shape).
       const terminalEscapeGrants = {
+        // AGRUN-542 — content-level structure exit: the single content-changing
+        // repair attempt budget is used (or the model kept ignoring the repair
+        // contract past the hardVeto threshold) while length + sources are
+        // satisfied and a real candidate exists, yet the content-level structure
+        // issue remains. Opens PUBLISH only — finalize would re-compress a
+        // length-satisfied candidate. Grant predicate is mutually exclusive with
+        // the source/candidate-quality escapes below (those require a source
+        // deficit; this requires source satisfied).
+        contentStructureExitForcedPublishGranted:
+          contentStructureExit.active === true &&
+          contentStructureExit.forcedPublish === true,
         // AGRUN-307 — zero-evidence source deficit is unresolvable: the AI has
         // repeatedly tried to terminate (ignoredCount >= hardVeto) yet has ZERO
         // successful read sources. Open final/finalize so the AI can answer with
@@ -14370,6 +14698,7 @@
         granted: terminalEscapeGrants[rule.key] === true
       }));
       const resolvedTerminalEscape = terminalEscapeRules.find((rule) => rule.granted) || null;
+      const contentStructureExitForced = resolvedTerminalEscape?.key === "contentStructureExitForcedPublishGranted";
       const sourceUnresolvable = resolvedTerminalEscape?.key === "sourceDeficitEscapeGranted";
       const publishLoopUnresolvable = resolvedTerminalEscape?.key === "publishLoopEscapeGranted";
       const candidateQualityUnresolvable = resolvedTerminalEscape?.key === "candidateQualityUnresolvable";
@@ -14418,6 +14747,8 @@
       allowedActions: effectiveAllowedActions,
       budgetState: facts.budgetState,
       escalation,
+      contentStructureExitForcedPublishGranted: contentStructureExitForced,
+      contentStructureExitSignal: buildContentStructureExitSignal(contentStructureExit),
       sourceDeficitEscapeGranted: sourceUnresolvable,
       publishLoopEscapeGranted: publishLoopUnresolvable,
       candidateQualityUnresolvable,
@@ -14447,6 +14778,13 @@
   function summarizeTerminalRepairState(value) {
     const state = createTerminalRepairState(value);
     if (!state.active && state.ignoredCount === 0 && !state.clearedReason) return null;
+    // AGRUN-542 — the exit signal is not preserved by createTerminalRepairState
+    // (it is recomputed per evaluation, like the escape flags), so read it from
+    // the RAW state for the planner-prompt summary.
+    const rawContentStructureExitSignal = value && typeof value === "object" && !Array.isArray(value) &&
+      value.contentStructureExitSignal && typeof value.contentStructureExitSignal === "object"
+      ? value.contentStructureExitSignal
+      : null;
     return {
       kind: state.kind,
       active: state.active,
@@ -14457,6 +14795,7 @@
       allowedActions: state.allowedActions,
       budgetState: state.budgetState,
       escalation: state.escalation,
+        contentStructureExitSignal: rawContentStructureExitSignal,
         forbiddenDecisions: state.forbiddenDecisions,
         requiredRepair: state.requiredRepair,
         validPublishContract: state.validPublishContract,
@@ -14488,6 +14827,9 @@
       actionOrderingSignals: Array.isArray(repair.actionOrderingSignals) ? repair.actionOrderingSignals.slice(0, 4) : [],
       advisoryPersistenceSignal: advisoryPersistenceSignal || null,
       allowedActions: Array.isArray(repair.allowedActions) ? repair.allowedActions.slice(0, 10) : [],
+      contentStructureExitSignal: repair.contentStructureExitSignal && typeof repair.contentStructureExitSignal === "object"
+        ? cloneValue$1(repair.contentStructureExitSignal)
+        : null,
       ignoredCount: repair.ignoredCount || 0,
       lengthExpansionSignal: repair.lengthExpansionSignal || null,
       workspaceRepairSignal: repair.workspaceRepairSignal
@@ -14983,7 +15325,18 @@
         return `HARD VETO — ${actionName} has been blocked ${ignoredCount} time(s) while terminal repair is `
           + `active (budgetState=${budgetState || "unknown"}). Any further ${actionName} call will continue `
           + `to be blocked. ${recovery}`;
-      }
+      },
+      // AGRUN-542 — content-structure exit contract. Emitted by BOTH doors
+      // (blocks/terminal-repair.js preflight + the onResponse finalize hook)
+      // when the single content-changing repair attempt budget is used and a
+      // content-level structure issue (duplicate-purpose sections / body after
+      // the final section) still remains while length and sources are satisfied.
+      contentStructureForcedPublish: ({ actionName, attemptsUsed, attemptLimit }) =>
+        `BLOCKED — ${actionName} is not available. The content-structure repair attempt budget is used `
+        + `(${attemptsUsed}/${attemptLimit}) and a content-level structure issue remains while length and `
+        + "sources are already satisfied. The ONLY allowed action now is workspace_publish_candidate with "
+        + "finalReadiness.decision='limited' and the concrete structure gap in remainingGaps (see "
+        + "requiredArgsExample). Further finalize/final_answer or repair attempts will keep being blocked."
     }),
     directTerminalBlock: Object.freeze({
       message:
@@ -15121,7 +15474,24 @@
         // forwarding at the call site; parity with the onResponse hook door).
         ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount, options && options.runtimeConfig)
         : null;
-      const message = isHardVeto
+      // AGRUN-542 — content-structure exit forced publish: the dedicated block
+      // message tells the model the repair-attempt budget is used and one honest
+      // limited publish is the only remaining move. Takes precedence over the
+      // generic hard-veto/advisory wording (same state drives the plan-batch
+      // door through the collapsed allowedActions surface).
+      const contentStructureExitSignal = repair.contentStructureExitSignal &&
+        typeof repair.contentStructureExitSignal === "object"
+        ? repair.contentStructureExitSignal
+        : null;
+      const contentStructureForced = Boolean(contentStructureExitSignal && contentStructureExitSignal.forcedPublish === true) &&
+        reason === "terminal_repair_action_not_allowed";
+      const message = contentStructureForced
+      ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.contentStructureForcedPublish({
+          actionName,
+          attemptsUsed: readFiniteNumber$1(contentStructureExitSignal.attemptsUsed),
+          attemptLimit: Math.max(readFiniteNumber$1(contentStructureExitSignal.attemptLimit), 1)
+        })
+      : isHardVeto
       ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
           actionName,
           ignoredCount,
@@ -15147,6 +15517,7 @@
         ignoredCount,
         invalidPublishReasons: isPublish ? publishValidation.reasons.slice(0, 8) : [],
         budgetRemainingForExpansionSignal: budgetExpansionSignal,
+        contentStructureExitSignal: contentStructureExitSignal ? cloneValue$1(contentStructureExitSignal) : null,
         terminalRepairState: {
         active: true,
         mode: repair.mode || "terminal_repair",
@@ -15165,6 +15536,7 @@
           ignoredCount,
           invalidPublishReasons: output.invalidPublishReasons,
           budgetRemainingForExpansionSignal: output.budgetRemainingForExpansionSignal,
+          contentStructureExitSignal: output.contentStructureExitSignal,
           reason
         });
     }
@@ -16205,7 +16577,82 @@
     if (WORKSPACE_MUTATION_KINDS.has(kind)) {
       return summarizeWorkspaceMutationForPrompt(output, kind);
     }
+    if (kind === "agent_skill_catalog") {
+      return summarizeAgentSkillCatalogForPrompt(output, opts.skillCatalog);
+    }
     return summarizeGenericOutputForPrompt(output, opts);
+  }
+
+  // AGRUN-623: skill-boundary-aware projection. The generic char-slice cut a
+  // multi-skill catalog after the FIRST skill, so the planner could never read
+  // the skill-name list — the one piece of information this observation exists
+  // to deliver. Every skill NAME always survives projection; only per-skill
+  // detail (description/tags/toolNames) is budgeted, and legacy full tool
+  // summaries (pre-compact catalogs replayed from persisted run state) are
+  // reduced to tool names.
+  function summarizeAgentSkillCatalogForPrompt(output, options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
+    const maxDetailedSkills = readPositiveInteger$m(opts.maxDetailedSkills) || 12;
+    const descriptionChars = readPositiveInteger$m(opts.descriptionChars) || 160;
+    const skills = Array.isArray(output.skills)
+      ? output.skills.filter((skill) => skill && typeof skill === "object" && !Array.isArray(skill))
+      : [];
+    const detailed = skills.slice(0, maxDetailedSkills).map((skill) => {
+      const entry = { name: readString$3(skill.name) || null };
+      const skillId = readString$3(skill.skillId);
+      if (skillId && skillId !== entry.name) entry.skillId = skillId;
+      const description = truncateForPrompt(readString$3(skill.description), descriptionChars);
+      if (description) entry.description = description;
+      const tags = Array.isArray(skill.tags)
+        ? skill.tags.map(readString$3).filter(Boolean).slice(0, 5)
+        : [];
+      if (tags.length > 0) entry.tags = tags;
+      const toolNames = readCatalogToolNames(skill).slice(0, 8);
+      if (toolNames.length > 0) entry.toolNames = toolNames;
+      return entry;
+    });
+    const result = {
+      kind: "agent_skill_catalog",
+      count: readNumber$h(output.count),
+      query: readString$3(output.query) || null,
+      skills: detailed
+    };
+    if (skills.length > maxDetailedSkills) {
+      result.moreSkillNames = skills.slice(maxDetailedSkills)
+        .map((skill) => readString$3(skill.name))
+        .filter(Boolean);
+    }
+    // AGRUN-623 follow-up: surface the pagination fields so the planner knows
+    // a next page exists and how to reach it (list_agent_skills{offset:N}),
+    // instead of more_available being a dead-end signal.
+    if (typeof output.totalMatches === "number") result.totalMatches = readNumber$h(output.totalMatches);
+    if (typeof output.offset === "number" && output.offset > 0) result.offset = readNumber$h(output.offset);
+    if (output.more_available === true) {
+      result.more_available = true;
+      if (typeof output.next_offset === "number") result.next_offset = readNumber$h(output.next_offset);
+    }
+    const error = readString$3(output.error);
+    if (error) {
+      result.error = error;
+      const errorDetail = readString$3(output.error_detail);
+      if (errorDetail) result.error_detail = errorDetail;
+    }
+    return result;
+  }
+
+  function readCatalogToolNames(skill) {
+    if (Array.isArray(skill.toolNames)) {
+      return skill.toolNames.map(readString$3).filter(Boolean);
+    }
+    if (Array.isArray(skill.tools)) {
+      return skill.tools
+        .map((tool) => {
+          if (typeof tool === "string") return tool.trim();
+          return tool && typeof tool === "object" ? readString$3(tool.name) : "";
+        })
+        .filter(Boolean);
+    }
+    return [];
   }
 
   function summarizeReadUrlRecovery(value) {
@@ -16830,7 +17277,7 @@
 
   function getRuntimeBuildId() {
     return readBuildId(
-      "0d9a54d33"
+      "08a04cf60"
         
     );
   }
@@ -19346,6 +19793,22 @@
     USE_AGENT_SKILL_ACTION,
     EXECUTE_SKILL_TOOL_ACTION
   ];
+  // AGRUN-623 stage 3: the actions a skill-discovery turn needs, in order,
+  // before it has ever successfully engaged a skill this run. The guard exists
+  // to stop unproductive read-only loops, but if it forbids these before any
+  // skill has EVER been successfully read/used, it manufactures the exact
+  // deadlock it is meant to prevent (Globe3 job bccb9bc8: a truncated/empty
+  // catalog forced a guessed skill name, the guessed read failed, the model
+  // retried list/read as the anti-hallucination-mandated recovery, and the
+  // guard escalated to hard_veto and forbade every remaining path to the data
+  // -- including execute_skill_tool -- before any discovery had ever
+  // succeeded).
+  const SKILL_DISCOVERY_ACTIONS = [
+    LIST_AGENT_SKILLS_ACTION,
+    READ_AGENT_SKILL_ACTION,
+    USE_AGENT_SKILL_ACTION,
+    EXECUTE_SKILL_TOOL_ACTION
+  ];
   const LENGTH_DEFICIT_CHURN_ACTIONS = [
     WORKSPACE_READ_ACTION,
     WORKSPACE_WRITE_ACTION,
@@ -21034,7 +21497,22 @@
         actions.add(action);
       }
     }
+    // AGRUN-623 stage 3: never lock the skill-discovery door shut before it has
+    // ever opened. Once a skill has actually been read or engaged this run,
+    // the guard applies normally (a productive skill turn can still churn
+    // unproductively afterwards).
+    if (!hasSkillDiscoverySucceeded(runState)) {
+      for (const action of SKILL_DISCOVERY_ACTIONS) {
+        actions.delete(action);
+      }
+    }
     return Array.from(actions).slice(0, 12);
+  }
+
+  function hasSkillDiscoverySucceeded(runState) {
+    const context = runState && typeof runState === "object" ? runState.agentSkillContext : null;
+    if (!context || typeof context !== "object") return false;
+    return Boolean(context.lastReadSkill) || Boolean(context.activeSkill);
   }
 
   function readReadOnlyPlanningAllowedNextMoves(signalMoves, forbiddenActions) {
@@ -30310,6 +30788,14 @@
       ? options.turnIntent
       : null;
     const turnIntentKind = readString$5(turnIntent && turnIntent.kind);
+    // AGRUN-617 — AI clarification-answer verdict, emitted by the intent
+    // classifier (which sees the pending clarification's question/options —
+    // see planTurnIntent) and whitelisted by normalizePlannedIntent. Empty
+    // string when no classifier is configured, the classifier errored ({}),
+    // or it produced no verdict — in all of those cases the structural
+    // clarification chain below runs unchanged (same fallback contract as
+    // topic-router.js post-ADR-0047).
+    const clarificationAnswerKind = readString$5(turnIntent && turnIntent.clarificationAnswerKind);
 
     if (turnIntentKind === "new_task") {
       return {
@@ -30404,6 +30890,77 @@
       }
     }
 
+    // AGRUN-617 — AI-owned clarification-answer resolution (ADR-0047 pattern).
+    // The crisp deterministic shapes above (affirmative confirm, verbatim topic
+    // echo, exact option select) stay first: they only fire on exact protocol
+    // matches where any correct AI verdict coincides with the structural one.
+    // Everything the fragile structural chain below used to decide ALONE —
+    // near-match/typo'd answers (matchesClarificationAnswer requires every
+    // reply token verbatim in the topic), the countTokenOverlap===0 breakout
+    // gate, and the catch-all's looksLikeTopicPrompt topic promotion (all
+    // whitespace/ASCII-token heuristics, broken outright for CJK) — is the
+    // classifier's call when a verdict is available. No verdict falls through
+    // to the EXACT structural chain below, unchanged.
+    if (pendingClarification && clarificationAnswerKind === "answers") {
+      // The reply answers/restates/corrects the pending clarification's topic.
+      // Prefer the cleanly-spelled topic inferred from the question ("Do you
+      // mean TNO System Pte Ltd?" → "TNO System Pte Ltd") over a typo'd reply;
+      // when the question shape yields no topic, the reply itself IS the topic
+      // the user is providing.
+      const aiClarifiedTopic = inferClarifiedTopic(pendingClarification.question);
+      return {
+        activeGoal: currentGoal || normalizedPrompt,
+        activeQuery: aiClarifiedTopic || normalizedPrompt,
+        activeTopic: aiClarifiedTopic || normalizedPrompt,
+        continuityKind: "clarification_explicit_answer",
+        hasUserClarification: true,
+        lastClarificationResolution: {
+          kind: "explicit_answer",
+          sourceTurn: "current_input",
+          value: normalizedPrompt
+        },
+        pendingClarification: null,
+        turnKind: "follow_up"
+      };
+    }
+
+    if (pendingClarification && clarificationAnswerKind === "breakout") {
+      // AI-confirmed breakout to a genuinely new topic — no zero-token-overlap
+      // gate required (a breakout can legitimately share incidental tokens
+      // with the question).
+      return {
+        activeGoal: normalizedPrompt,
+        activeQuery: normalizedPrompt,
+        activeTopic: normalizedPrompt,
+        continuityKind: "clarification_breakout",
+        hasUserClarification: false,
+        lastClarificationResolution: null,
+        pendingClarification: null,
+        turnKind: "new_task"
+      };
+    }
+
+    if (pendingClarification && clarificationAnswerKind === "unrelated") {
+      // An instruction unrelated to the question but inside the ongoing
+      // conversation: resolve the clarification (AGRUN-595 — re-asking loops)
+      // but never promote the reply as the topic; the conversation subject is
+      // preserved.
+      return {
+        activeGoal: currentGoal || normalizedPrompt,
+        activeQuery: normalizedPrompt,
+        activeTopic: currentTopic || normalizedPrompt,
+        continuityKind: "clarification_free_form_answer",
+        hasUserClarification: true,
+        lastClarificationResolution: {
+          kind: "free_form_answer",
+          sourceTurn: "current_input",
+          value: normalizedPrompt
+        },
+        pendingClarification: null,
+        turnKind: "follow_up"
+      };
+    }
+
     if (
       pendingClarification &&
       !looksLikeAffirmativePrompt(normalizedPrompt) &&
@@ -30443,6 +31000,10 @@
     // same structural primitive topic_refinement/breakout already use), treat
     // it as the topic the user is providing; a longer sentence-shaped reply
     // (an instruction, not a topic label) still preserves currentTopic.
+    //
+    // AGRUN-617 — this catch-all (and the breakout gate above) is now the
+    // NO-AI-SIGNAL fallback only: when the intent classifier produced a
+    // clarificationAnswerKind verdict, the AI branches above already returned.
     if (pendingClarification) {
       return {
         activeGoal: currentGoal || normalizedPrompt,
@@ -37363,23 +37924,76 @@
     return raw.trim();
   }
 
+  // AGRUN-623 follow-up: LIST_SKILLS_MAX_RESULTS was an undocumented hard cap
+  // with no way to reach a 21st+ match beyond the more_available flag. offset
+  // pages through matches LIST_SKILLS_MAX_RESULTS at a time.
+  function readListSkillsOffset(args) {
+    if (!args || typeof args !== "object") return 0;
+    const raw = Number(args.offset);
+    return Number.isInteger(raw) && raw > 0 ? raw : 0;
+  }
+
   function matchesListSkillsQuery(manifest, queryLower) {
     if (!manifest) return false;
     const queryTerms = expandQueryTerms(queryLower);
     if (queryTerms.length === 0) return true;
     const haystack = buildSkillSearchText(manifest);
-    return queryTerms.some((term) => matchesSearchTerm(haystack, term));
+    if (queryTerms.some((term) => matchesSearchTerm(haystack, term))) return true;
+    // AGRUN-623: a multi-word query used to match ONLY as one whole phrase
+    // substring, so query "category customer" returned 0 against a skill
+    // literally named "globe3-customer" (the Globe3 reproduction, stage 1).
+    // Fall back to per-token OR — for discovery, some candidates always beat
+    // zero; alias expansion above already uses the same OR semantics.
+    const tokens = tokenizeQueryTerms(queryTerms);
+    return tokens.length > 1 && tokens.some((token) => matchesSearchTerm(haystack, token));
   }
 
   function applyListSkillsQuery(manifests, args) {
     const query = readListSkillsQuery(args);
+    const offset = readListSkillsOffset(args);
     const queryLower = normalizeSearchText(query);
-    const matches = queryLower
+    const allMatches = queryLower
       ? manifests.filter((m) => matchesListSkillsQuery(m, queryLower))
       : manifests.slice();
-    const moreAvailable = matches.length > LIST_SKILLS_MAX_RESULTS;
-    const truncated = moreAvailable ? matches.slice(0, LIST_SKILLS_MAX_RESULTS) : matches;
-    return { query, matches: truncated, moreAvailable };
+    const page = allMatches.slice(offset, offset + LIST_SKILLS_MAX_RESULTS);
+    const moreAvailable = offset + page.length < allMatches.length;
+    return {
+      query,
+      offset,
+      matches: page,
+      moreAvailable,
+      totalMatches: allMatches.length
+    };
+  }
+
+  // AGRUN-623: the catalog observation must stay small enough that the planner
+  // can actually read every skill NAME. Full tool parameter schemas made a
+  // 20-40 skill catalog blow past the observation budget and truncate after the
+  // first skill, so the catalog now carries name/description/tags/toolNames
+  // only — full instructions and tool schemas stay with read_agent_skill.
+  function createCompactSkillCatalogEntry(manifest) {
+    if (!manifest || typeof manifest !== "object") return null;
+    const name = typeof manifest.name === "string" ? manifest.name.trim() : "";
+    if (!name) return null;
+    const entry = { name };
+    const skillId = typeof manifest.skillId === "string" ? manifest.skillId.trim() : "";
+    if (skillId && skillId !== name) entry.skillId = skillId;
+    const description = typeof manifest.description === "string" ? manifest.description.trim() : "";
+    if (description) entry.description = description;
+    const tags = Array.isArray(manifest.tags)
+      ? manifest.tags.filter((tag) => typeof tag === "string" && tag)
+      : [];
+    if (tags.length > 0) entry.tags = tags;
+    const toolNames = Array.isArray(manifest.tools)
+      ? manifest.tools
+        .map((tool) => {
+          if (typeof tool === "string") return tool;
+          return tool && typeof tool === "object" && typeof tool.name === "string" ? tool.name : "";
+        })
+        .filter(Boolean)
+      : [];
+    if (toolNames.length > 0) entry.toolNames = toolNames;
+    return entry;
   }
 
   function buildSkillSearchText(manifest) {
@@ -37405,6 +38019,16 @@
       }
     }
     return [...terms].filter(Boolean);
+  }
+
+  function tokenizeQueryTerms(queryTerms) {
+    const tokens = new Set();
+    for (const term of queryTerms) {
+      for (const token of term.split(" ")) {
+        if (token.length >= 2) tokens.add(token);
+      }
+    }
+    return [...tokens];
   }
 
   function matchesSearchTerm(haystack, term) {
@@ -37448,7 +38072,7 @@
     }
 
     return Object.freeze({
-      description: "List bundled agent skills available from skills/*/SKILL.md. Optional `query` filters by substring match against name, description, and tags.",
+      description: `List bundled agent skills available from skills/*/SKILL.md. Optional \`query\` filters by substring match against name, description, tags, and inputTypes. Returns a compact catalog (name, description, tags, tool names) — call read_agent_skill for a skill's full instructions and tool schemas. Returns at most ${LIST_SKILLS_MAX_RESULTS} skills per call; when \`more_available\` is true, pass \`offset\` (a multiple of ${LIST_SKILLS_MAX_RESULTS}) to page through the rest, or narrow with \`query\`.`,
       name: "list_agent_skills",
       plan: STANDALONE_PLAN_ACTION,
       planner: {
@@ -37459,10 +38083,15 @@
             type: "string",
             required: false,
             description: "Optional capability keyword to filter the skill catalog (substring match)."
+          },
+          offset: {
+            type: "number",
+            required: false,
+            description: `Skip this many matches before returning the next page of up to ${LIST_SKILLS_MAX_RESULTS}. Use when a previous call returned more_available:true.`
           }
         },
         decisionType: "action",
-        guidance: "Call list_agent_skills (alias: list_skills) to discover skills relevant to the user's task. Pass a capability keyword like 'research', 'debug', or 'plan' as `query`. Iterate from simple to specific keywords if needed (max 5 calls per turn). Once you find a fit, call read_agent_skill to load its full instructions."
+        guidance: `Call list_agent_skills (alias: list_skills) to discover skills relevant to the user's task. Pass a capability keyword like 'research', 'debug', or 'plan' as \`query\`. Iterate from simple to specific keywords if needed (max 5 calls per turn). Results are capped at ${LIST_SKILLS_MAX_RESULTS} per call — if more_available is true, either narrow the query or call again with offset:${LIST_SKILLS_MAX_RESULTS} to see the next page. Once you find a fit, call read_agent_skill to load its full instructions.`
       },
       tier: 0,
       outputSchema: {
@@ -37503,20 +38132,25 @@
           });
         }
 
-        const { query, matches, moreAvailable } = applyListSkillsQuery(policyFiltered.filtered, actionArgs);
+        const { query, offset, matches, moreAvailable, totalMatches } = applyListSkillsQuery(policyFiltered.filtered, actionArgs);
+        // AGRUN-623: compact catalog entries only — full tool schemas in the
+        // catalog observation truncated after the first skill at 20+ skills,
+        // hiding every other skill NAME from the planner. Per-skill detail
+        // lives in read_agent_skill.
+        const catalogEntries = matches.map(createCompactSkillCatalogEntry).filter(Boolean);
 
         return {
           control: "continue",
           output: {
-            count: matches.length,
+            count: catalogEntries.length,
             kind: "agent_skill_catalog",
             query: query || null,
-            skills: matches,
-            ...(moreAvailable ? { more_available: true } : {})
+            offset,
+            totalMatches,
+            skills: catalogEntries,
+            ...(moreAvailable ? { more_available: true, next_offset: offset + catalogEntries.length } : {})
           },
-          summary: query
-            ? `list_agent_skills(query="${query}") -> ${matches.length} skill(s)${moreAvailable ? " (truncated)" : ""}`
-            : `list_agent_skills -> ${matches.length} skill(s)`
+          summary: `list_agent_skills(${query ? `query="${query}", ` : ""}offset=${offset}) -> ${catalogEntries.length}/${totalMatches} skill(s)${moreAvailable ? " (more_available)" : ""}`
         };
       }
     });
@@ -37586,6 +38220,18 @@
 
   const DEFAULT_READ_URL_TIMEOUT_MS = 10000;
   const DEFAULT_READ_URL_MAX_BYTES = 200000;
+  // timeoutMs is the PAGE RENDER budget: the read service forwards it to the
+  // headless browser (page.goto timeout), so a proxied response legitimately
+  // arrives AFTER timeoutMs elapses (render + extraction + serialization +
+  // network transfer). The local abort watchdog must therefore sit above the
+  // render budget, not at it — with zero headroom, any page that needs close
+  // to the full budget gets aborted client-side even though the service is
+  // about to return a valid response (live repro 2026-07-06: apnews.com
+  // rendered in 9516ms against a 10000ms budget and the client killed it,
+  // then burned a retry). Grace is capped so the read_url retry sequence
+  // (2 attempts + 1500ms delay) stays inside DEFAULT_ACTION_TIMEOUT_MS
+  // (30000): 2 × (10000 + 4000) + 1500 = 29500.
+  const READ_URL_WATCHDOG_GRACE_MS = 4000;
   const READ_URL_SUPPORTED_METHODS = Object.freeze(["GET", "HEAD"]);
   const HTML_ENTITY_MAP = Object.freeze({ amp: "&", gt: ">", lt: "<", mdash: "-", nbsp: " ", quot: '"', rsquo: "'", "#39": "'" });
   const NON_CONTENT_TAGS = Object.freeze(["script", "style", "noscript", "template", "svg", "iframe", "form", "dialog"]);
@@ -38530,7 +39176,12 @@
       ...normalizeHeaders$2(request && request.headers)
     };
     const abortController = typeof AbortController === "function" ? new AbortController() : null;
-    const timer = abortController ? setTimeout(() => abortController.abort(), timeoutMs) : null;
+    // Watchdog sits READ_URL_WATCHDOG_GRACE_MS above the render budget so a
+    // proxied read that legitimately uses the full timeoutMs server-side is
+    // not aborted mid-response; see url-reader-utils.js for the arithmetic.
+    const timer = abortController
+      ? setTimeout(() => abortController.abort(), timeoutMs + READ_URL_WATCHDOG_GRACE_MS)
+      : null;
 
     try {
       const fetchInit = {
@@ -81989,6 +82640,10 @@ ${user}:`]
           searchResults: {
             maxResults: 2,
             snippetChars: 160
+          },
+          skillCatalog: {
+            maxDetailedSkills: 3,
+            descriptionChars: 80
           }
         },
         readSources: {
@@ -82039,6 +82694,10 @@ ${user}:`]
         searchResults: {
           maxResults: 3,
           snippetChars: 220
+        },
+        skillCatalog: {
+          maxDetailedSkills: 8,
+          descriptionChars: 120
         }
       },
       readSources: {
@@ -82090,6 +82749,13 @@ ${user}:`]
       const workspaceRepairSignal = state.workspaceRepairSignal && typeof state.workspaceRepairSignal === "object"
         ? state.workspaceRepairSignal
         : null;
+      // AGRUN-542 — content-structure exit contract: when the single content-
+      // changing repair attempt is used and the content-level structure issue
+      // remains, the ONLY move is one honest limited publish; surface that rule
+      // ahead of the generic ordering signals.
+      const contentStructureExitSignal = state.contentStructureExitSignal && typeof state.contentStructureExitSignal === "object"
+        ? state.contentStructureExitSignal
+        : null;
       const preferredExpansionActions = multiWriteSignal && Array.isArray(multiWriteSignal.preferredActions)
         ? multiWriteSignal.preferredActions.map(readString$3).filter((actionName) => allowedActions.includes(actionName))
         : [];
@@ -82107,7 +82773,9 @@ ${user}:`]
         mode: "terminal_repair_hard_veto_focused",
         active: true,
         escalation: "hard_veto",
-        rule: workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
+        rule: contentStructureExitSignal && contentStructureExitSignal.forcedPublish === true
+          ? contentStructureExitSignal.rule
+          : workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
           ? "Read the selected candidate first because workspaceRepairSignal says it was not inspected after the latest content change; then choose a targeted repair action."
           : preferredProductRepairActions.length > 0
           ? "TodoState sync is not enough while product deficits remain. Choose one preferred source/workspace repair action before using another Todo-only action."
@@ -82122,6 +82790,7 @@ ${user}:`]
         advisoryPersistenceSignal: state.advisoryPersistenceSignal && typeof state.advisoryPersistenceSignal === "object"
           ? state.advisoryPersistenceSignal
           : null,
+        contentStructureExitSignal,
         forbidden: forbiddenLines,
         activeDeficits: Array.isArray(state.activeDeficits) ? state.activeDeficits.slice(0, 8) : [],
         lengthExpansionSignal: state.lengthExpansionSignal && typeof state.lengthExpansionSignal === "object"
@@ -86849,7 +87518,23 @@ ${user}:`]
         // single-action door in action-loop-action.js).
         ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount, session && session.runtimeConfig)
         : null;
-      const message = isHardVeto
+      // AGRUN-542 — content-structure exit forced publish: the finalize decision
+      // is blocked with the dedicated contract message (parity with the
+      // single-action door in blocks/terminal-repair.js). The
+      // contentStructureExitForcedPublishGranted escape opens PUBLISH only, so
+      // it never reaches the opensFinalize pass-through above.
+      const contentStructureExitSignal = repair.contentStructureExitSignal &&
+        typeof repair.contentStructureExitSignal === "object"
+        ? repair.contentStructureExitSignal
+        : null;
+      const contentStructureForced = Boolean(contentStructureExitSignal && contentStructureExitSignal.forcedPublish === true);
+      const message = contentStructureForced
+        ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.contentStructureForcedPublish({
+            actionName,
+            attemptsUsed: Number(contentStructureExitSignal.attemptsUsed) || 0,
+            attemptLimit: Math.max(Number(contentStructureExitSignal.attemptLimit) || 1, 1)
+          })
+        : isHardVeto
         ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
             actionName,
             ignoredCount,
@@ -86873,6 +87558,7 @@ ${user}:`]
           escalation: repair.escalation || "advisory",
           ignoredCount,
           budgetRemainingForExpansionSignal: budgetExpansionSignal,
+          contentStructureExitSignal: contentStructureExitSignal ? cloneValue$1(contentStructureExitSignal) : null,
           reason: repair.reason || "direct_terminal_suppressed_by_terminal_repair"
         }
       );
@@ -93348,7 +94034,7 @@ ${user}:`]
    * hallucination never reaches the router.
    *
    * @param {unknown} raw
-   * @param {{threadIds:Set<string>, activeThreadId:string|null}} context
+   * @param {{threadIds:Set<string>, activeThreadId:string|null, hasPendingClarification?:boolean}} context
    * @returns {object}
    */
   function normalizePlannedIntent(raw, context) {
@@ -93358,6 +94044,7 @@ ${user}:`]
     const activeThreadId = context && typeof context.activeThreadId === "string"
       ? context.activeThreadId
       : null;
+    const hasPendingClarification = Boolean(context && context.hasPendingClarification === true);
 
     if (raw.pivotIntent === true) intent.pivotIntent = true;
     if (raw.divergentIntent === true) intent.divergentIntent = true;
@@ -93372,6 +94059,24 @@ ${user}:`]
       intent.kind = kind;
       if (kind === "new_task") {
         intent.divergentIntent = true;
+      }
+    }
+
+    // AGRUN-617 — clarification-answer verdict. Only meaningful when the caller
+    // actually had a pending clarification to show the classifier; a
+    // hallucinated verdict with nothing pending is rejected outright (same
+    // whitelist-and-validate posture as targetThreadId below).
+    const clarificationAnswerKind = normalizeClarificationAnswerKind(raw.clarificationAnswerKind);
+    if (clarificationAnswerKind && hasPendingClarification) {
+      intent.clarificationAnswerKind = clarificationAnswerKind;
+      // Mutual-exclusion guard: "answers" means the reply resolves the pending
+      // clarification about the ACTIVE topic — by definition a continuation, so
+      // a coexisting new_task reset (and its implied divergentIntent) is
+      // contradictory. The clarification-specific verdict is the more specific
+      // signal (the classifier was shown the pending question) and wins.
+      if (clarificationAnswerKind === "answers") {
+        if (intent.kind === "new_task") delete intent.kind;
+        if (intent.divergentIntent) delete intent.divergentIntent;
       }
     }
 
@@ -93415,6 +94120,7 @@ ${user}:`]
    * @param {Array<Thread>} options.threads
    * @param {string|null} options.activeThreadId
    * @param {(payload:object)=>Promise<object>} options.classify
+   * @param {{question?:string, options?:Array<{key?:string,text?:string}>}|null} [options.pendingClarification]
    * @returns {Promise<object>}
    */
   async function planTurnIntent(options) {
@@ -93423,6 +94129,11 @@ ${user}:`]
     const threads = Array.isArray(source.threads) ? source.threads.filter(Boolean) : [];
     const activeThreadId = typeof source.activeThreadId === "string" ? source.activeThreadId : null;
     const classify = typeof source.classify === "function" ? source.classify : null;
+    // AGRUN-617 — compact pending-clarification summary for the classifier
+    // payload. The classifier cannot judge "does this reply answer the pending
+    // clarification" without seeing the question, so the caller threads it in;
+    // absent (null) keeps the payload byte-identical to the pre-617 shape.
+    const pendingClarification = buildPendingClarificationSummary(source.pendingClarification);
 
     if (!userMessage || threads.length === 0 || !classify) return {};
 
@@ -93436,13 +94147,18 @@ ${user}:`]
       raw = await classify({
         userMessage,
         activeThreadId,
-        threads: summaries
+        threads: summaries,
+        ...(pendingClarification ? { pendingClarification } : {})
       });
     } catch (_err) {
       return {};
     }
 
-    return normalizePlannedIntent(raw, { threadIds, activeThreadId: activeThreadId || VALID_TARGET_FALLBACK });
+    return normalizePlannedIntent(raw, {
+      threadIds,
+      activeThreadId: activeThreadId || VALID_TARGET_FALLBACK,
+      hasPendingClarification: Boolean(pendingClarification)
+    });
   }
 
   /**
@@ -93497,6 +94213,16 @@ ${user}:`]
     if (plannerContinues && planned.divergentIntent !== true && out.divergentIntent) {
       delete out.divergentIntent;
     }
+    // AGRUN-617 — a positive AI verdict that the reply ANSWERS the pending
+    // clarification is a continuation of the active context, so a structural
+    // divergentIntent (a zero-token-overlap guess — a typo'd answer often
+    // shares no tokens with the thread) is an overruled guess. Same
+    // positive-verdict-only contract as AGRUN-618 above: "breakout"/"unrelated"
+    // and an absent verdict leave structural signals standing.
+    if (out.clarificationAnswerKind === "answers") {
+      if (out.divergentIntent) delete out.divergentIntent;
+      if (out.kind === "new_task") delete out.kind;
+    }
     return out;
   }
 
@@ -93513,6 +94239,43 @@ ${user}:`]
       return kind;
     }
     return "";
+  }
+
+  // AGRUN-617 — strict whitelist for the clarification-answer verdict:
+  //  "answers"   — the reply answers/restates/corrects the pending
+  //                clarification's topic (typos, paraphrases, other languages).
+  //  "breakout"  — the reply abandons the question for a genuinely new topic.
+  //  "unrelated" — the reply is an instruction unrelated to the question but
+  //                still inside the ongoing conversation (topic preserved).
+  // Anything else (including omission) is "no verdict" and the structural
+  // clarification chain in inquiry-context-resolution.js remains the fallback.
+  function normalizeClarificationAnswerKind(value) {
+    if (typeof value !== "string") return "";
+    const kind = value.trim();
+    if (kind === "answers" || kind === "breakout" || kind === "unrelated") {
+      return kind;
+    }
+    return "";
+  }
+
+  // AGRUN-617 — trim the pending clarification down to what the classifier
+  // needs (question + option labels), mirroring buildThreadSummaries' compact
+  // posture so the prompt stays small.
+  function buildPendingClarificationSummary(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const question = typeof value.question === "string" ? value.question.trim().slice(0, 300) : "";
+    if (!question) return null;
+    const options = Array.isArray(value.options)
+      ? value.options
+        .map((option) => {
+          if (!option || typeof option !== "object") return null;
+          const key = typeof option.key === "string" ? option.key.trim() : "";
+          const text = typeof option.text === "string" ? option.text.trim().slice(0, 160) : "";
+          return key || text ? { key, text } : null;
+        })
+        .filter(Boolean)
+      : [];
+    return { question, options };
   }
 
   const HOOK_KEYS = [
@@ -97420,6 +98183,14 @@ ${user}:`]
         activeThreadId
       });
 
+      // AGRUN-617 — surface the pending clarification (if any) to the intent
+      // planner so the AI can judge whether this reply answers it, breaks out
+      // to a new topic, or is an unrelated instruction
+      // (turnIntent.clarificationAnswerKind, consumed by
+      // resolvePromptInquiryContext). Read from the PREVIOUS turn's persisted
+      // snapshot — routing runs before this turn's input resolution.
+      const pendingClarification = readPendingClarificationFromSnapshot(sessionRecord.contextSnapshot);
+
       // Escalation to LLM-backed planner when:
       //  (a) A classifier callback was configured (runtime opts in), AND
       //  (b) At least one thread exists so there is something to route against, AND
@@ -97444,13 +98215,24 @@ ${user}:`]
         : null;
       const needsPlanner = classify
         && threads.length >= 1
-        && (Object.keys(structuralIntent).length === 0 || structuralIntent.divergentIntent === true);
+        && (
+          Object.keys(structuralIntent).length === 0
+          || structuralIntent.divergentIntent === true
+          // AGRUN-617 — answer-vs-breakout-vs-unrelated for a pending
+          // clarification is a semantic judgment the AI owns (ADR-0047
+          // pattern); consult the planner whenever one is pending so the
+          // clarificationAnswerKind verdict is available downstream. The
+          // structural clarification matchers remain the complete fallback
+          // when no classifier is configured or the planner fails ({}).
+          || pendingClarification !== null
+        );
       if (needsPlanner) {
         const planned = await planTurnIntent({
           userMessage: userText,
           threads,
           activeThreadId,
-          classify
+          classify,
+          pendingClarification
         });
         turnIntent = mergeTurnIntent(structuralIntent, planned);
       }
@@ -97790,6 +98572,19 @@ ${user}:`]
    * `filterMemoryEntriesByThread` trims memory before it reaches the planner's
    * semantic-recall request.
    */
+  // AGRUN-617 — read the pending clarification the previous turn left in the
+  // persisted context snapshot, so routeTurnToThread can show it to the intent
+  // classifier. Null when no snapshot exists or nothing is pending.
+  function readPendingClarificationFromSnapshot(contextSnapshot) {
+    const snapshot = readContextSnapshot(contextSnapshot);
+    if (!snapshot) return null;
+    const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
+    return inquiryContext && inquiryContext.pendingClarification
+      && typeof inquiryContext.pendingClarification === "object"
+      ? inquiryContext.pendingClarification
+      : null;
+  }
+
   function readThreadScope(runtimeConfig, threadRouting) {
     const threadsConfig = (runtimeConfig && runtimeConfig.threads) || null;
     if (!threadsConfig || threadsConfig.enabled !== true) return null;

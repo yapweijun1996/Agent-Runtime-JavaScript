@@ -734,6 +734,10 @@ function selectPlannerPromptProjectionProfile(options) {
         searchResults: {
           maxResults: 2,
           snippetChars: 160
+        },
+        skillCatalog: {
+          maxDetailedSkills: 3,
+          descriptionChars: 80
         }
       },
       readSources: {
@@ -784,6 +788,10 @@ function selectPlannerPromptProjectionProfile(options) {
       searchResults: {
         maxResults: 3,
         snippetChars: 220
+      },
+      skillCatalog: {
+        maxDetailedSkills: 8,
+        descriptionChars: 120
       }
     },
     readSources: {
@@ -835,6 +843,13 @@ function buildFocusedTerminalRepairPromptBlock(terminalRepairState) {
     const workspaceRepairSignal = state.workspaceRepairSignal && typeof state.workspaceRepairSignal === "object"
       ? state.workspaceRepairSignal
       : null;
+    // AGRUN-542 — content-structure exit contract: when the single content-
+    // changing repair attempt is used and the content-level structure issue
+    // remains, the ONLY move is one honest limited publish; surface that rule
+    // ahead of the generic ordering signals.
+    const contentStructureExitSignal = state.contentStructureExitSignal && typeof state.contentStructureExitSignal === "object"
+      ? state.contentStructureExitSignal
+      : null;
     const preferredExpansionActions = multiWriteSignal && Array.isArray(multiWriteSignal.preferredActions)
       ? multiWriteSignal.preferredActions.map(readString).filter((actionName) => allowedActions.includes(actionName))
       : [];
@@ -852,7 +867,9 @@ function buildFocusedTerminalRepairPromptBlock(terminalRepairState) {
       mode: "terminal_repair_hard_veto_focused",
       active: true,
       escalation: "hard_veto",
-      rule: workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
+      rule: contentStructureExitSignal && contentStructureExitSignal.forcedPublish === true
+        ? contentStructureExitSignal.rule
+        : workspaceRepairSignal && workspaceRepairSignal.mustInspectCandidate === true && allowedActions.includes("workspace_read")
         ? "Read the selected candidate first because workspaceRepairSignal says it was not inspected after the latest content change; then choose a targeted repair action."
         : preferredProductRepairActions.length > 0
         ? "TodoState sync is not enough while product deficits remain. Choose one preferred source/workspace repair action before using another Todo-only action."
@@ -867,6 +884,7 @@ function buildFocusedTerminalRepairPromptBlock(terminalRepairState) {
       advisoryPersistenceSignal: state.advisoryPersistenceSignal && typeof state.advisoryPersistenceSignal === "object"
         ? state.advisoryPersistenceSignal
         : null,
+      contentStructureExitSignal,
       forbidden: forbiddenLines,
       activeDeficits: Array.isArray(state.activeDeficits) ? state.activeDeficits.slice(0, 8) : [],
       lengthExpansionSignal: state.lengthExpansionSignal && typeof state.lengthExpansionSignal === "object"

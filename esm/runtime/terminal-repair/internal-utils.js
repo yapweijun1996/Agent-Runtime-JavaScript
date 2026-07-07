@@ -43,6 +43,14 @@ const TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD = 3;
 // so they never approach it.
 const TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP = 8;
 
+// AGRUN-542 — content-level structure repair attempt budget. Once length and
+// read sources are satisfied but semantic_duplicate_headings /
+// body_after_final_section remain on the final candidate, the model gets
+// exactly this many content-changing repair attempts (candidate file-version
+// advances) before the runtime forces the honest limited-publish exit. See
+// terminal-repair/content-structure-exit.js.
+const TERMINAL_REPAIR_CONTENT_STRUCTURE_REPAIR_ATTEMPTS = 1;
+
 // AGRUN: thresholds are host-overridable policy, not hardcoded runtime law.
 // Defaults preserve the historical behavior; a host can retune escalation via
 // runtimeConfig.terminalRepair.thresholds without forking the runtime. The
@@ -52,7 +60,8 @@ const DEFAULT_TERMINAL_REPAIR_THRESHOLDS = Object.freeze({
   hardVeto: TERMINAL_REPAIR_HARD_VETO_THRESHOLD,
   highWaterMark: TERMINAL_REPAIR_HIGH_WATER_MARK,
   advisorySignal: TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD,
-  absoluteIgnoredCap: TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP
+  absoluteIgnoredCap: TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP,
+  contentStructureRepairAttempts: TERMINAL_REPAIR_CONTENT_STRUCTURE_REPAIR_ATTEMPTS
 });
 
 function readPositiveThreshold(value, fallback) {
@@ -74,7 +83,11 @@ function resolveTerminalRepairThresholds(runtimeConfig) {
     hardVeto: readPositiveThreshold(overrides.hardVeto, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.hardVeto),
     highWaterMark: readPositiveThreshold(overrides.highWaterMark, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.highWaterMark),
     advisorySignal: readPositiveThreshold(overrides.advisorySignal, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.advisorySignal),
-    absoluteIgnoredCap: readPositiveThreshold(overrides.absoluteIgnoredCap, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.absoluteIgnoredCap)
+    absoluteIgnoredCap: readPositiveThreshold(overrides.absoluteIgnoredCap, DEFAULT_TERMINAL_REPAIR_THRESHOLDS.absoluteIgnoredCap),
+    contentStructureRepairAttempts: readPositiveThreshold(
+      overrides.contentStructureRepairAttempts,
+      DEFAULT_TERMINAL_REPAIR_THRESHOLDS.contentStructureRepairAttempts
+    )
   };
 }
 
@@ -654,4 +667,4 @@ function normalizeProgressSnapshot$1(value) {
   };
 }
 
-export { DEFAULT_TERMINAL_REPAIR_THRESHOLDS, DEFAULT_VALID_PUBLISH_EXCEPTION, TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP, TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD, TERMINAL_REPAIR_HARD_VETO_THRESHOLD, TERMINAL_REPAIR_HIGH_WATER_MARK, createTerminalRepairState, hasSelectedFinalCandidateContent, isTerminalAttempt, isTerminalCompleted$1 as isTerminalCompleted, mentionsGap, mentionsStructureGap, normalizeActionOrderingSignal, normalizeActionOrderingSignals, normalizeAdvisoryPersistenceSignal, normalizeBodyAfterFinalSectionContexts$2 as normalizeBodyAfterFinalSectionContexts, normalizeHeadingOutlineEntry, normalizeLengthExpansionSignal, normalizeNearDuplicateHeadingPair, normalizeObservableDeficits, normalizeProgressSnapshot$1 as normalizeProgressSnapshot, normalizeReadinessIssues, normalizeSectionDelta, normalizeSectionNumberRepairHints, normalizeSemanticDuplicateHeadingContexts$2 as normalizeSemanticDuplicateHeadingContexts, normalizeStructureContexts, normalizeStructureSamples$1 as normalizeStructureSamples, normalizeTextStats$2 as normalizeTextStats, normalizeUrlKey$2 as normalizeUrlKey, normalizeValidPublishContract, normalizeWorkspaceRepairSignal, observableDeficitsRecord, readCandidateStatsFromWorkspace, readCandidateUrl, readCurrentPublishProtocol, readFinalCandidatePathFromWorkspace, readNullableNumber$7 as readNullableNumber, readNumber$j as readNumber, readOnlyPlanningHardVetoForbiddenActions, readPositiveThreshold, readRecord$1 as readRecord, readSearchPassItems, readString$4 as readString, readStringArray$4 as readStringArray, readWorkspaceFileStats, resolveTerminalRepairThresholds, summarizeTextStats$1 as summarizeTextStats, workspaceMutationGrowthHardVetoForbiddenActions };
+export { DEFAULT_TERMINAL_REPAIR_THRESHOLDS, DEFAULT_VALID_PUBLISH_EXCEPTION, TERMINAL_REPAIR_ABSOLUTE_IGNORED_CAP, TERMINAL_REPAIR_ADVISORY_SIGNAL_THRESHOLD, TERMINAL_REPAIR_CONTENT_STRUCTURE_REPAIR_ATTEMPTS, TERMINAL_REPAIR_HARD_VETO_THRESHOLD, TERMINAL_REPAIR_HIGH_WATER_MARK, createTerminalRepairState, hasSelectedFinalCandidateContent, isTerminalAttempt, isTerminalCompleted$1 as isTerminalCompleted, mentionsGap, mentionsStructureGap, normalizeActionOrderingSignal, normalizeActionOrderingSignals, normalizeAdvisoryPersistenceSignal, normalizeBodyAfterFinalSectionContexts$2 as normalizeBodyAfterFinalSectionContexts, normalizeHeadingOutlineEntry, normalizeLengthExpansionSignal, normalizeNearDuplicateHeadingPair, normalizeObservableDeficits, normalizeProgressSnapshot$1 as normalizeProgressSnapshot, normalizeReadinessIssues, normalizeSectionDelta, normalizeSectionNumberRepairHints, normalizeSemanticDuplicateHeadingContexts$2 as normalizeSemanticDuplicateHeadingContexts, normalizeStructureContexts, normalizeStructureSamples$1 as normalizeStructureSamples, normalizeTextStats$2 as normalizeTextStats, normalizeUrlKey$2 as normalizeUrlKey, normalizeValidPublishContract, normalizeWorkspaceRepairSignal, observableDeficitsRecord, readCandidateStatsFromWorkspace, readCandidateUrl, readCurrentPublishProtocol, readFinalCandidatePathFromWorkspace, readNullableNumber$7 as readNullableNumber, readNumber$j as readNumber, readOnlyPlanningHardVetoForbiddenActions, readPositiveThreshold, readRecord$1 as readRecord, readSearchPassItems, readString$4 as readString, readStringArray$4 as readStringArray, readWorkspaceFileStats, resolveTerminalRepairThresholds, summarizeTextStats$1 as summarizeTextStats, workspaceMutationGrowthHardVetoForbiddenActions };

@@ -1,10 +1,11 @@
 import { CANDIDATE_QUALITY_BLOCKED_REASON } from '../kernel-terminal-actions.js';
-import { WORKSPACE_WRITE_ACTION, WORKSPACE_REPLACE_ACTION, WORKSPACE_INSERT_AFTER_SECTION_ACTION, TODO_ADVANCE_ACTION, TODO_RUN_NEXT_ACTION, TODO_CANCEL_ACTION, PUBLISH_DIRECT_ACTION, WORKSPACE_READ_ACTION, WORKSPACE_MULTI_EDIT_ACTION, FINALIZE_CANDIDATE_ACTION, WORKSPACE_REVIEW_CANDIDATE_ACTION, WEB_SEARCH_ACTION, WORKSPACE_PROPOSE_PATCH_ACTION, WORKSPACE_APPLY_PATCH_ACTION } from '../action-names.js';
+import { PUBLISH_DIRECT_ACTION, WORKSPACE_WRITE_ACTION, WORKSPACE_REPLACE_ACTION, WORKSPACE_INSERT_AFTER_SECTION_ACTION, TODO_ADVANCE_ACTION, TODO_RUN_NEXT_ACTION, TODO_CANCEL_ACTION, WORKSPACE_READ_ACTION, WORKSPACE_MULTI_EDIT_ACTION, FINALIZE_CANDIDATE_ACTION, WORKSPACE_REVIEW_CANDIDATE_ACTION, WEB_SEARCH_ACTION, WORKSPACE_PROPOSE_PATCH_ACTION, WORKSPACE_APPLY_PATCH_ACTION } from '../action-names.js';
 import { readEvidenceRecoveryActions } from '../evidence-policy.js';
 import { readString, observableDeficitsRecord, readOnlyPlanningHardVetoForbiddenActions, workspaceMutationGrowthHardVetoForbiddenActions, readRecord, normalizeUrlKey, readCandidateUrl, readSearchPassItems, readStringArray, readFinalCandidatePathFromWorkspace, readNumber, readCurrentPublishProtocol } from './internal-utils.js';
 import { isBudgetConstrainedForLimitedPublish, resolvePublishProtocolActionContract, isPublishProtocolRepairReason } from './publish-contract.js';
 import { readCandidateQualitySignal, buildCandidateQualityCitationDeficit } from './facts.js';
 import { shouldSurfaceMultiWriteIterationNudge, shouldRequireWorkspaceRepairInspection } from './signals.js';
+import { isContentStructureForcedPublish, hasContentLevelStructureIssue } from './content-structure-exit.js';
 
 // H10 split, Step 5 (AGRUN-507) — terminal-repair allowed-action whitelist.
 // VERBATIM moves from terminal-repair-state.js (see
@@ -17,6 +18,19 @@ import { shouldSurfaceMultiWriteIterationNudge, shouldRequireWorkspaceRepairInsp
 
 function buildAllowedActions(deficits, budgetState, reason, observableDeficits, runState, escalation, runtimeConfig) {
   const actions = new Set();
+  // AGRUN-542 — content-structure exit forced publish: the single content-
+  // changing repair attempt budget is used (or the repair contract was
+  // repeatedly ignored) while length + sources are satisfied, and the content-
+  // level structure issue remains. Every further repair/finalize cycle is out
+  // of contract — the honest limited publish is the ONLY action. This is the
+  // FIRST branch on purpose: both dispatch doors (single-action preflight
+  // allowlist and plan-batch planner-action-surface filter) consume the
+  // resulting allowedActions, so collapsing here enforces the exit on both.
+  // evaluateTerminalRepairState updates runState.contentStructureExitState
+  // immediately before calling this builder.
+  if (isContentStructureForcedPublish(runState)) {
+    return [PUBLISH_DIRECT_ACTION];
+  }
   // ADR-0033 Tier A.8 (X1 fix) — treat hard_veto state as a budget-constrained
   // exit condition for the structure-deficit branch, so AI can publish a
   // limited candidate (with structure in remainingGaps) instead of being
@@ -472,17 +486,11 @@ function shouldExposeLimitedPublishForBudget({
   return false;
 }
 
+// AGRUN-542 — delegates to the shared content-structure predicate
+// (content-structure-exit.js) so the repair-surface choice and the exit
+// episode can never disagree about what counts as a content-level issue.
 function shouldPreferFullRewriteForStructureRepair(observableDeficits, runState) {
-  const issueCodes = new Set([
-    ...readStructureIssueCodes(observableDeficitsRecord(observableDeficits, "structure")),
-    ...readStructureIssueCodes(readRecord(runState && runState.virtualWorkspace && runState.virtualWorkspace.quality && runState.virtualWorkspace.quality.finalCandidateStructure))
-  ]);
-  return issueCodes.has("semantic_duplicate_headings") ||
-    issueCodes.has("body_after_final_section");
-}
-
-function readStructureIssueCodes(structure) {
-  return readStringArray(structure && structure.issueCodes);
+  return hasContentLevelStructureIssue(observableDeficits, runState);
 }
 
 function hasEmptyFinalCandidateDeficit(observableDeficits, runState) {

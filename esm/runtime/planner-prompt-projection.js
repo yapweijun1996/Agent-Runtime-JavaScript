@@ -84,7 +84,82 @@ function summarizeObservationOutputForPrompt(output, options = {}) {
   if (WORKSPACE_MUTATION_KINDS.has(kind)) {
     return summarizeWorkspaceMutationForPrompt(output, kind);
   }
+  if (kind === "agent_skill_catalog") {
+    return summarizeAgentSkillCatalogForPrompt(output, opts.skillCatalog);
+  }
   return summarizeGenericOutputForPrompt(output, opts);
+}
+
+// AGRUN-623: skill-boundary-aware projection. The generic char-slice cut a
+// multi-skill catalog after the FIRST skill, so the planner could never read
+// the skill-name list — the one piece of information this observation exists
+// to deliver. Every skill NAME always survives projection; only per-skill
+// detail (description/tags/toolNames) is budgeted, and legacy full tool
+// summaries (pre-compact catalogs replayed from persisted run state) are
+// reduced to tool names.
+function summarizeAgentSkillCatalogForPrompt(output, options = {}) {
+  const opts = options && typeof options === "object" ? options : {};
+  const maxDetailedSkills = readPositiveInteger$m(opts.maxDetailedSkills) || 12;
+  const descriptionChars = readPositiveInteger$m(opts.descriptionChars) || 160;
+  const skills = Array.isArray(output.skills)
+    ? output.skills.filter((skill) => skill && typeof skill === "object" && !Array.isArray(skill))
+    : [];
+  const detailed = skills.slice(0, maxDetailedSkills).map((skill) => {
+    const entry = { name: readString(skill.name) || null };
+    const skillId = readString(skill.skillId);
+    if (skillId && skillId !== entry.name) entry.skillId = skillId;
+    const description = truncateForPrompt(readString(skill.description), descriptionChars);
+    if (description) entry.description = description;
+    const tags = Array.isArray(skill.tags)
+      ? skill.tags.map(readString).filter(Boolean).slice(0, 5)
+      : [];
+    if (tags.length > 0) entry.tags = tags;
+    const toolNames = readCatalogToolNames(skill).slice(0, 8);
+    if (toolNames.length > 0) entry.toolNames = toolNames;
+    return entry;
+  });
+  const result = {
+    kind: "agent_skill_catalog",
+    count: readNumber$h(output.count),
+    query: readString(output.query) || null,
+    skills: detailed
+  };
+  if (skills.length > maxDetailedSkills) {
+    result.moreSkillNames = skills.slice(maxDetailedSkills)
+      .map((skill) => readString(skill.name))
+      .filter(Boolean);
+  }
+  // AGRUN-623 follow-up: surface the pagination fields so the planner knows
+  // a next page exists and how to reach it (list_agent_skills{offset:N}),
+  // instead of more_available being a dead-end signal.
+  if (typeof output.totalMatches === "number") result.totalMatches = readNumber$h(output.totalMatches);
+  if (typeof output.offset === "number" && output.offset > 0) result.offset = readNumber$h(output.offset);
+  if (output.more_available === true) {
+    result.more_available = true;
+    if (typeof output.next_offset === "number") result.next_offset = readNumber$h(output.next_offset);
+  }
+  const error = readString(output.error);
+  if (error) {
+    result.error = error;
+    const errorDetail = readString(output.error_detail);
+    if (errorDetail) result.error_detail = errorDetail;
+  }
+  return result;
+}
+
+function readCatalogToolNames(skill) {
+  if (Array.isArray(skill.toolNames)) {
+    return skill.toolNames.map(readString).filter(Boolean);
+  }
+  if (Array.isArray(skill.tools)) {
+    return skill.tools
+      .map((tool) => {
+        if (typeof tool === "string") return tool.trim();
+        return tool && typeof tool === "object" ? readString(tool.name) : "";
+      })
+      .filter(Boolean);
+  }
+  return [];
 }
 
 function summarizeReadUrlRecovery(value) {

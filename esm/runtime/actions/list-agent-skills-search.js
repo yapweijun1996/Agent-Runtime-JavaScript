@@ -11,23 +11,76 @@ function readListSkillsQuery(args) {
   return raw.trim();
 }
 
+// AGRUN-623 follow-up: LIST_SKILLS_MAX_RESULTS was an undocumented hard cap
+// with no way to reach a 21st+ match beyond the more_available flag. offset
+// pages through matches LIST_SKILLS_MAX_RESULTS at a time.
+function readListSkillsOffset(args) {
+  if (!args || typeof args !== "object") return 0;
+  const raw = Number(args.offset);
+  return Number.isInteger(raw) && raw > 0 ? raw : 0;
+}
+
 function matchesListSkillsQuery(manifest, queryLower) {
   if (!manifest) return false;
   const queryTerms = expandQueryTerms(queryLower);
   if (queryTerms.length === 0) return true;
   const haystack = buildSkillSearchText(manifest);
-  return queryTerms.some((term) => matchesSearchTerm(haystack, term));
+  if (queryTerms.some((term) => matchesSearchTerm(haystack, term))) return true;
+  // AGRUN-623: a multi-word query used to match ONLY as one whole phrase
+  // substring, so query "category customer" returned 0 against a skill
+  // literally named "globe3-customer" (the Globe3 reproduction, stage 1).
+  // Fall back to per-token OR — for discovery, some candidates always beat
+  // zero; alias expansion above already uses the same OR semantics.
+  const tokens = tokenizeQueryTerms(queryTerms);
+  return tokens.length > 1 && tokens.some((token) => matchesSearchTerm(haystack, token));
 }
 
 function applyListSkillsQuery(manifests, args) {
   const query = readListSkillsQuery(args);
+  const offset = readListSkillsOffset(args);
   const queryLower = normalizeSearchText(query);
-  const matches = queryLower
+  const allMatches = queryLower
     ? manifests.filter((m) => matchesListSkillsQuery(m, queryLower))
     : manifests.slice();
-  const moreAvailable = matches.length > LIST_SKILLS_MAX_RESULTS;
-  const truncated = moreAvailable ? matches.slice(0, LIST_SKILLS_MAX_RESULTS) : matches;
-  return { query, matches: truncated, moreAvailable };
+  const page = allMatches.slice(offset, offset + LIST_SKILLS_MAX_RESULTS);
+  const moreAvailable = offset + page.length < allMatches.length;
+  return {
+    query,
+    offset,
+    matches: page,
+    moreAvailable,
+    totalMatches: allMatches.length
+  };
+}
+
+// AGRUN-623: the catalog observation must stay small enough that the planner
+// can actually read every skill NAME. Full tool parameter schemas made a
+// 20-40 skill catalog blow past the observation budget and truncate after the
+// first skill, so the catalog now carries name/description/tags/toolNames
+// only — full instructions and tool schemas stay with read_agent_skill.
+function createCompactSkillCatalogEntry(manifest) {
+  if (!manifest || typeof manifest !== "object") return null;
+  const name = typeof manifest.name === "string" ? manifest.name.trim() : "";
+  if (!name) return null;
+  const entry = { name };
+  const skillId = typeof manifest.skillId === "string" ? manifest.skillId.trim() : "";
+  if (skillId && skillId !== name) entry.skillId = skillId;
+  const description = typeof manifest.description === "string" ? manifest.description.trim() : "";
+  if (description) entry.description = description;
+  const tags = Array.isArray(manifest.tags)
+    ? manifest.tags.filter((tag) => typeof tag === "string" && tag)
+    : [];
+  if (tags.length > 0) entry.tags = tags;
+  const toolNames = Array.isArray(manifest.tools)
+    ? manifest.tools
+      .map((tool) => {
+        if (typeof tool === "string") return tool;
+        return tool && typeof tool === "object" && typeof tool.name === "string" ? tool.name : "";
+      })
+      .filter(Boolean)
+    : [];
+  if (toolNames.length > 0) entry.toolNames = toolNames;
+  return entry;
 }
 
 function buildSkillSearchText(manifest) {
@@ -53,6 +106,16 @@ function expandQueryTerms(queryLower) {
     }
   }
   return [...terms].filter(Boolean);
+}
+
+function tokenizeQueryTerms(queryTerms) {
+  const tokens = new Set();
+  for (const term of queryTerms) {
+    for (const token of term.split(" ")) {
+      if (token.length >= 2) tokens.add(token);
+    }
+  }
+  return [...tokens];
 }
 
 function matchesSearchTerm(haystack, term) {
@@ -88,4 +151,4 @@ const QUERY_ALIASES = [
   }
 ];
 
-export { LIST_SKILLS_BUDGET_PER_TURN, LIST_SKILLS_MAX_RESULTS, applyListSkillsQuery, matchesListSkillsQuery, readListSkillsQuery };
+export { LIST_SKILLS_BUDGET_PER_TURN, LIST_SKILLS_MAX_RESULTS, applyListSkillsQuery, createCompactSkillCatalogEntry, matchesListSkillsQuery, readListSkillsOffset, readListSkillsQuery };

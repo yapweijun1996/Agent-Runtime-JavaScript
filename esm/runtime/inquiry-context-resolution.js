@@ -31,6 +31,14 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
     ? options.turnIntent
     : null;
   const turnIntentKind = readString(turnIntent && turnIntent.kind);
+  // AGRUN-617 — AI clarification-answer verdict, emitted by the intent
+  // classifier (which sees the pending clarification's question/options —
+  // see planTurnIntent) and whitelisted by normalizePlannedIntent. Empty
+  // string when no classifier is configured, the classifier errored ({}),
+  // or it produced no verdict — in all of those cases the structural
+  // clarification chain below runs unchanged (same fallback contract as
+  // topic-router.js post-ADR-0047).
+  const clarificationAnswerKind = readString(turnIntent && turnIntent.clarificationAnswerKind);
 
   if (turnIntentKind === "new_task") {
     return {
@@ -125,6 +133,77 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
     }
   }
 
+  // AGRUN-617 — AI-owned clarification-answer resolution (ADR-0047 pattern).
+  // The crisp deterministic shapes above (affirmative confirm, verbatim topic
+  // echo, exact option select) stay first: they only fire on exact protocol
+  // matches where any correct AI verdict coincides with the structural one.
+  // Everything the fragile structural chain below used to decide ALONE —
+  // near-match/typo'd answers (matchesClarificationAnswer requires every
+  // reply token verbatim in the topic), the countTokenOverlap===0 breakout
+  // gate, and the catch-all's looksLikeTopicPrompt topic promotion (all
+  // whitespace/ASCII-token heuristics, broken outright for CJK) — is the
+  // classifier's call when a verdict is available. No verdict falls through
+  // to the EXACT structural chain below, unchanged.
+  if (pendingClarification && clarificationAnswerKind === "answers") {
+    // The reply answers/restates/corrects the pending clarification's topic.
+    // Prefer the cleanly-spelled topic inferred from the question ("Do you
+    // mean TNO System Pte Ltd?" → "TNO System Pte Ltd") over a typo'd reply;
+    // when the question shape yields no topic, the reply itself IS the topic
+    // the user is providing.
+    const aiClarifiedTopic = inferClarifiedTopic(pendingClarification.question);
+    return {
+      activeGoal: currentGoal || normalizedPrompt,
+      activeQuery: aiClarifiedTopic || normalizedPrompt,
+      activeTopic: aiClarifiedTopic || normalizedPrompt,
+      continuityKind: "clarification_explicit_answer",
+      hasUserClarification: true,
+      lastClarificationResolution: {
+        kind: "explicit_answer",
+        sourceTurn: "current_input",
+        value: normalizedPrompt
+      },
+      pendingClarification: null,
+      turnKind: "follow_up"
+    };
+  }
+
+  if (pendingClarification && clarificationAnswerKind === "breakout") {
+    // AI-confirmed breakout to a genuinely new topic — no zero-token-overlap
+    // gate required (a breakout can legitimately share incidental tokens
+    // with the question).
+    return {
+      activeGoal: normalizedPrompt,
+      activeQuery: normalizedPrompt,
+      activeTopic: normalizedPrompt,
+      continuityKind: "clarification_breakout",
+      hasUserClarification: false,
+      lastClarificationResolution: null,
+      pendingClarification: null,
+      turnKind: "new_task"
+    };
+  }
+
+  if (pendingClarification && clarificationAnswerKind === "unrelated") {
+    // An instruction unrelated to the question but inside the ongoing
+    // conversation: resolve the clarification (AGRUN-595 — re-asking loops)
+    // but never promote the reply as the topic; the conversation subject is
+    // preserved.
+    return {
+      activeGoal: currentGoal || normalizedPrompt,
+      activeQuery: normalizedPrompt,
+      activeTopic: currentTopic || normalizedPrompt,
+      continuityKind: "clarification_free_form_answer",
+      hasUserClarification: true,
+      lastClarificationResolution: {
+        kind: "free_form_answer",
+        sourceTurn: "current_input",
+        value: normalizedPrompt
+      },
+      pendingClarification: null,
+      turnKind: "follow_up"
+    };
+  }
+
   if (
     pendingClarification &&
     !looksLikeAffirmativePrompt(normalizedPrompt) &&
@@ -164,6 +243,10 @@ function resolvePromptInquiryContext(inquiryContext, prompt, options) {
   // same structural primitive topic_refinement/breakout already use), treat
   // it as the topic the user is providing; a longer sentence-shaped reply
   // (an instruction, not a topic label) still preserves currentTopic.
+  //
+  // AGRUN-617 — this catch-all (and the breakout gate above) is now the
+  // NO-AI-SIGNAL fallback only: when the intent classifier produced a
+  // clarificationAnswerKind verdict, the AI branches above already returned.
   if (pendingClarification) {
     return {
       activeGoal: currentGoal || normalizedPrompt,

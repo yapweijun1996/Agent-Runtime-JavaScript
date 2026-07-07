@@ -22,6 +22,7 @@ import { createPendingUserMessage, readPersistedMessageStatus, createAssistantMe
 import { createUsageSnapshot, accumulateUsage } from './token-budget.js';
 import { recordCostEntry } from '../runtime/cost-ledger.js';
 import { projectTodoRunState, projectResearchRunState } from '../runtime/run-state-projections.js';
+import { readContextSnapshot, normalizeInquiryContext } from './context-snapshot-normalize.js';
 import { readFiniteNumber } from '../runtime/semantic-json.js';
 import { projectSessionContextFromSnapshot, createSessionContextViewFromSnapshot } from './context-snapshot-projection.js';
 import { summarizeSessionContextMeta } from './prompt.js';
@@ -611,6 +612,14 @@ function createSessionHandle(options) {
       activeThreadId
     });
 
+    // AGRUN-617 — surface the pending clarification (if any) to the intent
+    // planner so the AI can judge whether this reply answers it, breaks out
+    // to a new topic, or is an unrelated instruction
+    // (turnIntent.clarificationAnswerKind, consumed by
+    // resolvePromptInquiryContext). Read from the PREVIOUS turn's persisted
+    // snapshot — routing runs before this turn's input resolution.
+    const pendingClarification = readPendingClarificationFromSnapshot(sessionRecord.contextSnapshot);
+
     // Escalation to LLM-backed planner when:
     //  (a) A classifier callback was configured (runtime opts in), AND
     //  (b) At least one thread exists so there is something to route against, AND
@@ -635,13 +644,24 @@ function createSessionHandle(options) {
       : null;
     const needsPlanner = classify
       && threads.length >= 1
-      && (Object.keys(structuralIntent).length === 0 || structuralIntent.divergentIntent === true);
+      && (
+        Object.keys(structuralIntent).length === 0
+        || structuralIntent.divergentIntent === true
+        // AGRUN-617 — answer-vs-breakout-vs-unrelated for a pending
+        // clarification is a semantic judgment the AI owns (ADR-0047
+        // pattern); consult the planner whenever one is pending so the
+        // clarificationAnswerKind verdict is available downstream. The
+        // structural clarification matchers remain the complete fallback
+        // when no classifier is configured or the planner fails ({}).
+        || pendingClarification !== null
+      );
     if (needsPlanner) {
       const planned = await planTurnIntent({
         userMessage: userText,
         threads,
         activeThreadId,
-        classify
+        classify,
+        pendingClarification
       });
       turnIntent = mergeTurnIntent(structuralIntent, planned);
     }
@@ -981,6 +1001,19 @@ function cloneThreadResearchContext(value) {
  * `filterMemoryEntriesByThread` trims memory before it reaches the planner's
  * semantic-recall request.
  */
+// AGRUN-617 — read the pending clarification the previous turn left in the
+// persisted context snapshot, so routeTurnToThread can show it to the intent
+// classifier. Null when no snapshot exists or nothing is pending.
+function readPendingClarificationFromSnapshot(contextSnapshot) {
+  const snapshot = readContextSnapshot(contextSnapshot);
+  if (!snapshot) return null;
+  const inquiryContext = normalizeInquiryContext(snapshot.inquiryContext);
+  return inquiryContext && inquiryContext.pendingClarification
+    && typeof inquiryContext.pendingClarification === "object"
+    ? inquiryContext.pendingClarification
+    : null;
+}
+
 function readThreadScope(runtimeConfig, threadRouting) {
   const threadsConfig = (runtimeConfig && runtimeConfig.threads) || null;
   if (!threadsConfig || threadsConfig.enabled !== true) return null;

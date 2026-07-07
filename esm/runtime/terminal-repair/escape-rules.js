@@ -26,6 +26,24 @@
 
 const TERMINAL_ESCAPE_RULE_DESCRIPTORS = Object.freeze([
   Object.freeze({
+    // AGRUN-542 — content-level structure exit: length and sources are
+    // satisfied, a real candidate exists, but semantic duplicate sections /
+    // body-after-final-section remain after the single content-changing repair
+    // attempt budget is used (or the model kept ignoring the repair contract).
+    // Opens PUBLISH (honest limited delivery of the drafted artifact) and
+    // NEVER finalize — a finalize here would re-summarize/compress a candidate
+    // whose length contract is already satisfied (the AGRUN-541 regression
+    // shape). FIRST in priority: its grant predicate is mutually exclusive
+    // with the source/candidate-quality escapes (those require source
+    // deficits; this requires source satisfied) and it must outrank the
+    // generic publish-loop escape so the observability reason names the real
+    // cause.
+    key: "contentStructureExitForcedPublishGranted",
+    opensFinalize: false,
+    opensPublish: true,
+    escapeReason: "content_structure_exit_forced_publish"
+  }),
+  Object.freeze({
     // AGRUN-307 — zero-evidence source deficit is unresolvable; opens an honest
     // finalize (answer with disclosed limitations) instead of a dead repair loop.
     key: "sourceDeficitEscapeGranted",

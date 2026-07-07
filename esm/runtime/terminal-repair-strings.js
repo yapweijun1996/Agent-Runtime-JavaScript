@@ -76,7 +76,18 @@ const DEFAULT_TERMINAL_REPAIR_STRINGS = Object.freeze({
       return `HARD VETO — ${actionName} has been blocked ${ignoredCount} time(s) while terminal repair is `
         + `active (budgetState=${budgetState || "unknown"}). Any further ${actionName} call will continue `
         + `to be blocked. ${recovery}`;
-    }
+    },
+    // AGRUN-542 — content-structure exit contract. Emitted by BOTH doors
+    // (blocks/terminal-repair.js preflight + the onResponse finalize hook)
+    // when the single content-changing repair attempt budget is used and a
+    // content-level structure issue (duplicate-purpose sections / body after
+    // the final section) still remains while length and sources are satisfied.
+    contentStructureForcedPublish: ({ actionName, attemptsUsed, attemptLimit }) =>
+      `BLOCKED — ${actionName} is not available. The content-structure repair attempt budget is used `
+      + `(${attemptsUsed}/${attemptLimit}) and a content-level structure issue remains while length and `
+      + "sources are already satisfied. The ONLY allowed action now is workspace_publish_candidate with "
+      + "finalReadiness.decision='limited' and the concrete structure gap in remainingGaps (see "
+      + "requiredArgsExample). Further finalize/final_answer or repair attempts will keep being blocked."
   }),
   directTerminalBlock: Object.freeze({
     message:

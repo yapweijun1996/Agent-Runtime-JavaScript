@@ -1,5 +1,17 @@
 const DEFAULT_READ_URL_TIMEOUT_MS = 10000;
 const DEFAULT_READ_URL_MAX_BYTES = 200000;
+// timeoutMs is the PAGE RENDER budget: the read service forwards it to the
+// headless browser (page.goto timeout), so a proxied response legitimately
+// arrives AFTER timeoutMs elapses (render + extraction + serialization +
+// network transfer). The local abort watchdog must therefore sit above the
+// render budget, not at it — with zero headroom, any page that needs close
+// to the full budget gets aborted client-side even though the service is
+// about to return a valid response (live repro 2026-07-06: apnews.com
+// rendered in 9516ms against a 10000ms budget and the client killed it,
+// then burned a retry). Grace is capped so the read_url retry sequence
+// (2 attempts + 1500ms delay) stays inside DEFAULT_ACTION_TIMEOUT_MS
+// (30000): 2 × (10000 + 4000) + 1500 = 29500.
+const READ_URL_WATCHDOG_GRACE_MS = 4000;
 const READ_URL_SUPPORTED_METHODS = Object.freeze(["GET", "HEAD"]);
 const HTML_ENTITY_MAP = Object.freeze({ amp: "&", gt: ">", lt: "<", mdash: "-", nbsp: " ", quot: '"', rsquo: "'", "#39": "'" });
 const NON_CONTENT_TAGS = Object.freeze(["script", "style", "noscript", "template", "svg", "iframe", "form", "dialog"]);
@@ -287,4 +299,4 @@ function decodeHtmlEntities(text) {
   });
 }
 
-export { DEFAULT_READ_URL_MAX_BYTES, DEFAULT_READ_URL_TIMEOUT_MS, READ_URL_SUPPORTED_METHODS, buildAcceptHeader, deriveReadMode, extractReadableHtmlText, htmlToText, isHtmlContentType, isJsonContentType, isTextLikeContentType, normalizeHeaders$2 as normalizeHeaders, normalizeHttpUrl, normalizePositiveInteger$5 as normalizePositiveInteger, normalizeReadUrlMethod, normalizeReadUrlMode, readContentType, readHeaderValue, resolveFetch$5 as resolveFetch };
+export { DEFAULT_READ_URL_MAX_BYTES, DEFAULT_READ_URL_TIMEOUT_MS, READ_URL_SUPPORTED_METHODS, READ_URL_WATCHDOG_GRACE_MS, buildAcceptHeader, deriveReadMode, extractReadableHtmlText, htmlToText, isHtmlContentType, isJsonContentType, isTextLikeContentType, normalizeHeaders$2 as normalizeHeaders, normalizeHttpUrl, normalizePositiveInteger$5 as normalizePositiveInteger, normalizeReadUrlMethod, normalizeReadUrlMode, readContentType, readHeaderValue, resolveFetch$5 as resolveFetch };

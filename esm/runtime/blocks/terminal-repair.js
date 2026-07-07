@@ -70,7 +70,24 @@ function maybeBlockTerminalRepairAction(options) {
       // forwarding at the call site; parity with the onResponse hook door).
       ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount, options && options.runtimeConfig)
       : null;
-    const message = isHardVeto
+    // AGRUN-542 — content-structure exit forced publish: the dedicated block
+    // message tells the model the repair-attempt budget is used and one honest
+    // limited publish is the only remaining move. Takes precedence over the
+    // generic hard-veto/advisory wording (same state drives the plan-batch
+    // door through the collapsed allowedActions surface).
+    const contentStructureExitSignal = repair.contentStructureExitSignal &&
+      typeof repair.contentStructureExitSignal === "object"
+      ? repair.contentStructureExitSignal
+      : null;
+    const contentStructureForced = Boolean(contentStructureExitSignal && contentStructureExitSignal.forcedPublish === true) &&
+      reason === "terminal_repair_action_not_allowed";
+    const message = contentStructureForced
+    ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.contentStructureForcedPublish({
+        actionName,
+        attemptsUsed: readFiniteNumber$1(contentStructureExitSignal.attemptsUsed),
+        attemptLimit: Math.max(readFiniteNumber$1(contentStructureExitSignal.attemptLimit), 1)
+      })
+    : isHardVeto
     ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
         actionName,
         ignoredCount,
@@ -96,6 +113,7 @@ function maybeBlockTerminalRepairAction(options) {
       ignoredCount,
       invalidPublishReasons: isPublish ? publishValidation.reasons.slice(0, 8) : [],
       budgetRemainingForExpansionSignal: budgetExpansionSignal,
+      contentStructureExitSignal: contentStructureExitSignal ? cloneValue(contentStructureExitSignal) : null,
       terminalRepairState: {
       active: true,
       mode: repair.mode || "terminal_repair",
@@ -114,6 +132,7 @@ function maybeBlockTerminalRepairAction(options) {
         ignoredCount,
         invalidPublishReasons: output.invalidPublishReasons,
         budgetRemainingForExpansionSignal: output.budgetRemainingForExpansionSignal,
+        contentStructureExitSignal: output.contentStructureExitSignal,
         reason
       });
   }

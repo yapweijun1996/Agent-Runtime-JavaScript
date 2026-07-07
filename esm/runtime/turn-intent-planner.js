@@ -61,7 +61,7 @@ function buildThreadSummaries(threads) {
  * hallucination never reaches the router.
  *
  * @param {unknown} raw
- * @param {{threadIds:Set<string>, activeThreadId:string|null}} context
+ * @param {{threadIds:Set<string>, activeThreadId:string|null, hasPendingClarification?:boolean}} context
  * @returns {object}
  */
 function normalizePlannedIntent(raw, context) {
@@ -71,6 +71,7 @@ function normalizePlannedIntent(raw, context) {
   const activeThreadId = context && typeof context.activeThreadId === "string"
     ? context.activeThreadId
     : null;
+  const hasPendingClarification = Boolean(context && context.hasPendingClarification === true);
 
   if (raw.pivotIntent === true) intent.pivotIntent = true;
   if (raw.divergentIntent === true) intent.divergentIntent = true;
@@ -85,6 +86,24 @@ function normalizePlannedIntent(raw, context) {
     intent.kind = kind;
     if (kind === "new_task") {
       intent.divergentIntent = true;
+    }
+  }
+
+  // AGRUN-617 — clarification-answer verdict. Only meaningful when the caller
+  // actually had a pending clarification to show the classifier; a
+  // hallucinated verdict with nothing pending is rejected outright (same
+  // whitelist-and-validate posture as targetThreadId below).
+  const clarificationAnswerKind = normalizeClarificationAnswerKind(raw.clarificationAnswerKind);
+  if (clarificationAnswerKind && hasPendingClarification) {
+    intent.clarificationAnswerKind = clarificationAnswerKind;
+    // Mutual-exclusion guard: "answers" means the reply resolves the pending
+    // clarification about the ACTIVE topic — by definition a continuation, so
+    // a coexisting new_task reset (and its implied divergentIntent) is
+    // contradictory. The clarification-specific verdict is the more specific
+    // signal (the classifier was shown the pending question) and wins.
+    if (clarificationAnswerKind === "answers") {
+      if (intent.kind === "new_task") delete intent.kind;
+      if (intent.divergentIntent) delete intent.divergentIntent;
     }
   }
 
@@ -128,6 +147,7 @@ function normalizePlannedIntent(raw, context) {
  * @param {Array<Thread>} options.threads
  * @param {string|null} options.activeThreadId
  * @param {(payload:object)=>Promise<object>} options.classify
+ * @param {{question?:string, options?:Array<{key?:string,text?:string}>}|null} [options.pendingClarification]
  * @returns {Promise<object>}
  */
 async function planTurnIntent(options) {
@@ -136,6 +156,11 @@ async function planTurnIntent(options) {
   const threads = Array.isArray(source.threads) ? source.threads.filter(Boolean) : [];
   const activeThreadId = typeof source.activeThreadId === "string" ? source.activeThreadId : null;
   const classify = typeof source.classify === "function" ? source.classify : null;
+  // AGRUN-617 — compact pending-clarification summary for the classifier
+  // payload. The classifier cannot judge "does this reply answer the pending
+  // clarification" without seeing the question, so the caller threads it in;
+  // absent (null) keeps the payload byte-identical to the pre-617 shape.
+  const pendingClarification = buildPendingClarificationSummary(source.pendingClarification);
 
   if (!userMessage || threads.length === 0 || !classify) return {};
 
@@ -149,13 +174,18 @@ async function planTurnIntent(options) {
     raw = await classify({
       userMessage,
       activeThreadId,
-      threads: summaries
+      threads: summaries,
+      ...(pendingClarification ? { pendingClarification } : {})
     });
   } catch (_err) {
     return {};
   }
 
-  return normalizePlannedIntent(raw, { threadIds, activeThreadId: activeThreadId || VALID_TARGET_FALLBACK });
+  return normalizePlannedIntent(raw, {
+    threadIds,
+    activeThreadId: activeThreadId || VALID_TARGET_FALLBACK,
+    hasPendingClarification: Boolean(pendingClarification)
+  });
 }
 
 /**
@@ -210,6 +240,16 @@ function mergeTurnIntent(structural, planned) {
   if (plannerContinues && planned.divergentIntent !== true && out.divergentIntent) {
     delete out.divergentIntent;
   }
+  // AGRUN-617 — a positive AI verdict that the reply ANSWERS the pending
+  // clarification is a continuation of the active context, so a structural
+  // divergentIntent (a zero-token-overlap guess — a typo'd answer often
+  // shares no tokens with the thread) is an overruled guess. Same
+  // positive-verdict-only contract as AGRUN-618 above: "breakout"/"unrelated"
+  // and an absent verdict leave structural signals standing.
+  if (out.clarificationAnswerKind === "answers") {
+    if (out.divergentIntent) delete out.divergentIntent;
+    if (out.kind === "new_task") delete out.kind;
+  }
   return out;
 }
 
@@ -226,6 +266,43 @@ function normalizeIntentKind(value) {
     return kind;
   }
   return "";
+}
+
+// AGRUN-617 — strict whitelist for the clarification-answer verdict:
+//  "answers"   — the reply answers/restates/corrects the pending
+//                clarification's topic (typos, paraphrases, other languages).
+//  "breakout"  — the reply abandons the question for a genuinely new topic.
+//  "unrelated" — the reply is an instruction unrelated to the question but
+//                still inside the ongoing conversation (topic preserved).
+// Anything else (including omission) is "no verdict" and the structural
+// clarification chain in inquiry-context-resolution.js remains the fallback.
+function normalizeClarificationAnswerKind(value) {
+  if (typeof value !== "string") return "";
+  const kind = value.trim();
+  if (kind === "answers" || kind === "breakout" || kind === "unrelated") {
+    return kind;
+  }
+  return "";
+}
+
+// AGRUN-617 — trim the pending clarification down to what the classifier
+// needs (question + option labels), mirroring buildThreadSummaries' compact
+// posture so the prompt stays small.
+function buildPendingClarificationSummary(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const question = typeof value.question === "string" ? value.question.trim().slice(0, 300) : "";
+  if (!question) return null;
+  const options = Array.isArray(value.options)
+    ? value.options
+      .map((option) => {
+        if (!option || typeof option !== "object") return null;
+        const key = typeof option.key === "string" ? option.key.trim() : "";
+        const text = typeof option.text === "string" ? option.text.trim().slice(0, 160) : "";
+        return key || text ? { key, text } : null;
+      })
+      .filter(Boolean)
+    : [];
+  return { question, options };
 }
 
 export { buildThreadSummaries, mergeTurnIntent, normalizePlannedIntent, planTurnIntent };

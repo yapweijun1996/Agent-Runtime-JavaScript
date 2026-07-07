@@ -6,6 +6,7 @@ import { readSharedRepairFactReads, readRepairFacts, readSuccessfulReadUrlCount 
 import { buildLengthExpansionSignal, buildWorkspaceRepairSignal, buildAdvisoryPersistenceSignal, buildActionOrderingSignals } from './signals.js';
 import { buildAllowedActions } from './allowed-actions.js';
 import { TERMINAL_ESCAPE_RULE_DESCRIPTORS } from './escape-rules.js';
+import { resetContentStructureExitEpisode, updateContentStructureExitEpisode, buildContentStructureExitSignal } from './content-structure-exit.js';
 
 // H10 split, Step 6 (AGRUN-508) — terminal-repair core state machine.
 // VERBATIM moves from terminal-repair-state.js (see
@@ -67,6 +68,8 @@ function evaluateTerminalRepairState(runState, context = {}) {
     if (runState && typeof runState === "object") {
       runState.terminalRepairCumulativeIgnored = 0;
     }
+    // AGRUN-542 — genuine completion ends any content-structure exit episode.
+    resetContentStructureExitEpisode(runState);
     return clearTerminalRepairState(previous, "terminal_completed", cycle, snapshot);
   }
 
@@ -102,6 +105,10 @@ function evaluateTerminalRepairState(runState, context = {}) {
     !publishProtocolStillBlocked &&
     !publishProtocolTransitionPending
   ) {
+    // AGRUN-542 — all observable deficits resolved: any content-structure exit
+    // episode is over (the structure fact must have cleared for this branch to
+    // be reachable — finalizedStructureBlocked would otherwise force-activate).
+    resetContentStructureExitEpisode(runState);
     return clearTerminalRepairState(
       previous,
       progress.hasProgress ? progress.reason || "observable_progress" : "observable_deficits_resolved",
@@ -192,6 +199,22 @@ function evaluateTerminalRepairState(runState, context = {}) {
     cumulativeIgnoredCount >= thresholds.absoluteIgnoredCap
       ? "hard_veto"
       : "advisory";
+    // AGRUN-542 — content-structure exit episode (STATE-TRANSITION, mutates
+    // runState.contentStructureExitState). MUST run before buildAllowedActions:
+    // once forcedPublish flips true, the allowed-action surface collapses to
+    // [workspace_publish_candidate] on BOTH dispatch doors (single-action
+    // preflight allowlist + plan-batch planner-action-surface filter both read
+    // the same allowedActions this evaluation produces). Called only inside
+    // this active branch so a drafting-phase duplicate heading can never burn
+    // the repair-attempt budget before terminal repair is engaged.
+    const contentStructureExit = updateContentStructureExitEpisode(runState, {
+      actionName,
+      activeDeficits,
+      observableDeficits: facts.observableDeficits,
+      ignoredCount,
+      output,
+      thresholds
+    });
     const allowedActions = buildAllowedActions(activeDeficits, facts.budgetState, activeReason, facts.observableDeficits, runState, escalation, context.runtimeConfig);
     // AGRUN-555 (Staff review 2026-07-02) — the four graceful-degradation escape
     // valves below (AGRUN-307 source, AGRUN-307 publish-loop, AGRUN-309
@@ -213,6 +236,17 @@ function evaluateTerminalRepairState(runState, context = {}) {
     // the hook/blocks/publish doors honor it automatically instead of each
     // hardcoding flag names (the AGRUN-550 bug shape).
     const terminalEscapeGrants = {
+      // AGRUN-542 — content-level structure exit: the single content-changing
+      // repair attempt budget is used (or the model kept ignoring the repair
+      // contract past the hardVeto threshold) while length + sources are
+      // satisfied and a real candidate exists, yet the content-level structure
+      // issue remains. Opens PUBLISH only — finalize would re-compress a
+      // length-satisfied candidate. Grant predicate is mutually exclusive with
+      // the source/candidate-quality escapes below (those require a source
+      // deficit; this requires source satisfied).
+      contentStructureExitForcedPublishGranted:
+        contentStructureExit.active === true &&
+        contentStructureExit.forcedPublish === true,
       // AGRUN-307 — zero-evidence source deficit is unresolvable: the AI has
       // repeatedly tried to terminate (ignoredCount >= hardVeto) yet has ZERO
       // successful read sources. Open final/finalize so the AI can answer with
@@ -255,6 +289,7 @@ function evaluateTerminalRepairState(runState, context = {}) {
       granted: terminalEscapeGrants[rule.key] === true
     }));
     const resolvedTerminalEscape = terminalEscapeRules.find((rule) => rule.granted) || null;
+    const contentStructureExitForced = resolvedTerminalEscape?.key === "contentStructureExitForcedPublishGranted";
     const sourceUnresolvable = resolvedTerminalEscape?.key === "sourceDeficitEscapeGranted";
     const publishLoopUnresolvable = resolvedTerminalEscape?.key === "publishLoopEscapeGranted";
     const candidateQualityUnresolvable = resolvedTerminalEscape?.key === "candidateQualityUnresolvable";
@@ -303,6 +338,8 @@ function evaluateTerminalRepairState(runState, context = {}) {
     allowedActions: effectiveAllowedActions,
     budgetState: facts.budgetState,
     escalation,
+    contentStructureExitForcedPublishGranted: contentStructureExitForced,
+    contentStructureExitSignal: buildContentStructureExitSignal(contentStructureExit),
     sourceDeficitEscapeGranted: sourceUnresolvable,
     publishLoopEscapeGranted: publishLoopUnresolvable,
     candidateQualityUnresolvable,
@@ -332,6 +369,13 @@ function evaluateTerminalRepairState(runState, context = {}) {
 function summarizeTerminalRepairState(value) {
   const state = createTerminalRepairState(value);
   if (!state.active && state.ignoredCount === 0 && !state.clearedReason) return null;
+  // AGRUN-542 — the exit signal is not preserved by createTerminalRepairState
+  // (it is recomputed per evaluation, like the escape flags), so read it from
+  // the RAW state for the planner-prompt summary.
+  const rawContentStructureExitSignal = value && typeof value === "object" && !Array.isArray(value) &&
+    value.contentStructureExitSignal && typeof value.contentStructureExitSignal === "object"
+    ? value.contentStructureExitSignal
+    : null;
   return {
     kind: state.kind,
     active: state.active,
@@ -342,6 +386,7 @@ function summarizeTerminalRepairState(value) {
     allowedActions: state.allowedActions,
     budgetState: state.budgetState,
     escalation: state.escalation,
+      contentStructureExitSignal: rawContentStructureExitSignal,
       forbiddenDecisions: state.forbiddenDecisions,
       requiredRepair: state.requiredRepair,
       validPublishContract: state.validPublishContract,
@@ -373,6 +418,9 @@ function buildTerminalRepairRefreshedStepDetail(repair, actionName, advisoryPers
     actionOrderingSignals: Array.isArray(repair.actionOrderingSignals) ? repair.actionOrderingSignals.slice(0, 4) : [],
     advisoryPersistenceSignal: advisoryPersistenceSignal || null,
     allowedActions: Array.isArray(repair.allowedActions) ? repair.allowedActions.slice(0, 10) : [],
+    contentStructureExitSignal: repair.contentStructureExitSignal && typeof repair.contentStructureExitSignal === "object"
+      ? cloneValue(repair.contentStructureExitSignal)
+      : null,
     ignoredCount: repair.ignoredCount || 0,
     lengthExpansionSignal: repair.lengthExpansionSignal || null,
     workspaceRepairSignal: repair.workspaceRepairSignal

@@ -46,6 +46,7 @@ any subset by exact action name.
 | Virtual workspace | `workspace_list`, `workspace_read`, `workspace_write`, `workspace_replace`, `workspace_propose_patch`, `workspace_apply_patch`, `workspace_insert_after_section`, `workspace_remove`, `workspace_move`, `workspace_multi_edit`, `workspace_finalize_candidate`, `workspace_review_candidate`, `workspace_publish_candidate` | Draft and revise virtual artifacts in runtime state |
 | Agent routing | `handoff_to_skill`, `spawn_subagent` | Hand off to selected skill context or run a subagent |
 | Optional repo tools | `repo_rg`, `repo_read_file` | Read-only repository search/read when the host supplies `repoFileTools` |
+| Model-initiated memory | `remember` | Let the planner store a durable preference/fact/decision mid-turn (aliases `remember_preference`, `save_memory`) |
 
 ### Runtime-level
 
@@ -56,7 +57,7 @@ createRuntime({
 });
 ```
 
-### Run-level (overrides runtime list)
+### Run-level (unions with the runtime list)
 
 ```js
 runtime.run(input, {
@@ -64,7 +65,11 @@ runtime.run(input, {
 });
 ```
 
-Disabled actions are filtered out of the planner surface, hidden from native-tools schemas, and skipped in research continuation.
+Run-level `disabledActions` is merged with the runtime-level list (`[...new Set([...runtime, ...run])]` in `action-loop-session.js`) — it can only add extra disables for that one call, it cannot re-enable an action the runtime already disabled.
+
+Disabled actions are filtered out of the planner surface (both the single-action and the plan-batch door — see `action-loop-session.js`), hidden from native-tools schemas, and skipped in research continuation. Any prompt directive that only makes sense when the action exists (e.g. the "call `remember` when the user says 'remember...'" line) is also dropped automatically, since those directives gate on the same filtered action list.
+
+**Disabling `remember` specifically**: `disabledActions: ["remember"]` fully turns off model-initiated memory writes — the action disappears from both doors and the model is never told to use it. This is distinct from `globalMemory.enabled: false` (below), which only stops *cross-session promotion*; with `globalMemory` left on, `remember` still writes into the current session's memory even if you don't want that. Use `actionPolicy: { remember: "deny" }` instead if you want the action to stay visible to the model (e.g. so it doesn't hallucinate a workaround) but every call to be blocked with a structured denial rather than removed from the catalog.
 
 ## Provider Adapters and Host Tools
 
@@ -849,6 +854,7 @@ createRuntime({
 | "Disable web search globally." | `disabledActions: ["web_search"]` |
 | "Disable read_url for this run only." | `runtime.run(input, { disabledActions: ["read_url"] })` |
 | "Stop the agent asking clarifying questions." | `disabledActions: ["ask_clarification"]` |
+| "Stop the model from calling `remember` (model-initiated memory)." | `disabledActions: ["remember"]` |
 | "Turn off cross-session memory." | `globalMemory: { enabled: false }` |
 | "Lower memory confidence threshold." | `globalMemory: { minConfidence: 0.6 }` |
 | "Require approval before search." | `actionPolicy: { web_search: "ask" }` |

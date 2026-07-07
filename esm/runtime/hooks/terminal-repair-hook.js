@@ -120,7 +120,23 @@ function createTerminalRepairOnResponseHook() {
       // single-action door in action-loop-action.js).
       ? buildBudgetRemainingForExpansionSignal(repair, ignoredCount, session && session.runtimeConfig)
       : null;
-    const message = isHardVeto
+    // AGRUN-542 — content-structure exit forced publish: the finalize decision
+    // is blocked with the dedicated contract message (parity with the
+    // single-action door in blocks/terminal-repair.js). The
+    // contentStructureExitForcedPublishGranted escape opens PUBLISH only, so
+    // it never reaches the opensFinalize pass-through above.
+    const contentStructureExitSignal = repair.contentStructureExitSignal &&
+      typeof repair.contentStructureExitSignal === "object"
+      ? repair.contentStructureExitSignal
+      : null;
+    const contentStructureForced = Boolean(contentStructureExitSignal && contentStructureExitSignal.forcedPublish === true);
+    const message = contentStructureForced
+      ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.contentStructureForcedPublish({
+          actionName,
+          attemptsUsed: Number(contentStructureExitSignal.attemptsUsed) || 0,
+          attemptLimit: Math.max(Number(contentStructureExitSignal.attemptLimit) || 1, 1)
+        })
+      : isHardVeto
       ? DEFAULT_TERMINAL_REPAIR_STRINGS.block.hardVetoActionNotAllowed({
           actionName,
           ignoredCount,
@@ -144,6 +160,7 @@ function createTerminalRepairOnResponseHook() {
         escalation: repair.escalation || "advisory",
         ignoredCount,
         budgetRemainingForExpansionSignal: budgetExpansionSignal,
+        contentStructureExitSignal: contentStructureExitSignal ? cloneValue(contentStructureExitSignal) : null,
         reason: repair.reason || "direct_terminal_suppressed_by_terminal_repair"
       }
     );

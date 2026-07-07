@@ -38,6 +38,22 @@ const DEFAULT_READ_ONLY_PLANNING_FORBIDDEN_ACTIONS = [
   USE_AGENT_SKILL_ACTION,
   EXECUTE_SKILL_TOOL_ACTION
 ];
+// AGRUN-623 stage 3: the actions a skill-discovery turn needs, in order,
+// before it has ever successfully engaged a skill this run. The guard exists
+// to stop unproductive read-only loops, but if it forbids these before any
+// skill has EVER been successfully read/used, it manufactures the exact
+// deadlock it is meant to prevent (Globe3 job bccb9bc8: a truncated/empty
+// catalog forced a guessed skill name, the guessed read failed, the model
+// retried list/read as the anti-hallucination-mandated recovery, and the
+// guard escalated to hard_veto and forbade every remaining path to the data
+// -- including execute_skill_tool -- before any discovery had ever
+// succeeded).
+const SKILL_DISCOVERY_ACTIONS = [
+  LIST_AGENT_SKILLS_ACTION,
+  READ_AGENT_SKILL_ACTION,
+  USE_AGENT_SKILL_ACTION,
+  EXECUTE_SKILL_TOOL_ACTION
+];
 const LENGTH_DEFICIT_CHURN_ACTIONS = [
   WORKSPACE_READ_ACTION,
   WORKSPACE_WRITE_ACTION,
@@ -1726,7 +1742,22 @@ function readReadOnlyPlanningForbiddenActions(runState, config = DEFAULT_CONVERG
       actions.add(action);
     }
   }
+  // AGRUN-623 stage 3: never lock the skill-discovery door shut before it has
+  // ever opened. Once a skill has actually been read or engaged this run,
+  // the guard applies normally (a productive skill turn can still churn
+  // unproductively afterwards).
+  if (!hasSkillDiscoverySucceeded(runState)) {
+    for (const action of SKILL_DISCOVERY_ACTIONS) {
+      actions.delete(action);
+    }
+  }
   return Array.from(actions).slice(0, 12);
+}
+
+function hasSkillDiscoverySucceeded(runState) {
+  const context = runState && typeof runState === "object" ? runState.agentSkillContext : null;
+  if (!context || typeof context !== "object") return false;
+  return Boolean(context.lastReadSkill) || Boolean(context.activeSkill);
 }
 
 function readReadOnlyPlanningAllowedNextMoves(signalMoves, forbiddenActions) {

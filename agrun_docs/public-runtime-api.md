@@ -1637,6 +1637,8 @@ Pass `globalMemory: { enabled: false }` to fully disable the cross-session memor
 
 Per-session memory (e.g. entries appended by `memory-skill` or surfaced by skills via `helpers.appendMemory`) still works — only the cross-session promotion path is bypassed. Existing rows in the `globalMemory` IndexedDB store remain on disk; toggling `enabled` back to `true` (or omitting it) restores recall and promotion.
 
+**`globalMemory.enabled: false` does not stop the `remember` action.** The model-initiated `remember` action (`src/runtime/actions/remember-action.js`) writes to per-turn session memory regardless of this flag — `globalMemory` only gates the *cross-session* promotion step. To stop the model from calling `remember` at all, disable the action itself: `disabledActions: ["remember"]` (runtime- or run-level, see [agrun_docs/feature-toggles.md](./feature-toggles.md#actions-built-in-tools)). That removes it from both the single-action and plan-batch planner surfaces and drops the matching prompt directive, so the model is never told the action exists.
+
 ### Host Hooks
 
 Both hooks are optional. When provided, they run in this order per candidate entry:
